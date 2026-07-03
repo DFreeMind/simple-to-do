@@ -204,6 +204,7 @@ import { useTaskStore } from '@/stores/task'
 import DatePicker from './DatePicker.vue'
 import RichTextEditor from './RichTextEditor.vue'
 import FormatMenu from './FormatMenu.vue'
+import { readImage, selectImage } from '@/services/platform'
 
 const store = useTaskStore()
 const newSubtask = ref('')
@@ -384,17 +385,16 @@ function insertEmoji(em) {
 
 // 图片
 function triggerImageUpload() {
-  if (window.electronAPI) {
-    window.electronAPI.selectImage().then(path => {
-      if (path) {
-        window.electronAPI.readImage(path).then(url => {
-          if (url) store.addAttachment(task.value.id, path, url)
-        })
-      }
+  selectImage().then(path => {
+    if (!path) {
+      fileInput.value?.click()
+      return
+    }
+
+    readImage(path).then(url => {
+      if (url) store.addAttachment(task.value.id, path, url)
     })
-  } else {
-    fileInput.value?.click()
-  }
+  })
 }
 
 function onFileSelected(e) {

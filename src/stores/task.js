@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { genId } from '@/utils/id'
 import { isToday, isWithin7Days } from '@/utils/date'
+import { loadData as loadPlatformData, saveData as savePlatformData } from '@/services/platform'
 
 export const useTaskStore = defineStore('task', () => {
   // ========== 状态 ==========
@@ -249,8 +250,7 @@ export const useTaskStore = defineStore('task', () => {
 
   // ========== 持久化 ==========
   async function loadData() {
-    if (!window.electronAPI) return
-    const data = await window.electronAPI.loadData()
+    const data = await loadPlatformData()
     if (data) {
       lists.value = data.lists || lists.value
       tasks.value = data.tasks || []
@@ -259,8 +259,7 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   async function saveData() {
-    if (!window.electronAPI) return
-    await window.electronAPI.saveData({
+    await savePlatformData({
       lists: lists.value,
       tasks: tasks.value,
       trash: trash.value
