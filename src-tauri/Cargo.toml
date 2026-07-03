@@ -5,10 +5,6 @@ description = "滴答清单 MVP 复刻版"
 authors = ["simple-to-do"]
 edition = "2021"
 
-[lib]
-name = "simple_to_do_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
-
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
