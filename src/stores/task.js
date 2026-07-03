@@ -16,10 +16,11 @@ export const useTaskStore = defineStore('task', () => {
   const currentView = ref('inbox') // 'inbox' | 'today' | 'week' | listId | 'completed' | 'trash'
   const selectedTaskId = ref(null)
   const sortBy = ref('default') // 'default' | 'date' | 'name'
+  const searchQuery = ref('')
 
   // ========== 计算属性 ==========
   const currentList = computed(() => {
-    if (['today', 'week', 'inbox', 'completed', 'trash'].includes(currentView.value)) return null
+    if (['today', 'week', 'inbox', 'completed', 'trash', 'search'].includes(currentView.value)) return null
     return lists.value.find(l => l.id === currentView.value)
   })
 
@@ -43,6 +44,21 @@ export const useTaskStore = defineStore('task', () => {
       case 'trash':
         result = trash.value
         break
+      case 'search': {
+        const query = searchQuery.value.trim().toLowerCase()
+        result = query
+          ? active.filter(t => {
+              const fields = [
+                t.title,
+                t.description,
+                t.descriptionHtml,
+                ...(t.tags || [])
+              ].filter(Boolean).join(' ').toLowerCase()
+              return fields.includes(query)
+            })
+          : []
+        break
+      }
       default:
         result = active.filter(t => t.listId === currentView.value)
     }
@@ -77,7 +93,8 @@ export const useTaskStore = defineStore('task', () => {
 
   const selectedTask = computed(() => {
     if (!selectedTaskId.value) return null
-    return tasks.value.find(t => t.id === selectedTaskId.value)
+    return tasks.value.find(t => t.id === selectedTaskId.value) ||
+      trash.value.find(t => t.id === selectedTaskId.value)
   })
 
   const listTaskCounts = computed(() => {
@@ -89,6 +106,8 @@ export const useTaskStore = defineStore('task', () => {
     counts.inbox = active.filter(t => t.listId === 'inbox').length
     counts.today = active.filter(t => isToday(t.dueDate)).length
     counts.week = active.filter(t => isWithin7Days(t.dueDate)).length
+    counts.completed = tasks.value.filter(t => t.completed && !t.deleted).length
+    counts.trash = trash.value.length
     return counts
   })
 
@@ -118,6 +137,7 @@ export const useTaskStore = defineStore('task', () => {
 
   // 任务 CRUD
   function addTask(title, listId) {
+    const now = new Date().toISOString()
     const task = {
       id: genId(),
       title,
@@ -125,17 +145,24 @@ export const useTaskStore = defineStore('task', () => {
       descriptionHtml: '',
       editorMode: 'detail',
       completed: false,
+      completedAt: null,
       deleted: false,
+      deletedAt: null,
       pinned: false,
       listId: listId || currentView.value,
       dueDate: null,
+      reminderAt: null,
+      repeatRule: null,
+      priority: 0,
+      tags: [],
       subtasks: [],
       comments: [],
       attachments: [],
-      createdAt: new Date().toISOString()
+      createdAt: now,
+      updatedAt: now
     }
     // 如果当前视图是今天/最近7天，分配到收集箱
-    if (['today', 'week', 'completed', 'trash'].includes(task.listId)) {
+    if (['today', 'week', 'completed', 'trash', 'search'].includes(task.listId)) {
       task.listId = 'inbox'
     }
     tasks.value.unshift(task)
@@ -147,6 +174,7 @@ export const useTaskStore = defineStore('task', () => {
     if (task) {
       task.completed = !task.completed
       task.completedAt = task.completed ? new Date().toISOString() : null
+      task.updatedAt = new Date().toISOString()
     }
   }
 
@@ -155,6 +183,7 @@ export const useTaskStore = defineStore('task', () => {
     if (task) {
       task.deleted = true
       task.deletedAt = new Date().toISOString()
+      task.updatedAt = task.deletedAt
       trash.value.push({ ...task })
       if (selectedTaskId.value === id) selectedTaskId.value = null
     }
@@ -168,6 +197,7 @@ export const useTaskStore = defineStore('task', () => {
       if (original) {
         original.deleted = false
         original.deletedAt = null
+        original.updatedAt = new Date().toISOString()
       }
       trash.value.splice(idx, 1)
     }
@@ -181,12 +211,44 @@ export const useTaskStore = defineStore('task', () => {
 
   function updateTask(id, updates) {
     const task = tasks.value.find(t => t.id === id)
-    if (task) Object.assign(task, updates)
+    if (task) Object.assign(task, updates, { updatedAt: new Date().toISOString() })
   }
 
   function togglePin(id) {
     const task = tasks.value.find(t => t.id === id)
-    if (task) task.pinned = !task.pinned
+    if (task) {
+      task.pinned = !task.pinned
+      task.updatedAt = new Date().toISOString()
+    }
+  }
+
+  function copyTask(id) {
+    const source = tasks.value.find(t => t.id === id) || trash.value.find(t => t.id === id)
+    if (!source) return null
+    const now = new Date().toISOString()
+    const task = {
+      ...source,
+      id: genId(),
+      title: `${source.title} (副本)`,
+      completed: false,
+      completedAt: null,
+      deleted: false,
+      deletedAt: null,
+      pinned: false,
+      subtasks: (source.subtasks || []).map(sub => ({ ...sub, id: genId() })),
+      comments: (source.comments || []).map(comment => ({ ...comment, id: genId() })),
+      attachments: (source.attachments || []).map(att => ({ ...att, id: genId() })),
+      createdAt: now,
+      updatedAt: now
+    }
+    tasks.value.unshift(task)
+    return task
+  }
+
+  function clearCompletedInCurrentView() {
+    const completed = filteredTasks.value.filter(t => t.completed && !t.deleted)
+    completed.forEach(t => deleteTask(t.id))
+    return completed.length
   }
 
   // 子任务
@@ -194,6 +256,7 @@ export const useTaskStore = defineStore('task', () => {
     const task = tasks.value.find(t => t.id === taskId)
     if (task) {
       task.subtasks.push({ id: genId(), title, completed: false })
+      task.updatedAt = new Date().toISOString()
     }
   }
 
@@ -201,7 +264,10 @@ export const useTaskStore = defineStore('task', () => {
     const task = tasks.value.find(t => t.id === taskId)
     if (task) {
       const sub = task.subtasks.find(s => s.id === subId)
-      if (sub) sub.completed = !sub.completed
+      if (sub) {
+        sub.completed = !sub.completed
+        task.updatedAt = new Date().toISOString()
+      }
     }
   }
 
@@ -209,6 +275,7 @@ export const useTaskStore = defineStore('task', () => {
     const task = tasks.value.find(t => t.id === taskId)
     if (task) {
       task.subtasks = task.subtasks.filter(s => s.id !== subId)
+      task.updatedAt = new Date().toISOString()
     }
   }
 
@@ -222,6 +289,7 @@ export const useTaskStore = defineStore('task', () => {
         author: '我',
         createdAt: new Date().toISOString()
       })
+      task.updatedAt = new Date().toISOString()
     }
   }
 
@@ -235,12 +303,19 @@ export const useTaskStore = defineStore('task', () => {
         url: imageUrl,
         createdAt: new Date().toISOString()
       })
+      task.updatedAt = new Date().toISOString()
     }
   }
 
   // 视图切换
   function setView(view) {
     currentView.value = view
+    selectedTaskId.value = null
+  }
+
+  function setSearch(query) {
+    searchQuery.value = query
+    currentView.value = 'search'
     selectedTaskId.value = null
   }
 
@@ -253,8 +328,8 @@ export const useTaskStore = defineStore('task', () => {
     const data = await loadPlatformData()
     if (data) {
       lists.value = data.lists || lists.value
-      tasks.value = data.tasks || []
-      trash.value = data.trash || []
+      tasks.value = (data.tasks || []).map(normalizeTask)
+      trash.value = (data.trash || []).map(normalizeTask)
     }
   }
 
@@ -269,13 +344,39 @@ export const useTaskStore = defineStore('task', () => {
   // 自动保存
   watch([lists, tasks, trash], () => saveData(), { deep: true })
 
+  function normalizeTask(task) {
+    const now = task.createdAt || new Date().toISOString()
+    return {
+      description: '',
+      descriptionHtml: '',
+      editorMode: 'detail',
+      completed: false,
+      completedAt: null,
+      deleted: false,
+      deletedAt: null,
+      pinned: false,
+      listId: 'inbox',
+      dueDate: null,
+      reminderAt: null,
+      repeatRule: null,
+      priority: 0,
+      tags: [],
+      subtasks: [],
+      comments: [],
+      attachments: [],
+      createdAt: now,
+      updatedAt: now,
+      ...task
+    }
+  }
+
   return {
-    lists, tasks, trash, currentView, selectedTaskId, sortBy,
+    lists, tasks, trash, currentView, selectedTaskId, sortBy, searchQuery,
     currentList, filteredTasks, uncompletedTasks, completedTasks, selectedTask, listTaskCounts,
     addList, deleteList, renameList,
-    addTask, completeTask, deleteTask, restoreTask, permanentDelete, updateTask, togglePin,
+    addTask, completeTask, deleteTask, restoreTask, permanentDelete, updateTask, togglePin, copyTask, clearCompletedInCurrentView,
     addSubtask, toggleSubtask, deleteSubtask,
     addComment, addAttachment,
-    setView, selectTask, loadData, saveData
+    setView, setSearch, selectTask, loadData, saveData
   }
 })

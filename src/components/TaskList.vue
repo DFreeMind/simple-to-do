@@ -20,6 +20,14 @@
     <!-- 添加任务 -->
     <div class="task-list__add" v-if="currentView !== 'trash'">
       <input
+        v-if="currentView === 'search'"
+        :value="store.searchQuery"
+        class="add-input search-input"
+        placeholder="搜索任务、描述或标签"
+        @input="store.setSearch($event.target.value)"
+      />
+      <input
+        v-else
         ref="addInput"
         v-model="newTaskTitle"
         class="add-input"
@@ -93,7 +101,7 @@ const addInput = ref(null)
 const showListMenu = ref(false)
 
 const currentList = computed(() => {
-  if (['today', 'week', 'inbox', 'completed', 'trash'].includes(store.currentView)) return null
+  if (['today', 'week', 'inbox', 'completed', 'trash', 'search'].includes(store.currentView)) return null
   return store.lists.find(l => l.id === store.currentView)
 })
 
@@ -104,6 +112,7 @@ const viewTitle = computed(() => {
     today: { icon: '📅', label: '今天' },
     week: { icon: '📆', label: '最近7天' },
     inbox: { icon: '📥', label: '收集箱' },
+    search: { icon: '🔍', label: '搜索' },
     completed: { icon: '✅', label: '已完成' },
     trash: { icon: '🗑️', label: '垃圾桶' }
   }
@@ -149,11 +158,12 @@ function deleteCurrentList() {
 }
 
 function clearCompletedTasks() {
-  const completed = store.tasks.filter(t => t.completed && !t.deleted && t.listId === store.currentView)
-  if (completed.length === 0) {
+  const count = store.filteredTasks.filter(t => t.completed && !t.deleted).length
+  if (count === 0) {
     alert('没有已完成的任务')
-  } else if (confirm(`确定清除 ${completed.length} 个已完成任务？`)) {
-    completed.forEach(t => store.deleteTask(t.id))
+  } else if (confirm(`确定清除 ${count} 个已完成任务？`)) {
+    store.clearCompletedInCurrentView()
+    alert(`已清除 ${count} 个已完成任务`)
   }
   showListMenu.value = false
 }

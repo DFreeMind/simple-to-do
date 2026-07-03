@@ -1,13 +1,16 @@
 <template>
   <aside class="sidebar">
     <div class="sidebar__content">
-      <!-- 用户头像 -->
-      <div class="sidebar__avatar">
-        <div class="avatar-circle">🧑</div>
-      </div>
-
       <!-- 快捷视图 -->
       <nav class="sidebar__nav">
+        <button
+          class="nav-item"
+          :class="{ active: store.currentView === 'search' }"
+          @click="store.setSearch(store.searchQuery)"
+        >
+          <span class="nav-icon">🔍</span>
+          <span class="nav-label">搜索</span>
+        </button>
         <button
           v-for="item in quickViews"
           :key="item.id"

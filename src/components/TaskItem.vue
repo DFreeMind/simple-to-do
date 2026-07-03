@@ -28,6 +28,10 @@
         <span v-if="task.dueDate" class="meta-date" :class="{ overdue: isOverdue }">
           📅 {{ formatDate(task.dueDate) }}
         </span>
+        <span v-if="task.priority" class="meta-priority" :class="`priority-${task.priority}`">
+          {{ priorityLabel }}
+        </span>
+        <span v-for="tag in task.tags || []" :key="tag" class="meta-tag">#{{ tag }}</span>
         <span v-if="task.subtasks?.length" class="meta-sub task-meta-icon">
           ☑ {{ task.subtasks.filter(s => s.completed).length }}/{{ task.subtasks.length }}
         </span>
@@ -39,6 +43,10 @@
     <!-- 操作按钮 -->
     <div class="task-actions" v-if="!isTrash">
       <button class="action-btn" @click.stop="toggleMenu" title="更多">⋯</button>
+    </div>
+    <div class="task-actions trash-actions" v-else>
+      <button class="action-btn" @click.stop="store.restoreTask(task.id)" title="恢复">↩</button>
+      <button class="action-btn" @click.stop="handleDelete" title="永久删除">✕</button>
     </div>
 
     <!-- 更多菜单 - 对齐参考图 -->
@@ -95,6 +103,11 @@ const isOverdue = computed(() => {
   return new Date(props.task.dueDate) < new Date()
 })
 
+const priorityLabel = computed(() => {
+  const map = { 1: '低', 2: '中', 3: '高' }
+  return map[props.task.priority] || ''
+})
+
 const menuStyle = computed(() => ({
   left: menuPos.value.x + 'px',
   top: menuPos.value.y + 'px'
@@ -133,7 +146,7 @@ function moveToList(listId) {
 }
 
 function handleCopy() {
-  store.addTask(props.task.title + ' (副本)', props.task.listId)
+  store.copyTask(props.task.id)
   menuOpen.value = false
 }
 

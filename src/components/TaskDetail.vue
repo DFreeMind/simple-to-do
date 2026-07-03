@@ -11,6 +11,12 @@
       <button class="toolbar-date" @click="showDatePicker = !showDatePicker">
         📅 日期与提醒
       </button>
+      <select class="toolbar-select" :value="task.priority || 0" @change="updatePriority">
+        <option :value="0">无优先级</option>
+        <option :value="3">高优先级</option>
+        <option :value="2">中优先级</option>
+        <option :value="1">低优先级</option>
+      </select>
       <div style="flex:1"></div>
       <!-- 模式切换 -->
       <button class="toolbar-mode" @click="toggleMode" :title="editorMode === 'detail' ? '切换为检查事项' : '切换为详情'">
@@ -34,6 +40,16 @@
       :task="task"
       @close="showDatePicker = false"
     />
+
+    <div class="detail-tags-row">
+      <span class="detail-tags-label">标签</span>
+      <input
+        class="detail-tags-input"
+        :value="tagText"
+        placeholder="用逗号分隔，例如 工作,重要"
+        @change="updateTags"
+      />
+    </div>
 
     <!-- 详情模式：富文本编辑器 -->
     <div class="detail-editor-area" v-if="editorMode === 'detail'">
@@ -281,6 +297,20 @@ function updateDesc(e) {
   autoResize(e.target)
 }
 
+const tagText = computed(() => (task.value?.tags || []).join(', '))
+
+function updatePriority(e) {
+  store.updateTask(task.value.id, { priority: Number(e.target.value) })
+}
+
+function updateTags(e) {
+  const tags = e.target.value
+    .split(/[,，]/)
+    .map(tag => tag.trim())
+    .filter(Boolean)
+  store.updateTask(task.value.id, { tags })
+}
+
 function autoResize(el) {
   el.style.height = 'auto'
   el.style.height = el.scrollHeight + 'px'
@@ -318,7 +348,7 @@ function handlePin() {
 
 function handleCopyTask() {
   if (task.value) {
-    store.addTask(task.value.title + ' (副本)', task.value.listId)
+    store.copyTask(task.value.id)
   }
   showMoreMenu.value = false
 }
