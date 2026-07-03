@@ -2,14 +2,15 @@
   "name": "simple-to-do",
   "version": "1.0.0",
   "description": "滴答清单 MVP 复刻版",
-  "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
-    "electron:build": "vite build && electron-builder"
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2.11.1",
     "@tiptap/extension-horizontal-rule": "^3.27.1",
     "@tiptap/extension-image": "^3.27.1",
     "@tiptap/extension-placeholder": "^3.27.1",
@@ -22,25 +23,10 @@
     "vue": "^3.5.39"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.11.4",
     "@vitejs/plugin-vue": "^6.0.7",
-    "electron": "^41.7.1",
-    "electron-builder": "^26.15.3",
     "sass": "^1.101.0",
     "vite": "^8.1.2"
   },
-  "build": {
-    "appId": "com.simpletodo.app",
-    "productName": "滴答清单 MVP",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "dist/**/*",
-      "electron/**/*"
-    ],
-    "win": {
-      "target": "nsis",
-      "icon": "public/icon.ico"
-    }
-  }
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }
