@@ -112,50 +112,6 @@ input, textarea {
   flex: 1;
 }
 
-// ========== Title Bar ==========
-.title-bar {
-  height: 36px;
-  background: $white;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 8px;
-  border-bottom: 1px solid $border;
-  -webkit-app-region: drag;
-  flex-shrink: 0;
-}
-
-.title-bar__title {
-  color: $text;
-  font-size: 12px;
-  padding-left: 4px;
-}
-
-.title-bar__controls {
-  display: flex;
-  -webkit-app-region: no-drag;
-}
-
-.title-btn {
-  width: 36px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #666;
-  font-size: 13px;
-  border-radius: 4px;
-  transition: background 0.15s;
-
-  &:hover {
-    background: #F0F0F0;
-  }
-  &--close:hover {
-    background: $danger;
-    color: white;
-  }
-}
-
 // ========== Sidebar ==========
 .sidebar {
   width: $sidebar-width;
@@ -729,64 +685,6 @@ input, textarea {
   }
 }
 
-// 统一内容编辑区域
-.detail-content {
-  flex: 1;
-  padding: 0 20px;
-  overflow-y: auto;
-  min-height: 0;
-  cursor: text;
-}
-
-// 描述 - textarea自动增长
-.content-desc-wrap {
-  min-height: 20px;
-}
-
-.content-desc {
-  width: 100%;
-  font-size: 13px;
-  line-height: 1.6;
-  color: $text;
-  border: none;
-  outline: none;
-  resize: none;
-  overflow: hidden;
-  background: transparent;
-  padding: 0;
-  font-family: inherit;
-
-  &::placeholder {
-    color: #CCC;
-  }
-
-  &:focus {
-    background: #FAFAFA;
-    border-radius: 4px;
-    padding: 2px 4px;
-    margin: 0 -4px;
-  }
-}
-
-// 子任务
-.content-subtask {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 0;
-  font-size: 13px;
-  line-height: 1.6;
-
-  &.completed .sub-text {
-    text-decoration: line-through;
-    color: $completed-color;
-  }
-
-  &:hover .sub-del {
-    opacity: 1;
-  }
-}
-
 .sub-check {
   width: 14px;
   height: 14px;
@@ -835,11 +733,6 @@ input, textarea {
   }
 }
 
-// 添加子任务
-.content-add-sub {
-  padding: 2px 0;
-}
-
 .add-sub-trigger {
   font-size: 13px;
   color: #CCC;
@@ -851,12 +744,6 @@ input, textarea {
   }
 }
 
-.content-add-sub.editing {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
 .sub-input {
   flex: 1;
   font-size: 13px;
@@ -866,68 +753,6 @@ input, textarea {
   &::placeholder {
     color: #CCC;
   }
-}
-
-// 图片
-.content-images {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  padding: 6px 0;
-}
-
-.content-img-item {
-  position: relative;
-  border-radius: 6px;
-  overflow: hidden;
-
-  &:hover .content-img-del {
-    opacity: 1;
-  }
-}
-
-.content-img {
-  width: 120px;
-  height: 80px;
-  object-fit: cover;
-  cursor: pointer;
-  display: block;
-}
-
-.content-img-del {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: rgba(0,0,0,0.5);
-  color: white;
-  font-size: 9px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: opacity 0.12s;
-}
-
-.content-add-img {
-  padding: 4px 0;
-}
-
-.add-img-trigger {
-  font-size: 12px;
-  color: #CCC;
-  padding: 0;
-  transition: color 0.12s;
-
-  &:hover {
-    color: $primary;
-  }
-}
-
-.hidden-file-input {
-  display: none;
 }
 
 // 评论
