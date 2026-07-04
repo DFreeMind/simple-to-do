@@ -7,21 +7,29 @@ function isTauri() {
 }
 
 export async function loadData() {
-  if (isTauri()) {
-    return invoke('load_data')
-  }
+  try {
+    if (isTauri()) {
+      return await invoke('load_data')
+    }
 
-  const raw = localStorage.getItem(STORAGE_KEY)
-  return raw ? JSON.parse(raw) : null
+    const raw = localStorage.getItem(STORAGE_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch (error) {
+    throw new Error(formatPlatformError(error, '读取本地数据失败'))
+  }
 }
 
 export async function saveData(data) {
-  if (isTauri()) {
-    return invoke('save_data', { data })
-  }
+  try {
+    if (isTauri()) {
+      return await invoke('save_data', { data })
+    }
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-  return true
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+    return true
+  } catch (error) {
+    throw new Error(formatPlatformError(error, '保存本地数据失败'))
+  }
 }
 
 export async function selectImage() {
@@ -36,4 +44,11 @@ export async function readImage(filePath) {
     return invoke('read_image', { filePath })
   }
   return null
+}
+
+function formatPlatformError(error, fallback) {
+  if (!error) return fallback
+  if (typeof error === 'string') return error
+  if (error.message) return error.message
+  return fallback
 }

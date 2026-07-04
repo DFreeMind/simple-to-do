@@ -40,6 +40,14 @@ button {
   color: inherit;
 }
 
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid rgba($primary, 0.45);
+  outline-offset: 2px;
+}
+
 input, textarea {
   border: none;
   outline: none;
@@ -58,6 +66,31 @@ input, textarea {
   display: flex;
   flex: 1;
   overflow: hidden;
+}
+
+.app-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  z-index: 1000;
+  max-width: min(420px, calc(100vw - 48px));
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #263238;
+  color: white;
+  font-size: 13px;
+  line-height: 1.4;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+
+  &--success {
+    background: #2f746d;
+  }
+
+  &--error {
+    background: #b83d3d;
+  }
 }
 
 // ========== App Rail ==========
@@ -330,6 +363,17 @@ input, textarea {
 
 .task-list__add {
   padding: 0 24px 8px;
+  flex-shrink: 0;
+}
+
+.task-list__hint {
+  margin: 0 24px 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #F8F8F8;
+  color: $text-secondary;
+  font-size: 12px;
+  line-height: 1.5;
   flex-shrink: 0;
 }
 

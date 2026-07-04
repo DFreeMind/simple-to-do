@@ -4,24 +4,43 @@ import { genId } from '@/utils/id'
 import { isToday, isWithin7Days } from '@/utils/date'
 import { loadData as loadPlatformData, saveData as savePlatformData } from '@/services/platform'
 
+const SYSTEM_VIEW_IDS = ['today', 'week', 'inbox', 'completed', 'trash', 'search']
+const READONLY_VIEWS = ['week', 'completed', 'trash']
+const DEFAULT_LISTS = [
+  { id: 'inbox', name: '收集箱', icon: '📥', isSystem: true },
+  { id: 'work', name: '工作任务', icon: '💼', isSystem: false },
+  { id: 'personal', name: '个人备忘', icon: '🏠', isSystem: false }
+]
+
+function todayAt(hour = 9, minute = 0) {
+  const date = new Date()
+  date.setHours(hour, minute, 0, 0)
+  return date.toISOString()
+}
+
 export const useTaskStore = defineStore('task', () => {
   // ========== 状态 ==========
-  const lists = ref([
-    { id: 'inbox', name: '收集箱', icon: '📥', isSystem: true },
-    { id: 'work', name: '工作任务', icon: '💼' },
-    { id: 'personal', name: '个人备忘', icon: '🏠' }
-  ])
+  const lists = ref(DEFAULT_LISTS.map(list => ({ ...list })))
   const tasks = ref([])
   const trash = ref([])
   const currentView = ref('inbox') // 'inbox' | 'today' | 'week' | listId | 'completed' | 'trash'
   const selectedTaskId = ref(null)
   const sortBy = ref('default') // 'default' | 'date' | 'name'
   const searchQuery = ref('')
+  const saveError = ref('')
+  const isSaving = ref(false)
+  const notice = ref(null)
 
   // ========== 计算属性 ==========
   const currentList = computed(() => {
-    if (['today', 'week', 'inbox', 'completed', 'trash', 'search'].includes(currentView.value)) return null
+    if (SYSTEM_VIEW_IDS.includes(currentView.value)) return null
     return lists.value.find(l => l.id === currentView.value)
+  })
+
+  const canQuickAddTask = computed(() => {
+    return currentView.value === 'today' ||
+      currentView.value === 'inbox' ||
+      Boolean(currentList.value)
   })
 
   const filteredTasks = computed(() => {
@@ -42,7 +61,7 @@ export const useTaskStore = defineStore('task', () => {
         result = tasks.value.filter(t => t.completed && !t.deleted)
         break
       case 'trash':
-        result = trash.value
+        result = [...trash.value]
         break
       case 'search': {
         const query = searchQuery.value.trim().toLowerCase()
@@ -113,18 +132,30 @@ export const useTaskStore = defineStore('task', () => {
 
   // ========== 操作 ==========
 
+  function showNotice(message, type = 'info') {
+    notice.value = { id: genId(), message, type }
+  }
+
+  function clearNotice() {
+    notice.value = null
+  }
+
   // 清单 CRUD
   function addList(name) {
-    const list = { id: genId(), name, icon: '📋' }
+    const list = { id: genId(), name, icon: '📋', isSystem: false }
     lists.value.push(list)
     return list
   }
 
   function deleteList(id) {
     if (id === 'inbox') return
+    const now = new Date().toISOString()
     // 将清单下的任务移到收集箱
     tasks.value.forEach(t => {
-      if (t.listId === id) t.listId = 'inbox'
+      if (t.listId === id) {
+        t.listId = 'inbox'
+        t.updatedAt = now
+      }
     })
     lists.value = lists.value.filter(l => l.id !== id)
     if (currentView.value === id) currentView.value = 'inbox'
@@ -137,7 +168,9 @@ export const useTaskStore = defineStore('task', () => {
 
   // 任务 CRUD
   function addTask(title, listId) {
+    if (READONLY_VIEWS.includes(currentView.value)) return null
     const now = new Date().toISOString()
+    const targetListId = resolveNewTaskListId(listId)
     const task = {
       id: genId(),
       title,
@@ -149,8 +182,8 @@ export const useTaskStore = defineStore('task', () => {
       deleted: false,
       deletedAt: null,
       pinned: false,
-      listId: listId || currentView.value,
-      dueDate: null,
+      listId: targetListId,
+      dueDate: currentView.value === 'today' ? todayAt() : null,
       reminderAt: null,
       repeatRule: null,
       priority: 0,
@@ -161,12 +194,15 @@ export const useTaskStore = defineStore('task', () => {
       createdAt: now,
       updatedAt: now
     }
-    // 如果当前视图是今天/最近7天，分配到收集箱
-    if (['today', 'week', 'completed', 'trash', 'search'].includes(task.listId)) {
-      task.listId = 'inbox'
-    }
     tasks.value.unshift(task)
+    selectedTaskId.value = task.id
     return task
+  }
+
+  function resolveNewTaskListId(listId) {
+    if (listId && lists.value.some(list => list.id === listId)) return listId
+    if (currentList.value) return currentList.value.id
+    return 'inbox'
   }
 
   function completeTask(id) {
@@ -180,12 +216,14 @@ export const useTaskStore = defineStore('task', () => {
 
   function deleteTask(id) {
     const task = tasks.value.find(t => t.id === id)
-    if (task) {
+    if (task && !task.deleted) {
       task.deleted = true
       task.deletedAt = new Date().toISOString()
       task.updatedAt = task.deletedAt
-      trash.value.push({ ...task })
+      trash.value = trash.value.filter(t => t.id !== id)
+      trash.value.unshift({ ...task })
       if (selectedTaskId.value === id) selectedTaskId.value = null
+      showNotice('任务已移入垃圾桶', 'success')
     }
   }
 
@@ -198,8 +236,16 @@ export const useTaskStore = defineStore('task', () => {
         original.deleted = false
         original.deletedAt = null
         original.updatedAt = new Date().toISOString()
+      } else {
+        tasks.value.unshift({
+          ...task,
+          deleted: false,
+          deletedAt: null,
+          updatedAt: new Date().toISOString()
+        })
       }
       trash.value.splice(idx, 1)
+      showNotice('任务已恢复', 'success')
     }
   }
 
@@ -210,7 +256,7 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   function updateTask(id, updates) {
-    const task = tasks.value.find(t => t.id === id)
+    const task = tasks.value.find(t => t.id === id) || trash.value.find(t => t.id === id)
     if (task) Object.assign(task, updates, { updatedAt: new Date().toISOString() })
   }
 
@@ -325,24 +371,62 @@ export const useTaskStore = defineStore('task', () => {
 
   // ========== 持久化 ==========
   async function loadData() {
-    const data = await loadPlatformData()
-    if (data) {
-      lists.value = data.lists || lists.value
-      tasks.value = (data.tasks || []).map(normalizeTask)
-      trash.value = (data.trash || []).map(normalizeTask)
+    try {
+      const data = await loadPlatformData()
+      if (data) {
+        lists.value = normalizeLists(data.lists)
+        tasks.value = (data.tasks || []).map(normalizeTask)
+        trash.value = (data.trash || []).map(task => normalizeTask({ ...task, deleted: true }))
+      }
+      saveError.value = ''
+    } catch (error) {
+      saveError.value = error?.message || '读取本地数据失败'
+      showNotice(saveError.value, 'error')
     }
   }
 
   async function saveData() {
-    await savePlatformData({
-      lists: lists.value,
-      tasks: tasks.value,
-      trash: trash.value
-    })
+    isSaving.value = true
+    try {
+      await savePlatformData({
+        schemaVersion: 1,
+        lists: lists.value,
+        tasks: tasks.value,
+        trash: trash.value
+      })
+      saveError.value = ''
+    } catch (error) {
+      saveError.value = error?.message || '保存本地数据失败'
+      showNotice(saveError.value, 'error')
+      throw error
+    } finally {
+      isSaving.value = false
+    }
   }
 
   // 自动保存
-  watch([lists, tasks, trash], () => saveData(), { deep: true })
+  watch([lists, tasks, trash], () => {
+    saveData().catch(() => {})
+  }, { deep: true })
+
+  function normalizeLists(rawLists) {
+    const source = Array.isArray(rawLists) && rawLists.length ? rawLists : DEFAULT_LISTS
+    const normalized = source.map(normalizeList)
+    if (!normalized.some(list => list.id === 'inbox')) {
+      normalized.unshift({ ...DEFAULT_LISTS[0] })
+    }
+    return normalized
+  }
+
+  function normalizeList(list) {
+    const fallback = DEFAULT_LISTS.find(item => item.id === list?.id)
+    return {
+      id: list?.id || genId(),
+      name: list?.name || fallback?.name || '未命名清单',
+      icon: list?.icon || fallback?.icon || '📋',
+      isSystem: Boolean(list?.isSystem || list?.id === 'inbox')
+    }
+  }
 
   function normalizeTask(task) {
     const now = task.createdAt || new Date().toISOString()
@@ -371,12 +455,12 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   return {
-    lists, tasks, trash, currentView, selectedTaskId, sortBy, searchQuery,
-    currentList, filteredTasks, uncompletedTasks, completedTasks, selectedTask, listTaskCounts,
+    lists, tasks, trash, currentView, selectedTaskId, sortBy, searchQuery, saveError, isSaving, notice,
+    currentList, canQuickAddTask, filteredTasks, uncompletedTasks, completedTasks, selectedTask, listTaskCounts,
     addList, deleteList, renameList,
     addTask, completeTask, deleteTask, restoreTask, permanentDelete, updateTask, togglePin, copyTask, clearCompletedInCurrentView,
     addSubtask, toggleSubtask, deleteSubtask,
     addComment, addAttachment,
-    setView, setSearch, selectTask, loadData, saveData
+    setView, setSearch, selectTask, showNotice, clearNotice, loadData, saveData
   }
 })

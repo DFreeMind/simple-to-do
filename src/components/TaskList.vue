@@ -18,7 +18,7 @@
     </div>
 
     <!-- 添加任务 -->
-    <div class="task-list__add" v-if="currentView !== 'trash'">
+    <div class="task-list__add" v-if="currentView === 'search' || store.canQuickAddTask">
       <input
         v-if="currentView === 'search'"
         :value="store.searchQuery"
@@ -31,9 +31,12 @@
         ref="addInput"
         v-model="newTaskTitle"
         class="add-input"
-        placeholder="+ 添加任务"
+        :placeholder="addPlaceholder"
         @keydown.enter="addTask"
       />
+    </div>
+    <div v-else class="task-list__hint">
+      {{ readonlyHint }}
     </div>
 
     <!-- 任务列表 -->
@@ -124,6 +127,20 @@ const viewTitle = computed(() => {
 const sortLabel = computed(() => {
   const map = { default: '默认排序', date: '按日期', name: '按名称' }
   return map[store.sortBy]
+})
+
+const addPlaceholder = computed(() => {
+  if (store.currentView === 'today') return '+ 添加今天的任务'
+  return '+ 添加任务'
+})
+
+const readonlyHint = computed(() => {
+  const map = {
+    week: '最近 7 天按任务日期自动汇总，可在今天或清单中添加任务。',
+    completed: '已完成视图用于回顾和清理任务。',
+    trash: '垃圾桶中的任务可恢复或永久删除。'
+  }
+  return map[store.currentView] || ''
 })
 
 function addTask() {
