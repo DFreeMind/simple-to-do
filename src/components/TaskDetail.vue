@@ -8,7 +8,7 @@
         </span>
       </button>
       <div class="toolbar-sep"></div>
-      <button class="toolbar-date" @click="showDatePicker = !showDatePicker">
+      <button class="toolbar-date" @click.stop="toggleDatePicker" aria-label="日期与提醒">
         📅 日期与提醒
       </button>
       <select class="toolbar-select" :value="task.priority || 0" @change="updatePriority">
@@ -19,7 +19,7 @@
       </select>
       <div style="flex:1"></div>
       <!-- 模式切换 -->
-      <button class="toolbar-mode" @click="toggleMode" :title="editorMode === 'detail' ? '切换为检查事项' : '切换为详情'">
+      <button class="toolbar-mode" @click="toggleMode" :title="editorMode === 'detail' ? '切换为检查事项' : '切换为详情'" aria-label="切换编辑模式">
         {{ editorMode === 'detail' ? '☰' : '📝' }}
       </button>
     </div>
@@ -48,6 +48,7 @@
         :value="tagText"
         placeholder="用逗号分隔，例如 工作,重要"
         @change="updateTags"
+        @keydown.enter="$event.target.blur()"
       />
     </div>
 
@@ -59,7 +60,7 @@
         placeholder="开始输入..."
       />
       <!-- 格式菜单触发按钮 -->
-      <div class="add-block-btn" @click="showFormatMenu">
+      <div class="add-block-btn" @click.stop="showFormatMenu">
         <span class="add-icon">+</span>
       </div>
     </div>
@@ -91,7 +92,14 @@
         >
           <span v-if="sub.completed">✓</span>
         </button>
-        <span class="sub-text" contenteditable="true" @blur="onSubtaskEdit($event, sub)">{{ sub.title }}</span>
+        <span
+          class="sub-text"
+          contenteditable="true"
+          role="textbox"
+          @keydown.enter.prevent="$event.target.blur()"
+          @keydown.esc.prevent="resetSubtaskEdit($event, sub)"
+          @blur="onSubtaskEdit($event, sub)"
+        >{{ sub.title }}</span>
         <button class="sub-del" @click.stop="store.deleteSubtask(task.id, sub.id)">✕</button>
       </div>
       <!-- 添加子任务 -->
@@ -145,7 +153,7 @@
         placeholder="添加评论"
         @keydown.enter="addComment"
       />
-      <button class="comment-action" @click="showEmojiPicker = !showEmojiPicker" title="表情">😊</button>
+      <button class="comment-action" @click.stop="toggleEmojiPicker" title="表情" aria-label="表情">😊</button>
       <button class="comment-action" @click="triggerImageUpload" title="图片">🖼️</button>
     </div>
 
@@ -183,9 +191,9 @@
         {{ currentList?.icon || '📋' }} {{ currentList?.name || '收集箱' }}
       </span>
       <div class="footer-right">
-        <button class="footer-btn" title="格式" @click="showFormatMenuFromFooter">A</button>
+        <button class="footer-btn" title="格式" @click.stop="showFormatMenuFromFooter">A</button>
         <button class="footer-btn" title="评论" @click="scrollToComment">💬</button>
-        <button class="footer-btn" title="更多" @click="showMoreMenu = !showMoreMenu">⋯</button>
+        <button class="footer-btn" title="更多" @click.stop="toggleMoreMenu">⋯</button>
       </div>
     </div>
 
@@ -288,6 +296,13 @@ function toggleMode() {
   }
 }
 
+function toggleDatePicker() {
+  showDatePicker.value = !showDatePicker.value
+  showEmojiPicker.value = false
+  showMoreMenu.value = false
+  formatMenuVisible.value = false
+}
+
 function updateTitle(e) {
   store.updateTask(task.value.id, { title: e.target.value })
 }
@@ -319,14 +334,26 @@ function autoResize(el) {
 // 格式菜单
 function showFormatMenu(e) {
   const rect = e.currentTarget.getBoundingClientRect()
-  formatMenuPos.value = { x: rect.left, y: rect.top - 320 }
+  formatMenuPos.value = clampFloatingPosition(rect.left, rect.top - 320, 220, 320)
   formatMenuVisible.value = true
+  showDatePicker.value = false
+  showMoreMenu.value = false
 }
 
 function showFormatMenuFromFooter(e) {
   const rect = e.currentTarget.getBoundingClientRect()
-  formatMenuPos.value = { x: rect.left - 160, y: rect.top - 320 }
+  formatMenuPos.value = clampFloatingPosition(rect.left - 160, rect.top - 320, 220, 320)
   formatMenuVisible.value = true
+  showDatePicker.value = false
+  showMoreMenu.value = false
+}
+
+function clampFloatingPosition(x, y, width, height) {
+  const margin = 12
+  return {
+    x: Math.max(margin, Math.min(x, window.innerWidth - width - margin)),
+    y: Math.max(margin, Math.min(y, window.innerHeight - height - margin))
+  }
 }
 
 function scrollToComment() {
@@ -339,6 +366,13 @@ function scrollToComment() {
 }
 
 // 更多菜单
+function toggleMoreMenu() {
+  showMoreMenu.value = !showMoreMenu.value
+  showDatePicker.value = false
+  showEmojiPicker.value = false
+  formatMenuVisible.value = false
+}
+
 function handlePin() {
   if (task.value) {
     store.togglePin(task.value.id)
@@ -348,16 +382,23 @@ function handlePin() {
 
 function handleCopyTask() {
   if (task.value) {
-    store.copyTask(task.value.id)
+    const copied = store.copyTask(task.value.id)
+    if (copied) {
+      store.selectTask(copied.id)
+      store.showNotice('已创建任务副本', 'success')
+    }
   }
   showMoreMenu.value = false
 }
 
-function handleCopyLink() {
+async function handleCopyLink() {
   if (task.value) {
-    navigator.clipboard?.writeText(`todo://${task.value.id}`).then(() => {
-      alert('链接已复制')
-    })
+    try {
+      await navigator.clipboard?.writeText(`todo://${task.value.id}`)
+      store.showNotice('任务链接已复制', 'success')
+    } catch (error) {
+      store.showNotice('复制失败，请检查剪贴板权限', 'error')
+    }
   }
   showMoreMenu.value = false
 }
@@ -393,11 +434,15 @@ function cancelAddSub() {
 function onSubtaskEdit(e, sub) {
   const text = e.target.innerText.trim()
   if (text && text !== sub.title) {
-    const idx = task.value.subtasks.findIndex(s => s.id === sub.id)
-    if (idx !== -1) {
-      task.value.subtasks[idx].title = text
-    }
+    store.updateSubtask(task.value.id, sub.id, text)
+  } else {
+    e.target.innerText = sub.title
   }
+}
+
+function resetSubtaskEdit(e, sub) {
+  e.target.innerText = sub.title
+  e.target.blur()
 }
 
 // 评论
@@ -413,18 +458,30 @@ function insertEmoji(em) {
   showEmojiPicker.value = false
 }
 
+function toggleEmojiPicker() {
+  showEmojiPicker.value = !showEmojiPicker.value
+  showDatePicker.value = false
+  showMoreMenu.value = false
+  formatMenuVisible.value = false
+}
+
 // 图片
-function triggerImageUpload() {
-  selectImage().then(path => {
+async function triggerImageUpload() {
+  try {
+    const path = await selectImage()
     if (!path) {
       fileInput.value?.click()
       return
     }
 
-    readImage(path).then(url => {
-      if (url) store.addAttachment(task.value.id, path, url)
-    })
-  })
+    const url = await readImage(path)
+    if (url) {
+      store.addAttachment(task.value.id, path, url)
+      store.showNotice('图片已添加', 'success')
+    }
+  } catch (error) {
+    store.showNotice(error?.message || '添加图片失败', 'error')
+  }
 }
 
 function onFileSelected(e) {
@@ -434,6 +491,7 @@ function onFileSelected(e) {
     const reader = new FileReader()
     reader.onload = (ev) => {
       store.addAttachment(task.value.id, file.name, ev.target.result)
+      store.showNotice('图片已添加', 'success')
     }
     reader.readAsDataURL(file)
   }
@@ -442,7 +500,8 @@ function onFileSelected(e) {
 
 function removeAttachment(id) {
   if (!task.value) return
-  task.value.attachments = task.value.attachments.filter(a => a.id !== id)
+  store.removeAttachment(task.value.id, id)
+  store.showNotice('附件已移除', 'success')
 }
 
 function previewImage(att) {
@@ -463,6 +522,8 @@ function timeAgo(dateStr) {
 function closeMenus() {
   showMoreMenu.value = false
   formatMenuVisible.value = false
+  showDatePicker.value = false
+  showEmojiPicker.value = false
 }
 
 onMounted(() => document.addEventListener('click', closeMenus))

@@ -2,7 +2,6 @@
   <div class="datepicker-popup" @click.stop>
     <div class="dp-tabs">
       <button class="dp-tab" :class="{ active: tab === 'date' }" @click="tab = 'date'">日期</button>
-      <button class="dp-tab" :class="{ active: tab === 'range' }" @click="tab = 'range'">时间段</button>
     </div>
 
     <!-- 快捷按钮 -->

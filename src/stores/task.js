@@ -253,6 +253,7 @@ export const useTaskStore = defineStore('task', () => {
     tasks.value = tasks.value.filter(t => t.id !== id)
     trash.value = trash.value.filter(t => t.id !== id)
     if (selectedTaskId.value === id) selectedTaskId.value = null
+    showNotice('任务已永久删除', 'success')
   }
 
   function updateTask(id, updates) {
@@ -325,6 +326,16 @@ export const useTaskStore = defineStore('task', () => {
     }
   }
 
+  function updateSubtask(taskId, subId, title) {
+    const task = tasks.value.find(t => t.id === taskId)
+    if (!task) return
+    const subtask = task.subtasks.find(s => s.id === subId)
+    if (subtask && title.trim()) {
+      subtask.title = title.trim()
+      task.updatedAt = new Date().toISOString()
+    }
+  }
+
   // 评论
   function addComment(taskId, text) {
     const task = tasks.value.find(t => t.id === taskId)
@@ -349,6 +360,14 @@ export const useTaskStore = defineStore('task', () => {
         url: imageUrl,
         createdAt: new Date().toISOString()
       })
+      task.updatedAt = new Date().toISOString()
+    }
+  }
+
+  function removeAttachment(taskId, attachmentId) {
+    const task = tasks.value.find(t => t.id === taskId)
+    if (task) {
+      task.attachments = task.attachments.filter(attachment => attachment.id !== attachmentId)
       task.updatedAt = new Date().toISOString()
     }
   }
@@ -459,8 +478,8 @@ export const useTaskStore = defineStore('task', () => {
     currentList, canQuickAddTask, filteredTasks, uncompletedTasks, completedTasks, selectedTask, listTaskCounts,
     addList, deleteList, renameList,
     addTask, completeTask, deleteTask, restoreTask, permanentDelete, updateTask, togglePin, copyTask, clearCompletedInCurrentView,
-    addSubtask, toggleSubtask, deleteSubtask,
-    addComment, addAttachment,
+    addSubtask, toggleSubtask, deleteSubtask, updateSubtask,
+    addComment, addAttachment, removeAttachment,
     setView, setSearch, selectTask, showNotice, clearNotice, loadData, saveData
   }
 })

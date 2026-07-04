@@ -7,7 +7,7 @@
       pinned: task.pinned
     }"
     @click="store.selectTask(task.id)"
-    @contextmenu.prevent="toggleMenu"
+    @contextmenu.prevent.stop="toggleMenu"
   >
     <!-- 复选框 - 圆角矩形 -->
     <button
@@ -141,17 +141,27 @@ function handleMove() {
 
 function moveToList(listId) {
   store.updateTask(props.task.id, { listId })
+  store.showNotice('任务已移动', 'success')
   menuOpen.value = false
   showMoveMenu.value = false
 }
 
 function handleCopy() {
-  store.copyTask(props.task.id)
+  const copied = store.copyTask(props.task.id)
+  if (copied) {
+    store.selectTask(copied.id)
+    store.showNotice('已创建任务副本', 'success')
+  }
   menuOpen.value = false
 }
 
-function handleCopyLink() {
-  navigator.clipboard?.writeText(`todo://${props.task.id}`)
+async function handleCopyLink() {
+  try {
+    await navigator.clipboard?.writeText(`todo://${props.task.id}`)
+    store.showNotice('任务链接已复制', 'success')
+  } catch (error) {
+    store.showNotice('复制失败，请检查剪贴板权限', 'error')
+  }
   menuOpen.value = false
 }
 
