@@ -223,12 +223,18 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { useTaskStore } from '@/stores/task'
 import DatePicker from './DatePicker.vue'
-import RichTextEditor from './RichTextEditor.vue'
 import FormatMenu from './FormatMenu.vue'
 import { readImage, selectImage } from '@/services/platform'
+
+const RichTextEditor = defineAsyncComponent({
+  loader: () => import('./RichTextEditor.vue'),
+  loadingComponent: {
+    template: '<div class="rich-editor-loading">正在加载编辑器...</div>'
+  }
+})
 
 const store = useTaskStore()
 const newSubtask = ref('')
