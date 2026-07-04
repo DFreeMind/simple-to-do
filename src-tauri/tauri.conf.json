@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "滴答清单 MVP",
+  "productName": "易简清单",
   "version": "1.0.0",
   "identifier": "com.simpletodo.desktop",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "滴答清单 MVP",
+        "title": "易简清单",
         "width": 1200,
         "height": 800,
         "minWidth": 900,

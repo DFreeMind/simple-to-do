@@ -1,7 +1,7 @@
 {
   "name": "simple-to-do",
   "version": "1.0.0",
-  "description": "滴答清单 MVP 复刻版",
+  "description": "易简清单，本地优先的桌面待办应用",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

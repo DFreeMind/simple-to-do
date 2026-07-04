@@ -1,12 +1,13 @@
 <template>
   <aside class="app-rail">
-    <button class="rail-avatar" title="个人">
-      <span>🧑</span>
+    <button class="rail-avatar" title="易简清单" aria-label="易简清单">
+      <span>易</span>
     </button>
     <button
       class="rail-btn"
       :class="{ active: store.currentView !== 'search' }"
       title="任务"
+      aria-label="任务"
       @click="store.setView('inbox')"
     >
       ✓
@@ -15,14 +16,12 @@
       class="rail-btn"
       :class="{ active: store.currentView === 'search' }"
       title="搜索"
+      aria-label="搜索"
       @click="store.setSearch(store.searchQuery)"
     >
-      🔍
+      ⌕
     </button>
     <div class="rail-spacer"></div>
-    <button class="rail-btn muted" title="同步状态">↻</button>
-    <button class="rail-btn muted" title="提醒">🔔</button>
-    <button class="rail-btn muted" title="帮助">?</button>
   </aside>
 </template>
 
