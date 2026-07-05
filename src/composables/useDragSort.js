@@ -1,0 +1,166 @@
+import { ref, onUnmounted } from 'vue'
+
+/**
+ * Cross-platform drag-and-drop composable using mouse events.
+ * Works in Tauri/WebView where native HTML5 drag events are unreliable.
+ *
+ * @param {Object} options
+ * @param {Function} options.onDrop(sourceId, targetId, position) - called when item is dropped; position is 'before' or 'after'
+ * @param {Function} options.getItemEl(target) - walk up from event target to find draggable item, returns { id, el } or null
+ * @param {Function} options.findItemAtPoint(x, y) - find target item at screen coordinates, returns { id, position } or null
+ * @param {String} [options.scrollContainerSelector] - CSS selector for the scrollable container (auto-scrolls near edges)
+ */
+export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContainerSelector }) {
+  const draggingId = ref('')
+  const dragOverId = ref('')
+  const dropPosition = ref('') // 'before' or 'after'
+  let ghostEl = null
+  let offsetX = 0
+  let offsetY = 0
+  let lastMoveTime = 0
+  let scrollRaf = null
+
+  const EDGE_THRESHOLD = 60 // px from edge to trigger auto-scroll
+  const SCROLL_SPEED = 8   // px per frame
+  const THROTTLE_MS = 16   // ~60fps
+
+  function startDrag(event, itemId) {
+    if (event.button !== 0) return // left click only
+    event.preventDefault()
+
+    const item = getItemEl(event.target)
+    if (!item) return
+
+    draggingId.value = itemId
+
+    // Calculate offset from item top-left to mouse position
+    const rect = item.el.getBoundingClientRect()
+    offsetX = event.clientX - rect.left
+    offsetY = event.clientY - rect.top
+
+    // Create ghost element
+    ghostEl = item.el.cloneNode(true)
+    // Remove classes that affect appearance, keep structural ones
+    ghostEl.classList.remove('is-dragging', 'drop-target-before', 'drop-target-after', 'selected', 'no-drag-handle')
+    ghostEl.classList.add('drag-ghost')
+    ghostEl.style.position = 'fixed'
+    ghostEl.style.zIndex = '9999'
+    ghostEl.style.pointerEvents = 'none'
+    ghostEl.style.opacity = '1'
+    ghostEl.style.width = rect.width + 'px'
+    ghostEl.style.left = (event.clientX - offsetX) + 'px'
+    ghostEl.style.top = (event.clientY - offsetY) + 'px'
+    ghostEl.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.12)'
+    ghostEl.style.border = '1.5px solid var(--accent)'
+    ghostEl.style.borderRadius = 'var(--radius-md)'
+    ghostEl.style.background = 'var(--surface)'
+    ghostEl.style.transform = 'scale(1.02)'
+    document.body.appendChild(ghostEl)
+
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+  }
+
+  function onMouseMove(e) {
+    if (!ghostEl) return
+
+    // Throttle to ~60fps
+    const now = Date.now()
+    if (now - lastMoveTime < THROTTLE_MS) return
+    lastMoveTime = now
+
+    ghostEl.style.left = (e.clientX - offsetX) + 'px'
+    ghostEl.style.top = (e.clientY - offsetY) + 'px'
+
+    // Auto-scroll near edges
+    autoScroll(e.clientY)
+
+    // Detect drop target
+    // Temporarily hide ghost so elementFromPoint finds the element beneath
+    ghostEl.style.pointerEvents = 'none'
+    const result = findItemAtPoint(e.clientX, e.clientY)
+    ghostEl.style.pointerEvents = ''
+
+    if (result && result.id !== draggingId.value) {
+      dragOverId.value = result.id
+      dropPosition.value = result.position || 'after'
+    } else {
+      dragOverId.value = ''
+      dropPosition.value = ''
+    }
+  }
+
+  function autoScroll(mouseY) {
+    if (scrollRaf) cancelAnimationFrame(scrollRaf)
+
+    const container = scrollContainerSelector
+      ? document.querySelector(scrollContainerSelector)
+      : ghostEl?.closest('.task-list__content, .group-list, .subtask-list')
+
+    if (!container || container.scrollHeight <= container.clientHeight) return
+
+    const rect = container.getBoundingClientRect()
+    const distFromTop = mouseY - rect.top
+    const distFromBottom = rect.bottom - mouseY
+
+    let scrollDelta = 0
+    if (distFromTop < EDGE_THRESHOLD && distFromTop > 0) {
+      // Near top → scroll up
+      const ratio = 1 - distFromTop / EDGE_THRESHOLD
+      scrollDelta = -SCROLL_SPEED * ratio
+    } else if (distFromBottom < EDGE_THRESHOLD && distFromBottom > 0) {
+      // Near bottom → scroll down
+      const ratio = 1 - distFromBottom / EDGE_THRESHOLD
+      scrollDelta = SCROLL_SPEED * ratio
+    }
+
+    if (scrollDelta !== 0) {
+      scrollRaf = requestAnimationFrame(() => {
+        container.scrollTop += scrollDelta
+        scrollRaf = null
+      })
+    }
+  }
+
+  function onMouseUp() {
+    document.removeEventListener('mousemove', onMouseMove)
+    document.removeEventListener('mouseup', onMouseUp)
+    if (scrollRaf) {
+      cancelAnimationFrame(scrollRaf)
+      scrollRaf = null
+    }
+
+    if (draggingId.value && dragOverId.value) {
+      onDrop(draggingId.value, dragOverId.value, dropPosition.value)
+    }
+
+    // Cleanup
+    if (ghostEl) {
+      ghostEl.remove()
+      ghostEl = null
+    }
+    draggingId.value = ''
+    dragOverId.value = ''
+    dropPosition.value = ''
+  }
+
+  function cleanup() {
+    document.removeEventListener('mousemove', onMouseMove)
+    document.removeEventListener('mouseup', onMouseUp)
+    if (scrollRaf) {
+      cancelAnimationFrame(scrollRaf)
+      scrollRaf = null
+    }
+    if (ghostEl) {
+      ghostEl.remove()
+      ghostEl = null
+    }
+    draggingId.value = ''
+    dragOverId.value = ''
+    dropPosition.value = ''
+  }
+
+  onUnmounted(cleanup)
+
+  return { draggingId, dragOverId, dropPosition, startDrag, cleanup }
+}

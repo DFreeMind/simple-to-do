@@ -1,0 +1,23 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="128" y1="128" x2="896" y2="896" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3BC3B4"/>
+      <stop offset="1" stop-color="#176A63"/>
+    </linearGradient>
+    <linearGradient id="tray" x1="222" y1="308" x2="802" y2="768" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#E3F5F1"/>
+    </linearGradient>
+    <filter id="shadow" x="132" y="160" width="760" height="708" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="36" stdDeviation="38" flood-color="#0F514C" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+  <rect x="96" y="96" width="832" height="832" rx="210" fill="url(#bg)"/>
+  <path d="M236 390C244.26 345.58 283.03 313.38 328.21 313.38H695.79C740.97 313.38 779.74 345.58 788 390L842 680C852.58 736.82 809 789.38 751.2 789.38H272.8C215 789.38 171.42 736.82 182 680L236 390Z" fill="url(#tray)" filter="url(#shadow)"/>
+  <path d="M246 568H380C406.51 568 428 589.49 428 616C428 642.51 449.49 664 476 664H548C574.51 664 596 642.51 596 616C596 589.49 617.49 568 644 568H778" stroke="#1A6E67" stroke-width="48" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M342 410H682" stroke="#1A6E67" stroke-width="42" stroke-linecap="round" opacity="0.7"/>
+  <path d="M342 498H556" stroke="#1A6E67" stroke-width="42" stroke-linecap="round" opacity="0.46"/>
+  <circle cx="694" cy="684" r="126" fill="#176A63"/>
+  <path d="M630 681L680 731L762 632" stroke="#FFFFFF" stroke-width="46" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="312" cy="408" r="20" fill="#F0A742"/>
+</svg>

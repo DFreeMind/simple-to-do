@@ -1,24 +1,33 @@
 <template>
   <div class="datepicker-popup" @click.stop>
-    <div class="dp-tabs">
-      <button class="dp-tab" :class="{ active: tab === 'date' }" @click="tab = 'date'">日期</button>
+    <div class="dp-header">
+      <button class="dp-nav" type="button" :aria-label="`上个月，${title}`" @click="prevMonth">‹</button>
+      <button class="dp-month" type="button" @click.stop="monthPickerOpen = !monthPickerOpen">
+        {{ calYear }}年{{ calMonth + 1 }}月
+      </button>
+      <YearMonthPicker
+        v-if="monthPickerOpen"
+        class="dp-ym-picker"
+        :year="calYear"
+        :month-index="calMonth"
+        @select="selectMonth"
+        @close="monthPickerOpen = false"
+      />
+      <button class="dp-nav" type="button" :aria-label="`下个月，${title}`" @click="nextMonth">›</button>
     </div>
 
-    <!-- 快捷按钮 -->
+    <div class="dp-toolbar">
+      <input class="dp-time-input" type="time" :value="selectedTime" aria-label="时间" @change="setTime" />
+      <button class="dp-clear" type="button" @click="clearDate">清除</button>
+    </div>
+
     <div class="dp-shortcuts">
-      <button class="dp-shortcut" @click="setToday">☀️ 今天</button>
-      <button class="dp-shortcut" @click="setTomorrow">🌤️ 明天</button>
-      <button class="dp-shortcut" @click="setNextWeek">📅 下周</button>
-      <button class="dp-shortcut" @click="clearDate">🌙 无日期</button>
+      <button class="dp-shortcut" type="button" @click="setToday">今天</button>
+      <button class="dp-shortcut" type="button" @click="setTomorrow">明天</button>
+      <button class="dp-shortcut" type="button" @click="setNextWeek">下周</button>
     </div>
 
-    <!-- 日历 -->
     <div class="dp-calendar">
-      <div class="dp-cal-header">
-        <button class="dp-nav" @click="prevMonth">‹</button>
-        <span class="dp-month">{{ calYear }}年{{ calMonth + 1 }}月</span>
-        <button class="dp-nav" @click="nextMonth">›</button>
-      </div>
       <div class="dp-weekdays">
         <span v-for="d in weekdays" :key="d">{{ d }}</span>
       </div>
@@ -27,6 +36,7 @@
           v-for="(d, i) in calendarDays"
           :key="i"
           class="dp-day"
+          type="button"
           :class="{
             'other-month': !d.current,
             'is-today': isToday(d.date),
@@ -38,23 +48,6 @@
         </button>
       </div>
     </div>
-
-    <!-- 时间设置 -->
-    <div class="dp-time-section">
-      <button class="dp-row" @click="showTimePicker = !showTimePicker">
-        <span>🕐 时间</span>
-        <span class="dp-arrow">›</span>
-      </button>
-      <div v-if="showTimePicker" class="dp-time-picker">
-        <input type="time" :value="selectedTime" @change="setTime" class="time-input" />
-      </div>
-    </div>
-
-    <!-- 操作按钮 -->
-    <div class="dp-footer">
-      <button class="dp-btn dp-btn--confirm" @click="confirm">确定</button>
-      <button class="dp-btn dp-btn--clear" @click="clearDate">清除</button>
-    </div>
   </div>
 </template>
 
@@ -62,17 +55,23 @@
 import { ref, computed } from 'vue'
 import { useTaskStore } from '@/stores/task'
 import { getMonthDays, toDateString } from '@/utils/date'
+import YearMonthPicker from './YearMonthPicker.vue'
 
-const props = defineProps({ task: Object })
+const props = defineProps({
+  task: { type: Object, required: true },
+  field: { type: String, default: 'dueDate' },
+  title: { type: String, default: '选择日期' }
+})
 const emit = defineEmits(['close'])
 const store = useTaskStore()
 
-const tab = ref('date')
-const calYear = ref(new Date().getFullYear())
-const calMonth = ref(new Date().getMonth())
-const selectedDate = ref(props.task.dueDate ? new Date(props.task.dueDate) : new Date())
-const selectedTime = ref(props.task.dueDate ? new Date(props.task.dueDate).toTimeString().slice(0, 5) : '09:00')
-const showTimePicker = ref(false)
+const initialValue = computed(() => props.task?.[props.field])
+const initialDate = initialValue.value ? new Date(initialValue.value) : new Date()
+const calYear = ref(initialDate.getFullYear())
+const calMonth = ref(initialDate.getMonth())
+const selectedDate = ref(initialDate)
+const selectedTime = ref(initialValue.value ? initialDate.toTimeString().slice(0, 5) : '09:00')
+const monthPickerOpen = ref(false)
 const weekdays = ['日', '一', '二', '三', '四', '五', '六']
 
 const calendarDays = computed(() => getMonthDays(calYear.value, calMonth.value))
@@ -87,6 +86,12 @@ function nextMonth() {
   else calMonth.value++
 }
 
+function selectMonth({ year, month }) {
+  calYear.value = year
+  calMonth.value = month
+  monthPickerOpen.value = false
+}
+
 function isToday(d) {
   const now = new Date()
   return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
@@ -98,10 +103,12 @@ function isSelected(d) {
 
 function selectDate(d) {
   selectedDate.value = new Date(d)
+  confirm()
 }
 
 function setTime(e) {
   selectedTime.value = e.target.value
+  if (initialValue.value) applyValue(false)
 }
 
 function setToday() { setSelected(new Date()) }
@@ -116,15 +123,19 @@ function setSelected(d) {
 }
 
 function clearDate() {
-  store.updateTask(props.task.id, { dueDate: null })
+  store.updateTask(props.task.id, { [props.field]: null })
   emit('close')
 }
 
 function confirm() {
+  applyValue()
+}
+
+function applyValue(shouldClose = true) {
   const [h, m] = selectedTime.value.split(':').map(Number)
   const d = new Date(selectedDate.value)
   d.setHours(h, m, 0, 0)
-  store.updateTask(props.task.id, { dueDate: d.toISOString() })
-  emit('close')
+  store.updateTask(props.task.id, { [props.field]: d.toISOString() })
+  if (shouldClose) emit('close')
 }
 </script>
