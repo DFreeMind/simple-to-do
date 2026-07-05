@@ -41,39 +41,27 @@ npm install
 
 ## 开发运行
 
-只运行前端页面：
+启动 Tauri 桌面应用：
 
 ```powershell
 npm run dev
 ```
 
-运行 Tauri 桌面应用：
-
-```powershell
-npm run tauri:dev
-```
-
-`tauri:dev` 会自动启动 Vite，并打开桌面窗口。
+`npm run dev` 会自动启动内部 Vite 服务，并打开桌面窗口。项目不再把浏览器页面作为产品运行入口；`frontend:dev` 只供 Tauri 开发流程内部使用。
 
 ## 构建
 
-构建前端静态资源：
+构建 Tauri 桌面应用和安装包：
 
 ```powershell
 npm run build
-```
-
-构建 Tauri 桌面应用和 Windows NSIS 安装包：
-
-```powershell
-npm run tauri:build
 ```
 
 可执行文件位于 `src-tauri/target/release/`，安装包位于 `src-tauri/target/release/bundle/`。
 
 ## 验证命令
 
-检查前端构建：
+完整桌面构建：
 
 ```powershell
 npm run build
@@ -100,10 +88,10 @@ cd src-tauri
 cargo check
 ```
 
-完整桌面构建：
+仅检查内嵌前端构建：
 
 ```powershell
-npm run tauri:build
+npm run frontend:build
 ```
 
 ## 当前功能
@@ -135,6 +123,7 @@ npm run tauri:build
 ## 开发约定
 
 - 不继续扩展 Electron，原生能力统一走 Tauri/Rust。
+- 不维护独立 Web 版本；GUI 是唯一产品形态，Vite 仅作为 Tauri 内嵌前端工具链。
 - 前端不要直接访问 Tauri 全局对象，统一通过 `src/services/platform.js` 调用。
 - 每完成一个稳定功能并验证通过后提交一次，commit 使用中文。
 - 新增数据字段必须兼容旧 JSON。

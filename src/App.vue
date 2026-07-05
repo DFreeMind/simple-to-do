@@ -1,11 +1,13 @@
 <template>
-  <div class="app">
-    <div class="app-body">
-      <AppRail />
+  <div class="app" :data-theme="store.settings.theme" :data-density="store.settings.density">
+    <div class="app-shell" :class="{ 'app-shell--detail-closed': !store.settings.detailOpen }">
       <Sidebar />
       <TaskList />
-      <TaskDetail v-if="store.selectedTask" />
+      <TaskDetail v-if="store.settings.detailOpen" />
     </div>
+
+    <SettingsPanel />
+
     <div
       v-if="store.notice"
       class="app-toast"
@@ -20,10 +22,10 @@
 
 <script setup>
 import { onMounted, watch } from 'vue'
-import AppRail from './components/AppRail.vue'
 import Sidebar from './components/Sidebar.vue'
 import TaskList from './components/TaskList.vue'
 import TaskDetail from './components/TaskDetail.vue'
+import SettingsPanel from './components/SettingsPanel.vue'
 import { useTaskStore } from './stores/task'
 
 const store = useTaskStore()

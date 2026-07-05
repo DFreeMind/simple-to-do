@@ -1,59 +1,59 @@
 <template>
-  <Teleport to="body">
-    <div v-if="show" class="format-menu" :style="menuStyle" @click.stop>
-      <div class="format-group">
-        <button class="format-item" @click="insertHeading(1)">
-          <span class="format-label">H1</span>
-          <span class="format-name">一级标题</span>
-        </button>
-        <button class="format-item" @click="insertHeading(2)">
-          <span class="format-label">H2</span>
-          <span class="format-name">二级标题</span>
-        </button>
-        <button class="format-item" @click="insertHeading(3)">
-          <span class="format-label">H3</span>
-          <span class="format-name">三级标题</span>
-        </button>
-      </div>
-      <div class="format-separator"></div>
-      <div class="format-group">
-        <button class="format-item" @click="insertBulletList">
-          <span class="format-icon">☰</span>
-          <span class="format-name">无序列表</span>
-        </button>
-        <button class="format-item" @click="insertOrderedList">
-          <span class="format-icon">≡</span>
-          <span class="format-name">有序列表</span>
-        </button>
-        <button class="format-item" @click="insertTaskList">
-          <span class="format-icon">☑</span>
-          <span class="format-name">检查项</span>
-        </button>
-      </div>
-      <div class="format-separator"></div>
-      <div class="format-group">
-        <button class="format-item" @click="insertBlockquote">
-          <span class="format-icon">❝</span>
-          <span class="format-name">引用</span>
-        </button>
-        <button class="format-item" @click="insertHorizontalRule">
-          <span class="format-icon">—</span>
-          <span class="format-name">水平分割线</span>
-        </button>
-      </div>
-      <div class="format-separator"></div>
-      <div class="format-group">
-        <button class="format-item" @click="insertImage">
-          <span class="format-icon">🖼️</span>
-          <span class="format-name">图片</span>
-        </button>
-      </div>
+    <div v-if="show" class="format-menu" :style="menuStyle" role="menu" @click.stop>
+      <button class="format-item" role="menuitem" type="button" @click="insertHeading(1)">
+        <Heading1 :size="16" />
+        <span>一级标题</span>
+      </button>
+      <button class="format-item" role="menuitem" type="button" @click="insertHeading(2)">
+        <Heading2 :size="16" />
+        <span>二级标题</span>
+      </button>
+      <button class="format-item" role="menuitem" type="button" @click="insertHeading(3)">
+        <Heading3 :size="16" />
+        <span>三级标题</span>
+      </button>
+      <div class="context-separator"></div>
+      <button class="format-item" role="menuitem" type="button" @click="insertBulletList">
+        <List :size="16" />
+        <span>无序列表</span>
+      </button>
+      <button class="format-item" role="menuitem" type="button" @click="insertOrderedList">
+        <ListOrdered :size="16" />
+        <span>有序列表</span>
+      </button>
+      <button class="format-item" role="menuitem" type="button" @click="insertTaskList">
+        <ListChecks :size="16" />
+        <span>待办块</span>
+      </button>
+      <div class="context-separator"></div>
+      <button class="format-item" role="menuitem" type="button" @click="insertBlockquote">
+        <Quote :size="16" />
+        <span>引用</span>
+      </button>
+      <button class="format-item" role="menuitem" type="button" @click="insertHorizontalRule">
+        <Minus :size="16" />
+        <span>分割线</span>
+      </button>
+      <button class="format-item" role="menuitem" type="button" @click="insertImage">
+        <ImagePlus :size="16" />
+        <span>图片</span>
+      </button>
     </div>
-  </Teleport>
 </template>
 
 <script setup>
 import { computed } from 'vue'
+import {
+  Heading1,
+  Heading2,
+  Heading3,
+  ImagePlus,
+  List,
+  ListChecks,
+  ListOrdered,
+  Minus,
+  Quote
+} from 'lucide-vue-next'
 
 const props = defineProps({
   show: Boolean,
@@ -64,8 +64,8 @@ const props = defineProps({
 const emit = defineEmits(['close', 'insertImage'])
 
 const menuStyle = computed(() => ({
-  left: props.position.x + 'px',
-  top: props.position.y + 'px'
+  left: `${props.position.x}px`,
+  top: `${props.position.y}px`
 }))
 
 function insertHeading(level) {
