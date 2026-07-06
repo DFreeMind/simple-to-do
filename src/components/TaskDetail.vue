@@ -187,6 +187,7 @@
             v-for="subtask in task.subtasks"
             :key="subtask.id"
             class="subtask-item"
+            :data-subtask-id="subtask.id"
             :class="{ completed: subtask.completed, 'is-dragging': subtaskDrag.draggingId.value === subtask.id, 'drop-target': subtaskDrag.dragOverId.value === subtask.id }"
           >
             <span
@@ -221,7 +222,7 @@
         </div>
       </section>
 
-      <section class="detail-section detail-section--editor">
+      <section class="detail-section detail-section--editor" @click="onEditorSectionClick">
         <div class="section-heading">
           <h2>备注</h2>
           <button class="small-btn" type="button" @click.stop="openFormatMenu">
@@ -242,7 +243,7 @@
         </div>
         <div v-if="task.attachments.length" class="attachment-grid">
           <figure v-for="attachment in task.attachments" :key="attachment.id" class="attachment-card">
-            <img :src="attachment.url" :alt="attachment.path || '任务附件'" @click="previewUrl = attachment.url" />
+            <img :src="attachment.url" :alt="attachment.path || '任务附件'" @click="openLightbox(attachmentIndex(attachment))" />
             <figcaption>
               <span>{{ attachment.path || '图片附件' }}</span>
               <button class="ghost-icon danger" type="button" aria-label="移除附件" @click="removeAttachment(attachment.id)">
@@ -279,11 +280,12 @@
 
       <input ref="fileInput" type="file" accept="image/*" multiple class="hidden-file-input" @change="onFileSelected" />
 
-      <Teleport to="body">
-        <div v-if="previewUrl" class="image-preview" role="dialog" aria-modal="true" @click="previewUrl = null">
-          <img :src="previewUrl" alt="附件预览" />
-        </div>
-      </Teleport>
+      <ImageLightbox
+        :images="allImageUrls"
+        :startIndex="previewIndex"
+        :visible="previewVisible"
+        @close="previewVisible = false"
+      />
     </template>
   </aside>
 </template>
@@ -316,6 +318,7 @@ import { useTaskStore } from '@/stores/task'
 import { useDragSort } from '@/composables/useDragSort'
 import FormatMenu from './FormatMenu.vue'
 import DatePicker from './DatePicker.vue'
+import ImageLightbox from './ImageLightbox.vue'
 import { readImage, selectImage } from '@/services/platform'
 
 const RichTextEditor = defineAsyncComponent({
@@ -332,7 +335,44 @@ const richTextEditor = ref(null)
 const formatMenuVisible = ref(false)
 const formatMenuPos = ref({ x: 0, y: 0 })
 const fileInput = ref(null)
-const previewUrl = ref(null)
+const previewVisible = ref(false)
+const previewIndex = ref(0)
+
+const allImageUrls = computed(() => {
+  if (!task.value) return []
+  const urls = []
+  if (task.value.attachments) {
+    for (const a of task.value.attachments) {
+      if (a.url) urls.push(a.url)
+    }
+  }
+  if (editorContent.value) {
+    const div = document.createElement('div')
+    div.innerHTML = editorContent.value
+    div.querySelectorAll('img').forEach(img => {
+      if (img.src && !urls.includes(img.src)) urls.push(img.src)
+    })
+  }
+  return urls
+})
+
+function attachmentIndex(attachment) {
+  return allImageUrls.value.indexOf(attachment.url)
+}
+
+function openLightbox(index) {
+  if (index < 0) return
+  previewIndex.value = index
+  previewVisible.value = true
+}
+
+function onEditorSectionClick(e) {
+  const img = e.target.closest('.editor-content img')
+  if (!img || !img.src) return
+  const idx = allImageUrls.value.indexOf(img.src)
+  if (idx >= 0) openLightbox(idx)
+  else openLightbox(0)
+}
 const openSelect = ref('')
 const openDatePicker = ref('')
 const tagInput = ref('')
@@ -357,21 +397,19 @@ const subtaskDrag = useDragSort({
     if (!handle) return null
     const item = handle.closest('.subtask-item')
     if (!item) return null
-    const input = item.querySelector('input')
-    const subtask = task.value?.subtasks.find(s => s.title === input?.value)
-    return subtask ? { id: subtask.id, el: item } : null
+    const subtaskId = item.dataset.subtaskId
+    return subtaskId ? { id: subtaskId, el: item } : null
   },
   findItemAtPoint(x, y) {
     const elements = document.elementsFromPoint(x, y)
     for (const el of elements) {
       const item = el.closest?.('.subtask-item')
       if (item) {
-        const input = item.querySelector('input')
-        const subtask = task.value?.subtasks.find(s => s.title === input?.value)
-        if (!subtask) continue
+        const subtaskId = item.dataset.subtaskId
+        if (!subtaskId) continue
         const rect = item.getBoundingClientRect()
         const midY = rect.top + rect.height / 2
-        return { id: subtask.id, position: y < midY ? 'before' : 'after' }
+        return { id: subtaskId, position: y < midY ? 'before' : 'after' }
       }
     }
     return null
@@ -383,9 +421,8 @@ function handleSubtaskMouseDown(e) {
   if (!handle) return
   const item = handle.closest('.subtask-item')
   if (!item) return
-  const input = item.querySelector('input')
-  const subtask = task.value?.subtasks.find(s => s.title === input?.value)
-  if (subtask) subtaskDrag.startDrag(e, subtask.id)
+  const subtaskId = item.dataset.subtaskId
+  if (subtaskId) subtaskDrag.startDrag(e, subtaskId)
 }
 
 const task = computed(() => store.selectedTask)

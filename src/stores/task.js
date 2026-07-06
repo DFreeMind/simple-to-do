@@ -7,6 +7,8 @@ import { loadData as loadPlatformData, saveData as savePlatformData } from '@/se
 const SYSTEM_VIEW_IDS = ['today', 'inbox', 'planned', 'important', 'calendar', 'stats', 'completed', 'trash', 'search']
 const READONLY_VIEWS = ['planned', 'calendar', 'stats', 'completed', 'trash']
 const THEME_IDS = ['mint', 'blue', 'violet', 'graphite']
+const DETAIL_WIDTH_MIN = 320
+const DETAIL_WIDTH_MAX = 800
 
 const DEFAULT_GROUPS = [
   { id: 'life', name: '生活', collapsed: false, sortOrder: 1000 },
@@ -23,6 +25,7 @@ const DEFAULT_SETTINGS = {
   theme: 'mint',
   density: 'comfortable',
   detailOpen: true,
+  detailWidth: 380,
   startView: 'today',
   completedVisible: true
 }
@@ -141,6 +144,9 @@ export const useTaskStore = defineStore('task', () => {
   const ungroupedCollapsed = ref(false)
   const calendarCursor = ref(new Date())
   const viewOrders = ref({})
+  let pendingSavePayload = null
+  let activeSavePromise = null
+  let saveTimer = null
 
   const activeTasks = computed(() => tasks.value.filter(task => !task.deleted))
   const todayKey = computed(() => localDateKey())
@@ -866,17 +872,21 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   async function saveData() {
+    pendingSavePayload = buildSavePayload()
+    if (activeSavePromise) return activeSavePromise
+
+    activeSavePromise = flushPendingSaves()
+    return activeSavePromise
+  }
+
+  async function flushPendingSaves() {
     isSaving.value = true
     try {
-      await savePlatformData({
-        schemaVersion: 2,
-        groups: groups.value,
-        lists: lists.value,
-        tasks: tasks.value,
-        trash: trash.value,
-        viewOrders: viewOrders.value,
-        settings: settings.value
-      })
+      while (pendingSavePayload) {
+        const payload = pendingSavePayload
+        pendingSavePayload = null
+        await savePlatformData(payload)
+      }
       saveError.value = ''
     } catch (error) {
       saveError.value = error?.message || '保存本地数据失败'
@@ -884,12 +894,33 @@ export const useTaskStore = defineStore('task', () => {
       throw error
     } finally {
       isSaving.value = false
+      activeSavePromise = null
     }
   }
 
   watch([groups, lists, tasks, trash, settings, viewOrders], () => {
-    saveData().catch(() => {})
+    scheduleSave()
   }, { deep: true })
+
+  function scheduleSave() {
+    if (saveTimer) window.clearTimeout(saveTimer)
+    saveTimer = window.setTimeout(() => {
+      saveTimer = null
+      saveData().catch(() => {})
+    }, 180)
+  }
+
+  function buildSavePayload() {
+    return JSON.parse(JSON.stringify({
+      schemaVersion: 2,
+      groups: groups.value,
+      lists: lists.value,
+      tasks: tasks.value,
+      trash: trash.value,
+      viewOrders: viewOrders.value,
+      settings: settings.value
+    }))
+  }
 
   function normalizeGroups(rawGroups) {
     const source = Array.isArray(rawGroups) && rawGroups.length ? rawGroups : DEFAULT_GROUPS
@@ -963,6 +994,9 @@ export const useTaskStore = defineStore('task', () => {
     const theme = THEME_IDS.includes(rawSettings.theme) ? rawSettings.theme : DEFAULT_SETTINGS.theme
     const density = ['comfortable', 'compact'].includes(rawSettings.density) ? rawSettings.density : DEFAULT_SETTINGS.density
     const startView = SYSTEM_VIEW_IDS.includes(rawSettings.startView) ? rawSettings.startView : DEFAULT_SETTINGS.startView
+    const detailWidth = typeof rawSettings.detailWidth === 'number'
+      ? Math.max(DETAIL_WIDTH_MIN, Math.min(DETAIL_WIDTH_MAX, rawSettings.detailWidth))
+      : DEFAULT_SETTINGS.detailWidth
     return {
       ...DEFAULT_SETTINGS,
       ...rawSettings,
@@ -970,6 +1004,7 @@ export const useTaskStore = defineStore('task', () => {
       density,
       startView,
       detailOpen: rawSettings.detailOpen !== false,
+      detailWidth,
       completedVisible: rawSettings.completedVisible !== false
     }
   }

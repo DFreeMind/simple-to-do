@@ -1,6 +1,7 @@
 <template>
   <article
     class="task-item"
+    :data-task-id="task.id"
     :class="{
       selected: store.selectedTaskId === task.id,
       completed: task.completed,
