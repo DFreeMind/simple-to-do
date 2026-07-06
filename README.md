@@ -57,7 +57,42 @@ npm run dev
 npm run build
 ```
 
-可执行文件位于 `src-tauri/target/release/`，安装包位于 `src-tauri/target/release/bundle/`。
+### 构建产物说明
+
+构建完成后，`src-tauri/target/release/` 下会生成大量文件，**只有安装包需要分发**：
+
+| 路径 | 说明 | 是否分发 |
+|------|------|---------|
+| `bundle/nsis/易简清单_1.0.0_x64-setup.exe` | NSIS 安装包（用户运行此文件） | ✅ 是 |
+| `simple-to-do.exe` | 主程序（已打包进安装包） | ❌ 否 |
+| `build/*/build_script_build-*.exe` | Rust 编译中间产物 | ❌ 否 |
+| `deps/simple_to_do.exe` | 编译依赖产物 | ❌ 否 |
+
+整个 `target/` 目录已被 `.gitignore` 排除，不会进入版本控制。
+
+### Windows 安装注意事项
+
+安装器在写入 `exe` 文件时，如果应用正在运行，Windows 会锁定该文件导致安装失败（报 "Error opening file for writing"）。
+
+- **全新安装**：用户电脑上没有此应用，不会遇到此问题
+- **升级安装**：安装器会自动检测并提示关闭正在运行的应用
+- **开发者测试**：运行安装包前需先关闭 dev 模式（`Ctrl+C` 停止 `npm run dev`）
+
+### 自定义安装器 UI
+
+安装器支持自定义头部和侧边栏图片，规格要求：
+
+- 头部图片：`src-tauri/nsis/header.bmp`，493×312 像素，24 位 BMP
+- 侧边栏图片：`src-tauri/nsis/sidebar.bmp`，164×314 像素，24 位 BMP
+
+在 `tauri.conf.json` 的 `bundle.windows.nsis` 中配置：
+
+```json
+{
+  "headerImage": "nsis/header.bmp",
+  "sidebarImage": "nsis/sidebar.bmp"
+}
+```
 
 ## 验证命令
 
