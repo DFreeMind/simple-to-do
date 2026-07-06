@@ -24,7 +24,7 @@ const DEFAULT_LISTS = [
 const DEFAULT_SETTINGS = {
   theme: 'mint',
   density: 'comfortable',
-  detailOpen: true,
+  detailOpen: false,
   detailWidth: 380,
   startView: 'today',
   completedVisible: true
