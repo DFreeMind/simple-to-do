@@ -1,5 +1,5 @@
 use base64::{engine::general_purpose, Engine as _};
-use std::{fs, path::PathBuf};
+use std::{fs, io::Write, path::PathBuf};
 use tauri::Manager;
 
 fn data_file(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -28,8 +28,40 @@ fn save_data(app: tauri::AppHandle, data: serde_json::Value) -> Result<bool, Str
     let file = data_file(&app)?;
     let content =
         serde_json::to_string_pretty(&data).map_err(|err| format!("序列化数据失败: {err}"))?;
-    fs::write(file, content).map_err(|err| format!("保存数据失败: {err}"))?;
+    write_data_file(&file, content.as_bytes())?;
     Ok(true)
+}
+
+fn write_data_file(file: &PathBuf, content: &[u8]) -> Result<(), String> {
+    let tmp_file = file.with_extension("json.tmp");
+    let backup_file = file.with_extension("json.bak");
+
+    {
+        let mut tmp =
+            fs::File::create(&tmp_file).map_err(|err| format!("创建临时数据文件失败: {err}"))?;
+        tmp.write_all(content)
+            .map_err(|err| format!("写入临时数据失败: {err}"))?;
+        tmp.write_all(b"\n")
+            .map_err(|err| format!("写入临时数据失败: {err}"))?;
+        tmp.sync_all()
+            .map_err(|err| format!("同步临时数据失败: {err}"))?;
+    }
+
+    if file.exists() {
+        if backup_file.exists() {
+            fs::remove_file(&backup_file).map_err(|err| format!("清理旧备份失败: {err}"))?;
+        }
+        fs::rename(file, &backup_file).map_err(|err| format!("备份现有数据失败: {err}"))?;
+    }
+
+    if let Err(err) = fs::rename(&tmp_file, file) {
+        if backup_file.exists() && !file.exists() {
+            let _ = fs::rename(&backup_file, file);
+        }
+        return Err(format!("替换数据文件失败: {err}"));
+    }
+
+    Ok(())
 }
 
 #[tauri::command]

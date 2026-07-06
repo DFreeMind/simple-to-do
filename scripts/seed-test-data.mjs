@@ -2,8 +2,9 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-const dataDir = path.join(os.homedir(), 'Library', 'Application Support', 'com.simpletodo.desktop')
-const dataFile = path.join(dataDir, 'todo-data.json')
+const appId = 'com.simpletodo.desktop'
+const dataFile = process.env.SIMPLE_TODO_DATA_FILE || path.join(resolveAppDataDir(), 'todo-data.json')
+const dataDir = path.dirname(dataFile)
 
 const now = new Date()
 
@@ -59,10 +60,20 @@ function sub(id, title, completed = false) {
 function attachment(id, name, createdAt = daysAgo(2)) {
   return {
     id,
-    path: `/Users/luqiu/Pictures/test-data/${name}`,
+    path: path.join(os.homedir(), 'Pictures', 'test-data', name),
     url: '',
     createdAt
   }
+}
+
+function resolveAppDataDir() {
+  if (process.platform === 'win32') {
+    return path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), appId)
+  }
+  if (process.platform === 'darwin') {
+    return path.join(os.homedir(), 'Library', 'Application Support', appId)
+  }
+  return path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'), appId)
 }
 
 const groups = [

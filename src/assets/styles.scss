@@ -96,7 +96,7 @@ select:focus-visible,
   --text-subtle: #8c9996;
   --danger: #d94d4d;
   --warning: #cc7a22;
-  --row-height: 58px;
+  --row-height: 62px;
   height: 100%;
   color: var(--text);
   background:
@@ -126,19 +126,20 @@ select:focus-visible,
 }
 
 .app[data-density="compact"] {
-  --row-height: 48px;
+  --row-height: 52px;
   font-size: 13px;
 }
 
 .app-shell {
   display: grid;
-  grid-template-columns: 286px minmax(420px, 1fr) minmax(360px, 430px);
+  grid-template-columns: 286px minmax(420px, 1fr) var(--detail-w, 400px);
   height: 100%;
   min-width: 0;
+  position: relative;
 }
 
 .app-shell--detail-closed {
-  grid-template-columns: 286px minmax(420px, 1fr);
+  grid-template-columns: 286px 1fr;
 }
 
 .sidebar,
@@ -146,6 +147,52 @@ select:focus-visible,
 .task-detail {
   min-width: 0;
   min-height: 0;
+}
+
+.col-resizer {
+  position: absolute;
+  right: var(--detail-w, 400px);
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  cursor: col-resize;
+  z-index: 10;
+  transform: translateX(50%);
+
+  &::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 16px;
+    bottom: 16px;
+    transform: translateX(-50%);
+    width: 1px;
+    border-radius: 1px;
+    background: var(--divider-soft, rgba(0,0,0,0.08));
+    transition: background 0.15s, width 0.15s, opacity 0.15s;
+  }
+
+  &:hover::after {
+    background: var(--accent);
+    opacity: 0.35;
+    width: 2px;
+  }
+
+  &:active::after {
+    opacity: 0.6;
+    width: 2px;
+  }
+}
+
+body.is-resizing {
+  user-select: none;
+  cursor: col-resize;
+
+  .col-resizer::after {
+    background: var(--accent);
+    opacity: 0.5;
+    width: 2px;
+  }
 }
 
 .sidebar {
@@ -435,9 +482,12 @@ select:focus-visible,
   border-radius: var(--radius-sm);
   color: var(--text-subtle);
   cursor: grab;
+  opacity: 0;
+  transition: opacity var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
 
   &:hover,
   &:focus-visible {
+    opacity: 1;
     background: var(--surface-muted);
     color: var(--accent-strong);
   }
@@ -648,7 +698,6 @@ select:focus-visible,
 .search-panel,
 .readonly-hint {
   flex: 0 0 auto;
-  min-height: 52px;
   margin-bottom: 16px;
   padding: 8px 10px 8px 14px;
 
@@ -658,6 +707,66 @@ select:focus-visible,
     outline: 0;
     background: transparent;
   }
+}
+
+.group-row:hover > .sidebar-drag-handle,
+.group-row:focus-within > .sidebar-drag-handle,
+.group-row.is-dragging > .sidebar-drag-handle,
+.group-row.drop-target > .sidebar-drag-handle,
+.list-item:hover > .sidebar-drag-handle,
+.list-item:focus-within > .sidebar-drag-handle,
+.list-item.is-dragging > .sidebar-drag-handle,
+.list-item.drop-target > .sidebar-drag-handle {
+  opacity: 1;
+}
+
+.quick-add {
+  display: grid;
+  align-items: stretch;
+  gap: 7px;
+}
+
+.quick-add__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+}
+
+.quick-add__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-left: 28px;
+}
+
+.quick-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 150px;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 620;
+
+  svg {
+    flex: 0 0 auto;
+  }
+}
+
+.quick-chip--date,
+.quick-chip--repeat {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.quick-chip--priority {
+  background: color-mix(in srgb, var(--warning) 13%, var(--surface));
+  color: var(--warning);
 }
 
 .readonly-hint {
@@ -1131,17 +1240,21 @@ select:focus-visible,
   grid-template-columns: 22px 32px minmax(0, 1fr) auto;
   align-items: center;
   min-height: var(--row-height);
-  padding: 8px 10px;
+  padding: 9px 10px;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
-  background: var(--surface);
-  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.03);
-  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+  background: transparent;
+  transition: background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
 
-  &:hover,
-  &.selected {
+  &:hover {
     border-color: color-mix(in srgb, var(--accent) 26%, var(--border));
-    background: var(--accent-tint);
+    background: color-mix(in srgb, var(--accent-tint) 68%, var(--surface));
+  }
+
+  &.selected {
+    border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+    background: color-mix(in srgb, var(--accent-tint) 76%, var(--surface));
+    box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 58%, transparent);
   }
 
   &:active {
@@ -1156,8 +1269,10 @@ select:focus-visible,
   }
 
   &.is-dragging {
-    opacity: 0.35;
-    transform: scale(0.97);
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+    background: var(--surface);
+    box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 58%, transparent);
+    opacity: 1;
   }
 
   &.no-drag-handle {
@@ -1204,9 +1319,12 @@ select:focus-visible,
   background: transparent;
   color: var(--text-subtle);
   cursor: grab;
+  opacity: 0;
+  transition: opacity var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
 
   &:hover,
   &:focus-visible {
+    opacity: 1;
     background: var(--surface-muted);
     color: var(--accent-strong);
   }
@@ -1256,11 +1374,13 @@ select:focus-visible,
 }
 
 .task-title {
+  display: -webkit-box;
   overflow: hidden;
   color: var(--text);
   font-weight: 560;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .inline-icon {
@@ -1270,8 +1390,8 @@ select:focus-visible,
 .task-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 6px;
+  gap: 4px;
+  margin-top: 5px;
 }
 
 .meta-chip {
@@ -1279,12 +1399,12 @@ select:focus-visible,
   align-items: center;
   gap: 4px;
   max-width: 160px;
-  min-height: 20px;
-  padding: 2px 7px;
+  min-height: 19px;
+  padding: 2px 6px;
   border-radius: 999px;
   background: var(--surface-muted);
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.2;
 
   &.overdue {
@@ -1367,7 +1487,7 @@ select:focus-visible,
   position: sticky;
   top: 0;
   z-index: 12;
-  padding: 20px 20px 14px;
+  padding: 18px 18px 12px;
   border-bottom: 1px solid var(--divider-soft);
   background: var(--surface);
   box-shadow: 0 10px 24px color-mix(in srgb, var(--text) 6%, transparent);
@@ -1382,7 +1502,7 @@ select:focus-visible,
   outline: 0;
   background: transparent;
   color: var(--text);
-  font-size: 20px;
+  font-size: 19px;
   font-weight: 680;
   line-height: 1.25;
 }
@@ -1391,7 +1511,7 @@ select:focus-visible,
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 14px 20px 0;
+  padding: 12px 18px 0;
 }
 
 .attribute-toggle.active {
@@ -1400,8 +1520,13 @@ select:focus-visible,
   color: var(--accent-strong);
 }
 
+.detail-actions .attribute-toggle {
+  min-height: 34px;
+  padding: 0 10px;
+}
+
 .detail-section {
-  margin: 16px 20px 0;
+  margin: 14px 18px 0;
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -1411,17 +1536,17 @@ select:focus-visible,
 .detail-section--grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 10px;
+  gap: 4px;
 }
 
 .field {
   position: relative;
   display: grid;
-  grid-template-columns: 92px minmax(0, 1fr);
+  grid-template-columns: 86px minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
-  min-height: 42px;
-  padding: 6px 0;
+  gap: 8px;
+  min-height: 38px;
+  padding: 4px 0;
   border-bottom: 1px solid var(--divider-soft);
 
   > span {
@@ -1437,8 +1562,8 @@ select:focus-visible,
   select,
   .detail-select__button {
     width: 100%;
-    height: 36px;
-    padding: 0 10px;
+    height: 32px;
+    padding: 0 9px;
     border: 1px solid transparent;
     border-radius: var(--radius-sm);
     background: transparent;
@@ -1448,9 +1573,9 @@ select:focus-visible,
 
     &:focus,
     &:focus-visible {
-      border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+      border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
       background: var(--surface);
-      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 9%, transparent);
     }
 
     &:hover {
@@ -1541,8 +1666,8 @@ select:focus-visible,
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  min-height: 36px;
-  padding: 6px;
+  min-height: 32px;
+  padding: 4px 6px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -1594,7 +1719,7 @@ select:focus-visible,
 }
 
 .section-heading {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 
   h2,
   h3 {
@@ -1610,7 +1735,7 @@ select:focus-visible,
 
 .subtask-list {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .subtask-item,
@@ -1619,8 +1744,8 @@ select:focus-visible,
   grid-template-columns: 22px auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
-  min-height: 40px;
-  padding: 6px 8px;
+  min-height: 36px;
+  padding: 5px 8px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface);
@@ -1637,7 +1762,9 @@ select:focus-visible,
   position: relative;
 
   &.is-dragging {
-    opacity: 0.4;
+    border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+    background: var(--surface);
+    opacity: 1;
   }
 
   &.drop-target-before::before {
@@ -1683,6 +1810,23 @@ select:focus-visible,
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface);
+
+  &:focus-within {
+    border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 8%, transparent);
+  }
+}
+
+.task-item:hover > .task-drag-handle,
+.task-item:focus-within > .task-drag-handle,
+.task-item.is-dragging > .task-drag-handle,
+.task-item.drop-target-before > .task-drag-handle,
+.task-item.drop-target-after > .task-drag-handle,
+.subtask-item:hover .subtask-drag-handle,
+.subtask-item:focus-within .subtask-drag-handle,
+.subtask-item.is-dragging .subtask-drag-handle,
+.subtask-item.drop-target .subtask-drag-handle {
+  opacity: 1;
 }
 
 .rich-editor-loading {
@@ -1691,8 +1835,8 @@ select:focus-visible,
 }
 
 .editor-inner {
-  min-height: 190px;
-  padding: 14px 16px;
+  min-height: 150px;
+  padding: 12px 14px;
   outline: 0;
   line-height: 1.65;
 
@@ -1730,6 +1874,7 @@ select:focus-visible,
   img {
     max-width: 100%;
     border-radius: var(--radius-sm);
+    cursor: zoom-in;
   }
 
   hr {
@@ -1792,7 +1937,7 @@ select:focus-visible,
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 18px 20px 24px;
+  padding: 14px 18px 22px;
 }
 
 .hidden-file-input {
@@ -2305,6 +2450,10 @@ select:focus-visible,
     grid-template-columns: 250px minmax(0, 1fr);
   }
 
+  .col-resizer {
+    display: none;
+  }
+
   .settings-panel {
     width: min(680px, calc(100vw - 20px));
   }
@@ -2389,10 +2538,14 @@ select:focus-visible,
   z-index: 9999;
   pointer-events: none;
   opacity: 1 !important;
+  isolation: isolate;
+  overflow: hidden;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   border: 1.5px solid var(--accent);
   border-radius: var(--radius-md);
-  background: var(--surface);
+  background: var(--surface, #ffffff) !important;
+  background-color: var(--surface, #ffffff) !important;
+  background-clip: padding-box;
   transform: scale(1.02);
 }
 
@@ -2439,5 +2592,6 @@ select:focus-visible,
 }
 
 .group-row.is-dragging {
-  opacity: 0.4;
+  background: var(--surface);
+  opacity: 1;
 }

@@ -40,6 +40,11 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
 
     // Create ghost element
     ghostEl = item.el.cloneNode(true)
+    const appRoot = document.querySelector('.app') || document.body
+    const appStyle = getComputedStyle(appRoot)
+    const ghostBg = appStyle.getPropertyValue('--surface').trim() || '#ffffff'
+    const ghostBorder = appStyle.getPropertyValue('--accent').trim() || '#2f8f86'
+
     // Remove classes that affect appearance, keep structural ones
     ghostEl.classList.remove('is-dragging', 'drop-target-before', 'drop-target-after', 'selected', 'no-drag-handle')
     ghostEl.classList.add('drag-ghost')
@@ -51,11 +56,12 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
     ghostEl.style.left = (event.clientX - offsetX) + 'px'
     ghostEl.style.top = (event.clientY - offsetY) + 'px'
     ghostEl.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.12)'
-    ghostEl.style.border = '1.5px solid var(--accent)'
+    ghostEl.style.border = `1.5px solid ${ghostBorder}`
     ghostEl.style.borderRadius = 'var(--radius-md)'
-    ghostEl.style.background = 'var(--surface)'
+    ghostEl.style.background = ghostBg
+    ghostEl.style.backgroundColor = ghostBg
     ghostEl.style.transform = 'scale(1.02)'
-    document.body.appendChild(ghostEl)
+    appRoot.appendChild(ghostEl)
 
     document.addEventListener('mousemove', onMouseMove)
     document.addEventListener('mouseup', onMouseUp)

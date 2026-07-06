@@ -57,15 +57,23 @@
     </section>
 
     <section v-else-if="store.canQuickAddTask" class="quick-add">
-      <Plus :size="19" />
-      <input
-        ref="quickInput"
-        v-model="newTaskTitle"
-        :placeholder="quickPlaceholder"
-        aria-label="快速添加任务"
-        @keydown.enter="addTask"
-      />
-      <button class="primary-btn" type="button" :disabled="!newTaskTitle.trim()" @click="addTask">添加</button>
+      <div class="quick-add__row">
+        <Plus :size="19" />
+        <input
+          ref="quickInput"
+          v-model="newTaskTitle"
+          :placeholder="quickPlaceholder"
+          aria-label="快速添加任务"
+          @keydown.enter="addTask"
+        />
+        <button class="primary-btn" type="button" :disabled="!newTaskTitle.trim()" @click="addTask">添加</button>
+      </div>
+      <div v-if="quickParseChips.length" class="quick-add__chips" aria-label="快速添加解析结果">
+        <span v-for="chip in quickParseChips" :key="`${chip.type}:${chip.label}`" class="quick-chip" :class="`quick-chip--${chip.type}`">
+          <component :is="chip.icon" :size="13" />
+          {{ chip.label }}
+        </span>
+      </div>
     </section>
 
     <section v-else class="readonly-hint">
@@ -139,14 +147,18 @@ import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import {
   ArchiveX,
   ArrowUpDown,
+  CalendarClock,
   Check,
   CheckCheck,
   ChevronDown,
   ChevronRight,
+  Flag,
   Info,
   PanelRight,
   Plus,
-  Search
+  Repeat2,
+  Search,
+  Tags
 } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import { useDragSort } from '@/composables/useDragSort'
@@ -185,25 +197,21 @@ const taskDrag = useDragSort({
     if (!handle) return null
     const article = handle.closest('.task-item')
     if (!article) return null
-    const taskTitle = article.querySelector('.task-title')?.textContent
-    const task = store.uncompletedTasks.find(t => t.title === taskTitle) ||
-      store.plannedSections.flatMap(s => s.tasks).find(t => t.title === taskTitle)
-    return task ? { id: task.id, el: article } : null
+    const taskId = article.dataset.taskId
+    return taskId ? { id: taskId, el: article } : null
   },
   findItemAtPoint(x, y) {
     const elements = document.elementsFromPoint(x, y)
     for (const el of elements) {
       const article = el.closest?.('.task-item')
       if (!article) continue
-      const taskTitle = article.querySelector('.task-title')?.textContent
-      const task = store.uncompletedTasks.find(t => t.title === taskTitle) ||
-        store.plannedSections.flatMap(s => s.tasks).find(t => t.title === taskTitle)
-      if (!task) continue
+      const taskId = article.dataset.taskId
+      if (!taskId) continue
       // Determine position: top half = before, bottom half = after
       const rect = article.getBoundingClientRect()
       const midY = rect.top + rect.height / 2
       const position = y < midY ? 'before' : 'after'
-      return { id: task.id, position }
+      return { id: taskId, position }
     }
     return null
   }
@@ -215,10 +223,8 @@ function handleMouseDown(e) {
   if (!handle) return
   const article = handle.closest('.task-item')
   if (!article) return
-  const taskTitle = article.querySelector('.task-title')?.textContent
-  const task = store.uncompletedTasks.find(t => t.title === taskTitle) ||
-    store.plannedSections.flatMap(s => s.tasks).find(t => t.title === taskTitle)
-  if (task) taskDrag.startDrag(e, task.id)
+  const taskId = article.dataset.taskId
+  if (taskId) taskDrag.startDrag(e, taskId)
 }
 
 const viewMeta = computed(() => {
@@ -250,6 +256,32 @@ const quickPlaceholder = computed(() => {
   if (store.currentView === 'today') return '添加到今日，例如：明天 9点 写周报 #工作'
   if (store.currentView === 'important') return '添加重要任务'
   return '添加任务，可输入"明天 18点""每周""#标签"'
+})
+
+const quickParseChips = computed(() => {
+  const input = newTaskTitle.value.trim()
+  if (!input) return []
+  const chips = []
+  const tagMatches = [...input.matchAll(/#([\p{L}\p{N}_-]+)/gu)]
+
+  if (/(今天|今日)/.test(input)) chips.push({ type: 'date', label: '今天', icon: CalendarClock })
+  else if (/明天/.test(input)) chips.push({ type: 'date', label: '明天', icon: CalendarClock })
+  else if (/后天/.test(input)) chips.push({ type: 'date', label: '后天', icon: CalendarClock })
+  else if (/(下周|下星期)/.test(input)) chips.push({ type: 'date', label: '下周', icon: CalendarClock })
+  else if (store.currentView === 'today') chips.push({ type: 'date', label: '今天', icon: CalendarClock })
+
+  const timeMatch = input.match(/(?:^|\s)(\d{1,2})[:：点](\d{2})?/)
+  if (timeMatch) chips.push({ type: 'date', label: `${timeMatch[1].padStart(2, '0')}:${timeMatch[2] || '00'}`, icon: CalendarClock })
+
+  if (/每天|每日/.test(input)) chips.push({ type: 'repeat', label: '每天重复', icon: Repeat2 })
+  else if (/每周|每星期/.test(input)) chips.push({ type: 'repeat', label: '每周重复', icon: Repeat2 })
+  else if (/每月/.test(input)) chips.push({ type: 'repeat', label: '每月重复', icon: Repeat2 })
+
+  if (/重要|高优先级/.test(input) || store.currentView === 'important') chips.push({ type: 'priority', label: '重要', icon: Flag })
+  for (const match of tagMatches.slice(0, 3)) {
+    chips.push({ type: 'tag', label: `#${match[1]}`, icon: Tags })
+  }
+  return chips.slice(0, 5)
 })
 
 const readonlyHint = computed(() => {

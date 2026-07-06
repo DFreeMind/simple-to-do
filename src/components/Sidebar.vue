@@ -74,6 +74,7 @@
         >
           <div
             class="group-row"
+            :data-group-id="group.id"
             :class="{
               'is-dragging': groupDrag.draggingId.value === group.id,
               'drop-target': groupDrag.dragOverId.value === group.id
@@ -115,6 +116,7 @@
               v-for="list in group.lists"
               :key="list.id"
               class="list-item"
+              :data-list-id="list.id"
               :class="{
                 active: store.currentView === list.id,
                 'is-dragging': listDrag.draggingId.value === list.id,
@@ -296,21 +298,19 @@ const listDrag = useDragSort({
     if (!handle) return null
     const listItem = handle.closest('.list-item')
     if (!listItem) return null
-    const listName = listItem.querySelector('.nav-label')?.textContent
-    const list = store.lists.find(l => l.name === listName && !l.isSystem)
-    return list ? { id: list.id, el: listItem } : null
+    const listId = listItem.dataset.listId
+    return listId ? { id: listId, el: listItem } : null
   },
   findItemAtPoint(x, y) {
     const elements = document.elementsFromPoint(x, y)
     for (const el of elements) {
       const listItem = el.closest?.('.list-item')
       if (listItem) {
-        const listName = listItem.querySelector('.nav-label')?.textContent
-        const list = store.lists.find(l => l.name === listName && !l.isSystem)
-        if (!list) continue
+        const listId = listItem.dataset.listId
+        if (!listId) continue
         const rect = listItem.getBoundingClientRect()
         const midY = rect.top + rect.height / 2
-        return { id: list.id, position: y < midY ? 'before' : 'after' }
+        return { id: listId, position: y < midY ? 'before' : 'after' }
       }
     }
     return null
@@ -328,18 +328,16 @@ const groupDrag = useDragSort({
     if (!handle) return null
     const groupRow = handle.closest('.group-row')
     if (!groupRow) return null
-    const groupName = groupRow.querySelector('.group-toggle span')?.textContent
-    const group = store.groups.find(g => g.name === groupName && g.id !== 'ungrouped')
-    return group ? { id: group.id, el: groupRow } : null
+    const groupId = groupRow.dataset.groupId
+    return groupId && groupId !== 'ungrouped' ? { id: groupId, el: groupRow } : null
   },
   findItemAtPoint(x, y) {
     const elements = document.elementsFromPoint(x, y)
     for (const el of elements) {
       const groupRow = el.closest?.('.group-row')
       if (groupRow) {
-        const groupName = groupRow.querySelector('.group-toggle span')?.textContent
-        const group = store.groups.find(g => g.name === groupName && g.id !== 'ungrouped')
-        if (group) return { id: group.id, position: 'after' }
+        const groupId = groupRow.dataset.groupId
+        if (groupId && groupId !== 'ungrouped') return { id: groupId, position: 'after' }
       }
     }
     return null
@@ -353,14 +351,12 @@ function handleMouseDown(e) {
   // Determine if this is a list or group drag handle
   if (handle.closest('.list-item')) {
     const listItem = handle.closest('.list-item')
-    const listName = listItem.querySelector('.nav-label')?.textContent
-    const list = store.lists.find(l => l.name === listName && !l.isSystem)
-    if (list) listDrag.startDrag(e, list.id)
+    const listId = listItem.dataset.listId
+    if (listId) listDrag.startDrag(e, listId)
   } else if (handle.closest('.group-row')) {
     const groupRow = handle.closest('.group-row')
-    const groupName = groupRow.querySelector('.group-toggle span')?.textContent
-    const group = store.groups.find(g => g.name === groupName && g.id !== 'ungrouped')
-    if (group) groupDrag.startDrag(e, group.id)
+    const groupId = groupRow.dataset.groupId
+    if (groupId && groupId !== 'ungrouped') groupDrag.startDrag(e, groupId)
   }
 }
 
