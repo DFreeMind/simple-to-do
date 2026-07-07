@@ -23,7 +23,10 @@
             @click="activeSection = section.id"
           >
             <component :is="section.icon" :size="17" />
-            <span>{{ section.label }}</span>
+            <span>
+              <strong>{{ section.label }}</strong>
+              <small>{{ section.description }}</small>
+            </span>
           </button>
         </nav>
 
@@ -46,25 +49,34 @@
                   @click="store.updateSettings({ theme: theme.id })"
                 >
                   <span class="theme-swatch" :style="{ background: theme.swatch }"></span>
-                  <span>{{ theme.label }}</span>
-                  <Check v-if="store.settings.theme === theme.id" :size="16" />
+                  <span class="theme-card__text">
+                    <strong>{{ theme.label }}</strong>
+                    <small>{{ theme.description }}</small>
+                  </span>
+                  <span class="theme-card__check" aria-hidden="true">
+                    <Check v-if="store.settings.theme === theme.id" :size="15" />
+                  </span>
                 </button>
               </div>
             </div>
 
             <div class="settings-block">
               <h4>模式</h4>
-              <label class="switch-row">
-                <span>
-                  <Moon :size="16" class="inline-icon" />
+              <label class="switch-row setting-row">
+                <span class="setting-row__icon">
+                  <Moon :size="17" />
+                </span>
+                <span class="setting-row__body">
                   <strong>深色模式</strong>
                   <small>切换深色 / 浅色界面</small>
                 </span>
                 <input
+                  class="toggle-input"
                   type="checkbox"
                   :checked="store.settings.darkMode"
                   @change="store.updateSettings({ darkMode: $event.target.checked })"
                 />
+                <span class="toggle-control" aria-hidden="true"></span>
               </label>
             </div>
 
@@ -90,27 +102,31 @@
 
             <div class="settings-block">
               <h4>界面</h4>
-              <label class="switch-row">
-                <span>
+              <label class="switch-row setting-row">
+                <span class="setting-row__body">
                   <strong>默认显示详情面板</strong>
                   <small>选中任务后可以直接编辑属性和备注</small>
                 </span>
                 <input
+                  class="toggle-input"
                   type="checkbox"
                   :checked="store.settings.detailOpen"
                   @change="store.updateSettings({ detailOpen: $event.target.checked })"
                 />
+                <span class="toggle-control" aria-hidden="true"></span>
               </label>
-              <label class="switch-row">
-                <span>
+              <label class="switch-row setting-row">
+                <span class="setting-row__body">
                   <strong>显示已完成分组</strong>
                   <small>在普通列表下折叠或展开已完成任务</small>
                 </span>
                 <input
+                  class="toggle-input"
                   type="checkbox"
                   :checked="store.settings.completedVisible"
                   @change="store.updateSettings({ completedVisible: $event.target.checked })"
                 />
+                <span class="toggle-control" aria-hidden="true"></span>
               </label>
             </div>
           </section>
@@ -123,8 +139,12 @@
 
             <div class="settings-block">
               <h4>启动页</h4>
-              <label class="field">
-                <span><PanelTop :size="15" /> 打开应用默认进入</span>
+              <label class="field setting-field">
+                <span class="setting-row__icon"><PanelTop :size="16" /></span>
+                <span class="setting-row__body">
+                  <strong>打开应用默认进入</strong>
+                  <small>选择每次启动后先显示的视图</small>
+                </span>
                 <select :value="store.settings.startView" @change="store.updateSettings({ startView: $event.target.value })">
                   <option value="today">今日</option>
                   <option value="inbox">收集箱</option>
@@ -136,8 +156,12 @@
 
             <div class="settings-block">
               <h4>垃圾桶</h4>
-              <label class="field">
-                <span><Trash2 :size="15" /> 保留时间</span>
+              <label class="field setting-field">
+                <span class="setting-row__icon"><Trash2 :size="16" /></span>
+                <span class="setting-row__body">
+                  <strong>保留时间</strong>
+                  <small>删除后的任务会在本机保留多久</small>
+                </span>
                 <select :value="store.settings.trashRetentionDays" @change="store.updateSettings({ trashRetentionDays: Number($event.target.value) })">
                   <option :value="7">7 天</option>
                   <option :value="30">30 天</option>
@@ -152,19 +176,21 @@
             <div class="settings-block">
               <h4>音效</h4>
               <div class="sound-settings">
-                <label class="switch-row sound-master">
-                  <span class="sound-label">
-                    <Volume2 :size="18" class="sound-icon" />
-                    <span>
-                      <strong>启用音效</strong>
-                      <small>操作时播放提示音</small>
-                    </span>
+                <label class="switch-row setting-row sound-master">
+                  <span class="setting-row__icon">
+                    <Volume2 :size="17" />
+                  </span>
+                  <span class="setting-row__body">
+                    <strong>启用音效</strong>
+                    <small>操作时播放提示音</small>
                   </span>
                   <input
+                    class="toggle-input"
                     type="checkbox"
                     :checked="store.settings.soundEnabled"
                     @change="store.updateSettings({ soundEnabled: $event.target.checked })"
                   />
+                  <span class="toggle-control" aria-hidden="true"></span>
                 </label>
 
                 <div class="sound-categories" :class="{ disabled: !store.settings.soundEnabled }">
@@ -177,11 +203,13 @@
                       <small>完成、添加、删除任务</small>
                     </span>
                     <input
+                      class="toggle-input"
                       type="checkbox"
                       :checked="store.settings.soundTaskEnabled"
                       :disabled="!store.settings.soundEnabled"
                       @change="store.updateSettings({ soundTaskEnabled: $event.target.checked })"
                     />
+                    <span class="toggle-control toggle-control--sm" aria-hidden="true"></span>
                   </label>
 
                   <label class="sound-item">
@@ -193,11 +221,13 @@
                       <small>添加、删除清单</small>
                     </span>
                     <input
+                      class="toggle-input"
                       type="checkbox"
                       :checked="store.settings.soundListEnabled"
                       :disabled="!store.settings.soundEnabled"
                       @change="store.updateSettings({ soundListEnabled: $event.target.checked })"
                     />
+                    <span class="toggle-control toggle-control--sm" aria-hidden="true"></span>
                   </label>
 
                   <label class="sound-item">
@@ -209,11 +239,13 @@
                       <small>添加、删除分组</small>
                     </span>
                     <input
+                      class="toggle-input"
                       type="checkbox"
                       :checked="store.settings.soundGroupEnabled"
                       :disabled="!store.settings.soundEnabled"
                       @change="store.updateSettings({ soundGroupEnabled: $event.target.checked })"
                     />
+                    <span class="toggle-control toggle-control--sm" aria-hidden="true"></span>
                   </label>
                 </div>
               </div>
@@ -265,16 +297,16 @@ const store = useTaskStore()
 const activeSection = ref('appearance')
 
 const sections = [
-  { id: 'appearance', label: '外观', icon: Palette },
-  { id: 'behavior', label: '行为', icon: SlidersHorizontal },
-  { id: 'data', label: '数据', icon: Database },
-  { id: 'about', label: '关于', icon: Info }
+  { id: 'appearance', label: '外观', description: '主题与布局', icon: Palette },
+  { id: 'behavior', label: '行为', description: '启动与清理', icon: SlidersHorizontal },
+  { id: 'data', label: '数据', description: '本地保存', icon: Database },
+  { id: 'about', label: '关于', description: '版本信息', icon: Info }
 ]
 
 const themes = [
-  { id: 'mint', label: '青绿', swatch: 'linear-gradient(135deg, #5fb8ad, #dff4ef)' },
-  { id: 'blue', label: '海蓝', swatch: 'linear-gradient(135deg, #4f8de8, #e7f0ff)' },
-  { id: 'violet', label: '紫罗兰', swatch: 'linear-gradient(135deg, #7c6ee6, #eeeaff)' },
-  { id: 'graphite', label: '石墨', swatch: 'linear-gradient(135deg, #475569, #eef2f7)' }
+  { id: 'mint', label: '青绿', description: '默认低饱和', swatch: 'linear-gradient(135deg, #287f77 0%, #69bdb5 52%, #dff4ef 100%)' },
+  { id: 'blue', label: '海蓝', description: '更清爽', swatch: 'linear-gradient(135deg, #346fd8 0%, #76a6df 52%, #e7f0ff 100%)' },
+  { id: 'violet', label: '紫罗兰', description: '轻微个性', swatch: 'linear-gradient(135deg, #6d5bd7 0%, #988be0 52%, #eeeaff 100%)' },
+  { id: 'graphite', label: '石墨', description: '低彩度', swatch: 'linear-gradient(135deg, #475569 0%, #8491a2 52%, #eef2f7 100%)' }
 ]
 </script>
