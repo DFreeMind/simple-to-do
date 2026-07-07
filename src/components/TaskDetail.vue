@@ -9,49 +9,76 @@
     </div>
 
     <template v-else>
-      <header class="detail-header">
-        <button
-          class="task-check task-check--large"
-          :class="{ checked: task.completed }"
-          type="button"
-          :aria-label="task.completed ? '标记为未完成' : '标记为完成'"
-          @click="store.completeTask(task.id)"
-        >
-          <Check v-if="task.completed" :size="16" />
-        </button>
-        <textarea
-          class="detail-title-input"
-          :value="task.title"
-          rows="1"
-          placeholder="任务标题"
-          @input="updateTitle"
-        ></textarea>
-        <button class="icon-btn" type="button" aria-label="关闭详情" title="关闭详情" @click="store.updateSettings({ detailOpen: false })">
-          <X :size="18" />
-        </button>
+      <header class="detail-hero">
+        <div class="detail-hero__card">
+          <div class="detail-toolbar">
+            <button
+              class="task-check task-check--large"
+              :class="{ checked: task.completed }"
+              type="button"
+              :aria-label="task.completed ? '标记为未完成' : '标记为完成'"
+              @click="store.completeTask(task.id)"
+            >
+              <Check v-if="task.completed" :size="16" />
+            </button>
+            <div class="detail-toolbar__actions">
+              <button
+                class="detail-icon-action"
+                :class="{ active: store.isInMyDay(task) }"
+                type="button"
+                :title="store.isInMyDay(task) ? '已加入今日' : '加入今日'"
+                :aria-label="store.isInMyDay(task) ? '已加入今日' : '加入今日'"
+                @click="store.toggleMyDay(task.id)"
+              >
+                <Sun :size="16" />
+              </button>
+              <button
+                class="detail-icon-action"
+                :class="{ active: task.important || task.priority === 3 }"
+                type="button"
+                :title="task.important || task.priority === 3 ? '取消重要' : '标记重要'"
+                :aria-label="task.important || task.priority === 3 ? '取消重要' : '标记重要'"
+                @click="store.toggleImportant(task.id)"
+              >
+                <Star :size="16" />
+              </button>
+              <button
+                class="detail-icon-action"
+                :class="{ active: task.pinned }"
+                type="button"
+                :title="task.pinned ? '取消置顶' : '置顶'"
+                :aria-label="task.pinned ? '取消置顶' : '置顶'"
+                @click="store.togglePin(task.id)"
+              >
+                <Pin :size="16" />
+              </button>
+              <button class="detail-icon-action detail-icon-action--close" type="button" aria-label="关闭详情" title="关闭详情" @click="store.updateSettings({ detailOpen: false })">
+                <X :size="18" />
+              </button>
+            </div>
+          </div>
+          <textarea
+            ref="titleInput"
+            class="detail-title-input"
+            :value="task.title"
+            rows="1"
+            placeholder="任务标题"
+            @input="updateTitle"
+          ></textarea>
+          <div v-if="task.subtasks.length" class="detail-hero-progress">
+            <div class="detail-hero-progress__ring" :style="{ '--progress': subtaskProgressPercent * 3.6 + 'deg' }"></div>
+            <span class="detail-hero-progress__count">{{ completedSubtasks }}/{{ task.subtasks.length }}</span>
+          </div>
+        </div>
       </header>
-
-      <section class="detail-actions">
-        <button class="attribute-toggle" type="button" :class="{ active: store.isInMyDay(task) }" @click="store.toggleMyDay(task.id)">
-          <Sun :size="16" />
-          <span>{{ store.isInMyDay(task) ? '今日' : '加入今日' }}</span>
-        </button>
-        <button class="attribute-toggle" type="button" :class="{ active: task.important || task.priority === 3 }" @click="store.toggleImportant(task.id)">
-          <Star :size="16" />
-          <span>{{ task.important || task.priority === 3 ? '重要' : '标记重要' }}</span>
-        </button>
-        <button class="attribute-toggle" type="button" :class="{ active: task.pinned }" @click="store.togglePin(task.id)">
-          <Pin :size="16" />
-          <span>{{ task.pinned ? '已置顶' : '置顶' }}</span>
-        </button>
-      </section>
 
       <section class="detail-section detail-section--grid" aria-label="任务属性">
         <div class="field">
           <span><ListChecks :size="15" /> 清单</span>
           <div class="detail-select">
-            <button class="detail-select__button" type="button" @click.stop="toggleSelect('list')">
-              <span>{{ selectedListName }}</span>
+            <button class="detail-select__button detail-select__button--list" type="button" :title="selectedListName" @click.stop="toggleSelect('list')">
+              <span class="color-dot" :style="{ backgroundColor: selectedListColor }"></span>
+              <span class="detail-select__text">{{ selectedListName }}</span>
               <ChevronDown :size="16" :class="{ rotated: openSelect === 'list' }" />
             </button>
             <div v-if="openSelect === 'list'" class="detail-select__menu">
@@ -72,59 +99,25 @@
         </div>
 
         <div class="field">
-          <span><CalendarClock :size="15" /> 截止日期</span>
+          <span><CalendarClock :size="15" /> 日期</span>
           <div class="date-field">
             <button class="detail-select__button" type="button" @click.stop="toggleDatePicker('dueDate')">
-              <span>{{ formatDateValue(task.dueDate) || '设置截止日期' }}</span>
+              <span>{{ formatDateValue(task.dueDate) || '设置日期' }}</span>
               <ChevronDown :size="16" :class="{ rotated: openDatePicker === 'dueDate' }" />
             </button>
+            <div v-if="task.dueDate" class="date-field__summary">
+              <span class="date-field__summary-text">{{ dateSummaryText }}</span>
+              <Bell v-if="task.reminderAt" class="date-field__summary-icon" :size="13" aria-label="已设置提醒" />
+              <Repeat2 v-if="task.repeatRule" class="date-field__summary-icon" :size="13" aria-label="已设置重复" />
+            </div>
             <DatePicker
               v-if="openDatePicker === 'dueDate'"
               :task="task"
               field="dueDate"
-              title="截止日期"
+              title="日期"
+              :show-extras="true"
               @close="openDatePicker = ''"
             />
-          </div>
-        </div>
-
-        <div class="field">
-          <span><Bell :size="15" /> 提醒</span>
-          <div class="date-field">
-            <button class="detail-select__button" type="button" @click.stop="toggleDatePicker('reminderAt')">
-              <span>{{ formatDateValue(task.reminderAt) || '设置提醒时间' }}</span>
-              <ChevronDown :size="16" :class="{ rotated: openDatePicker === 'reminderAt' }" />
-            </button>
-            <DatePicker
-              v-if="openDatePicker === 'reminderAt'"
-              :task="task"
-              field="reminderAt"
-              title="提醒时间"
-              @close="openDatePicker = ''"
-            />
-          </div>
-        </div>
-
-        <div class="field">
-          <span><Repeat2 :size="15" /> 重复</span>
-          <div class="detail-select">
-            <button class="detail-select__button" type="button" @click.stop="toggleSelect('repeat')">
-              <span>{{ repeatLabel }}</span>
-              <ChevronDown :size="16" :class="{ rotated: openSelect === 'repeat' }" />
-            </button>
-            <div v-if="openSelect === 'repeat'" class="detail-select__menu">
-              <button
-                v-for="option in repeatOptions"
-                :key="option.value || 'none'"
-                class="detail-select__option"
-                :class="{ active: (task.repeatRule || '') === option.value }"
-                type="button"
-                @click="chooseRepeat(option.value)"
-              >
-                <span>{{ option.label }}</span>
-                <Check v-if="(task.repeatRule || '') === option.value" :size="15" />
-              </button>
-            </div>
           </div>
         </div>
 
@@ -176,6 +169,7 @@
         </div>
       </section>
 
+
       <section class="detail-section">
         <div class="section-heading">
           <h2>子任务</h2>
@@ -188,7 +182,13 @@
             :key="subtask.id"
             class="subtask-item"
             :data-subtask-id="subtask.id"
-            :class="{ completed: subtask.completed, 'is-dragging': subtaskDrag.draggingId.value === subtask.id, 'drop-target': subtaskDrag.dragOverId.value === subtask.id }"
+            :class="{
+              completed: subtask.completed,
+              'is-dragging': subtaskDrag.draggingId.value === subtask.id,
+              'drop-target': subtaskDrag.dragOverId.value === subtask.id,
+              'drop-target-before': subtaskDrag.dragOverId.value === subtask.id && subtaskDrag.dropPosition.value === 'before',
+              'drop-target-after': subtaskDrag.dragOverId.value === subtask.id && subtaskDrag.dropPosition.value === 'after'
+            }"
           >
             <span
               class="subtask-drag-handle"
@@ -243,9 +243,9 @@
         </div>
         <div v-if="task.attachments.length" class="attachment-grid">
           <figure v-for="attachment in task.attachments" :key="attachment.id" class="attachment-card">
-            <img :src="attachment.url" :alt="attachment.path || '任务附件'" @click="openLightbox(attachmentIndex(attachment))" />
+            <img :src="attachment.url" :alt="attachment.originalName || attachment.path || '任务附件'" @click="openLightbox(attachmentIndex(attachment))" />
             <figcaption>
-              <span>{{ attachment.path || '图片附件' }}</span>
+              <span>{{ attachment.originalName || attachment.path || '图片附件' }}</span>
               <button class="ghost-icon danger" type="button" aria-label="移除附件" @click="removeAttachment(attachment.id)">
                 <Trash2 :size="15" />
               </button>
@@ -286,12 +286,22 @@
         :visible="previewVisible"
         @close="previewVisible = false"
       />
+
+      <ConfirmDialog
+        :visible="confirmDialog.visible"
+        :title="confirmDialog.title"
+        :message="confirmDialog.message"
+        :confirm-text="confirmDialog.confirmText"
+        :type="confirmDialog.type"
+        @confirm="confirmDialog.onConfirm"
+        @cancel="confirmDialog.visible = false"
+      />
     </template>
   </aside>
 </template>
 
 <script setup>
-import { computed, ref, watch, defineAsyncComponent, h, onMounted, onBeforeUnmount } from 'vue'
+import { computed, ref, reactive, watch, defineAsyncComponent, h, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import {
   Bell,
   CalendarClock,
@@ -319,7 +329,8 @@ import { useDragSort } from '@/composables/useDragSort'
 import FormatMenu from './FormatMenu.vue'
 import DatePicker from './DatePicker.vue'
 import ImageLightbox from './ImageLightbox.vue'
-import { readImage, selectImage } from '@/services/platform'
+import ConfirmDialog from './ConfirmDialog.vue'
+import { importImage, readImage, selectImage } from '@/services/platform'
 
 const RichTextEditor = defineAsyncComponent({
   loader: () => import('./RichTextEditor.vue'),
@@ -332,11 +343,20 @@ const store = useTaskStore()
 const newSubtask = ref('')
 const editorContent = ref('')
 const richTextEditor = ref(null)
+const titleInput = ref(null)
 const formatMenuVisible = ref(false)
 const formatMenuPos = ref({ x: 0, y: 0 })
 const fileInput = ref(null)
 const previewVisible = ref(false)
 const previewIndex = ref(0)
+const confirmDialog = reactive({
+  visible: false,
+  title: '',
+  message: '',
+  confirmText: '确定',
+  type: 'danger',
+  onConfirm: () => {}
+})
 
 const allImageUrls = computed(() => {
   if (!task.value) return []
@@ -393,9 +413,7 @@ const subtaskDrag = useDragSort({
     }
   },
   getItemEl(target) {
-    const handle = target.closest?.('.subtask-drag-handle')
-    if (!handle) return null
-    const item = handle.closest('.subtask-item')
+    const item = target.closest?.('.subtask-item')
     if (!item) return null
     const subtaskId = item.dataset.subtaskId
     return subtaskId ? { id: subtaskId, el: item } : null
@@ -417,23 +435,24 @@ const subtaskDrag = useDragSort({
 })
 
 function handleSubtaskMouseDown(e) {
-  const handle = e.target.closest('.subtask-drag-handle')
-  if (!handle) return
-  const item = handle.closest('.subtask-item')
+  if (isSubtaskDragIgnored(e.target)) return
+  const item = e.target.closest('.subtask-item')
   if (!item) return
   const subtaskId = item.dataset.subtaskId
   if (subtaskId) subtaskDrag.startDrag(e, subtaskId)
 }
 
+function isSubtaskDragIgnored(target) {
+  return Boolean(target.closest?.('button, input, textarea, select, a'))
+}
+
 const task = computed(() => store.selectedTask)
 const completedSubtasks = computed(() => task.value?.subtasks.filter(item => item.completed).length || 0)
-const repeatOptions = [
-  { value: '', label: '不重复' },
-  { value: 'daily', label: '每天' },
-  { value: 'weekly', label: '每周' },
-  { value: 'monthly', label: '每月' },
-  { value: 'yearly', label: '每年' }
-]
+const subtaskProgressPercent = computed(() => {
+  const total = task.value?.subtasks.length || 0
+  if (!total) return 0
+  return Math.round((completedSubtasks.value / total) * 100)
+})
 const priorityOptions = [
   { value: 0, label: '无优先级' },
   { value: 1, label: '低' },
@@ -441,14 +460,37 @@ const priorityOptions = [
   { value: 3, label: '高' }
 ]
 const selectedListName = computed(() => store.selectedList?.name || '收集箱')
-const repeatLabel = computed(() => repeatOptions.find(option => option.value === (task.value?.repeatRule || ''))?.label || '不重复')
+const selectedListColor = computed(() => store.selectedList?.color || '#5fb8ad')
 const priorityLabel = computed(() => priorityOptions.find(option => option.value === Number(task.value?.priority || 0))?.label || '无优先级')
+
+// 日期摘要文本，如 "7月8日,明天"
+const summaryWeekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+const dateSummaryText = computed(() => {
+  if (!task.value?.dueDate) return ''
+  const d = new Date(task.value.dueDate)
+  const month = d.getMonth() + 1
+  const day = d.getDate()
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const target = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  const diff = Math.round((target - today) / 86400000)
+  let relative = ''
+  if (diff === 0) relative = '今天'
+  else if (diff === 1) relative = '明天'
+  else if (diff === -1) relative = '昨天'
+  else if (diff > 0 && diff <= 7) relative = '本' + summaryWeekdays[d.getDay()]
+  else if (diff > 7 && diff <= 14) relative = '下周' + summaryWeekdays[d.getDay()]
+  return relative ? `${month}月${day}日,${relative}` : `${month}月${day}日`
+})
 
 watch(task, (nextTask) => {
   editorContent.value = nextTask?.descriptionHtml || ''
   openSelect.value = ''
   openDatePicker.value = ''
   tagInput.value = ''
+  nextTick(() => {
+    if (titleInput.value) autoResize(titleInput.value)
+  })
 }, { immediate: true })
 
 watch(editorContent, (value) => {
@@ -469,11 +511,6 @@ function toggleSelect(name) {
 
 function chooseList(listId) {
   store.updateTask(task.value.id, { listId })
-  openSelect.value = ''
-}
-
-function chooseRepeat(value) {
-  store.updateTask(task.value.id, { repeatRule: value || null })
   openSelect.value = ''
 }
 
@@ -561,9 +598,10 @@ async function triggerImageUpload() {
       fileInput.value?.click()
       return
     }
-    const url = await readImage(path)
-    if (url) {
-      store.addAttachment(task.value.id, path, url)
+    const attachment = await importImage(path)
+    if (attachment) {
+      const url = await readImage(path)
+      store.addAttachment(task.value.id, { ...attachment, path, url })
       store.showNotice('图片已添加', 'success')
     }
   } catch (error) {
@@ -608,14 +646,20 @@ async function copyLink() {
 }
 
 function deleteTask() {
-  if (window.confirm('删除此任务？任务会先进入垃圾桶。')) {
+  confirmDialog.title = '删除任务'
+  confirmDialog.message = '删除此任务？任务会先进入垃圾桶。'
+  confirmDialog.confirmText = '删除'
+  confirmDialog.type = 'danger'
+  confirmDialog.onConfirm = () => {
     store.deleteTask(task.value.id)
+    confirmDialog.visible = false
   }
+  confirmDialog.visible = true
 }
 
 function autoResize(element) {
   element.style.height = 'auto'
-  element.style.height = `${element.scrollHeight}px`
+  element.style.height = `${Math.min(element.scrollHeight, 64)}px`
 }
 
 function handleSelectKeydown(event) {
