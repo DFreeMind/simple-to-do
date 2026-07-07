@@ -9,37 +9,62 @@ import { ref, onUnmounted } from 'vue'
  * @param {Function} options.getItemEl(target) - walk up from event target to find draggable item, returns { id, el } or null
  * @param {Function} options.findItemAtPoint(x, y) - find target item at screen coordinates, returns { id, position } or null
  * @param {String} [options.scrollContainerSelector] - CSS selector for the scrollable container (auto-scrolls near edges)
+ * @param {Function} [options.onDragStart] - called when drag starts
+ * @param {Function} [options.onDragOver] - called when dragging over a target (throttled)
+ * @param {Function} [options.onDragEnd] - called when drag ends
  */
-export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContainerSelector }) {
+export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContainerSelector, onDragStart, onDragOver, onDragEnd }) {
   const draggingId = ref('')
   const dragOverId = ref('')
   const dropPosition = ref('') // 'before' or 'after'
   let ghostEl = null
+  let pendingItem = null
+  let pendingItemId = ''
+  let startX = 0
+  let startY = 0
   let offsetX = 0
   let offsetY = 0
   let lastMoveTime = 0
   let scrollRaf = null
+  let suppressNextClick = false
+  let lastDragOverId = ''
 
+  const DRAG_THRESHOLD = 5 // px before a press becomes a drag
   const EDGE_THRESHOLD = 60 // px from edge to trigger auto-scroll
   const SCROLL_SPEED = 8   // px per frame
   const THROTTLE_MS = 16   // ~60fps
 
   function startDrag(event, itemId) {
     if (event.button !== 0) return // left click only
-    event.preventDefault()
 
     const item = getItemEl(event.target)
     if (!item) return
+    event.preventDefault()
 
-    draggingId.value = itemId
+    pendingItem = item
+    pendingItemId = itemId
+    startX = event.clientX
+    startY = event.clientY
+
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+  }
+
+  function activateDrag(event) {
+    if (!pendingItem || !pendingItemId) return
+    event.preventDefault()
+    window.getSelection?.().removeAllRanges()
+    suppressNextClick = true
+    document.addEventListener('click', suppressClick, true)
+    draggingId.value = pendingItemId
 
     // Calculate offset from item top-left to mouse position
-    const rect = item.el.getBoundingClientRect()
-    offsetX = event.clientX - rect.left
-    offsetY = event.clientY - rect.top
+    const rect = pendingItem.el.getBoundingClientRect()
+    offsetX = startX - rect.left
+    offsetY = startY - rect.top
 
     // Create ghost element
-    ghostEl = item.el.cloneNode(true)
+    ghostEl = pendingItem.el.cloneNode(true)
     const appRoot = document.querySelector('.app') || document.body
     const appStyle = getComputedStyle(appRoot)
     const ghostBg = appStyle.getPropertyValue('--surface').trim() || '#ffffff'
@@ -63,12 +88,23 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
     ghostEl.style.transform = 'scale(1.02)'
     appRoot.appendChild(ghostEl)
 
-    document.addEventListener('mousemove', onMouseMove)
-    document.addEventListener('mouseup', onMouseUp)
+    // 播放拖动开始音效
+    if (onDragStart) onDragStart()
   }
 
   function onMouseMove(e) {
+    if (pendingItem) {
+      e.preventDefault()
+    }
+
+    if (!ghostEl) {
+      const deltaX = e.clientX - startX
+      const deltaY = e.clientY - startY
+      if (Math.hypot(deltaX, deltaY) < DRAG_THRESHOLD) return
+      activateDrag(e)
+    }
     if (!ghostEl) return
+    e.preventDefault()
 
     // Throttle to ~60fps
     const now = Date.now()
@@ -90,9 +126,15 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
     if (result && result.id !== draggingId.value) {
       dragOverId.value = result.id
       dropPosition.value = result.position || 'after'
+      // 播放拖动经过目标音效（仅在目标变化时）
+      if (onDragOver && result.id !== lastDragOverId) {
+        onDragOver()
+        lastDragOverId = result.id
+      }
     } else {
       dragOverId.value = ''
       dropPosition.value = ''
+      lastDragOverId = ''
     }
   }
 
@@ -140,14 +182,30 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
       onDrop(draggingId.value, dragOverId.value, dropPosition.value)
     }
 
+    // 播放拖动结束音效
+    if (onDragEnd && draggingId.value) {
+      onDragEnd()
+    }
+
     // Cleanup
     if (ghostEl) {
       ghostEl.remove()
       ghostEl = null
     }
+    pendingItem = null
+    pendingItemId = ''
     draggingId.value = ''
     dragOverId.value = ''
     dropPosition.value = ''
+    lastDragOverId = ''
+  }
+
+  function suppressClick(event) {
+    document.removeEventListener('click', suppressClick, true)
+    if (!suppressNextClick) return
+    suppressNextClick = false
+    event.preventDefault()
+    event.stopPropagation()
   }
 
   function cleanup() {
@@ -161,9 +219,14 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
       ghostEl.remove()
       ghostEl = null
     }
+    document.removeEventListener('click', suppressClick, true)
+    suppressNextClick = false
+    pendingItem = null
+    pendingItemId = ''
     draggingId.value = ''
     dragOverId.value = ''
     dropPosition.value = ''
+    lastDragOverId = ''
   }
 
   onUnmounted(cleanup)
