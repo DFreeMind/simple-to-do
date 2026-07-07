@@ -53,6 +53,22 @@
             </div>
 
             <div class="settings-block">
+              <h4>模式</h4>
+              <label class="switch-row">
+                <span>
+                  <Moon :size="16" class="inline-icon" />
+                  <strong>深色模式</strong>
+                  <small>切换深色 / 浅色界面</small>
+                </span>
+                <input
+                  type="checkbox"
+                  :checked="store.settings.darkMode"
+                  @change="store.updateSettings({ darkMode: $event.target.checked })"
+                />
+              </label>
+            </div>
+
+            <div class="settings-block">
               <h4>信息密度</h4>
               <div class="segmented">
                 <button
@@ -241,7 +257,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { Check, Database, Info, PanelTop, Palette, SlidersHorizontal, Trash2, X, Volume2, CheckSquare, Folder, Tag } from 'lucide-vue-next'
+import { Check, Database, Info, PanelTop, Palette, SlidersHorizontal, Trash2, X, Volume2, CheckSquare, Folder, Tag, Moon } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import appIcon from '@/assets/app-icon.svg'
 

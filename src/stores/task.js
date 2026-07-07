@@ -40,6 +40,7 @@ const DEFAULT_LISTS = [
 
 const DEFAULT_SETTINGS = {
   theme: 'mint',
+  darkMode: false,
   density: 'comfortable',
   detailOpen: false,
   detailWidth: 380,

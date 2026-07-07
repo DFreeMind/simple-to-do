@@ -1,5 +1,5 @@
 <template>
-  <div class="app" :data-theme="store.settings.theme" :data-density="store.settings.density">
+  <div class="app" :data-theme="store.settings.theme" :data-mode="store.settings.darkMode ? 'dark' : null" :data-density="store.settings.density">
     <div
       class="app-shell"
       :class="{ 'app-shell--detail-closed': !store.settings.detailOpen }"
