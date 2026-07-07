@@ -127,31 +127,36 @@
       <button class="context-item" role="menuitem" type="button" @click="copyLink">
         <LinkIcon :size="15" /> 复制任务链接
       </button>
-      <button class="context-item" role="menuitem" type="button" @click="showMoveMenu = !showMoveMenu">
+      <button class="context-item" role="menuitem" type="button" @click="openMoveModal">
         <FolderInput :size="15" /> 移动到清单
       </button>
-      <div v-if="showMoveMenu" class="move-list">
-        <button
-          v-for="item in store.lists"
-          :key="item.id"
-          class="move-list__item"
-          type="button"
-          @click="moveToList(item.id)"
-        >
-          <span class="color-dot" :style="{ backgroundColor: item.color }"></span>
-          {{ item.name }}
-        </button>
-      </div>
       <div class="context-separator"></div>
       <button class="context-item context-item--danger" role="menuitem" type="button" @click="deleteTask">
         <Trash2 :size="15" /> 删除
       </button>
     </div>
+
+    <MoveToListModal
+      :visible="moveModalOpen"
+      :current-list-id="task.listId"
+      @close="moveModalOpen = false"
+      @select="moveToList"
+    />
+
+    <ConfirmDialog
+      :visible="confirmDialog.visible"
+      :title="confirmDialog.title"
+      :message="confirmDialog.message"
+      :confirm-text="confirmDialog.confirmText"
+      :type="confirmDialog.type"
+      @confirm="confirmDialog.onConfirm"
+      @cancel="confirmDialog.visible = false"
+    />
   </article>
 </template>
 
 <script setup>
-import { computed, ref, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { computed, ref, reactive, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import {
   CalendarClock,
   Check,
@@ -171,6 +176,8 @@ import {
 } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import { formatDate as fmtDate } from '@/utils/date'
+import MoveToListModal from './MoveToListModal.vue'
+import ConfirmDialog from './ConfirmDialog.vue'
 
 const props = defineProps({
   task: { type: Object, required: true },
@@ -183,9 +190,17 @@ const props = defineProps({
 
 const store = useTaskStore()
 const menuOpen = ref(false)
-const showMoveMenu = ref(false)
+const moveModalOpen = ref(false)
 const menuPos = ref({ x: 0, y: 0 })
 const menuEl = ref(null)
+const confirmDialog = reactive({
+  visible: false,
+  title: '',
+  message: '',
+  confirmText: '确定',
+  type: 'danger',
+  onConfirm: () => {}
+})
 
 const list = computed(() => store.lists.find(item => item.id === props.task.listId))
 const completedSubtasks = computed(() => props.task.subtasks?.filter(item => item.completed).length || 0)
@@ -208,7 +223,11 @@ function openMenu(event) {
 
 function closeMenu() {
   menuOpen.value = false
-  showMoveMenu.value = false
+}
+
+function openMoveModal() {
+  menuOpen.value = false
+  moveModalOpen.value = true
 }
 
 function togglePin() {
@@ -247,9 +266,15 @@ function deleteTask() {
 }
 
 function deleteForever() {
-  if (window.confirm('永久删除此任务？此操作不可撤销。')) {
+  confirmDialog.title = '永久删除任务'
+  confirmDialog.message = '永久删除此任务？此操作不可撤销。'
+  confirmDialog.confirmText = '永久删除'
+  confirmDialog.type = 'danger'
+  confirmDialog.onConfirm = () => {
     store.permanentDelete(props.task.id)
+    confirmDialog.visible = false
   }
+  confirmDialog.visible = true
 }
 
 function clampMenuPosition(x, y, width, height) {

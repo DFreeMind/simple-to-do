@@ -46,6 +46,27 @@ export async function readImage(filePath) {
   return null
 }
 
+export async function importImage(filePath) {
+  if (isTauri()) {
+    return invoke('import_image', { filePath })
+  }
+  return null
+}
+
+export async function readAttachment(relativePath) {
+  if (isTauri()) {
+    return invoke('read_attachment', { relativePath })
+  }
+  return null
+}
+
+export async function cleanupOrphanAttachments(data) {
+  if (isTauri()) {
+    return invoke('cleanup_orphan_attachments', { data })
+  }
+  return 0
+}
+
 function formatPlatformError(error, fallback) {
   if (!error) return fallback
   if (typeof error === 'string') return error

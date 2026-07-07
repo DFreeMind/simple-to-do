@@ -81,7 +81,7 @@
             }"
           >
             <span
-              v-if="group.id !== 'ungrouped'"
+              v-if="group.id !== 'ungrouped' && group.id !== 'pinned'"
               class="sidebar-drag-handle"
               role="button"
               tabindex="-1"
@@ -95,11 +95,18 @@
               <span>{{ group.name }}</span>
             </button>
             <div class="group-actions">
-              <button class="mini-btn" type="button" title="添加清单" aria-label="添加清单" @click="startAddList(group.id)">
+              <button
+                v-if="group.id !== 'pinned'"
+                class="mini-btn"
+                type="button"
+                title="添加清单"
+                aria-label="添加清单"
+                @click="startAddList(group.id)"
+              >
                 <Plus :size="14" />
               </button>
               <button
-                v-if="group.id !== 'ungrouped'"
+                v-if="group.id !== 'ungrouped' && group.id !== 'pinned'"
                 class="mini-btn"
                 type="button"
                 title="分组操作"
@@ -120,7 +127,9 @@
               :class="{
                 active: store.currentView === list.id,
                 'is-dragging': listDrag.draggingId.value === list.id,
-                'drop-target': listDrag.dragOverId.value === list.id
+                'drop-target': listDrag.dragOverId.value === list.id,
+                'drop-target-before': listDrag.dragOverId.value === list.id && listDrag.dropPosition.value === 'before',
+                'drop-target-after': listDrag.dragOverId.value === list.id && listDrag.dropPosition.value === 'after'
               }"
               @contextmenu.prevent="openListMenu($event, list)"
             >
@@ -136,6 +145,7 @@
               <button class="list-link" type="button" @click="store.setView(list.id)">
                 <span class="color-dot" :style="{ backgroundColor: list.color }"></span>
                 <span class="nav-label">{{ list.name }}</span>
+                <Pin v-if="list.pinned" :size="11" class="inline-icon" />
                 <span v-if="store.listTaskCounts[list.id]" class="nav-badge">{{ store.listTaskCounts[list.id] }}</span>
               </button>
               <button class="row-more" type="button" aria-label="清单操作" @click.stop="openListMenu($event, list)">
@@ -195,6 +205,9 @@
       @keydown.esc="closeMenu"
     >
       <template v-if="menu.type === 'list'">
+        <button class="context-item" role="menuitem" type="button" @click="toggleSelectedListPin">
+          <Pin :size="15" /> {{ menu.target?.pinned ? '取消置顶' : '置顶清单' }}
+        </button>
         <button class="context-item" role="menuitem" type="button" @click="renameSelectedList">
           <Pencil :size="15" /> 重命名清单
         </button>
@@ -214,11 +227,35 @@
         </button>
       </template>
     </div>
+
+    <ConfirmDialog
+      :visible="confirmDialog.visible"
+      :title="confirmDialog.title"
+      :message="confirmDialog.message"
+      :tag="confirmDialog.tag"
+      :details="confirmDialog.details"
+      :confirm-text="confirmDialog.confirmText"
+      type="danger"
+      @confirm="confirmDialog.onConfirm"
+      @cancel="confirmDialog.visible = false"
+    />
+
+    <InputDialog
+      :visible="inputDialog.visible"
+      :title="inputDialog.title"
+      :message="inputDialog.message"
+      :placeholder="inputDialog.placeholder"
+      :default-value="inputDialog.defaultValue"
+      :confirm-text="inputDialog.confirmText"
+      :type="inputDialog.type"
+      @confirm="inputDialog.onConfirm"
+      @cancel="inputDialog.visible = false"
+    />
   </aside>
 </template>
 
 <script setup>
-import { ref, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import {
   BarChart3,
   CalendarCheck,
@@ -231,16 +268,20 @@ import {
   ListChecks,
   MoreHorizontal,
   Pencil,
+  Pin,
   Plus,
   Search,
   Settings as SettingsIcon,
   Star,
   Trash2,
+  Users,
   CheckCircle2
 } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import { useDragSort } from '@/composables/useDragSort'
 import appIcon from '@/assets/app-icon.svg'
+import ConfirmDialog from './ConfirmDialog.vue'
+import InputDialog from './InputDialog.vue'
 
 const store = useTaskStore()
 const searchText = ref('')
@@ -253,14 +294,32 @@ const listInputGrouped = ref(null)
 const listInputUngrouped = ref(null)
 const menuEl = ref(null)
 const menu = ref({ show: false, type: '', x: 0, y: 0, target: null })
+const confirmDialog = reactive({
+  visible: false,
+  title: '',
+  message: '',
+  tag: '',
+  details: [],
+  confirmText: '确定',
+  onConfirm: () => {}
+})
+
+const inputDialog = reactive({
+  visible: false,
+  title: '',
+  message: '',
+  placeholder: '',
+  defaultValue: '',
+  confirmText: '确定',
+  type: 'edit',
+  onConfirm: () => {}
+})
 
 const primaryViews = [
   { id: 'today', label: '今日', icon: CalendarCheck },
   { id: 'inbox', label: '收集箱', icon: Inbox },
   { id: 'planned', label: '计划', icon: ListChecks },
-  { id: 'important', label: '重要', icon: Star },
-  { id: 'calendar', label: '月历', icon: CalendarDays },
-  { id: 'stats', label: '统计', icon: BarChart3 }
+  { id: 'important', label: '重要', icon: Star }
 ]
 
 const utilityViews = [
@@ -271,6 +330,9 @@ const utilityViews = [
 // --- List drag ---
 const listDrag = useDragSort({
   scrollContainerSelector: '.group-list',
+  onDragStart: () => store.playDragStartSound(),
+  onDragOver: () => store.playDragOverSound(),
+  onDragEnd: () => store.playDragEndSound(),
   onDrop(sourceId, targetId, position) {
     // Find which group the target list belongs to
     for (const group of store.groupedLists) {
@@ -294,9 +356,7 @@ const listDrag = useDragSort({
     }
   },
   getItemEl(target) {
-    const handle = target.closest?.('.sidebar-drag-handle')
-    if (!handle) return null
-    const listItem = handle.closest('.list-item')
+    const listItem = target.closest?.('.list-item')
     if (!listItem) return null
     const listId = listItem.dataset.listId
     return listId ? { id: listId, el: listItem } : null
@@ -320,13 +380,14 @@ const listDrag = useDragSort({
 // --- Group drag ---
 const groupDrag = useDragSort({
   scrollContainerSelector: '.group-list',
+  onDragStart: () => store.playDragStartSound(),
+  onDragOver: () => store.playDragOverSound(),
+  onDragEnd: () => store.playDragEndSound(),
   onDrop(sourceId, targetId) {
     store.reorderGroup(sourceId, targetId)
   },
   getItemEl(target) {
-    const handle = target.closest?.('.sidebar-drag-handle')
-    if (!handle) return null
-    const groupRow = handle.closest('.group-row')
+    const groupRow = target.closest?.('.group-row')
     if (!groupRow) return null
     const groupId = groupRow.dataset.groupId
     return groupId && groupId !== 'ungrouped' ? { id: groupId, el: groupRow } : null
@@ -345,19 +406,21 @@ const groupDrag = useDragSort({
 })
 
 function handleMouseDown(e) {
-  const handle = e.target.closest('.sidebar-drag-handle')
-  if (!handle) return
+  if (isDragIgnored(e.target)) return
 
-  // Determine if this is a list or group drag handle
-  if (handle.closest('.list-item')) {
-    const listItem = handle.closest('.list-item')
+  if (e.target.closest('.list-item')) {
+    const listItem = e.target.closest('.list-item')
     const listId = listItem.dataset.listId
     if (listId) listDrag.startDrag(e, listId)
-  } else if (handle.closest('.group-row')) {
-    const groupRow = handle.closest('.group-row')
+  } else if (e.target.closest('.group-row')) {
+    const groupRow = e.target.closest('.group-row')
     const groupId = groupRow.dataset.groupId
     if (groupId && groupId !== 'ungrouped') groupDrag.startDrag(e, groupId)
   }
+}
+
+function isDragIgnored(target) {
+  return Boolean(target.closest?.('.group-actions, .row-more, .mini-btn, .inline-create, input, textarea, select, .context-menu'))
 }
 
 function startAddGroup() {
@@ -421,30 +484,53 @@ function closeMenu() {
 function renameSelectedList() {
   const list = menu.value.target
   if (!list) return
-  const name = window.prompt('重命名清单', list.name)
-  if (name?.trim()) store.renameList(list.id, name.trim())
+  inputDialog.title = '重命名清单'
+  inputDialog.message = '输入新的清单名称'
+  inputDialog.placeholder = '清单名称'
+  inputDialog.defaultValue = list.name
+  inputDialog.confirmText = '保存'
+  inputDialog.type = 'edit'
+  inputDialog.onConfirm = (name) => {
+    store.renameList(list.id, name)
+    inputDialog.visible = false
+  }
+  inputDialog.visible = true
+  closeMenu()
+}
+
+function toggleSelectedListPin() {
+  const list = menu.value.target
+  if (!list) return
+  store.toggleListPin(list.id)
   closeMenu()
 }
 
 function moveSelectedList() {
   const list = menu.value.target
   if (!list) return
-  const names = store.groups.map(group => `${group.name}:${group.id}`).join('\n')
-  const groupName = window.prompt(`输入目标分组名称，留空为未分组：\n${names}`, '')
-  if (groupName !== null) {
-    const group = store.groups.find(item => item.name === groupName.trim())
+  const groupNames = store.groups.map(group => group.name).join('、')
+  inputDialog.title = '移动清单'
+  inputDialog.message = `输入目标分组名称，留空为未分组。可选分组：${groupNames}`
+  inputDialog.placeholder = '分组名称（留空为未分组）'
+  inputDialog.defaultValue = ''
+  inputDialog.confirmText = '移动'
+  inputDialog.type = 'move'
+  inputDialog.onConfirm = (groupName) => {
+    const group = store.groups.find(item => item.name === groupName)
     store.moveList(list.id, group?.id || null)
     store.showNotice('清单已移动', 'success')
+    inputDialog.visible = false
   }
+  inputDialog.visible = true
   closeMenu()
 }
 
 function deleteSelectedList() {
   const list = menu.value.target
   if (!list) return
-  const movedTaskCount = store.tasks.filter(task => task.listId === list.id && !task.deleted).length
+  const taskCount = store.tasks.filter(task => task.listId === list.id && !task.deleted).length
   const deleted = store.deleteList(list.id)
-  const message = movedTaskCount ? `清单已删除，${movedTaskCount} 个任务已移入收集箱` : '清单已删除'
+  const message = taskCount ? `清单已移入垃圾桶，包含 ${taskCount} 个任务` : '清单已移入垃圾桶'
   store.showNotice(deleted ? message : '此清单不能删除', deleted ? 'success' : 'error')
   closeMenu()
 }
@@ -452,18 +538,37 @@ function deleteSelectedList() {
 function renameSelectedGroup() {
   const group = menu.value.target
   if (!group) return
-  const name = window.prompt('重命名分组', group.name)
-  if (name?.trim()) store.renameGroup(group.id, name.trim())
+  inputDialog.title = '重命名分组'
+  inputDialog.message = '输入新的分组名称'
+  inputDialog.placeholder = '分组名称'
+  inputDialog.defaultValue = group.name
+  inputDialog.confirmText = '保存'
+  inputDialog.type = 'edit'
+  inputDialog.onConfirm = (name) => {
+    store.renameGroup(group.id, name)
+    inputDialog.visible = false
+  }
+  inputDialog.visible = true
   closeMenu()
 }
 
 function deleteSelectedGroup() {
   const group = menu.value.target
   if (!group) return
-  if (window.confirm(`删除分组"${group.name}"？清单会移动到未分组。`)) {
+  confirmDialog.title = '确认删除这个分组？'
+  confirmDialog.message = `分组将被删除，分组内的清单会自动移动到"未分组"。`
+  confirmDialog.tag = group.name
+  confirmDialog.details = [
+    { label: '删除对象', value: '分组', type: 'danger' },
+    { label: '影响范围', value: '仅调整归属，不删除清单', type: 'info' }
+  ]
+  confirmDialog.confirmText = '删除分组'
+  confirmDialog.onConfirm = () => {
     store.deleteGroup(group.id)
     store.showNotice('分组已删除，清单已保留', 'success')
+    confirmDialog.visible = false
   }
+  confirmDialog.visible = true
   closeMenu()
 }
 

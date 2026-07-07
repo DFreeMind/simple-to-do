@@ -41,10 +41,6 @@
       </div>
     </header>
 
-    <CalendarView v-if="store.currentView === 'calendar'" />
-    <StatsView v-else-if="store.currentView === 'stats'" />
-
-    <template v-else>
     <section v-if="store.currentView === 'search'" class="search-panel">
       <Search :size="18" />
       <input
@@ -102,12 +98,52 @@
       </template>
 
       <template v-else-if="store.currentView === 'trash'">
-        <TaskItem v-for="task in store.trash" :key="task.id" :task="task" is-trash />
+        <div v-if="store.listTrash.length" class="task-section">
+          <h2>已删除清单</h2>
+          <article v-for="list in store.listTrash" :key="list.id" class="trash-list-card">
+            <div class="trash-list-card__icon">
+              <Folder :size="18" />
+            </div>
+            <div class="trash-list-card__body">
+              <strong>{{ list.name }}</strong>
+              <span>{{ list.taskCount || 0 }} 个任务 · {{ formatTrashDate(list.deletedAt) }}</span>
+            </div>
+            <div class="task-actions task-actions--visible">
+              <button class="ghost-icon" type="button" title="恢复清单" aria-label="恢复清单" @click.stop="store.restoreList(list.id)">
+                <RotateCcw :size="16" />
+              </button>
+              <button class="ghost-icon danger" type="button" title="永久删除清单" aria-label="永久删除清单" @click.stop="deleteListForever(list)">
+                <Trash2 :size="16" />
+              </button>
+            </div>
+          </article>
+        </div>
+        <TaskItem v-for="task in store.visibleTrashTasks" :key="task.id" :task="task" is-trash />
       </template>
 
       <template v-else>
+        <template v-if="store.pinnedTasks.length">
+          <div class="task-section pinned-section">
+            <button class="pinned-toggle" type="button" @click="pinnedVisible = !pinnedVisible">
+              <ChevronRight :size="16" :class="{ rotated: pinnedVisible }" />
+              <Pin :size="13" />
+              <span>置顶 {{ store.pinnedTasks.length }}</span>
+            </button>
+            <TaskItem
+              v-if="pinnedVisible"
+              v-for="task in store.pinnedTasks"
+              :key="task.id"
+              :task="task"
+              :draggable="store.canDragTasks"
+              :is-dragging="taskDrag.draggingId.value === task.id"
+              :is-drop-target="taskDrag.dragOverId.value === task.id"
+              :drop-position="taskDrag.dragOverId.value === task.id ? taskDrag.dropPosition.value : ''"
+            />
+          </div>
+        </template>
+
         <TaskItem
-          v-for="task in store.uncompletedTasks"
+          v-for="task in store.unpinnedTasks"
           :key="task.id"
           :task="task"
           :draggable="store.canDragTasks"
@@ -138,12 +174,21 @@
         <p>{{ emptyText }}</p>
       </div>
     </section>
-    </template>
+
+    <ConfirmDialog
+      :visible="confirmDialog.visible"
+      :title="confirmDialog.title"
+      :message="confirmDialog.message"
+      :confirm-text="confirmDialog.confirmText"
+      :type="confirmDialog.type"
+      @confirm="confirmDialog.onConfirm"
+      @cancel="confirmDialog.visible = false"
+    />
   </main>
 </template>
 
 <script setup>
-import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import {
   ArchiveX,
   ArrowUpDown,
@@ -153,23 +198,35 @@ import {
   ChevronDown,
   ChevronRight,
   Flag,
+  Folder,
   Info,
   PanelRight,
+  Pin,
   Plus,
   Repeat2,
+  RotateCcw,
   Search,
-  Tags
+  Tags,
+  Trash2
 } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import { useDragSort } from '@/composables/useDragSort'
 import TaskItem from './TaskItem.vue'
-import CalendarView from './CalendarView.vue'
-import StatsView from './StatsView.vue'
+import ConfirmDialog from './ConfirmDialog.vue'
 
 const store = useTaskStore()
 const newTaskTitle = ref('')
 const quickInput = ref(null)
 const sortMenuOpen = ref(false)
+const pinnedVisible = ref(true)
+const confirmDialog = reactive({
+  visible: false,
+  title: '',
+  message: '',
+  confirmText: '确定',
+  type: 'danger',
+  onConfirm: () => {}
+})
 const sortOptions = [
   { value: 'default', label: '智能排序' },
   { value: 'date', label: '截止日期近' },
@@ -181,6 +238,9 @@ const sortOptions = [
 
 const taskDrag = useDragSort({
   scrollContainerSelector: '.task-list__content',
+  onDragStart: () => store.playDragStartSound(),
+  onDragOver: () => store.playDragOverSound(),
+  onDragEnd: () => store.playDragEndSound(),
   onDrop(sourceId, targetId, position) {
     // Find which scope the tasks belong to
     if (store.currentView === 'planned') {
@@ -193,9 +253,7 @@ const taskDrag = useDragSort({
     }
   },
   getItemEl(target) {
-    const handle = target.closest?.('.task-drag-handle')
-    if (!handle) return null
-    const article = handle.closest('.task-item')
+    const article = target.closest?.('.task-item')
     if (!article) return null
     const taskId = article.dataset.taskId
     return taskId ? { id: taskId, el: article } : null
@@ -219,12 +277,15 @@ const taskDrag = useDragSort({
 
 function handleMouseDown(e) {
   if (!store.canDragTasks) return
-  const handle = e.target.closest('.task-drag-handle')
-  if (!handle) return
-  const article = handle.closest('.task-item')
+  if (isDragIgnored(e.target)) return
+  const article = e.target.closest('.task-item')
   if (!article) return
   const taskId = article.dataset.taskId
   if (taskId) taskDrag.startDrag(e, taskId)
+}
+
+function isDragIgnored(target) {
+  return Boolean(target.closest?.('button, input, textarea, select, a, .context-menu'))
 }
 
 const viewMeta = computed(() => {
@@ -233,8 +294,6 @@ const viewMeta = computed(() => {
     inbox: { title: '收集箱', eyebrow: '先记录，再整理' },
     planned: { title: '计划', eyebrow: '按时间推进任务' },
     important: { title: '重要', eyebrow: '需要优先处理的任务' },
-    calendar: { title: '月历', eyebrow: '按日期查看和安排任务' },
-    stats: { title: '统计', eyebrow: '回顾近期推进情况' },
     completed: { title: '已完成', eyebrow: '回顾和清理已经完成的事项' },
     trash: { title: '垃圾桶', eyebrow: '恢复或永久删除任务' },
     search: { title: '搜索', eyebrow: '查找任务、标签和备注' }
@@ -250,7 +309,7 @@ const sortLabel = computed(() => {
   return sortOptions.find(option => option.value === store.sortBy)?.label || '智能排序'
 })
 
-const showTaskActions = computed(() => !['calendar', 'stats'].includes(store.currentView))
+const showTaskActions = computed(() => true)
 
 const quickPlaceholder = computed(() => {
   if (store.currentView === 'today') return '添加到今日，例如：明天 9点 写周报 #工作'
@@ -294,7 +353,7 @@ const readonlyHint = computed(() => {
 })
 
 const isEmpty = computed(() => {
-  if (store.currentView === 'trash') return store.trash.length === 0
+  if (store.currentView === 'trash') return store.visibleTrashTasks.length === 0 && store.listTrash.length === 0
   if (store.currentView === 'planned') return store.plannedSections.length === 0
   return store.filteredTasks.length === 0
 })
@@ -366,9 +425,34 @@ function clearCompleted() {
     store.showNotice('没有可清理的已完成任务', 'info')
     return
   }
-  if (window.confirm(`清理 ${count} 个已完成任务？它们会进入垃圾桶。`)) {
+  confirmDialog.title = '清理已完成任务'
+  confirmDialog.message = `清理 ${count} 个已完成任务？它们会进入垃圾桶。`
+  confirmDialog.confirmText = '清理'
+  confirmDialog.type = 'danger'
+  confirmDialog.onConfirm = () => {
     store.clearCompletedInCurrentView()
     store.showNotice(`已清理 ${count} 个任务`, 'success')
+    confirmDialog.visible = false
   }
+  confirmDialog.visible = true
+}
+
+function formatTrashDate(value) {
+  if (!value) return '删除时间未知'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '删除时间未知'
+  return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`
+}
+
+function deleteListForever(list) {
+  confirmDialog.title = '永久删除清单'
+  confirmDialog.message = `永久删除清单"${list.name}"及其任务？此操作不可撤销。`
+  confirmDialog.confirmText = '永久删除'
+  confirmDialog.type = 'danger'
+  confirmDialog.onConfirm = () => {
+    store.permanentDeleteList(list.id)
+    confirmDialog.visible = false
+  }
+  confirmDialog.visible = true
 }
 </script>

@@ -3,9 +3,26 @@ import { ref, computed, watch } from 'vue'
 import { genId } from '@/utils/id'
 import { getMonthDays, isToday, toDateString } from '@/utils/date'
 import { loadData as loadPlatformData, saveData as savePlatformData } from '@/services/platform'
+import {
+  playCompleteSound,
+  playSubtaskCompleteSound,
+  playDeleteSound,
+  playAddSound,
+  playRestoreSound,
+  playMoveSound,
+  playDragStartSound,
+  playDragOverSound,
+  playDragEndSound,
+  playListAddSound,
+  playListDeleteSound,
+  playGroupAddSound,
+  playGroupDeleteSound,
+  setSoundEnabled,
+  setSoundCategories
+} from '@/utils/sound'
 
-const SYSTEM_VIEW_IDS = ['today', 'inbox', 'planned', 'important', 'calendar', 'stats', 'completed', 'trash', 'search']
-const READONLY_VIEWS = ['planned', 'calendar', 'stats', 'completed', 'trash']
+const SYSTEM_VIEW_IDS = ['today', 'inbox', 'planned', 'important', 'completed', 'trash', 'search']
+const READONLY_VIEWS = ['planned', 'completed', 'trash']
 const THEME_IDS = ['mint', 'blue', 'violet', 'graphite']
 const DETAIL_WIDTH_MIN = 320
 const DETAIL_WIDTH_MAX = 800
@@ -16,9 +33,9 @@ const DEFAULT_GROUPS = [
 ]
 
 const DEFAULT_LISTS = [
-  { id: 'inbox', name: '收集箱', groupId: null, color: '#5fb8ad', isSystem: true, sortOrder: 0 },
-  { id: 'work', name: '工作任务', groupId: 'work', color: '#4f8de8', isSystem: false, sortOrder: 1000 },
-  { id: 'personal', name: '个人备忘', groupId: 'life', color: '#e0a54f', isSystem: false, sortOrder: 2000 }
+  { id: 'inbox', name: '收集箱', groupId: null, color: '#5fb8ad', isSystem: true, pinned: false, sortOrder: 0 },
+  { id: 'work', name: '工作任务', groupId: 'work', color: '#4f8de8', isSystem: false, pinned: false, sortOrder: 1000 },
+  { id: 'personal', name: '个人备忘', groupId: 'life', color: '#e0a54f', isSystem: false, pinned: false, sortOrder: 2000 }
 ]
 
 const DEFAULT_SETTINGS = {
@@ -27,7 +44,12 @@ const DEFAULT_SETTINGS = {
   detailOpen: false,
   detailWidth: 380,
   startView: 'today',
-  completedVisible: true
+  completedVisible: true,
+  trashRetentionDays: 30,
+  soundEnabled: true,
+  soundTaskEnabled: true,
+  soundListEnabled: true,
+  soundGroupEnabled: true
 }
 
 function nowIso() {
@@ -132,6 +154,7 @@ export const useTaskStore = defineStore('task', () => {
   const lists = ref(DEFAULT_LISTS.map(list => ({ ...list })))
   const tasks = ref([])
   const trash = ref([])
+  const listTrash = ref([])
   const currentView = ref(DEFAULT_SETTINGS.startView)
   const selectedTaskId = ref(null)
   const sortBy = ref('default')
@@ -148,7 +171,9 @@ export const useTaskStore = defineStore('task', () => {
   let activeSavePromise = null
   let saveTimer = null
 
-  const activeTasks = computed(() => tasks.value.filter(task => !task.deleted))
+  const trashedListIds = computed(() => new Set(listTrash.value.map(item => item.id)))
+  const activeTasks = computed(() => tasks.value.filter(task => !task.deleted && !trashedListIds.value.has(task.listId)))
+  const visibleTrashTasks = computed(() => trash.value.filter(task => !task.deletedByListId || !trashedListIds.value.has(task.deletedByListId)))
   const todayKey = computed(() => localDateKey())
 
   const currentList = computed(() => {
@@ -180,15 +205,11 @@ export const useTaskStore = defineStore('task', () => {
       case 'important':
         result = activeTasks.value.filter(task => task.important || task.priority === 3 || task.pinned)
         break
-      case 'calendar':
-      case 'stats':
-        result = []
-        break
       case 'completed':
         result = tasks.value.filter(task => task.completed && !task.deleted)
         break
       case 'trash':
-        result = [...trash.value]
+        result = [...visibleTrashTasks.value]
         break
       case 'search':
         result = query ? activeTasks.value.filter(task => {
@@ -211,6 +232,8 @@ export const useTaskStore = defineStore('task', () => {
 
   const uncompletedTasks = computed(() => filteredTasks.value.filter(task => !task.completed))
   const completedTasks = computed(() => filteredTasks.value.filter(task => task.completed))
+  const pinnedTasks = computed(() => uncompletedTasks.value.filter(task => task.pinned))
+  const unpinnedTasks = computed(() => uncompletedTasks.value.filter(task => !task.pinned))
 
   const selectedTask = computed(() => {
     if (!selectedTaskId.value) return null
@@ -234,9 +257,8 @@ export const useTaskStore = defineStore('task', () => {
     counts.inbox = open.filter(task => task.listId === 'inbox').length
     counts.planned = open.filter(task => task.dueDate).length
     counts.important = open.filter(task => task.important || task.priority === 3 || task.pinned).length
-    counts.calendar = open.filter(task => task.dueDate).length
     counts.completed = tasks.value.filter(task => task.completed && !task.deleted).length
-    counts.trash = trash.value.length
+    counts.trash = visibleTrashTasks.value.length + listTrash.value.length
     return counts
   })
 
@@ -244,15 +266,29 @@ export const useTaskStore = defineStore('task', () => {
     const customLists = lists.value
       .filter(list => !list.isSystem)
       .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-    return [...groups.value].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)).map(group => ({
+    const pinnedLists = customLists.filter(list => list.pinned)
+    const unpinnedLists = customLists.filter(list => !list.pinned)
+    const allGroups = [...groups.value].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+    const result = allGroups.map(group => ({
       ...group,
-      lists: customLists.filter(list => list.groupId === group.id)
+      lists: unpinnedLists.filter(list => list.groupId === group.id)
     })).concat({
       id: 'ungrouped',
       name: '未分组',
       collapsed: ungroupedCollapsed.value,
-      lists: customLists.filter(list => !list.groupId || !groups.value.some(group => group.id === list.groupId))
+      lists: unpinnedLists.filter(list => !list.groupId || !allGroups.some(group => group.id === list.groupId))
     }).filter(group => group.lists.length || group.id !== 'ungrouped')
+    // 置顶分组始终显示在最前面
+    if (pinnedLists.length) {
+      result.unshift({
+        id: 'pinned',
+        name: '置顶',
+        collapsed: false,
+        lists: pinnedLists,
+        isSystem: true
+      })
+    }
+    return result
   })
 
   const suggestedTodayTasks = computed(() => {
@@ -347,7 +383,7 @@ export const useTaskStore = defineStore('task', () => {
   const canDragTasks = computed(() => {
     return sortBy.value === 'default' &&
       Boolean(currentTaskOrderKey.value) &&
-      !['calendar', 'stats', 'completed', 'trash'].includes(currentView.value)
+      !['completed', 'trash'].includes(currentView.value)
   })
 
   function sortTasks(source) {
@@ -414,15 +450,21 @@ export const useTaskStore = defineStore('task', () => {
   function applyViewOrder(source, key = currentTaskOrderKey.value) {
     const order = key ? viewOrders.value[key] : null
     if (!Array.isArray(order) || !order.some(id => source.some(task => task.id === id))) return null
+    // 置顶和未置顶分别排序，各自使用 viewOrder
+    const pinnedTasks = source.filter(t => t.pinned)
+    const unpinnedTasks = source.filter(t => !t.pinned)
     const rank = new Map(order.map((id, index) => [id, index]))
-    const fallback = smartSortTasks(source)
-    const fallbackRank = new Map(fallback.map((task, index) => [task.id, index]))
-    return [...source].sort((a, b) => {
-      const ar = rank.has(a.id) ? rank.get(a.id) : Number.MAX_SAFE_INTEGER
-      const br = rank.has(b.id) ? rank.get(b.id) : Number.MAX_SAFE_INTEGER
-      if (ar !== br) return ar - br
-      return (fallbackRank.get(a.id) ?? 0) - (fallbackRank.get(b.id) ?? 0)
-    })
+    function sortByViewOrder(tasks) {
+      const fallback = smartSortTasks(tasks)
+      const fallbackRank = new Map(fallback.map((task, index) => [task.id, index]))
+      return tasks.sort((a, b) => {
+        const ar = rank.has(a.id) ? rank.get(a.id) : Number.MAX_SAFE_INTEGER
+        const br = rank.has(b.id) ? rank.get(b.id) : Number.MAX_SAFE_INTEGER
+        if (ar !== br) return ar - br
+        return (fallbackRank.get(a.id) ?? 0) - (fallbackRank.get(b.id) ?? 0)
+      })
+    }
+    return [...sortByViewOrder(pinnedTasks), ...sortByViewOrder(unpinnedTasks)]
   }
 
   function isInMyDay(task) {
@@ -447,6 +489,19 @@ export const useTaskStore = defineStore('task', () => {
 
   function updateSettings(updates) {
     settings.value = normalizeSettings({ ...settings.value, ...updates })
+    // 更新音效开关
+    if ('soundEnabled' in updates) {
+      setSoundEnabled(updates.soundEnabled)
+    }
+    // 更新音效分类开关
+    if ('soundTaskEnabled' in updates || 'soundListEnabled' in updates || 'soundGroupEnabled' in updates) {
+      setSoundCategories({
+        task: updates.soundTaskEnabled ?? settings.value.soundTaskEnabled,
+        list: updates.soundListEnabled ?? settings.value.soundListEnabled,
+        group: updates.soundGroupEnabled ?? settings.value.soundGroupEnabled
+      })
+    }
+    purgeExpiredTrash()
   }
 
   function cycleSort() {
@@ -462,6 +517,7 @@ export const useTaskStore = defineStore('task', () => {
   function addGroup(name) {
     const group = { id: genId(), name, collapsed: false, sortOrder: nextGroupSortOrder() }
     groups.value.push(group)
+    playGroupAddSound()
     return group
   }
 
@@ -475,6 +531,7 @@ export const useTaskStore = defineStore('task', () => {
     lists.value.forEach(list => {
       if (list.groupId === id) list.groupId = null
     })
+    playGroupDeleteSound()
   }
 
   function toggleGroup(id) {
@@ -493,24 +550,83 @@ export const useTaskStore = defineStore('task', () => {
       groupId,
       color: pickListColor(),
       isSystem: false,
+      pinned: false,
       sortOrder: nextListSortOrder(groupId || null)
     }
     lists.value.push(list)
+    playListAddSound()
     return list
+  }
+
+  function toggleListPin(id) {
+    const list = lists.value.find(item => item.id === id)
+    if (list && !list.isSystem) list.pinned = !list.pinned
   }
 
   function deleteList(id) {
     const list = lists.value.find(item => item.id === id)
     if (!list || list.isSystem || id === 'inbox') return false
     const updatedAt = nowIso()
+    const listTasks = tasks.value.filter(task => task.listId === id)
+    listTrash.value = listTrash.value.filter(item => item.id !== id)
+    listTrash.value.unshift({
+      ...list,
+      deleted: true,
+      deletedAt: updatedAt,
+      taskCount: listTasks.length
+    })
     tasks.value.forEach(task => {
       if (task.listId === id) {
-        task.listId = 'inbox'
+        task.deleted = true
+        task.deletedAt = updatedAt
+        task.deletedByListId = id
         task.updatedAt = updatedAt
+        trash.value = trash.value.filter(item => item.id !== task.id)
+        trash.value.unshift({ ...task, subtasks: [...task.subtasks], attachments: [...task.attachments] })
+        removeTaskFromOrders(task.id)
       }
     })
     lists.value = lists.value.filter(item => item.id !== id)
     if (currentView.value === id) currentView.value = 'inbox'
+    playListDeleteSound()
+    return true
+  }
+
+  function restoreList(id) {
+    const idx = listTrash.value.findIndex(list => list.id === id)
+    if (idx === -1) return false
+    const trashed = listTrash.value[idx]
+    if (!lists.value.some(list => list.id === id)) {
+      lists.value.push(normalizeList({
+        ...trashed,
+        deleted: false,
+        deletedAt: null
+      }))
+    }
+    const restoredAt = nowIso()
+    tasks.value.forEach(task => {
+      if (task.deletedByListId === id) {
+        task.deleted = false
+        task.deletedAt = null
+        task.deletedByListId = null
+        task.updatedAt = restoredAt
+      }
+    })
+    trash.value = trash.value.filter(task => task.deletedByListId !== id)
+    listTrash.value.splice(idx, 1)
+    showNotice('清单已恢复', 'success')
+    return true
+  }
+
+  function permanentDeleteList(id) {
+    const idx = listTrash.value.findIndex(list => list.id === id)
+    if (idx === -1) return false
+    const taskIds = tasks.value.filter(task => task.deletedByListId === id).map(task => task.id)
+    tasks.value = tasks.value.filter(task => task.deletedByListId !== id)
+    trash.value = trash.value.filter(task => task.deletedByListId !== id)
+    taskIds.forEach(removeTaskFromOrders)
+    listTrash.value.splice(idx, 1)
+    showNotice('清单已永久删除', 'success')
     return true
   }
 
@@ -532,6 +648,7 @@ export const useTaskStore = defineStore('task', () => {
       const target = groups.value.find(item => item.id === group.id)
       if (target) target.sortOrder = (index + 1) * 1000
     })
+    playMoveSound()
   }
 
   function reorderList(sourceId, targetId, groupId = null) {
@@ -548,6 +665,7 @@ export const useTaskStore = defineStore('task', () => {
       const item = lists.value.find(candidate => candidate.id === list.id)
       if (item) item.sortOrder = (index + 1) * 1000
     })
+    playMoveSound()
   }
 
   function reorderTask(sourceId, targetId, scopeIds = null, position = 'before') {
@@ -557,20 +675,27 @@ export const useTaskStore = defineStore('task', () => {
       ? scopeIds
       : uncompletedTasks.value.map(task => task.id)
     if (!visibleIds.includes(sourceId) || !visibleIds.includes(targetId)) return
+    // 置顶和未置顶任务分别排序，不能跨组拖拽
+    const sourceTask = tasks.value.find(t => t.id === sourceId)
+    const targetTask = tasks.value.find(t => t.id === targetId)
+    if (sourceTask && targetTask && sourceTask.pinned !== targetTask.pinned) return
+    const pinned = sourceTask?.pinned
+    const scopedIds = visibleIds.filter(id => {
+      const t = tasks.value.find(task => task.id === id)
+      return t ? t.pinned === pinned : false
+    })
     const existing = Array.isArray(viewOrders.value[key]) ? viewOrders.value[key] : []
-    const merged = [
-      ...visibleIds,
-      ...existing.filter(id => !visibleIds.includes(id))
-    ].filter(id => tasks.value.some(task => task.id === id && !task.deleted))
+    // 合并：当前作用域的置顶/未置顶任务 + 已有顺序中其他任务
+    const otherIds = existing.filter(id => !scopedIds.includes(id))
+    const merged = [...scopedIds, ...otherIds]
+      .filter(id => tasks.value.some(task => task.id === id && !task.deleted))
 
     if (position === 'after') {
-      // Find the next item after target to insert after
       const targetIdx = merged.indexOf(targetId)
       const nextId = targetIdx >= 0 && targetIdx < merged.length - 1 ? merged[targetIdx + 1] : null
       if (nextId && nextId !== sourceId) {
         moveById(merged, sourceId, nextId)
       } else {
-        // At the end, just move to target position (will end up after target)
         moveById(merged, sourceId, targetId)
       }
     } else {
@@ -581,6 +706,7 @@ export const useTaskStore = defineStore('task', () => {
       ...viewOrders.value,
       [key]: merged
     }
+    playMoveSound()
   }
 
   function moveListToGroup(listId, groupId = null) {
@@ -612,6 +738,7 @@ export const useTaskStore = defineStore('task', () => {
     tasks.value.unshift(task)
     prependTaskToCurrentOrder(task.id)
     selectedTaskId.value = task.id
+    playAddSound()
     return task
   }
 
@@ -650,6 +777,10 @@ export const useTaskStore = defineStore('task', () => {
     task.completed = !task.completed
     task.completedAt = task.completed ? nowIso() : null
     task.updatedAt = nowIso()
+    // 仅在标记为完成时播放音效，取消完成时不播放
+    if (task.completed) {
+      playCompleteSound()
+    }
   }
 
   function toggleMyDay(id) {
@@ -679,6 +810,7 @@ export const useTaskStore = defineStore('task', () => {
       removeTaskFromOrders(id)
       if (selectedTaskId.value === id) selectedTaskId.value = null
       showNotice('任务已移入垃圾桶', 'success')
+      playDeleteSound()
     }
   }
 
@@ -690,12 +822,18 @@ export const useTaskStore = defineStore('task', () => {
     if (original) {
       original.deleted = false
       original.deletedAt = null
+      if (original.deletedByListId && !lists.value.some(list => list.id === original.listId)) {
+        original.listId = 'inbox'
+      }
+      original.deletedByListId = null
       original.updatedAt = nowIso()
     } else {
-      tasks.value.unshift(normalizeTask({ ...task, deleted: false, deletedAt: null, updatedAt: nowIso() }))
+      const listId = lists.value.some(list => list.id === task.listId) ? task.listId : 'inbox'
+      tasks.value.unshift(normalizeTask({ ...task, listId, deleted: false, deletedAt: null, deletedByListId: null, updatedAt: nowIso() }))
     }
     trash.value.splice(idx, 1)
     showNotice('任务已恢复', 'success')
+    playRestoreSound()
   }
 
   function permanentDelete(id) {
@@ -748,6 +886,7 @@ export const useTaskStore = defineStore('task', () => {
       updatedAt: createdAt
     })
     tasks.value.unshift(task)
+    playAddSound()
     return task
   }
 
@@ -762,6 +901,7 @@ export const useTaskStore = defineStore('task', () => {
     if (!task || !title.trim()) return
     task.subtasks.push({ id: genId(), title: title.trim(), completed: false, sortOrder: nextSubtaskSortOrder(task) })
     task.updatedAt = nowIso()
+    playAddSound()
   }
 
   function toggleSubtask(taskId, subId) {
@@ -770,6 +910,10 @@ export const useTaskStore = defineStore('task', () => {
     if (!subtask || !task) return
     subtask.completed = !subtask.completed
     task.updatedAt = nowIso()
+    // 仅在标记为完成时播放音效
+    if (subtask.completed) {
+      playSubtaskCompleteSound()
+    }
   }
 
   function deleteSubtask(taskId, subId) {
@@ -777,6 +921,7 @@ export const useTaskStore = defineStore('task', () => {
     if (!task) return
     task.subtasks = task.subtasks.filter(subtask => subtask.id !== subId)
     task.updatedAt = nowIso()
+    playDeleteSound()
   }
 
   function updateSubtask(taskId, subId, title) {
@@ -801,14 +946,27 @@ export const useTaskStore = defineStore('task', () => {
     task.updatedAt = nowIso()
   }
 
-  function addAttachment(taskId, filePath, imageUrl) {
+  function addAttachment(taskId, attachment, imageUrl = '') {
     const task = tasks.value.find(item => item.id === taskId)
     if (!task) return
+    const source = typeof attachment === 'string'
+      ? { path: attachment, originalName: attachment, url: imageUrl }
+      : (attachment || {})
+    const createdAt = source.createdAt || source.created_at || nowIso()
     task.attachments.push({
-      id: genId(),
-      path: filePath,
-      url: imageUrl,
-      createdAt: nowIso()
+      id: source.id || genId(),
+      kind: source.kind || inferAttachmentKind(source.mime),
+      mime: source.mime || '',
+      originalName: source.originalName || source.original_name || source.path || '图片附件',
+      path: source.path || source.originalPath || source.original_path || source.originalName || source.original_name || '',
+      relativePath: source.relativePath || source.relative_path || '',
+      sha256: source.sha256 || '',
+      sizeBytes: Number(source.sizeBytes ?? source.size_bytes ?? 0),
+      width: Number.isFinite(Number(source.width)) ? Number(source.width) : null,
+      height: Number.isFinite(Number(source.height)) ? Number(source.height) : null,
+      url: source.url || imageUrl || '',
+      createdAt,
+      lastReferencedAt: source.lastReferencedAt || source.last_referenced_at || createdAt
     })
     task.updatedAt = nowIso()
   }
@@ -854,18 +1012,31 @@ export const useTaskStore = defineStore('task', () => {
 
   async function loadData() {
     try {
+      console.log('[Store] 开始加载数据...')
       const data = await loadPlatformData()
+      console.log('[Store] 数据加载完成', data ? `${Object.keys(data).length} 个顶级字段` : '空数据')
       if (data) {
         groups.value = normalizeGroups(data.groups)
         lists.value = normalizeLists(data.lists)
         tasks.value = (data.tasks || []).map(normalizeTask)
         trash.value = (data.trash || []).map(task => normalizeTask({ ...task, deleted: true }))
+        listTrash.value = normalizeListTrash(data.listTrash)
         settings.value = normalizeSettings(data.settings)
         viewOrders.value = normalizeViewOrders(data.viewOrders)
+        // 根据用户设置更新音效开关
+        setSoundEnabled(settings.value.soundEnabled)
+        setSoundCategories({
+          task: settings.value.soundTaskEnabled,
+          list: settings.value.soundListEnabled,
+          group: settings.value.soundGroupEnabled
+        })
+        purgeExpiredTrash()
+        console.log(`[Store] 数据初始化完成: ${tasks.value.length} 任务, ${lists.value.length} 清单`)
       }
       currentView.value = settings.value.startView || 'today'
       saveError.value = ''
     } catch (error) {
+      console.error('[Store] 数据加载失败:', error)
       saveError.value = error?.message || '读取本地数据失败'
       showNotice(saveError.value, 'error')
     }
@@ -898,7 +1069,7 @@ export const useTaskStore = defineStore('task', () => {
     }
   }
 
-  watch([groups, lists, tasks, trash, settings, viewOrders], () => {
+  watch([groups, lists, tasks, trash, listTrash, settings, viewOrders], () => {
     scheduleSave()
   }, { deep: true })
 
@@ -911,15 +1082,28 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   function buildSavePayload() {
-    return JSON.parse(JSON.stringify({
+    const payload = JSON.parse(JSON.stringify({
       schemaVersion: 2,
       groups: groups.value,
       lists: lists.value,
       tasks: tasks.value,
       trash: trash.value,
+      listTrash: listTrash.value,
       viewOrders: viewOrders.value,
       settings: settings.value
     }))
+    stripHydratedAttachmentUrls(payload)
+    return payload
+  }
+
+  function stripHydratedAttachmentUrls(value) {
+    if (Array.isArray(value)) {
+      value.forEach(stripHydratedAttachmentUrls)
+      return
+    }
+    if (!value || typeof value !== 'object') return
+    if (value.relativePath) delete value.url
+    Object.values(value).forEach(stripHydratedAttachmentUrls)
   }
 
   function normalizeGroups(rawGroups) {
@@ -947,6 +1131,7 @@ export const useTaskStore = defineStore('task', () => {
       groupId: list?.groupId ?? fallback?.groupId ?? null,
       color: list?.color || fallback?.color || pickListColor(),
       isSystem: Boolean(list?.isSystem || list?.id === 'inbox'),
+      pinned: Boolean(list?.pinned),
       sortOrder: Number.isFinite(Number(list?.sortOrder)) ? Number(list.sortOrder) : (fallback?.sortOrder ?? (index + 1) * 1000)
     }
   }
@@ -962,6 +1147,7 @@ export const useTaskStore = defineStore('task', () => {
       completedAt: task.completedAt || null,
       deleted: Boolean(task.deleted),
       deletedAt: task.deletedAt || null,
+      deletedByListId: task.deletedByListId || null,
       pinned: Boolean(task.pinned),
       important: Boolean(task.important || task.priority === 3),
       myDayDate: task.myDayDate || null,
@@ -979,9 +1165,18 @@ export const useTaskStore = defineStore('task', () => {
       })).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)) : [],
       attachments: Array.isArray(task.attachments) ? task.attachments.map(att => ({
         id: att.id || genId(),
-        path: att.path || '',
+        kind: att.kind || inferAttachmentKind(att.mime),
+        mime: att.mime || '',
+        originalName: att.originalName || att.original_name || att.path || '图片附件',
+        path: att.path || att.originalPath || att.original_path || '',
+        relativePath: att.relativePath || att.relative_path || '',
+        sha256: att.sha256 || '',
+        sizeBytes: Number(att.sizeBytes ?? att.size_bytes ?? 0),
+        width: Number.isFinite(Number(att.width)) ? Number(att.width) : null,
+        height: Number.isFinite(Number(att.height)) ? Number(att.height) : null,
         url: att.url || '',
-        createdAt: att.createdAt || createdAt
+        createdAt: att.createdAt || att.created_at || createdAt,
+        lastReferencedAt: att.lastReferencedAt || att.last_referenced_at || att.createdAt || createdAt
       })) : [],
       comments: Array.isArray(task.comments) ? task.comments : [],
       editorMode: task.editorMode || 'detail',
@@ -997,6 +1192,13 @@ export const useTaskStore = defineStore('task', () => {
     const detailWidth = typeof rawSettings.detailWidth === 'number'
       ? Math.max(DETAIL_WIDTH_MIN, Math.min(DETAIL_WIDTH_MAX, rawSettings.detailWidth))
       : DEFAULT_SETTINGS.detailWidth
+    const trashRetentionDays = Number.isFinite(Number(rawSettings.trashRetentionDays))
+      ? Math.max(1, Math.min(365, Number(rawSettings.trashRetentionDays)))
+      : DEFAULT_SETTINGS.trashRetentionDays
+    const soundEnabled = rawSettings.soundEnabled !== false
+    const soundTaskEnabled = rawSettings.soundTaskEnabled !== false
+    const soundListEnabled = rawSettings.soundListEnabled !== false
+    const soundGroupEnabled = rawSettings.soundGroupEnabled !== false
     return {
       ...DEFAULT_SETTINGS,
       ...rawSettings,
@@ -1005,8 +1207,48 @@ export const useTaskStore = defineStore('task', () => {
       startView,
       detailOpen: rawSettings.detailOpen !== false,
       detailWidth,
-      completedVisible: rawSettings.completedVisible !== false
+      completedVisible: rawSettings.completedVisible !== false,
+      trashRetentionDays,
+      soundEnabled,
+      soundTaskEnabled,
+      soundListEnabled,
+      soundGroupEnabled
     }
+  }
+
+  function normalizeListTrash(rawListTrash = []) {
+    if (!Array.isArray(rawListTrash)) return []
+    return rawListTrash.map((list, index) => ({
+      ...normalizeList(list, index),
+      deleted: true,
+      deletedAt: list.deletedAt || nowIso(),
+      taskCount: Number.isFinite(Number(list.taskCount)) ? Number(list.taskCount) : tasks.value.filter(task => task.deletedByListId === list.id).length
+    }))
+  }
+
+  function purgeExpiredTrash() {
+    const retentionDays = Number(settings.value.trashRetentionDays || DEFAULT_SETTINGS.trashRetentionDays)
+    const threshold = Date.now() - retentionDays * 86400000
+    const expiredTaskIds = trash.value
+      .filter(task => task.deletedAt && new Date(task.deletedAt).getTime() < threshold)
+      .map(task => task.id)
+    if (expiredTaskIds.length) {
+      const expired = new Set(expiredTaskIds)
+      tasks.value = tasks.value.filter(task => !expired.has(task.id))
+      trash.value = trash.value.filter(task => !expired.has(task.id))
+      expiredTaskIds.forEach(removeTaskFromOrders)
+    }
+    const expiredListIds = listTrash.value
+      .filter(list => list.deletedAt && new Date(list.deletedAt).getTime() < threshold)
+      .map(list => list.id)
+    expiredListIds.forEach(id => {
+      const idx = listTrash.value.findIndex(list => list.id === id)
+      if (idx >= 0) {
+        tasks.value = tasks.value.filter(task => task.deletedByListId !== id)
+        trash.value = trash.value.filter(task => task.deletedByListId !== id)
+        listTrash.value.splice(idx, 1)
+      }
+    })
   }
 
   function normalizeViewOrders(rawOrders = {}) {
@@ -1020,6 +1262,12 @@ export const useTaskStore = defineStore('task', () => {
   function pickListColor() {
     const colors = ['#5fb8ad', '#4f8de8', '#e0a54f', '#cf6f87', '#7c6ee6', '#5f9e72']
     return colors[lists.value.length % colors.length]
+  }
+
+  function inferAttachmentKind(mime = '') {
+    if (mime.startsWith('image/')) return 'image'
+    if (mime) return 'file'
+    return 'unknown'
   }
 
   function nextGroupSortOrder() {
@@ -1087,6 +1335,7 @@ export const useTaskStore = defineStore('task', () => {
     lists,
     tasks,
     trash,
+    listTrash,
     currentView,
     selectedTaskId,
     sortBy,
@@ -1099,12 +1348,15 @@ export const useTaskStore = defineStore('task', () => {
     settings,
     settingsOpen,
     activeTasks,
+    visibleTrashTasks,
     currentList,
     selectedList,
     canQuickAddTask,
     filteredTasks,
     uncompletedTasks,
     completedTasks,
+    pinnedTasks,
+    unpinnedTasks,
     canDragTasks,
     selectedTask,
     listTaskCounts,
@@ -1132,6 +1384,8 @@ export const useTaskStore = defineStore('task', () => {
     toggleGroup,
     addList,
     deleteList,
+    restoreList,
+    permanentDeleteList,
     renameList,
     moveList,
     addTask,
@@ -1167,6 +1421,9 @@ export const useTaskStore = defineStore('task', () => {
     closeSettings,
     updateSettings,
     loadData,
-    saveData
+    saveData,
+    playDragStartSound,
+    playDragOverSound,
+    playDragEndSound
   }
 })
