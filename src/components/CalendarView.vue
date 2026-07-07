@@ -20,96 +20,88 @@
           <ChevronRight :size="17" />
         </button>
       </div>
+
+      <div class="calendar-quick-add">
+        <Plus :size="16" />
+        <input
+          ref="quickInput"
+          v-model="newTitle"
+          type="text"
+          placeholder="快速添加任务到选中日期..."
+          aria-label="快速添加任务"
+          @keydown.enter="addTask"
+        />
+        <button class="primary-btn" type="button" :disabled="!newTitle.trim()" @click="addTask">添加</button>
+      </div>
+
       <button class="small-btn" type="button" @click="goToday">今天</button>
     </div>
 
-    <div class="calendar-layout">
-      <div class="calendar-board">
-        <div class="calendar-weekdays">
-          <span v-for="day in weekdays" :key="day">{{ day }}</span>
-        </div>
+    <div class="calendar-board">
+      <div class="calendar-weekdays">
+        <span v-for="day in weekdays" :key="day">{{ day }}</span>
+      </div>
 
-        <div class="calendar-grid">
-          <div
-            v-for="day in store.calendarMonthDays"
-            :key="day.key"
-            class="calendar-day"
-            :class="{
-              'other-month': !day.current,
-              today: isTodayKey(day.key),
-              selected: selectedKey === day.key
-            }"
-            role="button"
-            tabindex="0"
-            @click="selectDate(day.date)"
-            @keydown.enter.prevent="selectDate(day.date)"
-            @keydown.space.prevent="selectDate(day.date)"
-            @dragover.prevent
-            @drop="dropTask(day.date, $event)"
-          >
-            <span class="calendar-day__head">
-              <span class="calendar-day__number">{{ day.day }}</span>
-              <span v-if="day.tasks.length" class="calendar-count">{{ day.tasks.length }}</span>
-            </span>
-            <span class="calendar-day__tasks">
+      <div class="calendar-grid">
+        <div
+          v-for="day in store.calendarMonthDays"
+          :key="day.key"
+          class="calendar-day"
+          :class="{
+            'other-month': !day.current,
+            today: isTodayKey(day.key),
+            selected: selectedKey === day.key,
+            'has-tasks': day.tasks.length > 0
+          }"
+          role="button"
+          tabindex="0"
+          @click="selectDate(day.date)"
+          @keydown.enter.prevent="selectDate(day.date)"
+          @keydown.space.prevent="selectDate(day.date)"
+          @dragover.prevent
+          @drop="dropTask(day.date, $event)"
+        >
+          <span class="calendar-day__head">
+            <span class="calendar-day__number">{{ day.day }}</span>
+            <span v-if="day.tasks.length" class="calendar-count">{{ day.tasks.length }}</span>
+          </span>
+          <span class="calendar-day__tasks">
+            <template v-if="day.tasks.length <= 4">
               <button
-                v-for="task in day.tasks.slice(0, 2)"
+                v-for="task in day.tasks"
                 :key="task.id"
                 class="calendar-task"
+                :class="{ completed: task.completed }"
                 type="button"
                 draggable="true"
                 @click.stop="store.selectTask(task.id)"
                 @dragstart="startTaskDrag(task.id, $event)"
               >
-                {{ task.title }}
+                <span class="task-color" :style="{ backgroundColor: getTaskColor(task) }"></span>
+                <span class="task-title">{{ task.title }}</span>
+                <Check v-if="task.completed" :size="10" class="task-check-icon" />
               </button>
-              <span v-if="day.tasks.length > 2" class="calendar-more">+{{ day.tasks.length - 2 }}</span>
-            </span>
-          </div>
+            </template>
+            <template v-else>
+              <div class="task-dots">
+                <span
+                  v-for="(task, index) in day.tasks.slice(0, 6)"
+                  :key="task.id"
+                  class="task-dot"
+                  :class="{ completed: task.completed }"
+                  :style="{ backgroundColor: getTaskColor(task) }"
+                  :title="task.title"
+                  draggable="true"
+                  @click.stop="store.selectTask(task.id)"
+                  @dragstart="startTaskDrag(task.id, $event)"
+                ></span>
+                <span v-if="day.tasks.length > 6" class="task-dot-more">+{{ day.tasks.length - 6 }}</span>
+              </div>
+              <span class="calendar-more">共{{ day.tasks.length }}项</span>
+            </template>
+          </span>
         </div>
       </div>
-
-      <aside class="calendar-agenda">
-        <div class="calendar-agenda__header">
-          <div>
-            <p class="eyebrow">选中日期</p>
-            <h2>{{ selectedFullLabel }}</h2>
-          </div>
-          <span>{{ selectedTasks.length }}项</span>
-        </div>
-
-        <div class="calendar-quick-add">
-          <Plus :size="18" />
-          <input
-            ref="quickInput"
-            v-model="newTitle"
-            type="text"
-            :placeholder="`添加到 ${selectedLabel}`"
-            aria-label="添加月历任务"
-            @keydown.enter="addTask"
-          />
-          <button class="primary-btn" type="button" :disabled="!newTitle.trim()" @click="addTask">添加</button>
-        </div>
-
-        <div v-if="selectedTasks.length" class="calendar-agenda__list">
-          <button
-            v-for="task in selectedTasks"
-            :key="task.id"
-            class="agenda-task"
-            type="button"
-            draggable="true"
-            @click="store.selectTask(task.id)"
-            @dragstart="startTaskDrag(task.id, $event)"
-          >
-            <span>{{ task.title }}</span>
-            <small>{{ task.listId === 'inbox' ? '收集箱' : listName(task.listId) }}</small>
-          </button>
-        </div>
-        <div v-else class="calendar-empty">
-          <strong>这天还没有任务</strong>
-          <span>可以在上方输入框添加，或把其他日期的任务拖过来。</span>
-        </div>
-      </aside>
     </div>
   </section>
 </template>
@@ -117,6 +109,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import {
+  Check,
   ChevronLeft,
   ChevronRight,
   Plus
@@ -133,15 +126,6 @@ const quickInput = ref(null)
 const monthPickerOpen = ref(false)
 
 const selectedKey = computed(() => toDateString(selectedDate.value))
-const selectedTasks = computed(() => store.calendarTasksByDate[selectedKey.value] || [])
-const selectedLabel = computed(() => {
-  const date = selectedDate.value
-  return `${date.getMonth() + 1}月${date.getDate()}日`
-})
-const selectedFullLabel = computed(() => {
-  const date = selectedDate.value
-  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`
-})
 
 function selectDate(date) {
   const next = new Date(date)
@@ -149,7 +133,6 @@ function selectDate(date) {
   if (next.getFullYear() !== store.calendarYear || next.getMonth() !== store.calendarMonth) {
     store.setCalendarMonth(next.getFullYear(), next.getMonth())
   }
-  quickInput.value?.focus()
 }
 
 function shiftMonth(delta) {
@@ -197,7 +180,8 @@ function isTodayKey(key) {
   return key === toDateString(new Date())
 }
 
-function listName(listId) {
-  return store.lists.find(list => list.id === listId)?.name || '清单'
+function getTaskColor(task) {
+  const list = store.lists.find(l => l.id === task.listId)
+  return list?.color || '#5fb8ad'
 }
 </script>
