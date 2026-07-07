@@ -106,40 +106,44 @@ select:focus-visible,
 
 /* Dark mode overrides */
 .app[data-mode="dark"] {
-  --bg: #111318;
-  --surface: #1a1d24;
+  --accent: #5aafa8;
+  --accent-strong: #7ec4bd;
+  --accent-soft: rgba(90, 175, 168, 0.12);
+  --accent-tint: rgba(90, 175, 168, 0.06);
+  --bg: #0f1115;
+  --surface: #181b21;
   --surface-raised: #1e2128;
-  --surface-muted: #22262e;
-  --border: #2c3039;
-  --border-strong: #3a3f4a;
-  --text: #e2e5ea;
-  --text-muted: #8b919a;
-  --text-subtle: #5c6370;
-  --danger: #f06b6b;
-  --warning: #e09a44;
-  --shadow-popover: 0 18px 48px rgba(0, 0, 0, 0.45);
+  --surface-muted: #23272f;
+  --border: #2a2e36;
+  --border-strong: #383d47;
+  --text: #d8dbe2;
+  --text-muted: #7c828e;
+  --text-subtle: #515763;
+  --danger: #e06060;
+  --warning: #d4923a;
+  --shadow-popover: 0 18px 48px rgba(0, 0, 0, 0.5);
 }
 
 /* Dark mode accent color variants */
 .app[data-mode="dark"][data-theme="blue"] {
-  --accent: #5b9bf0;
-  --accent-strong: #7db3ff;
-  --accent-soft: rgba(91, 155, 240, 0.15);
-  --accent-tint: rgba(91, 155, 240, 0.08);
+  --accent: #5588d4;
+  --accent-strong: #7aa4e8;
+  --accent-soft: rgba(85, 136, 212, 0.12);
+  --accent-tint: rgba(85, 136, 212, 0.06);
 }
 
 .app[data-mode="dark"][data-theme="violet"] {
-  --accent: #8b7ee8;
-  --accent-strong: #a99dff;
-  --accent-soft: rgba(139, 126, 232, 0.15);
-  --accent-tint: rgba(139, 126, 232, 0.08);
+  --accent: #7e72d0;
+  --accent-strong: #9d94e2;
+  --accent-soft: rgba(126, 114, 208, 0.12);
+  --accent-tint: rgba(126, 114, 208, 0.06);
 }
 
 .app[data-mode="dark"][data-theme="graphite"] {
-  --accent: #64748b;
-  --accent-strong: #8294aa;
-  --accent-soft: rgba(100, 116, 139, 0.15);
-  --accent-tint: rgba(100, 116, 139, 0.08);
+  --accent: #5a6678;
+  --accent-strong: #78859a;
+  --accent-soft: rgba(90, 102, 120, 0.12);
+  --accent-tint: rgba(90, 102, 120, 0.06);
 }
 
 .app[data-theme="blue"] {
@@ -3254,54 +3258,48 @@ body.is-resizing {
 
 /* Dark mode element overrides */
 .app[data-mode="dark"] .sidebar {
-  background: linear-gradient(90deg, color-mix(in srgb, var(--surface) 95%, var(--accent-tint)), color-mix(in srgb, var(--surface) 88%, var(--accent-tint)));
+  background: color-mix(in srgb, var(--surface) 96%, var(--accent-tint));
 }
 
 .app[data-mode="dark"] .task-list {
-  background: linear-gradient(90deg, color-mix(in srgb, var(--surface-muted) 78%, var(--surface)), color-mix(in srgb, var(--surface) 92%, var(--surface-muted)));
+  background: var(--bg);
 }
 
 .app[data-mode="dark"] .task-detail {
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, var(--accent-tint)), var(--surface) 38%),
-    var(--surface);
+  background: var(--surface);
 }
 
 .app[data-mode="dark"] .detail-hero {
-  background: linear-gradient(180deg, var(--surface), color-mix(in srgb, var(--surface) 80%, var(--accent-tint)));
+  background: linear-gradient(180deg, var(--surface-raised), var(--surface));
 }
 
 .app[data-mode="dark"] .detail-hero__card {
   background:
-    radial-gradient(circle at 88% 26%, color-mix(in srgb, var(--surface-raised) 28%, transparent) 0 20%, transparent 36%),
-    linear-gradient(135deg, color-mix(in srgb, var(--accent) 50%, var(--surface-raised)), color-mix(in srgb, var(--accent-tint) 60%, var(--surface-raised)));
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 18%, var(--surface-raised)), var(--surface-raised));
 }
 
 .app[data-mode="dark"] .detail-hero-progress {
-  background: color-mix(in srgb, var(--surface-raised) 70%, transparent);
-  border-color: color-mix(in srgb, var(--border) 50%, transparent);
+  background: var(--surface-muted);
+  border-color: var(--border);
 }
 
 .app[data-mode="dark"] .detail-hero-progress__ring::after {
-  background: var(--surface-raised);
+  background: var(--surface-muted);
 }
 
 .app[data-mode="dark"] .detail-toolbar__actions {
-  background: color-mix(in srgb, var(--surface-raised) 70%, transparent);
-  border-color: color-mix(in srgb, var(--border) 50%, transparent);
+  background: var(--surface-muted);
+  border-color: var(--border);
 }
 
 .app[data-mode="dark"] .detail-icon-action {
-  color: color-mix(in srgb, var(--text) 72%, var(--accent-strong));
-
   &:hover {
-    border-color: color-mix(in srgb, var(--border) 50%, transparent);
-    background: color-mix(in srgb, var(--surface-muted) 72%, transparent);
+    background: var(--surface-muted);
   }
 
   &.active {
-    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
-    background: color-mix(in srgb, var(--accent-soft) 50%, var(--surface-muted));
+    background: var(--accent-soft);
+    color: var(--accent-strong);
   }
 }
 
@@ -3310,20 +3308,19 @@ body.is-resizing {
 }
 
 .app[data-mode="dark"] .settings-scrim {
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.6);
 }
 
 .app[data-mode="dark"] .settings-panel {
-  box-shadow: -20px 0 60px rgba(0, 0, 0, 0.45);
+  box-shadow: -20px 0 60px rgba(0, 0, 0, 0.5);
 }
 
 .app[data-mode="dark"] .settings-nav {
-  background: color-mix(in srgb, var(--surface-muted) 80%, var(--surface));
+  background: var(--surface);
 }
 
 .app[data-mode="dark"] .segmented button.active {
   background: var(--surface-raised);
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.2);
 }
 
 .app[data-mode="dark"] .primary-btn {
@@ -3338,23 +3335,23 @@ body.is-resizing {
 
 .app[data-mode="dark"] .calendar-day:hover,
 .app[data-mode="dark"] .calendar-day.selected {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .app[data-mode="dark"] .calendar-day.today {
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent);
 }
 
 .app[data-mode="dark"] .calendar-day.today .calendar-day__number {
-  box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 30%, transparent);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 25%, transparent);
 }
 
 .app[data-mode="dark"] .image-preview {
-  background: rgba(0, 0, 0, 0.82);
+  background: rgba(0, 0, 0, 0.85);
 }
 
 .app[data-mode="dark"] .app-toast {
-  background: #2a2d35;
+  background: #2c3038;
 }
 
 .app[data-mode="dark"] .app-toast--success {
@@ -3365,27 +3362,18 @@ body.is-resizing {
   background: var(--danger);
 }
 
-.app[data-mode="dark"] .sound-master:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-}
-
-.app[data-mode="dark"] .sound-item:hover {
-  border-color: var(--accent);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-}
-
 .app[data-mode="dark"] .rich-editor {
   &:focus-within {
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 10%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent);
   }
 }
 
 .app[data-mode="dark"] .drag-ghost {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
 @media (max-width: 1040px) {
   .app[data-mode="dark"] .task-detail {
-    box-shadow: -18px 0 50px rgba(0, 0, 0, 0.35);
+    box-shadow: -18px 0 50px rgba(0, 0, 0, 0.4);
   }
 }
