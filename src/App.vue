@@ -92,8 +92,26 @@ function clampDetailWidth(value, max = DETAIL_WIDTH_MAX) {
 }
 
 onMounted(() => {
+  syncBodyTheme()
   store.loadData()
 })
+
+watch(
+  () => [store.settings.theme, store.settings.darkMode, store.settings.density],
+  syncBodyTheme,
+  { immediate: true }
+)
+
+function syncBodyTheme() {
+  document.body.dataset.theme = store.settings.theme || 'mint'
+  document.body.dataset.density = store.settings.density || 'comfortable'
+  document.body.style.colorScheme = store.settings.darkMode ? 'dark' : 'light'
+  if (store.settings.darkMode) {
+    document.body.dataset.mode = 'dark'
+  } else {
+    delete document.body.dataset.mode
+  }
+}
 
 watch(() => store.notice?.id, (id) => {
   if (!id) return
