@@ -2,8 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-const appId = 'com.simpletodo.desktop'
-const dataFile = process.env.SIMPLE_TODO_DATA_FILE || path.join(resolveAppDataDir(), 'todo-data.json')
+const dataFile = process.env.SIMPLE_TODO_DATA_FILE || path.join(process.cwd(), 'seed-test-data.json')
 const dataDir = path.dirname(dataFile)
 
 const now = new Date()
@@ -64,16 +63,6 @@ function attachment(id, name, createdAt = daysAgo(2)) {
     url: '',
     createdAt
   }
-}
-
-function resolveAppDataDir() {
-  if (process.platform === 'win32') {
-    return path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), appId)
-  }
-  if (process.platform === 'darwin') {
-    return path.join(os.homedir(), 'Library', 'Application Support', appId)
-  }
-  return path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'), appId)
 }
 
 const groups = [
@@ -325,12 +314,14 @@ const data = {
   lists,
   tasks,
   trash: tasks.filter(item => item.deleted).map(item => ({ ...item })),
+  listTrash: [],
   settings: {
     theme: 'mint',
     density: 'comfortable',
     detailOpen: true,
     startView: 'today',
-    completedVisible: true
+    completedVisible: true,
+    trashRetentionDays: 30
   }
 }
 
@@ -346,5 +337,6 @@ if (fs.existsSync(dataFile)) {
 }
 
 fs.writeFileSync(dataFile, `${JSON.stringify(data, null, 2)}\n`)
-console.log(`已写入测试数据: ${dataFile}`)
+console.log(`已写入 JSON 测试样例: ${dataFile}`)
+console.log('当前运行时主存储为 SQLite simpletodo.db；该文件仅作为样例数据，不会被应用自动读取。')
 console.log(`任务: ${data.tasks.length} 条，垃圾桶: ${data.trash.length} 条，清单: ${data.lists.length} 个，分组: ${data.groups.length} 个`)

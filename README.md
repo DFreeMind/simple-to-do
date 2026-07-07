@@ -8,7 +8,7 @@
 - 原生能力：Rust command
 - 前端：Vue 3、Pinia、Vite、SCSS
 - 富文本：Tiptap
-- 本地存储：应用数据目录下的 JSON 文件
+- 本地存储：应用数据目录下的 SQLite 数据库 `simpletodo.db`
 
 ## 环境要求
 
@@ -142,7 +142,7 @@ npm run frontend:build
 
 - 只做本地个人任务管理，不展示账号、云同步、协作、完整日历、习惯、番茄和四象限入口。
 - 未实现能力不会作为可点击入口出现，避免误导用户。
-- 数据模型保持向后兼容，旧 JSON 缺字段时由前端 normalize 补默认值。
+- 当前开发阶段主存储为 SQLite，不迁移旧 JSON 数据；前端 normalize 仍会为缺失字段补默认值。
 
 ## 项目文档
 
@@ -161,7 +161,7 @@ npm run frontend:build
 - 不维护独立 Web 版本；GUI 是唯一产品形态，Vite 仅作为 Tauri 内嵌前端工具链。
 - 前端不要直接访问 Tauri 全局对象，统一通过 `src/services/platform.js` 调用。
 - 每完成一个稳定功能并验证通过后提交一次，commit 使用中文。
-- 新增数据字段必须兼容旧 JSON。
+- 新增数据字段必须同步更新 SQLite 表设计、读写逻辑和前端 normalize 默认值。
 
 ## 常见问题
 
