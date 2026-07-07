@@ -104,46 +104,48 @@ select:focus-visible,
     linear-gradient(135deg, var(--bg), #fbfcfc);
 }
 
-/* Dark mode overrides */
+/* Dark mode overrides — warm-tinted, eye-friendly */
 .app[data-mode="dark"] {
-  --accent: #5aafa8;
-  --accent-strong: #7ec4bd;
-  --accent-soft: rgba(90, 175, 168, 0.12);
-  --accent-tint: rgba(90, 175, 168, 0.06);
-  --bg: #0f1115;
-  --surface: #181b21;
-  --surface-raised: #1e2128;
-  --surface-muted: #23272f;
-  --border: #2a2e36;
-  --border-strong: #383d47;
-  --text: #d8dbe2;
-  --text-muted: #7c828e;
-  --text-subtle: #515763;
-  --danger: #e06060;
-  --warning: #d4923a;
+  --accent: #5fb8b0;
+  --accent-strong: #80cdc6;
+  --accent-soft: rgba(95, 184, 176, 0.14);
+  --accent-tint: rgba(95, 184, 176, 0.07);
+  --bg: #17191e;
+  --surface: #1e2027;
+  --surface-raised: #252830;
+  --surface-muted: #2a2d36;
+  --border: #33373f;
+  --border-strong: #434850;
+  --text: #dcdfe6;
+  --text-muted: #8e929c;
+  --text-subtle: #5e636e;
+  --danger: #e87070;
+  --warning: #dda04a;
   --shadow-popover: 0 18px 48px rgba(0, 0, 0, 0.5);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Dark mode accent color variants */
 .app[data-mode="dark"][data-theme="blue"] {
-  --accent: #5588d4;
-  --accent-strong: #7aa4e8;
-  --accent-soft: rgba(85, 136, 212, 0.12);
-  --accent-tint: rgba(85, 136, 212, 0.06);
+  --accent: #6096d8;
+  --accent-strong: #82b0eb;
+  --accent-soft: rgba(96, 150, 216, 0.14);
+  --accent-tint: rgba(96, 150, 216, 0.07);
 }
 
 .app[data-mode="dark"][data-theme="violet"] {
-  --accent: #7e72d0;
-  --accent-strong: #9d94e2;
-  --accent-soft: rgba(126, 114, 208, 0.12);
-  --accent-tint: rgba(126, 114, 208, 0.06);
+  --accent: #8678d4;
+  --accent-strong: #a49ae6;
+  --accent-soft: rgba(134, 120, 212, 0.14);
+  --accent-tint: rgba(134, 120, 212, 0.07);
 }
 
 .app[data-mode="dark"][data-theme="graphite"] {
-  --accent: #5a6678;
-  --accent-strong: #78859a;
-  --accent-soft: rgba(90, 102, 120, 0.12);
-  --accent-tint: rgba(90, 102, 120, 0.06);
+  --accent: #627080;
+  --accent-strong: #82909e;
+  --accent-soft: rgba(98, 112, 128, 0.14);
+  --accent-tint: rgba(98, 112, 128, 0.07);
 }
 
 .app[data-theme="blue"] {
@@ -3305,6 +3307,10 @@ body.is-resizing {
 
 .app[data-mode="dark"] .detail-hero-progress__count {
   color: var(--accent-strong);
+}
+
+.app[data-mode="dark"] .brand-mark {
+  background: linear-gradient(135deg, var(--accent-strong), var(--accent));
 }
 
 .app[data-mode="dark"] .settings-scrim {
