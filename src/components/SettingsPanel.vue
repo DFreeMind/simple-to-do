@@ -117,6 +117,91 @@
                 </select>
               </label>
             </div>
+
+            <div class="settings-block">
+              <h4>垃圾桶</h4>
+              <label class="field">
+                <span><Trash2 :size="15" /> 保留时间</span>
+                <select :value="store.settings.trashRetentionDays" @change="store.updateSettings({ trashRetentionDays: Number($event.target.value) })">
+                  <option :value="7">7 天</option>
+                  <option :value="30">30 天</option>
+                  <option :value="60">60 天</option>
+                  <option :value="90">90 天</option>
+                  <option :value="180">180 天</option>
+                  <option :value="365">365 天</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="settings-block">
+              <h4>音效</h4>
+              <div class="sound-settings">
+                <label class="switch-row sound-master">
+                  <span class="sound-label">
+                    <Volume2 :size="18" class="sound-icon" />
+                    <span>
+                      <strong>启用音效</strong>
+                      <small>操作时播放提示音</small>
+                    </span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    :checked="store.settings.soundEnabled"
+                    @change="store.updateSettings({ soundEnabled: $event.target.checked })"
+                  />
+                </label>
+
+                <div class="sound-categories" :class="{ disabled: !store.settings.soundEnabled }">
+                  <label class="sound-item">
+                    <span class="sound-item-icon">
+                      <CheckSquare :size="16" />
+                    </span>
+                    <span class="sound-item-content">
+                      <strong>任务操作</strong>
+                      <small>完成、添加、删除任务</small>
+                    </span>
+                    <input
+                      type="checkbox"
+                      :checked="store.settings.soundTaskEnabled"
+                      :disabled="!store.settings.soundEnabled"
+                      @change="store.updateSettings({ soundTaskEnabled: $event.target.checked })"
+                    />
+                  </label>
+
+                  <label class="sound-item">
+                    <span class="sound-item-icon">
+                      <Tag :size="16" />
+                    </span>
+                    <span class="sound-item-content">
+                      <strong>清单操作</strong>
+                      <small>添加、删除清单</small>
+                    </span>
+                    <input
+                      type="checkbox"
+                      :checked="store.settings.soundListEnabled"
+                      :disabled="!store.settings.soundEnabled"
+                      @change="store.updateSettings({ soundListEnabled: $event.target.checked })"
+                    />
+                  </label>
+
+                  <label class="sound-item">
+                    <span class="sound-item-icon">
+                      <Folder :size="16" />
+                    </span>
+                    <span class="sound-item-content">
+                      <strong>分组操作</strong>
+                      <small>添加、删除分组</small>
+                    </span>
+                    <input
+                      type="checkbox"
+                      :checked="store.settings.soundGroupEnabled"
+                      :disabled="!store.settings.soundEnabled"
+                      @change="store.updateSettings({ soundGroupEnabled: $event.target.checked })"
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
           </section>
 
           <section v-else-if="activeSection === 'data'" class="settings-section">
@@ -156,7 +241,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { Check, Database, Info, PanelTop, Palette, SlidersHorizontal, X } from 'lucide-vue-next'
+import { Check, Database, Info, PanelTop, Palette, SlidersHorizontal, Trash2, X, Volume2, CheckSquare, Folder, Tag } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import appIcon from '@/assets/app-icon.svg'
 
