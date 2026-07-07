@@ -13,6 +13,11 @@ import {
   playDragStartSound,
   playDragOverSound,
   playDragEndSound,
+  playFlagSound,
+  playScheduleSound,
+  playAttachSound,
+  playCopySound,
+  playHardDeleteSound,
   playListAddSound,
   playListDeleteSound,
   playGroupAddSound,
@@ -616,6 +621,7 @@ export const useTaskStore = defineStore('task', () => {
     trash.value = trash.value.filter(task => task.deletedByListId !== id)
     listTrash.value.splice(idx, 1)
     showNotice('清单已恢复', 'success')
+    playListAddSound()
     return true
   }
 
@@ -628,6 +634,7 @@ export const useTaskStore = defineStore('task', () => {
     taskIds.forEach(removeTaskFromOrders)
     listTrash.value.splice(idx, 1)
     showNotice('清单已永久删除', 'success')
+    playListDeleteSound()
     return true
   }
 
@@ -715,6 +722,7 @@ export const useTaskStore = defineStore('task', () => {
     if (!list || list.isSystem) return
     list.groupId = groupId || null
     list.sortOrder = nextListSortOrder(groupId || null)
+    playMoveSound()
   }
 
   function addTask(input, listId) {
@@ -763,6 +771,7 @@ export const useTaskStore = defineStore('task', () => {
     tasks.value.unshift(task)
     prependTaskToOrder(task.id, 'planned')
     selectedTaskId.value = task.id
+    playScheduleSound()
     return task
   }
 
@@ -789,6 +798,7 @@ export const useTaskStore = defineStore('task', () => {
     if (!task) return
     task.myDayDate = isInMyDay(task) ? null : todayKey.value
     task.updatedAt = nowIso()
+    if (task.myDayDate) playFlagSound()
   }
 
   function toggleImportant(id) {
@@ -797,6 +807,7 @@ export const useTaskStore = defineStore('task', () => {
     task.important = !task.important
     if (task.important && task.priority < 3) task.priority = 3
     task.updatedAt = nowIso()
+    if (task.important) playFlagSound()
   }
 
   function deleteTask(id) {
@@ -843,6 +854,7 @@ export const useTaskStore = defineStore('task', () => {
     removeTaskFromOrders(id)
     if (selectedTaskId.value === id) selectedTaskId.value = null
     showNotice('任务已永久删除', 'success')
+    playHardDeleteSound()
   }
 
   function updateTask(id, updates) {
@@ -858,6 +870,7 @@ export const useTaskStore = defineStore('task', () => {
     next.setHours(previous.getHours() || 9, previous.getMinutes() || 0, 0, 0)
     task.dueDate = next.toISOString()
     task.updatedAt = nowIso()
+    playScheduleSound()
   }
 
   function togglePin(id) {
@@ -865,6 +878,7 @@ export const useTaskStore = defineStore('task', () => {
     if (task) {
       task.pinned = !task.pinned
       task.updatedAt = nowIso()
+      if (task.pinned) playFlagSound()
     }
   }
 
@@ -887,7 +901,7 @@ export const useTaskStore = defineStore('task', () => {
       updatedAt: createdAt
     })
     tasks.value.unshift(task)
-    playAddSound()
+    playCopySound()
     return task
   }
 
@@ -945,6 +959,7 @@ export const useTaskStore = defineStore('task', () => {
     })
     task.subtasks = ordered
     task.updatedAt = nowIso()
+    playMoveSound()
   }
 
   function addAttachment(taskId, attachment, imageUrl = '') {
@@ -970,6 +985,7 @@ export const useTaskStore = defineStore('task', () => {
       lastReferencedAt: source.lastReferencedAt || source.last_referenced_at || createdAt
     })
     task.updatedAt = nowIso()
+    playAttachSound()
   }
 
   function removeAttachment(taskId, attachmentId) {
@@ -977,6 +993,7 @@ export const useTaskStore = defineStore('task', () => {
     if (!task) return
     task.attachments = task.attachments.filter(attachment => attachment.id !== attachmentId)
     task.updatedAt = nowIso()
+    playDeleteSound()
   }
 
   function setView(view) {

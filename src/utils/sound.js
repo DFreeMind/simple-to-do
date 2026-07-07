@@ -12,6 +12,9 @@ let soundCategories = {
   group: true
 }
 
+const MASTER_VOLUME = 0.42
+const MIN_GAIN = 0.0008
+
 function getAudioContext() {
   if (!audioContext) {
     audioContext = new (window.AudioContext || window.webkitAudioContext)()
@@ -43,18 +46,27 @@ function playTone(frequency, duration, type = 'sine', volume = 0.3) {
     const ctx = getAudioContext()
     const oscillator = ctx.createOscillator()
     const gainNode = ctx.createGain()
+    const filter = ctx.createBiquadFilter()
 
-    oscillator.connect(gainNode)
+    oscillator.connect(filter)
+    filter.connect(gainNode)
     gainNode.connect(ctx.destination)
 
     oscillator.type = type
     oscillator.frequency.setValueAtTime(frequency, ctx.currentTime)
+    filter.type = 'lowpass'
+    filter.frequency.setValueAtTime(3600, ctx.currentTime)
+    filter.Q.setValueAtTime(0.5, ctx.currentTime)
 
-    gainNode.gain.setValueAtTime(volume, ctx.currentTime)
-    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration)
+    const start = ctx.currentTime
+    const peak = Math.max(MIN_GAIN, volume * MASTER_VOLUME)
+    const attack = Math.min(0.012, duration * 0.22)
+    gainNode.gain.setValueAtTime(MIN_GAIN, start)
+    gainNode.gain.linearRampToValueAtTime(peak, start + attack)
+    gainNode.gain.exponentialRampToValueAtTime(MIN_GAIN, start + duration)
 
-    oscillator.start(ctx.currentTime)
-    oscillator.stop(ctx.currentTime + duration)
+    oscillator.start(start)
+    oscillator.stop(start + duration + 0.02)
   } catch (error) {
     // 静默处理错误
   }
@@ -72,20 +84,28 @@ function playSequence(notes) {
     notes.forEach(({ frequency, duration, type = 'sine', volume = 0.3 }) => {
       const oscillator = ctx.createOscillator()
       const gainNode = ctx.createGain()
+      const filter = ctx.createBiquadFilter()
 
-      oscillator.connect(gainNode)
+      oscillator.connect(filter)
+      filter.connect(gainNode)
       gainNode.connect(ctx.destination)
 
       oscillator.type = type
       oscillator.frequency.setValueAtTime(frequency, time)
+      filter.type = 'lowpass'
+      filter.frequency.setValueAtTime(3600, time)
+      filter.Q.setValueAtTime(0.5, time)
 
-      gainNode.gain.setValueAtTime(volume, time)
-      gainNode.gain.exponentialRampToValueAtTime(0.01, time + duration)
+      const peak = Math.max(MIN_GAIN, volume * MASTER_VOLUME)
+      const attack = Math.min(0.012, duration * 0.22)
+      gainNode.gain.setValueAtTime(MIN_GAIN, time)
+      gainNode.gain.linearRampToValueAtTime(peak, time + attack)
+      gainNode.gain.exponentialRampToValueAtTime(MIN_GAIN, time + duration)
 
       oscillator.start(time)
-      oscillator.stop(time + duration)
+      oscillator.stop(time + duration + 0.02)
 
-      time += duration * 0.8 // 重叠一点
+      time += duration * 0.72 // 轻微重叠，保持反馈紧凑
     })
   } catch (error) {
     // 静默处理错误
@@ -101,19 +121,27 @@ function playSlide(startFreq, endFreq, duration, type = 'sine', volume = 0.3) {
     const ctx = getAudioContext()
     const oscillator = ctx.createOscillator()
     const gainNode = ctx.createGain()
+    const filter = ctx.createBiquadFilter()
 
-    oscillator.connect(gainNode)
+    oscillator.connect(filter)
+    filter.connect(gainNode)
     gainNode.connect(ctx.destination)
 
     oscillator.type = type
     oscillator.frequency.setValueAtTime(startFreq, ctx.currentTime)
     oscillator.frequency.exponentialRampToValueAtTime(endFreq, ctx.currentTime + duration)
+    filter.type = 'lowpass'
+    filter.frequency.setValueAtTime(3200, ctx.currentTime)
+    filter.Q.setValueAtTime(0.5, ctx.currentTime)
 
-    gainNode.gain.setValueAtTime(volume, ctx.currentTime)
-    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration)
+    const peak = Math.max(MIN_GAIN, volume * MASTER_VOLUME)
+    const start = ctx.currentTime
+    gainNode.gain.setValueAtTime(MIN_GAIN, start)
+    gainNode.gain.linearRampToValueAtTime(peak, start + 0.01)
+    gainNode.gain.exponentialRampToValueAtTime(MIN_GAIN, start + duration)
 
-    oscillator.start(ctx.currentTime)
-    oscillator.stop(ctx.currentTime + duration)
+    oscillator.start(start)
+    oscillator.stop(start + duration + 0.02)
   } catch (error) {
     // 静默处理错误
   }
@@ -128,8 +156,8 @@ function playSlide(startFreq, endFreq, duration, type = 'sine', volume = 0.3) {
 export function playCompleteSound() {
   if (!isCategoryEnabled('task')) return
   playSequence([
-    { frequency: 880, duration: 0.1, type: 'sine', volume: 0.3 },
-    { frequency: 1320, duration: 0.15, type: 'sine', volume: 0.3 }
+    { frequency: 659, duration: 0.08, type: 'sine', volume: 0.22 },
+    { frequency: 880, duration: 0.13, type: 'sine', volume: 0.2 }
   ])
 }
 
@@ -139,7 +167,7 @@ export function playCompleteSound() {
  */
 export function playSubtaskCompleteSound() {
   if (!isCategoryEnabled('task')) return
-  playTone(1047, 0.12, 'sine', 0.25)
+  playTone(784, 0.09, 'sine', 0.16)
 }
 
 /**
@@ -149,8 +177,8 @@ export function playSubtaskCompleteSound() {
 export function playDeleteSound() {
   if (!isCategoryEnabled('task')) return
   playSequence([
-    { frequency: 440, duration: 0.15, type: 'sine', volume: 0.3 },
-    { frequency: 220, duration: 0.2, type: 'sine', volume: 0.25 }
+    { frequency: 392, duration: 0.09, type: 'triangle', volume: 0.18 },
+    { frequency: 247, duration: 0.14, type: 'triangle', volume: 0.15 }
   ])
 }
 
@@ -161,8 +189,8 @@ export function playDeleteSound() {
 export function playAddSound() {
   if (!isCategoryEnabled('task')) return
   playSequence([
-    { frequency: 1047, duration: 0.08, type: 'sine', volume: 0.25 },
-    { frequency: 1319, duration: 0.12, type: 'sine', volume: 0.25 }
+    { frequency: 587, duration: 0.06, type: 'sine', volume: 0.16 },
+    { frequency: 740, duration: 0.09, type: 'sine', volume: 0.15 }
   ])
 }
 
@@ -173,9 +201,9 @@ export function playAddSound() {
 export function playRestoreSound() {
   if (!isCategoryEnabled('task')) return
   playSequence([
-    { frequency: 523, duration: 0.1, type: 'sine', volume: 0.3 },
-    { frequency: 659, duration: 0.1, type: 'sine', volume: 0.3 },
-    { frequency: 784, duration: 0.15, type: 'sine', volume: 0.3 }
+    { frequency: 440, duration: 0.08, type: 'sine', volume: 0.18 },
+    { frequency: 554, duration: 0.08, type: 'sine', volume: 0.17 },
+    { frequency: 659, duration: 0.12, type: 'sine', volume: 0.16 }
   ])
 }
 
@@ -185,13 +213,13 @@ export function playRestoreSound() {
  */
 export function playMoveSound() {
   if (!isCategoryEnabled('task')) return
-  playSlide(440, 880, 0.15, 'sine', 0.25)
+  playSlide(392, 587, 0.11, 'sine', 0.14)
 }
 
 // ==================== 拖动音效（节流控制）====================
 
 let lastDragSoundTime = 0
-const DRAG_THROTTLE_MS = 100 // 节流间隔
+const DRAG_THROTTLE_MS = 180 // 节流间隔，避免拖拽时过密
 
 /**
  * 拖动开始音效
@@ -199,7 +227,7 @@ const DRAG_THROTTLE_MS = 100 // 节流间隔
  */
 export function playDragStartSound() {
   if (!isCategoryEnabled('task')) return
-  playTone(330, 0.08, 'sine', 0.2)
+  playTone(294, 0.06, 'sine', 0.11)
 }
 
 /**
@@ -211,7 +239,7 @@ export function playDragOverSound() {
   const now = Date.now()
   if (now - lastDragSoundTime < DRAG_THROTTLE_MS) return
   lastDragSoundTime = now
-  playTone(660, 0.05, 'sine', 0.15)
+  playTone(523, 0.035, 'sine', 0.07)
 }
 
 /**
@@ -221,8 +249,46 @@ export function playDragOverSound() {
 export function playDragEndSound() {
   if (!isCategoryEnabled('task')) return
   playSequence([
-    { frequency: 440, duration: 0.06, type: 'sine', volume: 0.2 },
-    { frequency: 660, duration: 0.08, type: 'sine', volume: 0.2 }
+    { frequency: 392, duration: 0.05, type: 'sine', volume: 0.12 },
+    { frequency: 523, duration: 0.07, type: 'sine', volume: 0.11 }
+  ])
+}
+
+export function playFlagSound() {
+  if (!isCategoryEnabled('task')) return
+  playSequence([
+    { frequency: 523, duration: 0.06, type: 'triangle', volume: 0.13 },
+    { frequency: 784, duration: 0.08, type: 'triangle', volume: 0.12 }
+  ])
+}
+
+export function playScheduleSound() {
+  if (!isCategoryEnabled('task')) return
+  playSequence([
+    { frequency: 440, duration: 0.05, type: 'sine', volume: 0.11 },
+    { frequency: 587, duration: 0.06, type: 'sine', volume: 0.1 },
+    { frequency: 740, duration: 0.08, type: 'sine', volume: 0.09 }
+  ])
+}
+
+export function playAttachSound() {
+  if (!isCategoryEnabled('task')) return
+  playTone(698, 0.08, 'triangle', 0.11)
+}
+
+export function playCopySound() {
+  if (!isCategoryEnabled('task')) return
+  playSequence([
+    { frequency: 587, duration: 0.055, type: 'sine', volume: 0.11 },
+    { frequency: 587, duration: 0.075, type: 'sine', volume: 0.1 }
+  ])
+}
+
+export function playHardDeleteSound() {
+  if (!isCategoryEnabled('task')) return
+  playSequence([
+    { frequency: 294, duration: 0.08, type: 'triangle', volume: 0.15 },
+    { frequency: 196, duration: 0.13, type: 'triangle', volume: 0.13 }
   ])
 }
 
@@ -235,8 +301,8 @@ export function playDragEndSound() {
 export function playListAddSound() {
   if (!isCategoryEnabled('list')) return
   playSequence([
-    { frequency: 659, duration: 0.1, type: 'triangle', volume: 0.3 },
-    { frequency: 880, duration: 0.12, type: 'triangle', volume: 0.3 }
+    { frequency: 523, duration: 0.08, type: 'triangle', volume: 0.17 },
+    { frequency: 659, duration: 0.1, type: 'triangle', volume: 0.16 }
   ])
 }
 
@@ -247,12 +313,12 @@ export function playListAddSound() {
 export function playListDeleteSound() {
   if (!isCategoryEnabled('list')) return
   playSequence([
-    { frequency: 523, duration: 0.12, type: 'triangle', volume: 0.3 },
-    { frequency: 392, duration: 0.15, type: 'triangle', volume: 0.25 }
+    { frequency: 440, duration: 0.09, type: 'triangle', volume: 0.16 },
+    { frequency: 330, duration: 0.12, type: 'triangle', volume: 0.14 }
   ])
 }
 
-// ==================== 分组音效（方波 - 清脆明亮）====================
+// ==================== 分组音效（三角波 - 有区分但不刺耳）====================
 
 /**
  * 分组添加音效
@@ -261,8 +327,8 @@ export function playListDeleteSound() {
 export function playGroupAddSound() {
   if (!isCategoryEnabled('group')) return
   playSequence([
-    { frequency: 784, duration: 0.08, type: 'square', volume: 0.2 },
-    { frequency: 1047, duration: 0.1, type: 'square', volume: 0.2 }
+    { frequency: 587, duration: 0.07, type: 'triangle', volume: 0.15 },
+    { frequency: 740, duration: 0.09, type: 'triangle', volume: 0.14 }
   ])
 }
 
@@ -273,8 +339,8 @@ export function playGroupAddSound() {
 export function playGroupDeleteSound() {
   if (!isCategoryEnabled('group')) return
   playSequence([
-    { frequency: 659, duration: 0.1, type: 'square', volume: 0.2 },
-    { frequency: 494, duration: 0.12, type: 'square', volume: 0.15 }
+    { frequency: 494, duration: 0.08, type: 'triangle', volume: 0.14 },
+    { frequency: 370, duration: 0.11, type: 'triangle', volume: 0.12 }
   ])
 }
 
