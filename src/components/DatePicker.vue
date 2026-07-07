@@ -16,7 +16,8 @@
       <button class="dp-nav" type="button" :aria-label="`下个月，${title}`" @click="nextMonth">›</button>
     </div>
 
-    <div class="dp-toolbar">
+    <!-- 原始工具栏：时间输入 + 清除 -->
+    <div v-if="!showExtras" class="dp-toolbar">
       <input class="dp-time-input" type="time" :value="selectedTime" aria-label="时间" @change="setTime" />
       <button class="dp-clear" type="button" @click="clearDate">清除</button>
     </div>
@@ -25,11 +26,12 @@
       <button class="dp-shortcut" type="button" @click="setToday">今天</button>
       <button class="dp-shortcut" type="button" @click="setTomorrow">明天</button>
       <button class="dp-shortcut" type="button" @click="setNextWeek">下周</button>
+      <button v-if="showExtras" class="dp-shortcut dp-shortcut--clear" type="button" @click="clearDate">清除</button>
     </div>
 
     <div class="dp-calendar">
       <div class="dp-weekdays">
-        <span v-for="d in weekdays" :key="d">{{ d }}</span>
+        <span v-for="d in calendarWeekdays" :key="d">{{ d }}</span>
       </div>
       <div class="dp-days">
         <button
@@ -48,6 +50,64 @@
         </button>
       </div>
     </div>
+
+    <!-- 额外行：时间、提醒、重复（手风琴，同时只展开一个） -->
+    <template v-if="showExtras">
+      <div class="dp-extras">
+        <!-- 时间行 -->
+        <button class="dp-extra-row" type="button" @click.stop="toggleExtra('time')">
+          <span class="dp-extra-row__icon">🕐</span>
+          <span class="dp-extra-row__label">时间</span>
+          <span class="dp-extra-row__value">{{ selectedTime }}</span>
+          <ChevronDown :size="14" :class="{ rotated: expandedSection === 'time' }" />
+        </button>
+        <div v-if="expandedSection === 'time'" class="dp-extra-options">
+          <input class="dp-time-input" type="time" :value="selectedTime" aria-label="设置时间" @change="setTime" />
+        </div>
+
+        <!-- 提醒行 -->
+        <button class="dp-extra-row" type="button" @click.stop="toggleExtra('reminder')">
+          <span class="dp-extra-row__icon">🔔</span>
+          <span class="dp-extra-row__label">提醒</span>
+          <span class="dp-extra-row__value">{{ reminderLabel }}</span>
+          <ChevronDown :size="14" :class="{ rotated: expandedSection === 'reminder' }" />
+        </button>
+        <div v-if="expandedSection === 'reminder'" class="dp-extra-options">
+          <button
+            v-for="option in reminderOptions"
+            :key="option.value"
+            class="dp-extra-option"
+            :class="{ active: option.value === currentReminderValue }"
+            type="button"
+            @click="chooseReminder(option.value)"
+          >
+            <span>{{ option.label }}</span>
+            <Check v-if="option.value === currentReminderValue" :size="14" />
+          </button>
+        </div>
+
+        <!-- 重复行 -->
+        <button class="dp-extra-row" type="button" @click.stop="toggleExtra('repeat')">
+          <span class="dp-extra-row__icon">🔄</span>
+          <span class="dp-extra-row__label">重复</span>
+          <span class="dp-extra-row__value">{{ repeatLabel }}</span>
+          <ChevronDown :size="14" :class="{ rotated: expandedSection === 'repeat' }" />
+        </button>
+        <div v-if="expandedSection === 'repeat'" class="dp-extra-options">
+          <button
+            v-for="option in repeatOptions"
+            :key="option.value || 'none'"
+            class="dp-extra-option"
+            :class="{ active: option.value === (task.repeatRule || '') }"
+            type="button"
+            @click="chooseRepeat(option.value)"
+          >
+            <span>{{ option.label }}</span>
+            <Check v-if="option.value === (task.repeatRule || '')" :size="14" />
+          </button>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -55,12 +115,14 @@
 import { ref, computed } from 'vue'
 import { useTaskStore } from '@/stores/task'
 import { getMonthDays, toDateString } from '@/utils/date'
+import { Check, ChevronDown } from 'lucide-vue-next'
 import YearMonthPicker from './YearMonthPicker.vue'
 
 const props = defineProps({
   task: { type: Object, required: true },
   field: { type: String, default: 'dueDate' },
-  title: { type: String, default: '选择日期' }
+  title: { type: String, default: '选择日期' },
+  showExtras: { type: Boolean, default: false }
 })
 const emit = defineEmits(['close'])
 const store = useTaskStore()
@@ -72,7 +134,61 @@ const calMonth = ref(initialDate.getMonth())
 const selectedDate = ref(initialDate)
 const selectedTime = ref(initialValue.value ? initialDate.toTimeString().slice(0, 5) : '09:00')
 const monthPickerOpen = ref(false)
-const weekdays = ['日', '一', '二', '三', '四', '五', '六']
+const calendarWeekdays = ['日', '一', '二', '三', '四', '五', '六']
+
+// 额外行展开状态（手风琴模式，同时只展开一个）
+const expandedSection = ref('')
+function toggleExtra(name) {
+  expandedSection.value = expandedSection.value === name ? '' : name
+}
+
+// 重复选项
+const repeatOptions = [
+  { value: '', label: '不重复' },
+  { value: 'daily', label: '每天' },
+  { value: 'weekly', label: '每周' },
+  { value: 'monthly', label: '每月' },
+  { value: 'yearly', label: '每年' }
+]
+const repeatLabel = computed(() =>
+  repeatOptions.find(o => o.value === (props.task?.repeatRule || ''))?.label || '不重复'
+)
+
+// 提醒选项
+const reminderOptions = [
+  { value: '', label: '无' },
+  { value: 'at-time', label: '提醒我当天' },
+  { value: '15m', label: '提前 15 分钟' },
+  { value: '1h', label: '提前 1 小时' },
+  { value: '1d', label: '提前 1 天' },
+  { value: '1w', label: '提前 1 周' }
+]
+const currentReminderValue = computed(() => {
+  if (!props.task?.reminderAt) return ''
+  return '' // 无法精确还原快捷值，显示自定义
+})
+const reminderLabel = computed(() => {
+  if (!props.task?.reminderAt) return '未设置'
+  // 尝试匹配快捷标签
+  const diff = new Date(props.task.reminderAt).getTime() - new Date(props.task.dueDate || props.task.reminderAt).getTime()
+  const match = reminderOptions.find(o => {
+    if (!o.value || o.value === '') return false
+    if (o.value === 'at-time') return Math.abs(diff) < 60000
+    if (o.value === '15m') return Math.abs(diff + 15 * 60000) < 60000
+    if (o.value === '1h') return Math.abs(diff + 3600000) < 60000
+    if (o.value === '1d') return Math.abs(diff + 86400000) < 60000
+    if (o.value === '1w') return Math.abs(diff + 604800000) < 60000
+    return false
+  })
+  if (match) return match.label
+  return formatReminderDate(props.task.reminderAt)
+})
+
+function formatReminderDate(dateStr) {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
 
 const calendarDays = computed(() => getMonthDays(calYear.value, calMonth.value))
 
@@ -137,5 +253,41 @@ function applyValue(shouldClose = true) {
   d.setHours(h, m, 0, 0)
   store.updateTask(props.task.id, { [props.field]: d.toISOString() })
   if (shouldClose) emit('close')
+}
+
+function chooseRepeat(value) {
+  store.updateTask(props.task.id, { repeatRule: value || null })
+  expandedSection.value = ''
+}
+
+function chooseReminder(value) {
+  if (!value) {
+    store.updateTask(props.task.id, { reminderAt: null })
+    expandedSection.value = ''
+    return
+  }
+  const base = new Date(selectedDate.value)
+  const [h, m] = selectedTime.value.split(':').map(Number)
+  base.setHours(h, m, 0, 0)
+  let reminderDate
+  switch (value) {
+    case 'at-time':
+      reminderDate = new Date(base)
+      break
+    case '15m':
+      reminderDate = new Date(base.getTime() - 15 * 60000)
+      break
+    case '1h':
+      reminderDate = new Date(base.getTime() - 3600000)
+      break
+    case '1d':
+      reminderDate = new Date(base.getTime() - 86400000)
+      break
+    case '1w':
+      reminderDate = new Date(base.getTime() - 604800000)
+      break
+  }
+  store.updateTask(props.task.id, { reminderAt: reminderDate.toISOString() })
+  expandedSection.value = ''
 }
 </script>
