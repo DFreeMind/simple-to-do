@@ -1,10 +1,10 @@
 /**
  * 音效工具函数
- * 使用 Web Audio API 生成丰富的音效
- * 每个类别使用不同的波形，增强区分度
+ * 使用 Web Audio API 生成轻量操作音效
  */
 
 let audioContext = null
+let masterGain = null
 let soundEnabled = true
 let soundCategories = {
   task: true,
@@ -15,6 +15,9 @@ let soundCategories = {
 function getAudioContext() {
   if (!audioContext) {
     audioContext = new (window.AudioContext || window.webkitAudioContext)()
+    masterGain = audioContext.createGain()
+    masterGain.gain.value = 0.72
+    masterGain.connect(audioContext.destination)
   }
   // 确保 AudioContext 处于运行状态
   if (audioContext.state === 'suspended') {
@@ -43,18 +46,28 @@ function playTone(frequency, duration, type = 'sine', volume = 0.3) {
     const ctx = getAudioContext()
     const oscillator = ctx.createOscillator()
     const gainNode = ctx.createGain()
+    const filter = ctx.createBiquadFilter()
+    const start = ctx.currentTime
+    const attack = Math.min(0.012, duration * 0.22)
+    const releaseStart = Math.max(start + attack, start + duration - Math.min(0.08, duration * 0.6))
 
-    oscillator.connect(gainNode)
-    gainNode.connect(ctx.destination)
+    oscillator.connect(filter)
+    filter.connect(gainNode)
+    gainNode.connect(masterGain)
 
     oscillator.type = type
-    oscillator.frequency.setValueAtTime(frequency, ctx.currentTime)
+    oscillator.frequency.setValueAtTime(frequency, start)
+    filter.type = 'lowpass'
+    filter.frequency.setValueAtTime(type === 'square' || type === 'sawtooth' ? 1800 : 3200, start)
+    filter.Q.setValueAtTime(0.6, start)
 
-    gainNode.gain.setValueAtTime(volume, ctx.currentTime)
-    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration)
+    gainNode.gain.setValueAtTime(0.0001, start)
+    gainNode.gain.linearRampToValueAtTime(volume, start + attack)
+    gainNode.gain.setValueAtTime(volume * 0.72, releaseStart)
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, start + duration)
 
-    oscillator.start(ctx.currentTime)
-    oscillator.stop(ctx.currentTime + duration)
+    oscillator.start(start)
+    oscillator.stop(start + duration + 0.01)
   } catch (error) {
     // 静默处理错误
   }
@@ -69,21 +82,31 @@ function playSequence(notes) {
     const ctx = getAudioContext()
     let time = ctx.currentTime
 
-    notes.forEach(({ frequency, duration, type = 'sine', volume = 0.3 }) => {
+    notes.forEach(({ frequency, duration, type = 'sine', volume = 0.3, detune = 0 }) => {
       const oscillator = ctx.createOscillator()
       const gainNode = ctx.createGain()
+      const filter = ctx.createBiquadFilter()
+      const attack = Math.min(0.01, duration * 0.24)
+      const releaseStart = Math.max(time + attack, time + duration - Math.min(0.07, duration * 0.6))
 
-      oscillator.connect(gainNode)
-      gainNode.connect(ctx.destination)
+      oscillator.connect(filter)
+      filter.connect(gainNode)
+      gainNode.connect(masterGain)
 
       oscillator.type = type
       oscillator.frequency.setValueAtTime(frequency, time)
+      oscillator.detune.setValueAtTime(detune, time)
+      filter.type = 'lowpass'
+      filter.frequency.setValueAtTime(type === 'square' || type === 'sawtooth' ? 1800 : 3200, time)
+      filter.Q.setValueAtTime(0.6, time)
 
-      gainNode.gain.setValueAtTime(volume, time)
-      gainNode.gain.exponentialRampToValueAtTime(0.01, time + duration)
+      gainNode.gain.setValueAtTime(0.0001, time)
+      gainNode.gain.linearRampToValueAtTime(volume, time + attack)
+      gainNode.gain.setValueAtTime(volume * 0.72, releaseStart)
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, time + duration)
 
       oscillator.start(time)
-      oscillator.stop(time + duration)
+      oscillator.stop(time + duration + 0.01)
 
       time += duration * 0.8 // 重叠一点
     })
@@ -101,97 +124,213 @@ function playSlide(startFreq, endFreq, duration, type = 'sine', volume = 0.3) {
     const ctx = getAudioContext()
     const oscillator = ctx.createOscillator()
     const gainNode = ctx.createGain()
+    const filter = ctx.createBiquadFilter()
+    const start = ctx.currentTime
+    const attack = Math.min(0.01, duration * 0.22)
+    const releaseStart = Math.max(start + attack, start + duration - Math.min(0.07, duration * 0.6))
 
-    oscillator.connect(gainNode)
-    gainNode.connect(ctx.destination)
+    oscillator.connect(filter)
+    filter.connect(gainNode)
+    gainNode.connect(masterGain)
 
     oscillator.type = type
-    oscillator.frequency.setValueAtTime(startFreq, ctx.currentTime)
-    oscillator.frequency.exponentialRampToValueAtTime(endFreq, ctx.currentTime + duration)
+    oscillator.frequency.setValueAtTime(startFreq, start)
+    oscillator.frequency.exponentialRampToValueAtTime(endFreq, start + duration)
+    filter.type = 'lowpass'
+    filter.frequency.setValueAtTime(2400, start)
+    filter.Q.setValueAtTime(0.6, start)
 
-    gainNode.gain.setValueAtTime(volume, ctx.currentTime)
-    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration)
+    gainNode.gain.setValueAtTime(0.0001, start)
+    gainNode.gain.linearRampToValueAtTime(volume, start + attack)
+    gainNode.gain.setValueAtTime(volume * 0.7, releaseStart)
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, start + duration)
 
-    oscillator.start(ctx.currentTime)
-    oscillator.stop(ctx.currentTime + duration)
+    oscillator.start(start)
+    oscillator.stop(start + duration + 0.01)
   } catch (error) {
     // 静默处理错误
   }
 }
 
-// ==================== 任务音效（正弦波 - 清脆悦耳）====================
+// ==================== 任务音效（短促、柔和、低打扰）====================
 
 /**
  * 任务完成音效
- * 双音调上行，清脆愉悦
+ * 三音调上行琶音（C→E→G），明亮愉悦的"叮铃"感
  */
 export function playCompleteSound() {
   if (!isCategoryEnabled('task')) return
   playSequence([
-    { frequency: 880, duration: 0.1, type: 'sine', volume: 0.3 },
-    { frequency: 1320, duration: 0.15, type: 'sine', volume: 0.3 }
+    { frequency: 784, duration: 0.07, type: 'sine', volume: 0.18 },
+    { frequency: 988, duration: 0.06, type: 'sine', volume: 0.16 },
+    { frequency: 1319, duration: 0.14, type: 'sine', volume: 0.17 }
+  ])
+}
+
+/**
+ * 任务取消完成音效
+ * 三音调下行琶音（E→C→G），温和的"回退"感
+ */
+export function playTaskUndoSound() {
+  if (!isCategoryEnabled('task')) return
+  playSequence([
+    { frequency: 1319, duration: 0.06, type: 'triangle', volume: 0.16 },
+    { frequency: 988, duration: 0.06, type: 'triangle', volume: 0.14 },
+    { frequency: 784, duration: 0.12, type: 'triangle', volume: 0.13 }
   ])
 }
 
 /**
  * 子任务完成音效
- * 单音调短促音，轻快
+ * 轻快双音上行，比主任务完成更短更轻
  */
 export function playSubtaskCompleteSound() {
   if (!isCategoryEnabled('task')) return
-  playTone(1047, 0.12, 'sine', 0.25)
+  playSequence([
+    { frequency: 880, duration: 0.05, type: 'sine', volume: 0.15 },
+    { frequency: 1109, duration: 0.09, type: 'sine', volume: 0.14 }
+  ])
+}
+
+/**
+ * 子任务取消完成音效
+ * 柔和下行双音，温和的"撤销"感
+ */
+export function playSubtaskUndoSound() {
+  if (!isCategoryEnabled('task')) return
+  playSequence([
+    { frequency: 880, duration: 0.06, type: 'triangle', volume: 0.14 },
+    { frequency: 698, duration: 0.1, type: 'triangle', volume: 0.12 }
+  ])
 }
 
 /**
  * 任务删除音效
- * 低音衰减，表示移除
+ * 低沉下行，温和移除感
  */
 export function playDeleteSound() {
   if (!isCategoryEnabled('task')) return
   playSequence([
-    { frequency: 440, duration: 0.15, type: 'sine', volume: 0.3 },
-    { frequency: 220, duration: 0.2, type: 'sine', volume: 0.25 }
+    { frequency: 440, duration: 0.07, type: 'triangle', volume: 0.16 },
+    { frequency: 330, duration: 0.06, type: 'triangle', volume: 0.14 },
+    { frequency: 262, duration: 0.12, type: 'triangle', volume: 0.12 }
   ])
 }
 
 /**
  * 任务添加音效
- * 短促高音，表示添加
+ * 明亮双音上行，积极的"新增"感
  */
 export function playAddSound() {
   if (!isCategoryEnabled('task')) return
   playSequence([
-    { frequency: 1047, duration: 0.08, type: 'sine', volume: 0.25 },
-    { frequency: 1319, duration: 0.12, type: 'sine', volume: 0.25 }
+    { frequency: 659, duration: 0.06, type: 'sine', volume: 0.16 },
+    { frequency: 988, duration: 0.1, type: 'sine', volume: 0.17 }
   ])
 }
 
 /**
  * 恢复任务音效
- * 三音阶上行，表示恢复
+ * 三音阶上行琶音，温暖的"复原"感
  */
 export function playRestoreSound() {
   if (!isCategoryEnabled('task')) return
   playSequence([
-    { frequency: 523, duration: 0.1, type: 'sine', volume: 0.3 },
-    { frequency: 659, duration: 0.1, type: 'sine', volume: 0.3 },
-    { frequency: 784, duration: 0.15, type: 'sine', volume: 0.3 }
+    { frequency: 523, duration: 0.06, type: 'triangle', volume: 0.15 },
+    { frequency: 659, duration: 0.07, type: 'triangle', volume: 0.15 },
+    { frequency: 880, duration: 0.11, type: 'triangle', volume: 0.14 }
   ])
 }
 
 /**
  * 移动任务音效
- * 滑音，表示移动
+ * 柔和滑音，空间位移感
  */
 export function playMoveSound() {
   if (!isCategoryEnabled('task')) return
-  playSlide(440, 880, 0.15, 'sine', 0.25)
+  playSlide(494, 784, 0.12, 'sine', 0.13)
+}
+
+/**
+ * 轻量切换音效（加入今日、完成取消完成等通用切换）
+ * 短促清脆的"嗒"声
+ */
+export function playToggleSound() {
+  if (!isCategoryEnabled('task')) return
+  playTone(830, 0.06, 'sine', 0.12)
+}
+
+/**
+ * 置顶/重要标记音效
+ * 明亮双音上行，闪亮的"星标"感
+ */
+export function playMarkSound() {
+  if (!isCategoryEnabled('task')) return
+  playSequence([
+    { frequency: 1047, duration: 0.045, type: 'sine', volume: 0.12 },
+    { frequency: 1319, duration: 0.09, type: 'sine', volume: 0.13 }
+  ])
+}
+
+/**
+ * 设置日期、提醒等计划类音效
+ * 柔和双音上行，温和的"计划"感
+ */
+export function playScheduleSound() {
+  if (!isCategoryEnabled('task')) return
+  playSequence([
+    { frequency: 587, duration: 0.06, type: 'triangle', volume: 0.13 },
+    { frequency: 784, duration: 0.09, type: 'triangle', volume: 0.13 }
+  ])
+}
+
+/**
+ * 附件增删音效
+ * 单音短促，文件感
+ */
+export function playAttachSound() {
+  if (!isCategoryEnabled('task')) return
+  playTone(698, 0.07, 'triangle', 0.12)
+}
+
+/**
+ * 批量清理音效
+ * 三音阶下行，清扫感
+ */
+export function playClearSound() {
+  if (!isCategoryEnabled('task')) return
+  playSequence([
+    { frequency: 440, duration: 0.05, type: 'triangle', volume: 0.13 },
+    { frequency: 349, duration: 0.06, type: 'triangle', volume: 0.11 },
+    { frequency: 262, duration: 0.1, type: 'triangle', volume: 0.09 }
+  ])
+}
+
+/**
+ * 数据保存音效
+ * 极轻柔的单音，安心感
+ */
+export function playSaveSound() {
+  if (!isCategoryEnabled('task')) return
+  playTone(1047, 0.04, 'sine', 0.06)
+}
+
+/**
+ * 校验失败/错误音效
+ * 低沉双音下行，温和警告
+ */
+export function playErrorSound() {
+  if (!isCategoryEnabled('task')) return
+  playSequence([
+    { frequency: 330, duration: 0.08, type: 'triangle', volume: 0.14 },
+    { frequency: 262, duration: 0.12, type: 'triangle', volume: 0.12 }
+  ])
 }
 
 // ==================== 拖动音效（节流控制）====================
 
 let lastDragSoundTime = 0
-const DRAG_THROTTLE_MS = 100 // 节流间隔
+const DRAG_THROTTLE_MS = 180 // 节流间隔
 
 /**
  * 拖动开始音效
@@ -199,7 +338,7 @@ const DRAG_THROTTLE_MS = 100 // 节流间隔
  */
 export function playDragStartSound() {
   if (!isCategoryEnabled('task')) return
-  playTone(330, 0.08, 'sine', 0.2)
+  playTone(330, 0.06, 'triangle', 0.11)
 }
 
 /**
@@ -211,7 +350,7 @@ export function playDragOverSound() {
   const now = Date.now()
   if (now - lastDragSoundTime < DRAG_THROTTLE_MS) return
   lastDragSoundTime = now
-  playTone(660, 0.05, 'sine', 0.15)
+  playTone(660, 0.035, 'sine', 0.08)
 }
 
 /**
@@ -221,8 +360,8 @@ export function playDragOverSound() {
 export function playDragEndSound() {
   if (!isCategoryEnabled('task')) return
   playSequence([
-    { frequency: 440, duration: 0.06, type: 'sine', volume: 0.2 },
-    { frequency: 660, duration: 0.08, type: 'sine', volume: 0.2 }
+    { frequency: 440, duration: 0.05, type: 'triangle', volume: 0.11 },
+    { frequency: 659, duration: 0.07, type: 'triangle', volume: 0.11 }
   ])
 }
 
@@ -235,8 +374,8 @@ export function playDragEndSound() {
 export function playListAddSound() {
   if (!isCategoryEnabled('list')) return
   playSequence([
-    { frequency: 659, duration: 0.1, type: 'triangle', volume: 0.3 },
-    { frequency: 880, duration: 0.12, type: 'triangle', volume: 0.3 }
+    { frequency: 523, duration: 0.08, type: 'triangle', volume: 0.18 },
+    { frequency: 698, duration: 0.11, type: 'triangle', volume: 0.17 }
   ])
 }
 
@@ -247,12 +386,45 @@ export function playListAddSound() {
 export function playListDeleteSound() {
   if (!isCategoryEnabled('list')) return
   playSequence([
-    { frequency: 523, duration: 0.12, type: 'triangle', volume: 0.3 },
-    { frequency: 392, duration: 0.15, type: 'triangle', volume: 0.25 }
+    { frequency: 440, duration: 0.08, type: 'triangle', volume: 0.16 },
+    { frequency: 330, duration: 0.12, type: 'triangle', volume: 0.14 }
   ])
 }
 
-// ==================== 分组音效（方波 - 清脆明亮）====================
+/**
+ * 清单恢复音效
+ */
+export function playListRestoreSound() {
+  if (!isCategoryEnabled('list')) return
+  playSequence([
+    { frequency: 392, duration: 0.07, type: 'triangle', volume: 0.15 },
+    { frequency: 523, duration: 0.08, type: 'triangle', volume: 0.15 },
+    { frequency: 698, duration: 0.1, type: 'triangle', volume: 0.14 }
+  ])
+}
+
+/**
+ * 清单置顶/取消置顶音效
+ * 明亮双音，切换感
+ */
+export function playListPinSound() {
+  if (!isCategoryEnabled('list')) return
+  playSequence([
+    { frequency: 698, duration: 0.05, type: 'sine', volume: 0.14 },
+    { frequency: 880, duration: 0.08, type: 'sine', volume: 0.13 }
+  ])
+}
+
+/**
+ * 清单/分组重命名音效
+ * 柔和单音，确认感
+ */
+export function playRenameSound() {
+  if (!isCategoryEnabled('list')) return
+  playTone(784, 0.06, 'triangle', 0.11)
+}
+
+// ==================== 分组音效（柔和区分，避免方波刺耳）====================
 
 /**
  * 分组添加音效
@@ -261,8 +433,8 @@ export function playListDeleteSound() {
 export function playGroupAddSound() {
   if (!isCategoryEnabled('group')) return
   playSequence([
-    { frequency: 784, duration: 0.08, type: 'square', volume: 0.2 },
-    { frequency: 1047, duration: 0.1, type: 'square', volume: 0.2 }
+    { frequency: 587, duration: 0.07, type: 'triangle', volume: 0.16 },
+    { frequency: 784, duration: 0.1, type: 'sine', volume: 0.15 }
   ])
 }
 
@@ -273,8 +445,8 @@ export function playGroupAddSound() {
 export function playGroupDeleteSound() {
   if (!isCategoryEnabled('group')) return
   playSequence([
-    { frequency: 659, duration: 0.1, type: 'square', volume: 0.2 },
-    { frequency: 494, duration: 0.12, type: 'square', volume: 0.15 }
+    { frequency: 494, duration: 0.08, type: 'triangle', volume: 0.15 },
+    { frequency: 370, duration: 0.11, type: 'triangle', volume: 0.13 }
   ])
 }
 
