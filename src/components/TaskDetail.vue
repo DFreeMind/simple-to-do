@@ -102,14 +102,19 @@
           <span><CalendarClock :size="15" /> 日期</span>
           <div class="date-field">
             <button class="detail-select__button" type="button" @click.stop="toggleDatePicker('dueDate')">
-              <span>{{ formatDateValue(task.dueDate) || '设置日期' }}</span>
+              <span class="date-field__value" :class="{ empty: !task.dueDate }">
+                <span class="date-field__main">{{ task.dueDate ? dateSummaryText : '设置日期' }}</span>
+                <span v-if="task.reminderAt" class="date-field__meta" :title="`提醒 ${formatTime(task.reminderAt)}`">
+                  <Bell :size="12" />
+                  <span>{{ formatTime(task.reminderAt) }}</span>
+                </span>
+                <span v-if="task.repeatRule" class="date-field__meta" :title="repeatLabel">
+                  <Repeat2 :size="12" />
+                  <span>{{ repeatLabel }}</span>
+                </span>
+              </span>
               <ChevronDown :size="16" :class="{ rotated: openDatePicker === 'dueDate' }" />
             </button>
-            <div v-if="task.dueDate" class="date-field__summary">
-              <span class="date-field__summary-text">{{ dateSummaryText }}</span>
-              <Bell v-if="task.reminderAt" class="date-field__summary-icon" :size="13" aria-label="已设置提醒" />
-              <Repeat2 v-if="task.repeatRule" class="date-field__summary-icon" :size="13" aria-label="已设置重复" />
-            </div>
             <DatePicker
               v-if="openDatePicker === 'dueDate'"
               :task="task"
@@ -222,7 +227,7 @@
         </div>
       </section>
 
-      <section class="detail-section detail-section--editor" @click="onEditorSectionClick">
+      <section ref="editorSection" class="detail-section detail-section--editor" @click="onEditorSectionClick">
         <div class="section-heading">
           <h2>备注</h2>
           <button class="small-btn" type="button" @click.stop="openFormatMenu">
@@ -281,7 +286,7 @@
       <input ref="fileInput" type="file" accept="image/*" multiple class="hidden-file-input" @change="onFileSelected" />
 
       <ImageLightbox
-        :images="allImageUrls"
+        :images="previewImages"
         :startIndex="previewIndex"
         :visible="previewVisible"
         @close="previewVisible = false"
@@ -344,11 +349,14 @@ const newSubtask = ref('')
 const editorContent = ref('')
 const richTextEditor = ref(null)
 const titleInput = ref(null)
+const editorSection = ref(null)
 const formatMenuVisible = ref(false)
 const formatMenuPos = ref({ x: 0, y: 0 })
 const fileInput = ref(null)
 const previewVisible = ref(false)
 const previewIndex = ref(0)
+const editorImageUrls = ref([])
+const previewImages = ref([])
 const confirmDialog = reactive({
   visible: false,
   title: '',
@@ -366,13 +374,9 @@ const allImageUrls = computed(() => {
       if (a.url) urls.push(a.url)
     }
   }
-  if (editorContent.value) {
-    const div = document.createElement('div')
-    div.innerHTML = editorContent.value
-    div.querySelectorAll('img').forEach(img => {
-      if (img.src && !urls.includes(img.src)) urls.push(img.src)
-    })
-  }
+  editorImageUrls.value.forEach(url => {
+    if (url && !urls.includes(url)) urls.push(url)
+  })
   return urls
 })
 
@@ -380,8 +384,9 @@ function attachmentIndex(attachment) {
   return allImageUrls.value.indexOf(attachment.url)
 }
 
-function openLightbox(index) {
+function openLightbox(index, images = allImageUrls.value) {
   if (index < 0) return
+  previewImages.value = images
   previewIndex.value = index
   previewVisible.value = true
 }
@@ -389,9 +394,12 @@ function openLightbox(index) {
 function onEditorSectionClick(e) {
   const img = e.target.closest('.editor-content img')
   if (!img || !img.src) return
-  const idx = allImageUrls.value.indexOf(img.src)
-  if (idx >= 0) openLightbox(idx)
-  else openLightbox(0)
+  const urls = collectEditorImageUrls()
+  editorImageUrls.value = urls
+  const src = img.currentSrc || img.src
+  const idx = urls.indexOf(src)
+  if (idx >= 0) openLightbox(idx, urls)
+  else openLightbox(0, [src])
 }
 const openSelect = ref('')
 const openDatePicker = ref('')
@@ -431,7 +439,10 @@ const subtaskDrag = useDragSort({
       }
     }
     return null
-  }
+  },
+  onDragStart: () => store.playDragStartSound(),
+  onDragOver: () => store.playDragOverSound(),
+  onDragEnd: () => store.playDragEndSound()
 })
 
 function handleSubtaskMouseDown(e) {
@@ -463,7 +474,7 @@ const selectedListName = computed(() => store.selectedList?.name || '收集箱')
 const selectedListColor = computed(() => store.selectedList?.color || '#5fb8ad')
 const priorityLabel = computed(() => priorityOptions.find(option => option.value === Number(task.value?.priority || 0))?.label || '无优先级')
 
-// 日期摘要文本，如 "7月8日,明天"
+// 日期摘要文本，如 "7月8日 · 明天"
 const summaryWeekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 const dateSummaryText = computed(() => {
   if (!task.value?.dueDate) return ''
@@ -480,8 +491,21 @@ const dateSummaryText = computed(() => {
   else if (diff === -1) relative = '昨天'
   else if (diff > 0 && diff <= 7) relative = '本' + summaryWeekdays[d.getDay()]
   else if (diff > 7 && diff <= 14) relative = '下周' + summaryWeekdays[d.getDay()]
-  return relative ? `${month}月${day}日,${relative}` : `${month}月${day}日`
+  return relative ? `${month}月${day}日 · ${relative}` : `${month}月${day}日`
 })
+const repeatLabels = {
+  daily: '每天',
+  weekly: '每周',
+  monthly: '每月',
+  yearly: '每年'
+}
+const repeatLabel = computed(() => repeatLabels[task.value?.repeatRule] || task.value?.repeatRule || '')
+
+function formatTime(value) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
 
 watch(task, (nextTask) => {
   editorContent.value = nextTask?.descriptionHtml || ''
@@ -497,7 +521,19 @@ watch(editorContent, (value) => {
   if (task.value && value !== task.value.descriptionHtml) {
     store.updateTask(task.value.id, { descriptionHtml: value })
   }
+  nextTick(refreshEditorImageUrls)
 })
+
+function collectEditorImageUrls() {
+  if (!editorSection.value) return []
+  return Array.from(editorSection.value.querySelectorAll('.editor-content img'))
+    .map(img => img.currentSrc || img.src)
+    .filter(Boolean)
+}
+
+function refreshEditorImageUrls() {
+  editorImageUrls.value = collectEditorImageUrls()
+}
 
 function updateTitle(event) {
   store.updateTask(task.value.id, { title: event.target.value })
@@ -569,18 +605,23 @@ function addSubtask() {
 }
 
 
-function formatDateValue(dateStr) {
-  if (!dateStr) return ''
-  const date = new Date(dateStr)
-  if (Number.isNaN(date.getTime())) return ''
-  return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
-}
-
 function openFormatMenu(event) {
   const rect = event.currentTarget.getBoundingClientRect()
   formatMenuPos.value = clampFloatingPosition(rect.left - 120, rect.bottom + 8, 240, 340)
   formatMenuVisible.value = true
 }
+
+function onFormatMenuOutsideClick(e) {
+  if (formatMenuVisible.value) {
+    formatMenuVisible.value = false
+  }
+}
+
+watch(formatMenuVisible, (visible) => {
+  if (visible) {
+    setTimeout(() => document.addEventListener('click', onFormatMenuOutsideClick, { once: true }), 0)
+  }
+})
 
 function clampFloatingPosition(x, y, width, height) {
   const margin = 12
@@ -669,6 +710,7 @@ function handleSelectKeydown(event) {
 onMounted(() => {
   window.addEventListener('click', closeSelect)
   window.addEventListener('keydown', handleSelectKeydown)
+  nextTick(refreshEditorImageUrls)
 })
 
 onBeforeUnmount(() => {
