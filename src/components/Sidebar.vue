@@ -1,198 +1,354 @@
 <template>
-  <aside class="sidebar">
-    <header class="sidebar__header">
-      <button class="brand" type="button" aria-label="回到今日" @click="store.setView('today')">
-        <span class="brand-mark">
-          <img :src="appIcon" alt="" />
-        </span>
-        <span>
-          <strong>易简清单</strong>
-          <small>本地优先</small>
-        </span>
-      </button>
-      <button class="icon-btn" type="button" aria-label="打开设置" title="设置" @click="store.openSettings">
-        <SettingsIcon :size="18" />
-      </button>
-    </header>
+  <aside class="sidebar" :class="{ 'sidebar--collapsed': collapsed }">
+    <!-- 折叠 Rail 模式 -->
+    <template v-if="collapsed">
+      <nav class="rail-nav" aria-label="主要视图">
+        <button
+          v-for="item in primaryViews"
+          :key="item.id"
+          class="rail-item"
+          :class="{ active: store.currentView === item.id }"
+          type="button"
+          :title="item.label"
+          :aria-label="item.label"
+          @click="store.setView(item.id)"
+        >
+          <component :is="item.icon" :size="20" />
+          <span v-if="store.listTaskCounts[item.id]" class="rail-badge">{{ store.listTaskCounts[item.id] }}</span>
+        </button>
+      </nav>
 
-    <div class="sidebar-search">
-      <Search :size="17" />
-      <input
-        v-model="searchText"
-        type="search"
-        placeholder="搜索任务、标签、备注"
-        aria-label="搜索任务"
-        @focus="store.setSearch(searchText)"
-        @input="store.setSearch(searchText)"
-      />
-    </div>
+      <div class="rail-divider"></div>
 
-    <nav class="sidebar__nav" aria-label="主要视图">
-      <button
-        v-for="item in primaryViews"
-        :key="item.id"
-        class="nav-item"
-        :class="{ active: store.currentView === item.id }"
-        type="button"
-        @click="store.setView(item.id)"
-      >
-        <component :is="item.icon" :size="18" />
-        <span class="nav-label">{{ item.label }}</span>
-        <span v-if="store.listTaskCounts[item.id]" class="nav-badge">{{ store.listTaskCounts[item.id] }}</span>
-      </button>
-    </nav>
+      <div class="rail-flyout-anchor">
+        <button
+          ref="folderBtnRef"
+          class="rail-item"
+          :class="{ active: isCurrentViewList }"
+          type="button"
+          title="我的清单"
+          aria-label="我的清单"
+          @click.stop="toggleListsFlyout"
+        >
+          <Folder :size="20" />
+        </button>
 
-    <section class="sidebar__section">
-      <div class="section-title">
-        <span>我的清单</span>
-        <div class="section-actions">
-          <button class="mini-btn" type="button" title="新建分组" aria-label="新建分组" @click="startAddGroup">
-            <FolderPlus :size="15" />
-          </button>
-          <button class="mini-btn" type="button" title="新建清单" aria-label="新建清单" @click="startAddList(null)">
-            <Plus :size="16" />
-          </button>
-        </div>
+        <!-- 清单浮动卡片 -->
+        <Transition name="flyout">
+          <div
+            v-if="listsFlyout"
+            class="rail-flyout"
+            :style="{ top: flyoutTop + 'px' }"
+            @click.stop
+          >
+            <div class="rail-flyout__head">
+              <span class="rail-flyout__title">我的清单</span>
+              <button class="rail-flyout__close" type="button" aria-label="关闭" @click="listsFlyout = false">
+                <X :size="13" />
+              </button>
+            </div>
+
+            <div class="rail-flyout__search">
+              <Search :size="13" />
+              <input
+                v-model="flyoutSearch"
+                type="search"
+                placeholder="搜索清单…"
+                aria-label="搜索清单"
+              />
+            </div>
+
+            <div class="rail-flyout__body">
+              <!-- 置顶快捷区 -->
+              <div v-if="pinnedLists.length > 0 && !flyoutSearch" class="rail-flyout__section">
+                <div class="rail-flyout__section-label">
+                  <Pin :size="10" />
+                  <span>已置顶</span>
+                </div>
+                <button
+                  v-for="list in pinnedLists"
+                  :key="list.id"
+                  class="rail-flyout__item"
+                  :class="{ active: store.currentView === list.id }"
+                  type="button"
+                  @click="selectList(list.id)"
+                >
+                  <span class="rail-flyout__dot" :style="{ backgroundColor: list.color }"></span>
+                  <span class="rail-flyout__name">{{ list.name }}</span>
+                  <span v-if="store.listTaskCounts[list.id]" class="rail-flyout__count">{{ store.listTaskCounts[list.id] }}</span>
+                </button>
+              </div>
+
+              <!-- 分组清单 -->
+              <template v-for="group in filteredGroups" :key="group.id">
+                <div v-if="group.lists.length > 0" class="rail-flyout__section">
+                  <div v-if="group.id !== 'ungrouped' && !flyoutSearch" class="rail-flyout__section-label">
+                    <span>{{ group.name }}</span>
+                  </div>
+                  <button
+                    v-for="list in group.lists"
+                    :key="list.id"
+                    class="rail-flyout__item"
+                    :class="{ active: store.currentView === list.id }"
+                    type="button"
+                    @click="selectList(list.id)"
+                  >
+                    <span class="rail-flyout__dot" :style="{ backgroundColor: list.color }"></span>
+                    <span class="rail-flyout__name">{{ list.name }}</span>
+                    <span v-if="store.listTaskCounts[list.id]" class="rail-flyout__count">{{ store.listTaskCounts[list.id] }}</span>
+                  </button>
+                </div>
+              </template>
+
+              <div v-if="flyoutSearch && totalFiltered === 0" class="rail-flyout__empty">
+                <Search :size="20" class="rail-flyout__empty-icon" />
+                <span>未找到匹配的清单</span>
+              </div>
+
+              <div v-if="!flyoutSearch && totalLists === 0" class="rail-flyout__empty">
+                <Folder :size="24" class="rail-flyout__empty-icon" />
+                <span>暂无清单</span>
+                <small>展开侧栏后可创建</small>
+              </div>
+            </div>
+
+            <button class="rail-flyout__create" type="button" @click="createListFromFlyout">
+              <Plus :size="14" />
+              <span>新建清单</span>
+            </button>
+          </div>
+        </Transition>
       </div>
 
-      <div v-if="addingGroup" class="inline-create">
+      <nav class="rail-nav" aria-label="维护视图">
+        <button
+          v-for="item in utilityViews"
+          :key="item.id"
+          class="rail-item"
+          :class="{ active: store.currentView === item.id }"
+          type="button"
+          :title="item.label"
+          :aria-label="item.label"
+          @click="store.setView(item.id)"
+        >
+          <component :is="item.icon" :size="20" />
+          <span v-if="store.listTaskCounts[item.id]" class="rail-badge">{{ store.listTaskCounts[item.id] }}</span>
+        </button>
+      </nav>
+
+      <div class="rail-spacer"></div>
+
+      <div class="rail-bottom">
+        <button class="rail-item" type="button" title="设置" aria-label="设置" @click="store.openSettings">
+          <SettingsIcon :size="20" />
+        </button>
+        <button class="rail-item" type="button" aria-label="展开侧栏" title="展开侧栏" @click="expand">
+          <PanelLeft :size="20" />
+        </button>
+      </div>
+    </template>
+
+    <!-- 展开完整模式 -->
+    <template v-else>
+      <header class="sidebar__header">
+        <button class="brand" type="button" aria-label="回到今日" @click="store.setView('today')">
+          <span class="brand-mark">
+            <img :src="appIcon" alt="" />
+          </span>
+          <span>
+            <strong>易简清单</strong>
+            <small>本地优先</small>
+          </span>
+        </button>
+        <div style="display: flex; gap: 2px;">
+          <button class="icon-btn" type="button" aria-label="折叠侧栏" title="折叠侧栏" @click="collapse">
+            <PanelLeft :size="18" />
+          </button>
+          <button class="icon-btn" type="button" aria-label="打开设置" title="设置" @click="store.openSettings">
+            <SettingsIcon :size="18" />
+          </button>
+        </div>
+      </header>
+
+      <div class="sidebar-search">
+        <Search :size="17" />
         <input
-          ref="groupInput"
-          v-model="newGroupName"
-          placeholder="分组名称"
-          @keydown.enter="confirmAddGroup"
-          @keydown.esc="cancelInlineCreate"
-          @blur="confirmAddGroup"
+          v-model="searchText"
+          type="search"
+          placeholder="搜索任务、标签、备注"
+          aria-label="搜索任务"
+          @focus="store.setSearch(searchText)"
+          @input="store.setSearch(searchText)"
         />
       </div>
 
-      <div class="group-list" @mousedown="handleMouseDown">
-        <div
-          v-for="group in store.groupedLists"
-          :key="group.id"
-          class="list-group"
+      <nav class="sidebar__nav" aria-label="主要视图">
+        <button
+          v-for="item in primaryViews"
+          :key="item.id"
+          class="nav-item"
+          :class="{ active: store.currentView === item.id }"
+          type="button"
+          @click="store.setView(item.id)"
         >
-          <div
-            class="group-row"
-            :data-group-id="group.id"
-            :class="{
-              'is-dragging': groupDrag.draggingId.value === group.id,
-              'drop-target': groupDrag.dragOverId.value === group.id
-            }"
-          >
-            <span
-              v-if="group.id !== 'ungrouped' && group.id !== 'pinned'"
-              class="sidebar-drag-handle"
-              role="button"
-              tabindex="-1"
-              title="拖动分组排序"
-              aria-label="拖动分组排序"
-            >
-              <GripVertical :size="14" />
-            </span>
-            <button class="group-toggle" type="button" @click="store.toggleGroup(group.id)" :aria-expanded="!group.collapsed">
-              <ChevronRight :size="15" :class="{ rotated: !group.collapsed }" />
-              <span>{{ group.name }}</span>
-            </button>
-            <div class="group-actions">
-              <button
-                v-if="group.id !== 'pinned'"
-                class="mini-btn"
-                type="button"
-                title="添加清单"
-                aria-label="添加清单"
-                @click="startAddList(group.id)"
-              >
-                <Plus :size="14" />
-              </button>
-              <button
-                v-if="group.id !== 'ungrouped' && group.id !== 'pinned'"
-                class="mini-btn"
-                type="button"
-                title="分组操作"
-                aria-label="分组操作"
-                @click="openGroupMenu($event, group)"
-              >
-                <MoreHorizontal :size="15" />
-              </button>
-            </div>
-          </div>
+          <component :is="item.icon" :size="18" />
+          <span class="nav-label">{{ item.label }}</span>
+          <span v-if="store.listTaskCounts[item.id]" class="nav-badge">{{ store.listTaskCounts[item.id] }}</span>
+        </button>
+      </nav>
 
-          <div v-if="!group.collapsed" class="list-stack">
+      <section class="sidebar__section">
+        <div class="section-title">
+          <span>我的清单</span>
+          <div class="section-actions">
+            <button class="mini-btn" type="button" title="新建分组" aria-label="新建分组" @click="startAddGroup">
+              <FolderPlus :size="15" />
+            </button>
+            <button class="mini-btn" type="button" title="新建清单" aria-label="新建清单" @click="startAddList(null)">
+              <Plus :size="16" />
+            </button>
+          </div>
+        </div>
+
+        <div v-if="addingGroup" class="inline-create">
+          <input
+            ref="groupInput"
+            v-model="newGroupName"
+            placeholder="分组名称"
+            @keydown.enter="confirmAddGroup"
+            @keydown.esc="cancelInlineCreate"
+            @blur="confirmAddGroup"
+          />
+        </div>
+
+        <div class="group-list" @mousedown="handleMouseDown">
+          <div
+            v-for="group in store.groupedLists"
+            :key="group.id"
+            class="list-group"
+          >
             <div
-              v-for="list in group.lists"
-              :key="list.id"
-              class="list-item"
-              :data-list-id="list.id"
+              class="group-row"
+              :data-group-id="group.id"
               :class="{
-                active: store.currentView === list.id,
-                'is-dragging': listDrag.draggingId.value === list.id,
-                'drop-target': listDrag.dragOverId.value === list.id,
-                'drop-target-before': listDrag.dragOverId.value === list.id && listDrag.dropPosition.value === 'before',
-                'drop-target-after': listDrag.dragOverId.value === list.id && listDrag.dropPosition.value === 'after'
+                'is-dragging': groupDrag.draggingId.value === group.id,
+                'drop-target': groupDrag.dragOverId.value === group.id
               }"
-              @contextmenu.prevent="openListMenu($event, list)"
             >
               <span
+                v-if="group.id !== 'ungrouped' && group.id !== 'pinned'"
                 class="sidebar-drag-handle"
                 role="button"
                 tabindex="-1"
-                title="拖动清单排序"
-                aria-label="拖动清单排序"
+                title="拖动分组排序"
+                aria-label="拖动分组排序"
               >
                 <GripVertical :size="14" />
               </span>
-              <button class="list-link" type="button" @click="store.setView(list.id)">
-                <span class="color-dot" :style="{ backgroundColor: list.color }"></span>
-                <span class="nav-label">{{ list.name }}</span>
-                <Pin v-if="list.pinned" :size="11" class="inline-icon" />
-                <span v-if="store.listTaskCounts[list.id]" class="nav-badge">{{ store.listTaskCounts[list.id] }}</span>
+              <button class="group-toggle" type="button" @click="store.toggleGroup(group.id)" :aria-expanded="!group.collapsed">
+                <ChevronRight :size="15" :class="{ rotated: !group.collapsed }" />
+                <span>{{ group.name }}</span>
               </button>
-              <button class="row-more" type="button" aria-label="清单操作" @click.stop="openListMenu($event, list)">
-                <MoreHorizontal :size="15" />
-              </button>
+              <div class="group-actions">
+                <button
+                  v-if="group.id !== 'pinned'"
+                  class="mini-btn"
+                  type="button"
+                  title="添加清单"
+                  aria-label="添加清单"
+                  @click="startAddList(group.id)"
+                >
+                  <Plus :size="14" />
+                </button>
+                <button
+                  v-if="group.id !== 'ungrouped' && group.id !== 'pinned'"
+                  class="mini-btn"
+                  type="button"
+                  title="分组操作"
+                  aria-label="分组操作"
+                  @click="openGroupMenu($event, group)"
+                >
+                  <MoreHorizontal :size="15" />
+                </button>
+              </div>
             </div>
 
-            <div v-if="addingListGroupId === group.id" class="inline-create inline-create--nested">
-              <input
-                ref="listInputGrouped"
-                v-model="newListName"
-                placeholder="清单名称"
-                @keydown.enter="confirmAddList"
-                @keydown.esc="cancelInlineCreate"
-                @blur="confirmAddList"
-              />
+            <div v-if="!group.collapsed" class="list-stack">
+              <div
+                v-for="list in group.lists"
+                :key="list.id"
+                class="list-item"
+                :data-list-id="list.id"
+                :class="{
+                  active: store.currentView === list.id,
+                  'is-dragging': listDrag.draggingId.value === list.id,
+                  'drop-target': listDrag.dragOverId.value === list.id,
+                  'drop-target-before': listDrag.dragOverId.value === list.id && listDrag.dropPosition.value === 'before',
+                  'drop-target-after': listDrag.dragOverId.value === list.id && listDrag.dropPosition.value === 'after'
+                }"
+                @contextmenu.prevent="openListMenu($event, list)"
+              >
+                <span
+                  class="sidebar-drag-handle"
+                  role="button"
+                  tabindex="-1"
+                  title="拖动清单排序"
+                  aria-label="拖动清单排序"
+                >
+                  <GripVertical :size="14" />
+                </span>
+                <button class="list-link" type="button" @click="store.setView(list.id)">
+                  <span class="color-dot" :style="{ backgroundColor: list.color }"></span>
+                  <span class="nav-label">{{ list.name }}</span>
+                  <Pin v-if="list.pinned" :size="11" class="inline-icon" />
+                  <span v-if="store.listTaskCounts[list.id]" class="nav-badge">{{ store.listTaskCounts[list.id] }}</span>
+                </button>
+                <button class="row-more" type="button" aria-label="清单操作" @click.stop="openListMenu($event, list)">
+                  <MoreHorizontal :size="15" />
+                </button>
+              </div>
+
+              <div v-if="addingListGroupId === group.id" class="inline-create inline-create--nested">
+                <input
+                  ref="listInputGrouped"
+                  v-model="newListName"
+                  placeholder="清单名称"
+                  @keydown.enter="confirmAddList"
+                  @keydown.esc="cancelInlineCreate"
+                  @blur="confirmAddList"
+                />
+              </div>
             </div>
           </div>
-        </div>
 
-        <div v-if="addingListGroupId === null" class="inline-create">
-          <input
-            ref="listInputUngrouped"
-            v-model="newListName"
-            placeholder="清单名称"
-            @keydown.enter="confirmAddList"
-            @keydown.esc="cancelInlineCreate"
-            @blur="confirmAddList"
-          />
+          <div v-if="addingListGroupId === null" class="inline-create">
+            <input
+              ref="listInputUngrouped"
+              v-model="newListName"
+              placeholder="清单名称"
+              @keydown.enter="confirmAddList"
+              @keydown.esc="cancelInlineCreate"
+              @blur="confirmAddList"
+            />
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <nav class="sidebar__utility" aria-label="维护视图">
-      <button
-        v-for="item in utilityViews"
-        :key="item.id"
-        class="nav-item nav-item--utility"
-        :class="{ active: store.currentView === item.id }"
-        type="button"
-        @click="store.setView(item.id)"
-      >
-        <component :is="item.icon" :size="18" />
-        <span class="nav-label">{{ item.label }}</span>
-        <span v-if="store.listTaskCounts[item.id]" class="nav-badge">{{ store.listTaskCounts[item.id] }}</span>
-      </button>
-    </nav>
+      <nav class="sidebar__utility" aria-label="维护视图">
+        <button
+          v-for="item in utilityViews"
+          :key="item.id"
+          class="nav-item nav-item--utility"
+          :class="{ active: store.currentView === item.id }"
+          type="button"
+          @click="store.setView(item.id)"
+        >
+          <component :is="item.icon" :size="18" />
+          <span class="nav-label">{{ item.label }}</span>
+          <span v-if="store.listTaskCounts[item.id]" class="nav-badge">{{ store.listTaskCounts[item.id] }}</span>
+        </button>
+      </nav>
+    </template>
 
     <div
       v-if="menu.show"
@@ -255,7 +411,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import {
   BarChart3,
   CalendarCheck,
@@ -264,14 +420,17 @@ import {
   FolderInput,
   FolderPlus,
   GripVertical,
+  Folder,
   Inbox,
   ListChecks,
   MoreHorizontal,
   Pencil,
+  PanelLeft,
   Pin,
   Plus,
   Search,
   Settings as SettingsIcon,
+  X,
   Star,
   Trash2,
   Users,
@@ -284,6 +443,66 @@ import ConfirmDialog from './ConfirmDialog.vue'
 import InputDialog from './InputDialog.vue'
 
 const store = useTaskStore()
+const collapsed = computed(() => store.settings.sidebarCollapsed)
+
+function collapse() {
+  store.updateSettings({ sidebarCollapsed: true })
+}
+
+function expand() {
+  store.updateSettings({ sidebarCollapsed: false })
+}
+
+const listsFlyout = ref(false)
+const folderBtnRef = ref(null)
+const flyoutTop = ref(0)
+
+function toggleListsFlyout() {
+  if (!listsFlyout.value && folderBtnRef.value) {
+    const btn = folderBtnRef.value
+    const anchor = btn.parentElement // .rail-flyout-anchor
+    const btnRect = btn.getBoundingClientRect()
+    const anchorRect = anchor.getBoundingClientRect()
+    const btnCenterY = btnRect.top - anchorRect.top + btnRect.height / 2
+    flyoutTop.value = Math.max(8, btnCenterY - 24)
+  }
+  listsFlyout.value = !listsFlyout.value
+}
+
+const isCurrentViewList = computed(() => {
+  const id = store.currentView
+  return store.lists.some(l => l.id === id)
+})
+
+const totalLists = computed(() => store.groupedLists.reduce((sum, g) => sum + g.lists.length, 0))
+
+// --- 飞出面板 ---
+const flyoutSearch = ref('')
+
+const pinnedLists = computed(() => store.lists.filter(l => l.pinned && !l.deleted))
+
+const filteredGroups = computed(() => {
+  const q = flyoutSearch.value.trim().toLowerCase()
+  if (!q) return store.groupedLists
+  return store.groupedLists.map(g => ({
+    ...g,
+    lists: g.lists.filter(l => l.name.toLowerCase().includes(q))
+  }))
+})
+
+const totalFiltered = computed(() => filteredGroups.value.reduce((sum, g) => sum + g.lists.length, 0))
+
+function createListFromFlyout() {
+  listsFlyout.value = false
+  store.updateSettings({ sidebarCollapsed: false })
+}
+
+function selectList(id) {
+  store.setView(id)
+  listsFlyout.value = false
+  flyoutSearch.value = ''
+}
+
 const searchText = ref('')
 const addingGroup = ref(false)
 const addingListGroupId = ref(undefined)
@@ -589,11 +808,13 @@ function clampMenuPosition(x, y, width, height) {
 
 function onDocumentClick() {
   closeMenu()
+  listsFlyout.value = false
 }
 
 function onDocumentKeydown(event) {
   if (event.key === 'Escape') {
     closeMenu()
+    listsFlyout.value = false
     cancelInlineCreate()
   }
 }
