@@ -11,6 +11,11 @@ use std::{
     path::{Path, PathBuf},
 };
 use tauri::Manager;
+use tauri::{
+    WindowEvent,
+    menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem},
+    tray::{TrayIconBuilder, TrayIconEvent, MouseButton, MouseButtonState},
+};
 
 fn app_data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let dir = app
@@ -39,6 +44,14 @@ fn attachment_root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         .join("attachments");
     fs::create_dir_all(&dir).map_err(|err| format!("创建附件目录失败: {err}"))?;
     Ok(dir)
+}
+
+fn attachment_file_path(app: &tauri::AppHandle, relative_path: &str) -> Result<PathBuf, String> {
+    let relative_path = normalize_attachment_relative_path(relative_path)?;
+    let path = relative_path
+        .split('/')
+        .fold(attachment_root(app)?, |path, component| path.join(component));
+    Ok(path)
 }
 
 #[tauri::command]
@@ -917,14 +930,15 @@ fn import_image(app: tauri::AppHandle, file_path: String) -> Result<ImportedAtta
         .unwrap_or("bin")
         .to_ascii_lowercase();
     let now = Local::now();
+    let short_hash = &sha256[..16.min(sha256.len())];
     let relative_path = format!(
         "images/{:04}/{:02}/{}.{}",
         now.year(),
         now.month(),
-        sha256,
+        short_hash,
         ext
     );
-    let destination = attachment_root(&app)?.join(relative_path.replace('/', "\\"));
+    let destination = attachment_file_path(&app, &relative_path)?;
     if let Some(parent) = destination.parent() {
         fs::create_dir_all(parent).map_err(|err| format!("创建附件分组目录失败: {err}"))?;
     }
@@ -956,11 +970,112 @@ fn import_image(app: tauri::AppHandle, file_path: String) -> Result<ImportedAtta
 }
 
 #[tauri::command]
-fn read_attachment(app: tauri::AppHandle, relative_path: String) -> Result<Option<String>, String> {
-    if relative_path.contains("..") || Path::new(&relative_path).is_absolute() {
-        return Err("附件路径不合法".to_string());
+fn import_image_data(app: tauri::AppHandle, data: String, mime: String) -> Result<ImportedAttachment, String> {
+    let bytes = general_purpose::STANDARD
+        .decode(&data)
+        .map_err(|err| format!("解码图片数据失败: {err}"))?;
+
+    if !mime.starts_with("image/") {
+        return Err("请选择图片文件".to_string());
     }
-    let path = attachment_root(&app)?.join(relative_path.replace('/', "\\"));
+
+    let sha256 = hex_sha256(&bytes);
+    let ext = extension_for_mime(&mime).unwrap_or("bin").to_ascii_lowercase();
+    let now = Local::now();
+    let short_hash = &sha256[..16.min(sha256.len())];
+    let relative_path = format!(
+        "images/{:04}/{:02}/{}.{}",
+        now.year(),
+        now.month(),
+        short_hash,
+        ext
+    );
+    let destination = attachment_file_path(&app, &relative_path)?;
+    if let Some(parent) = destination.parent() {
+        fs::create_dir_all(parent).map_err(|err| format!("创建附件分组目录失败: {err}"))?;
+    }
+    if !destination.exists() {
+        fs::write(&destination, &bytes).map_err(|err| format!("写入附件失败: {err}"))?;
+    }
+
+    let (width, height) = image::image_dimensions(&destination)
+        .map(|(width, height)| (Some(width), Some(height)))
+        .unwrap_or((None, None));
+    let timestamp = now.to_rfc3339();
+
+    Ok(ImportedAttachment {
+        kind: "image".to_string(),
+        mime,
+        original_name: format!("paste-{}.{}", sha256[..8].to_string(), ext),
+        relative_path,
+        sha256,
+        size_bytes: bytes.len() as u64,
+        width,
+        height,
+        created_at: timestamp.clone(),
+        last_referenced_at: timestamp,
+    })
+}
+
+#[tauri::command]
+fn resolve_html_images(app: tauri::AppHandle, html: String) -> Result<String, String> {
+    if !html.contains("attachments/") && !html.contains("src=\"images/") {
+        return Ok(html);
+    }
+
+    let mut result = html;
+    let mut search_start = 0;
+
+    loop {
+        // 匹配 src="attachments/..." 或 src="images/..."
+        let pos_a = result[search_start..].find("src=\"attachments/");
+        let pos_b = result[search_start..].find("src=\"images/");
+        let pos = match (pos_a, pos_b) {
+            (Some(a), Some(b)) => Some(a.min(b)),
+            (Some(a), None) => Some(a),
+            (None, Some(b)) => Some(b),
+            (None, None) => None,
+        };
+
+        let Some(offset) = pos else { break };
+        let abs_pos = search_start + offset;
+        let value_start = abs_pos + 5; // skip 'src="'
+        let Some(value_end) = result[value_start..].find('"') else { break };
+
+        let raw_path = &result[value_start..value_start + value_end];
+        let relative_path = normalize_attachment_relative_path(raw_path)?;
+
+        if let Ok(Some(data_url)) = read_attachment(app.clone(), relative_path.clone()) {
+            let tag_start = result[..abs_pos].rfind('<').unwrap_or(abs_pos);
+            let tag_end = result[abs_pos..]
+                .find('>')
+                .map(|offset| abs_pos + offset)
+                .unwrap_or(value_start + value_end);
+            let tag = &result[tag_start..=tag_end.min(result.len() - 1)];
+            let storage_src = format!("attachments/{relative_path}");
+            let replacement = if tag.contains("data-attachment-src=") {
+                format!("src=\"{data_url}\"")
+            } else {
+                format!("src=\"{data_url}\" data-attachment-src=\"{storage_src}\"")
+            };
+            result = format!(
+                "{}{}{}",
+                &result[..abs_pos],
+                replacement,
+                &result[value_start + value_end + 1..]
+            );
+            search_start = abs_pos + replacement.len();
+        } else {
+            search_start = value_start + value_end + 1;
+        }
+    }
+
+    Ok(result)
+}
+
+#[tauri::command]
+fn read_attachment(app: tauri::AppHandle, relative_path: String) -> Result<Option<String>, String> {
+    let path = attachment_file_path(&app, &relative_path)?;
     if !path.exists() {
         return Ok(None);
     }
@@ -1051,14 +1166,61 @@ fn collect_attachment_paths(
                 .or_else(|| map.get("relative_path"))
                 .and_then(|value| value.as_str())
             {
-                paths.insert(path.replace('\\', "/"));
+                if let Ok(path) = normalize_attachment_relative_path(path) {
+                    paths.insert(path);
+                }
             }
+            // 扫描 HTML 字符串中的附件路径
             for item in map.values() {
+                if let serde_json::Value::String(s) = item {
+                    collect_html_attachment_paths(s, paths);
+                }
                 collect_attachment_paths(item, paths);
             }
         }
+        serde_json::Value::String(s) => {
+            collect_html_attachment_paths(s, paths);
+        }
         _ => {}
     }
+}
+
+fn collect_html_attachment_paths(html: &str, paths: &mut std::collections::HashSet<String>) {
+    let mut remaining = html;
+    loop {
+        let pos_a = remaining.find("src=\"attachments/");
+        let pos_b = remaining.find("src=\"images/");
+        let pos = match (pos_a, pos_b) {
+            (Some(a), Some(b)) => Some(a.min(b)),
+            (Some(a), None) => Some(a),
+            (None, Some(b)) => Some(b),
+            (None, None) => None,
+        };
+
+        let Some(offset) = pos else { break };
+        let value_start = offset + 5; // skip 'src="'
+        if let Some(value_end) = remaining[value_start..].find('"') {
+            let raw = &remaining[value_start..value_start + value_end];
+            if let Ok(path) = normalize_attachment_relative_path(raw) {
+                paths.insert(path);
+            }
+            remaining = &remaining[value_start + value_end + 1..];
+        } else {
+            break;
+        }
+    }
+}
+
+fn normalize_attachment_relative_path(path: &str) -> Result<String, String> {
+    let normalized = path.trim().replace('\\', "/");
+    let relative = normalized
+        .strip_prefix("attachments/")
+        .unwrap_or(&normalized)
+        .trim_start_matches('/');
+    if relative.contains("..") || Path::new(relative).is_absolute() || relative.is_empty() {
+        return Err("附件路径不合法".to_string());
+    }
+    Ok(relative.to_string())
 }
 
 fn remove_unreferenced_files(
@@ -1147,13 +1309,70 @@ fn extension_for_mime(mime: &str) -> Option<&'static str> {
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_notification::init())
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let _ = window.hide();
+            }
+        })
+        .setup(|app| {
+            let show_item = MenuItemBuilder::new("显示主窗口")
+                .id("show")
+                .build(app)?;
+            let separator = PredefinedMenuItem::separator(app)?;
+            let quit_item = MenuItemBuilder::new("退出")
+                .id("quit")
+                .build(app)?;
+            let menu = MenuBuilder::new(app)
+                .item(&show_item)
+                .item(&separator)
+                .item(&quit_item)
+                .build()?;
+
+            let _tray = TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .menu(&menu)
+                .tooltip("易简清单")
+                .on_menu_event(|app, event| match event.id().as_ref() {
+                    "show" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                    "quit" => {
+                        app.exit(0);
+                    }
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        let app = tray.app_handle();
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                })
+                .build(app)?;
+
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             load_data,
             save_data,
             select_image,
             read_image,
             import_image,
+            import_image_data,
             read_attachment,
+            resolve_html_images,
             cleanup_orphan_attachments
         ])
         .run(tauri::generate_context!())

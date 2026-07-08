@@ -1,9 +1,11 @@
+import json
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
 
 ROOT = Path(__file__).resolve().parent.parent
+PKG_VERSION = json.loads((ROOT.parent / "package.json").read_text(encoding="utf-8"))["version"]
 NSIS_DIR = ROOT / "nsis"
 ICON_PATH = ROOT / "icons" / "icon.png"
 
@@ -100,7 +102,7 @@ def draw_sidebar():
 
     title = "易简清单"
     subtitle = "本地优先"
-    version = "1.0.0"
+    version = PKG_VERSION
     title_box = draw.textbbox((0, 0), title, font=FONT_SIDEBAR_TITLE)
     subtitle_box = draw.textbbox((0, 0), subtitle, font=FONT_SIDEBAR_BODY)
     version_box = draw.textbbox((0, 0), version, font=FONT_SMALL)
