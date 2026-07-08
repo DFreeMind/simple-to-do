@@ -6,6 +6,141 @@
   --radius-lg: 16px;
   --shadow-popover: 0 18px 48px rgba(15, 23, 42, 0.18);
   --transition-fast: 160ms ease;
+
+  /* 静态降级颜色（旧版 WebKit 使用） */
+  --divider-soft-fallback: rgba(226, 232, 230, 0.48);
+  --accent-soft-70-fallback: rgba(229, 245, 242, 0.70);
+  --surface-80-accent-tint-fallback: rgba(255, 255, 255, 0.80);
+  --text-7-fallback: rgba(23, 33, 31, 0.07);
+  --accent-20-fallback: rgba(47, 143, 134, 0.20);
+  --white-28-fallback: rgba(255, 255, 255, 0.28);
+  --accent-70-white-fallback: rgba(59, 183, 171, 0.70);
+  --accent-tint-86-white-fallback: rgba(243, 251, 249, 0.86);
+  --accent-15-fallback: rgba(47, 143, 134, 0.15);
+  --white-62-fallback: rgba(255, 255, 255, 0.62);
+  --white-64-fallback: rgba(255, 255, 255, 0.64);
+  --text-6-fallback: rgba(23, 33, 31, 0.06);
+  --accent-16-surface-muted-fallback: rgba(229, 245, 242, 0.16);
+  --white-24-fallback: rgba(255, 255, 255, 0.24);
+  --text-muted-34-fallback: rgba(104, 118, 116, 0.34);
+  --text-muted-26-fallback: rgba(104, 118, 116, 0.26);
+  --accent-34-text-muted-fallback: rgba(47, 143, 134, 0.34);
+  --accent-58-fallback: rgba(47, 143, 134, 0.58);
+  --accent-soft-58-surface-fallback: rgba(229, 245, 242, 0.58);
+  --border-70-fallback: rgba(226, 232, 230, 0.70);
+  --surface-92-fallback: rgba(255, 255, 255, 0.92);
+  --surface-muted-fallback: rgba(248, 250, 249, 1);
+  --accent-34-fallback: rgba(47, 143, 134, 0.34);
+  --accent-9-fallback: rgba(47, 143, 134, 0.09);
+  --surface-muted-74-surface-fallback: rgba(248, 250, 249, 0.74);
+  --accent-40-fallback: rgba(47, 143, 134, 0.40);
+  --accent-42-fallback: rgba(47, 143, 134, 0.42);
+  --accent-tint-76-surface-fallback: rgba(243, 251, 249, 0.76);
+  --accent-24-fallback: rgba(47, 143, 134, 0.24);
+  --surface-90-fallback: rgba(255, 255, 255, 0.90);
+  --accent-28-fallback: rgba(47, 143, 134, 0.28);
+  --accent-soft-70-surface-fallback: rgba(229, 245, 242, 0.70);
+  --danger-10-fallback: rgba(217, 77, 77, 0.10);
+  --warning-13-fallback: rgba(204, 122, 34, 0.13);
+  --accent-12-fallback: rgba(47, 143, 134, 0.12);
+  --accent-18-fallback: rgba(47, 143, 134, 0.18);
+  --accent-90-fallback: rgba(47, 143, 134, 0.90);
+  --accent-15-black-fallback: rgba(47, 143, 134, 0.15);
+  --accent-10-fallback: rgba(47, 143, 134, 0.10);
+  --accent-20-border-fallback: rgba(47, 143, 134, 0.20);
+  --accent-20-border-fallback2: rgba(47, 143, 134, 0.20);
+  --accent-38-fallback: rgba(47, 143, 134, 0.38);
+  --accent-8-fallback: rgba(47, 143, 134, 0.08);
+  --surface-muted-86-surface-fallback: rgba(248, 250, 249, 0.86);
+  --accent-58-transparent-fallback: rgba(47, 143, 134, 0.58);
+  --surface-82-accent-tint-fallback: rgba(255, 255, 255, 0.82);
+  --border-strong-78-border-fallback: rgba(205, 216, 213, 0.78);
+  --surface-muted-86-border-fallback: rgba(248, 250, 249, 0.86);
+  --text-8-fallback: rgba(23, 33, 31, 0.08);
+  --accent-82-accent-tint-fallback: rgba(47, 143, 134, 0.82);
+  --surface-muted-68-surface-fallback: rgba(248, 250, 249, 0.68);
+  --accent-soft-58-surface-fallback2: rgba(229, 245, 242, 0.58);
+  --accent-soft-72-surface-fallback: rgba(229, 245, 242, 0.72);
+  --border-86-transparent-fallback: rgba(226, 232, 230, 0.86);
+  --surface-92-surface-muted-fallback: rgba(255, 255, 255, 0.92);
+  --surface-90-surface-muted-fallback: rgba(255, 255, 255, 0.90);
+  --text-4-fallback: rgba(23, 33, 31, 0.04);
+  --text-5-fallback: rgba(23, 33, 31, 0.05);
+  --accent-soft-50-fallback: rgba(229, 245, 242, 0.50);
+  --surface-92-transparent-fallback: rgba(255, 255, 255, 0.92);
+  --border-86-fallback: rgba(226, 232, 230, 0.86);
+  --accent-soft-86-fallback: rgba(229, 245, 242, 0.86);
+  --text-3-fallback: rgba(23, 33, 31, 0.03);
+  --danger-12-fallback: rgba(217, 77, 77, 0.12);
+}
+
+@supports (color: color-mix(in srgb, red, blue)) {
+  :root {
+    --divider-soft: color-mix(in srgb, var(--border) 48%, transparent);
+    --divider-soft-fallback: color-mix(in srgb, var(--border) 48%, transparent);
+    --accent-soft-70-fallback: color-mix(in srgb, var(--accent-soft) 70%, transparent);
+    --surface-80-accent-tint-fallback: var(--surface-80-accent-tint-fallback);
+    --text-7-fallback: var(--text-7-fallback);
+    --accent-20-fallback: var(--accent-20-fallback);
+    --white-28-fallback: var(--white-28-fallback);
+    --accent-70-white-fallback: var(--accent-70-white-fallback);
+    --accent-tint-86-white-fallback: var(--accent-tint-86-white-fallback);
+    --accent-15-fallback: var(--accent-15-fallback);
+    --white-62-fallback: var(--white-62-fallback);
+    --white-64-fallback: var(--white-64-fallback);
+    --text-6-fallback: var(--text-6-fallback);
+    --accent-16-surface-muted-fallback: var(--accent-16-surface-muted-fallback);
+    --white-24-fallback: var(--white-24-fallback);
+    --text-muted-34-fallback: var(--text-muted-34-fallback);
+    --text-muted-26-fallback: var(--text-muted-26-fallback);
+    --accent-34-text-muted-fallback: var(--accent-34-text-muted-fallback);
+    --accent-58-fallback: var(--accent-58-transparent-fallback);
+    --accent-soft-58-surface-fallback: var(--accent-soft-58-surface-fallback);
+    --border-70-fallback: var(--border-70-fallback);
+    --surface-92-fallback: var(--surface-92-fallback);
+    --surface-muted-fallback: var(--surface-muted);
+    --accent-34-fallback: var(--accent-34-fallback);
+    --accent-9-fallback: color-mix(in srgb, var(--accent) 9%, transparent);
+    --surface-muted-74-surface-fallback: var(--surface-muted-74-surface-fallback);
+    --accent-40-fallback: var(--accent-40-fallback);
+    --accent-42-fallback: var(--accent-42-fallback);
+    --accent-tint-76-surface-fallback: var(--accent-tint-76-surface-fallback);
+    --accent-24-fallback: var(--accent-24-fallback);
+    --surface-90-fallback: var(--surface-90-fallback);
+    --accent-28-fallback: var(--accent-28-fallback);
+    --accent-soft-70-surface-fallback: var(--accent-soft-70-surface-fallback);
+    --danger-10-fallback: var(--danger-10-fallback);
+    --warning-13-fallback: var(--warning-13-fallback);
+    --accent-12-fallback: color-mix(in srgb, var(--accent) 12%, transparent);
+    --accent-18-fallback: var(--accent-18-fallback);
+    --accent-90-fallback: var(--accent-90-fallback);
+    --accent-15-black-fallback: var(--accent-15-black-fallback);
+    --accent-10-fallback: var(--accent-10-fallback);
+    --accent-20-border-fallback: var(--accent-20-border-fallback);
+    --accent-38-fallback: var(--accent-38-fallback);
+    --accent-8-fallback: var(--accent-8-fallback);
+    --surface-muted-86-surface-fallback: var(--surface-muted-86-surface-fallback);
+    --accent-58-transparent-fallback: var(--accent-58-transparent-fallback);
+    --surface-82-accent-tint-fallback: var(--surface-82-accent-tint-fallback);
+    --border-strong-78-border-fallback: var(--border-strong-78-border-fallback);
+    --surface-muted-86-border-fallback: var(--surface-muted-86-border-fallback);
+    --text-8-fallback: var(--text-8-fallback);
+    --accent-82-accent-tint-fallback: var(--accent-82-accent-tint-fallback);
+    --surface-muted-68-surface-fallback: var(--surface-muted-68-surface-fallback);
+    --accent-soft-58-surface-fallback2: var(--accent-soft-58-surface-fallback);
+    --accent-soft-72-surface-fallback: var(--accent-soft-72-surface-fallback);
+    --border-86-transparent-fallback: var(--border-86-transparent-fallback);
+    --surface-92-surface-muted-fallback: var(--surface-92-surface-muted-fallback);
+    --surface-90-surface-muted-fallback: var(--surface-90-surface-muted-fallback);
+    --text-4-fallback: var(--text-4-fallback);
+    --text-5-fallback: var(--text-5-fallback);
+    --accent-soft-50-fallback: var(--accent-soft-50-fallback);
+    --surface-92-transparent-fallback: var(--surface-92-fallback);
+    --border-86-fallback: var(--border-86-transparent-fallback);
+    --accent-soft-86-fallback: var(--accent-soft-86-fallback);
+    --text-3-fallback: var(--text-3-fallback);
+    --danger-12-fallback: var(--danger-12-fallback);
+  }
 }
 
 *, *::before, *::after {
@@ -66,7 +201,7 @@ input:focus-visible,
 textarea:focus-visible,
 select:focus-visible,
 [tabindex]:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--accent) 58%, transparent);
+  outline: 2px solid var(--accent-58-fallback);
   outline-offset: 2px;
 }
 
@@ -90,7 +225,7 @@ select:focus-visible,
   --surface-muted: #f8faf9;
   --border: #e2e8e6;
   --border-strong: #cdd8d5;
-  --divider-soft: color-mix(in srgb, var(--border) 48%, transparent);
+  --divider-soft: var(--divider-soft-fallback);
   --text: #17211f;
   --text-muted: #687674;
   --text-subtle: #8c9996;
@@ -100,7 +235,7 @@ select:focus-visible,
   height: 100%;
   color: var(--text);
   background:
-    radial-gradient(circle at 14% 12%, color-mix(in srgb, var(--accent-soft) 70%, transparent), transparent 28%),
+    radial-gradient(circle at 14% 12%, var(--accent-soft-70-fallback), transparent 28%),
     linear-gradient(135deg, var(--bg), #fbfcfc);
 }
 
@@ -207,7 +342,7 @@ body.is-resizing {
   display: grid;
   grid-template-rows: auto auto auto minmax(0, 1fr) auto;
   padding: 12px 10px;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--surface) 95%, var(--accent-tint)), color-mix(in srgb, var(--surface) 88%, var(--accent-tint)));
+  background: linear-gradient(90deg, var(--surface-92-surface-muted-fallback), var(--surface-90-surface-muted-fallback));
   box-shadow: inset -1px 0 0 var(--divider-soft);
 }
 
@@ -260,7 +395,7 @@ body.is-resizing {
   height: 38px;
   place-items: center;
   border-radius: 11px;
-  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 70%, #ffffff));
+  background: linear-gradient(135deg, var(--accent), var(--accent-70-white-fallback));
   color: #fff;
   font-weight: 700;
   overflow: hidden;
@@ -307,7 +442,7 @@ body.is-resizing {
   color: var(--danger);
 
   &:hover {
-    background: color-mix(in srgb, var(--danger) 12%, transparent);
+    background: var(--danger-12-fallback);
   }
 }
 
@@ -434,7 +569,7 @@ body.is-resizing {
   min-width: 20px;
   padding: 1px 6px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  background: var(--accent-12-fallback);
   color: var(--accent-strong);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
@@ -605,7 +740,7 @@ body.is-resizing {
   margin-top: 12px;
   padding: 12px 4px 0;
   border-top: 1px solid var(--divider-soft);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 70%, transparent), transparent);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), transparent);
 }
 
 /* ─── 侧栏折叠 Rail 模式 ──────────────────────── */
@@ -905,7 +1040,7 @@ body.is-resizing {
   transition: background var(--transition-fast);
 
   &:hover {
-    background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+    background: var(--accent-18-fallback);
   }
 }
 
@@ -929,7 +1064,7 @@ body.is-resizing {
   display: flex;
   flex-direction: column;
   padding: 26px 26px 0;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--surface-muted) 78%, var(--surface)), color-mix(in srgb, var(--surface) 92%, var(--surface-muted)));
+  background: linear-gradient(90deg, rgba(248, 250, 249, 0.78), var(--surface-92-surface-muted-fallback));
   box-shadow: inset -1px 0 0 var(--divider-soft);
 }
 
@@ -1105,7 +1240,7 @@ body.is-resizing {
 }
 
 .quick-chip--priority {
-  background: color-mix(in srgb, var(--warning) 13%, var(--surface));
+  background: rgba(204, 122, 34, 0.13);
   color: var(--warning);
 }
 
@@ -1166,7 +1301,7 @@ body.is-resizing {
   transition: all var(--transition-fast);
 
   &:hover {
-    background: color-mix(in srgb, var(--accent) 90%, black);
+    background: var(--accent-90-fallback);
     transform: scale(1.02);
   }
 }
@@ -1194,7 +1329,7 @@ body.is-resizing {
   &:focus-within {
     border-color: var(--accent);
     background: var(--surface);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
+    box-shadow: 0 0 0 3px var(--accent-15-fallback);
   }
 
   span {
@@ -1249,7 +1384,7 @@ body.is-resizing {
 
   &:hover,
   &.selected {
-    border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
+    border-color: var(--accent-38-fallback);
     background: var(--accent-tint);
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
@@ -1263,18 +1398,18 @@ body.is-resizing {
   &.today {
     border-color: var(--accent);
     border-width: 2px;
-    background: color-mix(in srgb, var(--accent) 8%, var(--surface));
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
+    background: rgba(47, 143, 134, 0.08);
+    box-shadow: 0 0 0 1px var(--accent-20-fallback);
 
     .calendar-day__number {
       background: var(--accent);
       color: #fff;
-      box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 40%, transparent);
+      box-shadow: 0 2px 6px var(--accent-40-fallback);
     }
   }
 
   &.has-tasks {
-    background: color-mix(in srgb, var(--accent) 4%, var(--surface));
+    background: rgba(47, 143, 134, 0.04);
   }
 }
 
@@ -1493,7 +1628,7 @@ body.is-resizing {
 }
 
 .trend-bar--created {
-  background: color-mix(in srgb, var(--accent) 26%, var(--surface));
+  background: rgba(47, 143, 134, 0.26);
 }
 
 .trend-bar--done {
@@ -1590,7 +1725,7 @@ body.is-resizing {
   }
 
   &.today:not(.active) {
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 42%, var(--border));
+    box-shadow: inset 0 0 0 1px rgba(47, 143, 134, 0.42);
   }
 }
 
@@ -1643,14 +1778,14 @@ body.is-resizing {
   transition: background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
 
   &:hover {
-    border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+    border-color: rgba(47, 143, 134, 0.34);
     background: var(--surface);
   }
 
   &.selected {
-    border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
-    background: color-mix(in srgb, var(--accent-tint) 76%, var(--surface));
-    box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 58%, transparent);
+    border-color: rgba(47, 143, 134, 0.42);
+    background: var(--accent-tint-76-surface-fallback);
+    box-shadow: inset 3px 0 0 var(--accent-58-transparent-fallback);
   }
 
   &.completed {
@@ -1661,9 +1796,9 @@ body.is-resizing {
   }
 
   &.is-dragging {
-    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+    border-color: rgba(47, 143, 134, 0.40);
     background: var(--surface);
-    box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 58%, transparent);
+    box-shadow: inset 3px 0 0 var(--accent-58-transparent-fallback);
     cursor: grabbing;
     opacity: 1;
   }
@@ -1753,11 +1888,11 @@ body.is-resizing {
   place-items: center;
   padding: 0;
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  background: var(--surface-92-fallback);
   color: var(--text-subtle);
   cursor: grab;
   opacity: 0;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--border) 70%, transparent);
+  box-shadow: 0 0 0 1px var(--border-70-fallback);
   transition: opacity var(--transition-fast), background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
 
   &:hover,
@@ -1785,11 +1920,11 @@ body.is-resizing {
   place-items: center;
   padding: 0;
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  background: var(--surface-92-fallback);
   color: var(--text-subtle);
   cursor: grab;
   opacity: 0;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--border) 70%, transparent);
+  box-shadow: 0 0 0 1px var(--border-70-fallback);
   transition: opacity var(--transition-fast), background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
 
   &:hover,
@@ -1879,7 +2014,7 @@ body.is-resizing {
   line-height: 1.2;
 
   &.overdue {
-    background: color-mix(in srgb, var(--danger) 10%, var(--surface));
+    background: rgba(217, 77, 77, 0.10);
     color: var(--danger);
   }
 }
@@ -1952,12 +2087,11 @@ body.is-resizing {
 .task-detail {
   display: flex;
   flex-direction: column;
-  container: detail-panel / inline-size;
   overflow-y: auto;
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, var(--accent-tint)), var(--surface) 38%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), var(--surface) 38%),
     var(--surface);
-  scrollbar-color: color-mix(in srgb, var(--text-muted) 34%, transparent) transparent;
+  scrollbar-color: var(--text-muted-34-fallback) transparent;
   scrollbar-width: thin;
 
   &::-webkit-scrollbar {
@@ -1971,13 +2105,19 @@ body.is-resizing {
   &::-webkit-scrollbar-thumb {
     border: 2px solid transparent;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--text-muted) 26%, transparent);
+    background: var(--text-muted-26-fallback);
     background-clip: padding-box;
   }
 
   &:hover::-webkit-scrollbar-thumb {
-    background: color-mix(in srgb, var(--accent) 34%, var(--text-muted));
+    background: var(--accent-34-text-muted-fallback);
     background-clip: padding-box;
+  }
+}
+
+@supports (container-type: inline-size) {
+  .task-detail {
+    container: detail-panel / inline-size;
   }
 }
 
@@ -1989,8 +2129,8 @@ body.is-resizing {
   gap: 0;
   padding: 12px 16px 10px;
   border-bottom: 1px solid var(--divider-soft);
-  background: linear-gradient(180deg, var(--surface), color-mix(in srgb, var(--surface) 80%, var(--accent-tint)));
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--text) 7%, transparent);
+  background: linear-gradient(180deg, var(--surface), var(--surface-80-accent-tint-fallback));
+  box-shadow: 0 10px 24px var(--text-7-fallback);
 }
 
 .detail-hero__card {
@@ -2000,12 +2140,12 @@ body.is-resizing {
   min-width: 0;
   padding: 12px 16px 14px;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  border: 1px solid var(--accent-20-fallback);
   border-radius: 18px;
   background:
-    radial-gradient(circle at 88% 26%, color-mix(in srgb, #fff 28%, transparent) 0 20%, transparent 36%),
-    linear-gradient(135deg, color-mix(in srgb, var(--accent) 70%, #fff), color-mix(in srgb, var(--accent-tint) 86%, #fff));
-  box-shadow: 0 12px 26px color-mix(in srgb, var(--accent) 15%, transparent);
+    radial-gradient(circle at 88% 26%, var(--white-28-fallback) 0 20%, transparent 36%),
+    linear-gradient(135deg, var(--accent-70-white-fallback), var(--accent-tint-86-white-fallback));
+  box-shadow: 0 12px 26px var(--accent-15-fallback);
 
   &::after {
     content: '';
@@ -2017,7 +2157,7 @@ body.is-resizing {
     pointer-events: none;
     border-radius: 50%;
     background:
-      repeating-radial-gradient(ellipse at center, color-mix(in srgb, #fff 24%, transparent) 0 1px, transparent 1px 7px);
+      repeating-radial-gradient(ellipse at center, var(--white-24-fallback) 0 1px, transparent 1px 7px);
     opacity: 0.5;
     transform: rotate(-10deg);
   }
@@ -2032,17 +2172,17 @@ body.is-resizing {
   justify-self: start;
   min-height: 24px;
   padding: 0 9px 0 7px;
-  border: 1px solid color-mix(in srgb, #fff 62%, transparent);
+  border: 1px solid var(--white-62-fallback);
   border-radius: 999px;
-  background: color-mix(in srgb, #fff 64%, transparent);
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--text) 6%, transparent);
+  background: var(--white-64-fallback);
+  box-shadow: 0 1px 3px var(--text-6-fallback);
 }
 
 .detail-hero-progress__ring {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: conic-gradient(var(--accent) var(--progress), color-mix(in srgb, var(--accent) 16%, var(--surface-muted)) 0deg);
+  background: conic-gradient(var(--accent) var(--progress), var(--accent-16-surface-muted-fallback) 0deg);
   flex-shrink: 0;
 
   &::after {
@@ -2052,7 +2192,7 @@ body.is-resizing {
     height: 6px;
     margin: 4px;
     border-radius: 50%;
-    background: color-mix(in srgb, #fff 50%, var(--accent-tint));
+    background: rgba(255, 255, 255, 0.50);
   }
 }
 
@@ -2080,10 +2220,10 @@ body.is-resizing {
   justify-content: flex-end;
   gap: 2px;
   padding: 2px;
-  border: 1px solid color-mix(in srgb, #fff 54%, transparent);
+  border: 1px solid rgba(255, 255, 255, 0.54);
   border-radius: 12px;
-  background: color-mix(in srgb, #fff 62%, transparent);
-  box-shadow: 0 3px 10px color-mix(in srgb, var(--text) 8%, transparent);
+  background: var(--white-62-fallback);
+  box-shadow: 0 3px 10px var(--text-8-fallback);
 }
 
 .detail-icon-action {
@@ -2095,30 +2235,30 @@ body.is-resizing {
   border: 1px solid transparent;
   border-radius: 7px;
   background: transparent;
-  color: color-mix(in srgb, var(--text) 72%, var(--accent-strong));
+  color: rgba(23, 33, 31, 0.72);
   transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 
   &:hover {
-    border-color: color-mix(in srgb, #fff 76%, transparent);
-    background: color-mix(in srgb, #fff 72%, transparent);
+    border-color: rgba(255, 255, 255, 0.76);
+    background: rgba(255, 255, 255, 0.72);
     color: var(--text);
   }
 
   &:focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--accent) 32%, transparent);
+    outline: 2px solid rgba(47, 143, 134, 0.32);
     outline-offset: 2px;
   }
 
   &.active {
-    border-color: color-mix(in srgb, #fff 62%, var(--accent));
-    background: color-mix(in srgb, #fff 68%, var(--accent-soft));
+    border-color: rgba(255, 255, 255, 0.62);
+    background: rgba(255, 255, 255, 0.68);
     color: var(--accent-strong);
-    box-shadow: 0 1px 2px color-mix(in srgb, var(--accent) 14%, transparent);
+    box-shadow: 0 1px 2px rgba(47, 143, 134, 0.14);
   }
 }
 
 .detail-icon-action--close {
-  color: color-mix(in srgb, var(--text-muted) 80%, transparent);
+  color: rgba(104, 118, 116, 0.80);
 }
 
 .detail-title-input {
@@ -2159,10 +2299,10 @@ body.is-resizing {
   gap: 0;
   margin-top: 12px;
   padding: 4px 12px;
-  border: 1px solid color-mix(in srgb, var(--border) 86%, transparent);
+  border: 1px solid var(--border-86-transparent-fallback);
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--surface) 86%, var(--surface-muted));
-  box-shadow: 0 1px 2px color-mix(in srgb, var(--text) 4%, transparent);
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 1px 2px var(--text-4-fallback);
 }
 
 .field {
@@ -2205,13 +2345,13 @@ body.is-resizing {
 
     &:focus,
     &:focus-visible {
-      border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+      border-color: rgba(47, 143, 134, 0.34);
       background: var(--surface);
-      box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 9%, transparent);
+      box-shadow: 0 0 0 2px rgba(47, 143, 134, 0.09);
     }
 
     &:hover {
-      background: color-mix(in srgb, var(--surface-muted) 74%, var(--surface));
+      background: var(--surface-muted-74-surface-fallback);
     }
   }
 }
@@ -2381,11 +2521,36 @@ body.is-resizing {
   &:hover,
   &:focus-within {
     border-color: var(--border);
-    background: color-mix(in srgb, var(--surface-muted) 54%, var(--surface));
+    background: rgba(248, 250, 249, 0.54);
   }
 }
 
-@container detail-panel (max-width: 360px) {
+@supports (container-type: inline-size) {
+  @container detail-panel (max-width: 360px) {
+    .detail-hero {
+      padding: 12px 12px 10px;
+    }
+
+    .detail-hero__card {
+      padding: 12px 13px 16px;
+      border-radius: var(--radius-md);
+    }
+
+    .field {
+      grid-template-columns: 1fr;
+      align-items: stretch;
+      gap: 4px;
+      padding: 7px 0;
+    }
+
+    .field > span {
+      font-size: 11px;
+    }
+  }
+}
+
+/* 降级方案：对于不支持容器查询的浏览器，使用媒体查询 */
+@media (max-width: 700px) {
   .detail-hero {
     padding: 12px 12px 10px;
   }
@@ -2432,7 +2597,7 @@ body.is-resizing {
   }
 
   &:hover {
-    background: color-mix(in srgb, var(--accent-soft) 70%, var(--surface));
+    background: var(--accent-soft-70-surface-fallback);
   }
 }
 
@@ -2468,10 +2633,10 @@ body.is-resizing {
   gap: 8px;
   min-height: 38px;
   padding: 6px 9px;
-  border: 1px solid color-mix(in srgb, var(--border) 86%, transparent);
+  border: 1px solid var(--border-86-transparent-fallback);
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--surface) 90%, var(--surface-muted));
-  box-shadow: 0 1px 1px color-mix(in srgb, var(--text) 3%, transparent);
+  background: var(--surface-90-surface-muted-fallback);
+  box-shadow: 0 1px 1px var(--text-3-fallback);
   transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
 
   input {
@@ -2488,13 +2653,13 @@ body.is-resizing {
 
   &:hover,
   &:focus-within {
-    border-color: color-mix(in srgb, var(--accent) 24%, var(--border));
+    border-color: rgba(47, 143, 134, 0.24);
     background: var(--surface);
-    box-shadow: 0 2px 8px color-mix(in srgb, var(--text) 5%, transparent);
+    box-shadow: 0 2px 8px var(--text-5-fallback);
   }
 
   &.is-dragging {
-    border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+    border-color: rgba(47, 143, 134, 0.34);
     background: var(--surface);
     cursor: grabbing;
     opacity: 1;
@@ -2537,7 +2702,7 @@ body.is-resizing {
 
   &:focus-within {
     border-style: solid;
-    border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
+    border-color: rgba(47, 143, 134, 0.28);
     background: var(--surface);
   }
 }
@@ -2547,15 +2712,15 @@ body.is-resizing {
 }
 
 .rich-editor {
-  border: 1px solid color-mix(in srgb, var(--border) 86%, transparent);
+  border: 1px solid var(--border-86-transparent-fallback);
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--surface) 92%, var(--surface-muted));
-  box-shadow: 0 1px 2px color-mix(in srgb, var(--text) 4%, transparent);
+  background: var(--surface-92-surface-muted-fallback);
+  box-shadow: 0 1px 2px var(--text-4-fallback);
 
   &:focus-within {
-    border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+    border-color: rgba(47, 143, 134, 0.34);
     background: var(--surface);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 8%, transparent);
+    box-shadow: 0 0 0 2px var(--accent-8-fallback);
   }
 }
 
@@ -2722,7 +2887,7 @@ body.is-resizing {
   color: var(--danger);
 
   &:hover {
-    background: color-mix(in srgb, var(--danger) 10%, transparent);
+    background: var(--danger-10-fallback);
     color: var(--danger);
   }
 }
@@ -2765,7 +2930,7 @@ body.is-resizing {
   height: 100%;
   flex-direction: column;
   overflow: hidden;
-  background: linear-gradient(180deg, var(--surface), color-mix(in srgb, var(--surface-muted) 54%, var(--surface)));
+  background: linear-gradient(180deg, var(--surface), rgba(248, 250, 249, 0.54));
   box-shadow: -20px 0 60px rgba(15, 23, 42, 0.22);
 }
 
@@ -2773,7 +2938,7 @@ body.is-resizing {
   flex: 0 0 auto;
   padding: 16px 20px 12px;
   border-bottom: 1px solid var(--divider-soft);
-  background: color-mix(in srgb, var(--surface) 84%, var(--accent-tint));
+  background: rgba(255, 255, 255, 0.84);
 }
 
 .settings-panel__header h2 {
@@ -2793,7 +2958,7 @@ body.is-resizing {
   align-content: start;
   gap: 3px;
   padding: 12px 10px;
-  background: color-mix(in srgb, var(--surface-muted) 68%, var(--surface));
+  background: var(--surface-muted-68-surface-fallback);
   box-shadow: inset -1px 0 0 var(--divider-soft);
 }
 
@@ -2819,7 +2984,7 @@ body.is-resizing {
     background: var(--surface);
     color: var(--accent-strong);
     font-weight: 650;
-    box-shadow: 0 1px 8px color-mix(in srgb, var(--text) 8%, transparent);
+    box-shadow: 0 1px 8px var(--text-8-fallback);
   }
 }
 
@@ -2829,7 +2994,7 @@ body.is-resizing {
   height: 30px;
   place-items: center;
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--accent-soft) 58%, var(--surface));
+  background: var(--accent-soft-58-surface-fallback);
   color: var(--accent-strong);
 }
 
@@ -2886,9 +3051,9 @@ body.is-resizing {
 .settings-section__head--accent {
   min-height: 58px;
   padding: 9px 10px;
-  border: 1px solid color-mix(in srgb, var(--accent) 16%, var(--border));
+  border: 1px solid rgba(47, 143, 134, 0.16);
   border-radius: var(--radius-sm);
-  background: linear-gradient(135deg, color-mix(in srgb, var(--accent-tint) 78%, var(--surface)), var(--surface));
+  background: linear-gradient(135deg, rgba(243, 251, 249, 0.78), var(--surface));
 }
 
 .settings-section__icon {
@@ -2900,7 +3065,7 @@ body.is-resizing {
   border-radius: var(--radius-sm);
   background: var(--accent);
   color: #fff;
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--accent) 18%, transparent);
+  box-shadow: 0 8px 18px rgba(47, 143, 134, 0.18);
 }
 
 .settings-block {
@@ -2957,15 +3122,15 @@ body.is-resizing {
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
 
   &:hover {
-    border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
-    box-shadow: 0 4px 12px color-mix(in srgb, var(--text) 7%, transparent);
+    border-color: rgba(47, 143, 134, 0.42);
+    box-shadow: 0 4px 12px var(--text-7-fallback);
     transform: translateY(-1px);
   }
 
   &.active {
     border-color: var(--accent);
     color: var(--accent-strong);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 10%, transparent);
+    box-shadow: 0 0 0 2px var(--accent-10-fallback);
   }
 }
 
@@ -2973,7 +3138,7 @@ body.is-resizing {
   width: 34px;
   height: 30px;
   border-radius: var(--radius-sm);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, #ffffff 50%, transparent);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.50);
 }
 
 .theme-card__copy {
@@ -3002,7 +3167,7 @@ body.is-resizing {
   height: 20px;
   place-items: center;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--accent-soft) 72%, var(--surface));
+  background: var(--accent-soft-72-surface-fallback);
   color: var(--accent-strong);
 }
 
@@ -3013,7 +3178,7 @@ body.is-resizing {
   padding: 4px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--surface-muted) 82%, var(--surface));
+  background: rgba(248, 250, 249, 0.82);
 
   button {
     min-height: 32px;
@@ -3060,8 +3225,8 @@ body.is-resizing {
   cursor: pointer;
 
   &:hover {
-    border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
-    background: color-mix(in srgb, var(--surface) 82%, var(--accent-tint));
+    border-color: rgba(47, 143, 134, 0.34);
+    background: var(--surface-82-accent-tint-fallback);
   }
 }
 
@@ -3076,9 +3241,9 @@ body.is-resizing {
   flex: 0 0 auto;
   width: 42px;
   height: 24px;
-  border: 1px solid color-mix(in srgb, var(--border-strong) 78%, var(--border));
+  border: 1px solid var(--border-strong-78-border-fallback);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--surface-muted) 86%, var(--border));
+  background: var(--surface-muted-86-border-fallback);
   transition: background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
 
   &::after {
@@ -3099,7 +3264,7 @@ body.is-resizing {
 .sound-item input:checked + .switch-control {
   border-color: var(--accent);
   background: var(--accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 10%, transparent);
+  box-shadow: 0 0 0 2px var(--accent-10-fallback);
 }
 
 .switch-row input:checked + .switch-control::after,
@@ -3109,7 +3274,7 @@ body.is-resizing {
 
 .switch-row input:focus-visible + .switch-control,
 .sound-item input:focus-visible + .switch-control {
-  outline: 2px solid color-mix(in srgb, var(--accent) 58%, transparent);
+  outline: 2px solid var(--accent-58-transparent-fallback);
   outline-offset: 2px;
 }
 
@@ -3131,8 +3296,8 @@ body.is-resizing {
   transition: border-color var(--transition-fast), background var(--transition-fast);
 
   &:hover {
-    border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
-    background: color-mix(in srgb, var(--surface) 82%, var(--accent-tint));
+    border-color: rgba(47, 143, 134, 0.34);
+    background: var(--surface-82-accent-tint-fallback);
   }
 
   select {
@@ -3239,7 +3404,7 @@ body.is-resizing {
 
   &:hover {
     border-color: var(--accent);
-    background: color-mix(in srgb, var(--surface) 82%, var(--accent-tint));
+    background: var(--surface-82-accent-tint-fallback);
   }
 }
 
@@ -3350,7 +3515,7 @@ body.is-resizing {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface);
-  box-shadow: 0 1px 2px color-mix(in srgb, var(--text) 4%, transparent);
+  box-shadow: 0 1px 2px var(--text-4-fallback);
 
   img {
     width: 54px;
@@ -3526,7 +3691,7 @@ body.is-resizing {
   font-weight: 650;
 
   &:hover {
-    background: color-mix(in srgb, var(--accent-soft) 72%, var(--surface));
+    background: var(--accent-soft-72-surface-fallback);
   }
 
   &--clear {
@@ -3872,7 +4037,7 @@ body.is-resizing {
 }
 
 .group-row.drop-target {
-  background: color-mix(in srgb, var(--accent-soft) 70%, transparent);
+  background: rgba(229, 245, 242, 0.70);
 }
 
 .group-row.is-dragging {
