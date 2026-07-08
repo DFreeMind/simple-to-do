@@ -2,19 +2,39 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { genId } from '@/utils/id'
 import { getMonthDays, isToday, toDateString } from '@/utils/date'
-import { loadData as loadPlatformData, saveData as savePlatformData } from '@/services/platform'
+import {
+  cancelTaskReminderNotification,
+  cleanupOrphanAttachments,
+  loadData as loadPlatformData,
+  saveData as savePlatformData,
+  scheduleTaskReminderNotification,
+  sendReminderTestNotification,
+  syncTaskReminderNotifications
+} from '@/services/platform'
 import {
   playCompleteSound,
+  playTaskUndoSound,
   playSubtaskCompleteSound,
+  playSubtaskUndoSound,
   playDeleteSound,
   playAddSound,
   playRestoreSound,
   playMoveSound,
+  playToggleSound,
+  playMarkSound,
+  playScheduleSound,
+  playAttachSound,
+  playClearSound,
+  playSaveSound,
+  playErrorSound,
   playDragStartSound,
   playDragOverSound,
   playDragEndSound,
   playListAddSound,
   playListDeleteSound,
+  playListRestoreSound,
+  playListPinSound,
+  playRenameSound,
   playGroupAddSound,
   playGroupDeleteSound,
   setSoundEnabled,
@@ -41,6 +61,7 @@ const DEFAULT_LISTS = [
 const DEFAULT_SETTINGS = {
   theme: 'mint',
   density: 'comfortable',
+  sidebarCollapsed: false,
   detailOpen: false,
   detailWidth: 380,
   startView: 'today',
@@ -49,7 +70,9 @@ const DEFAULT_SETTINGS = {
   soundEnabled: true,
   soundTaskEnabled: true,
   soundListEnabled: true,
-  soundGroupEnabled: true
+  soundGroupEnabled: true,
+  reminderNotificationsEnabled: true,
+  reminderSoundEnabled: true
 }
 
 function nowIso() {
@@ -501,7 +524,24 @@ export const useTaskStore = defineStore('task', () => {
         group: updates.soundGroupEnabled ?? settings.value.soundGroupEnabled
       })
     }
+    if ('reminderNotificationsEnabled' in updates || 'reminderSoundEnabled' in updates) {
+      syncReminderNotifications({ requestPermission: Boolean(updates.reminderNotificationsEnabled) })
+      if (updates.reminderNotificationsEnabled === false) showNotice('任务提醒通知已关闭', 'info')
+    }
     purgeExpiredTrash()
+  }
+
+  async function testReminderNotification() {
+    const result = await sendReminderTestNotification(settings.value)
+    if (result.sent) {
+      showNotice('已发送测试提醒', 'success')
+      syncReminderNotifications({ requestPermission: false })
+    } else if (result.reason === 'permission') {
+      showNotice('通知权限未开启，请在系统设置中允许通知', 'error')
+    } else {
+      showNotice('当前环境不支持系统通知', 'error')
+    }
+    return result
   }
 
   function cycleSort() {
@@ -523,7 +563,10 @@ export const useTaskStore = defineStore('task', () => {
 
   function renameGroup(id, name) {
     const group = groups.value.find(item => item.id === id)
-    if (group && name.trim()) group.name = name.trim()
+    if (group && name.trim()) {
+      group.name = name.trim()
+      playRenameSound()
+    }
   }
 
   function deleteGroup(id) {
@@ -560,7 +603,10 @@ export const useTaskStore = defineStore('task', () => {
 
   function toggleListPin(id) {
     const list = lists.value.find(item => item.id === id)
-    if (list && !list.isSystem) list.pinned = !list.pinned
+    if (list && !list.isSystem) {
+      list.pinned = !list.pinned
+      playListPinSound()
+    }
   }
 
   function deleteList(id) {
@@ -583,6 +629,7 @@ export const useTaskStore = defineStore('task', () => {
         task.updatedAt = updatedAt
         trash.value = trash.value.filter(item => item.id !== task.id)
         trash.value.unshift({ ...task, subtasks: [...task.subtasks], attachments: [...task.attachments] })
+        cancelReminder(task.id)
         removeTaskFromOrders(task.id)
       }
     })
@@ -610,11 +657,13 @@ export const useTaskStore = defineStore('task', () => {
         task.deletedAt = null
         task.deletedByListId = null
         task.updatedAt = restoredAt
+        rescheduleReminder(task)
       }
     })
     trash.value = trash.value.filter(task => task.deletedByListId !== id)
     listTrash.value.splice(idx, 1)
     showNotice('清单已恢复', 'success')
+    playListRestoreSound()
     return true
   }
 
@@ -622,17 +671,23 @@ export const useTaskStore = defineStore('task', () => {
     const idx = listTrash.value.findIndex(list => list.id === id)
     if (idx === -1) return false
     const taskIds = tasks.value.filter(task => task.deletedByListId === id).map(task => task.id)
+    taskIds.forEach(cancelReminder)
     tasks.value = tasks.value.filter(task => task.deletedByListId !== id)
     trash.value = trash.value.filter(task => task.deletedByListId !== id)
     taskIds.forEach(removeTaskFromOrders)
     listTrash.value.splice(idx, 1)
     showNotice('清单已永久删除', 'success')
+    playListDeleteSound()
+    cleanupAttachmentsAsync()
     return true
   }
 
   function renameList(id, name) {
     const list = lists.value.find(item => item.id === id)
-    if (list && name.trim()) list.name = name.trim()
+    if (list && name.trim()) {
+      list.name = name.trim()
+      playRenameSound()
+    }
   }
 
   function moveList(id, groupId) {
@@ -762,6 +817,7 @@ export const useTaskStore = defineStore('task', () => {
     tasks.value.unshift(task)
     prependTaskToOrder(task.id, 'planned')
     selectedTaskId.value = task.id
+    playScheduleSound()
     return task
   }
 
@@ -777,9 +833,11 @@ export const useTaskStore = defineStore('task', () => {
     task.completed = !task.completed
     task.completedAt = task.completed ? nowIso() : null
     task.updatedAt = nowIso()
-    // 仅在标记为完成时播放音效，取消完成时不播放
+    rescheduleReminder(task)
     if (task.completed) {
       playCompleteSound()
+    } else {
+      playTaskUndoSound()
     }
   }
 
@@ -788,6 +846,7 @@ export const useTaskStore = defineStore('task', () => {
     if (!task) return
     task.myDayDate = isInMyDay(task) ? null : todayKey.value
     task.updatedAt = nowIso()
+    playToggleSound()
   }
 
   function toggleImportant(id) {
@@ -796,9 +855,10 @@ export const useTaskStore = defineStore('task', () => {
     task.important = !task.important
     if (task.important && task.priority < 3) task.priority = 3
     task.updatedAt = nowIso()
+    playMarkSound()
   }
 
-  function deleteTask(id) {
+  function deleteTask(id, options = {}) {
     const task = tasks.value.find(item => item.id === id)
     if (task && !task.deleted) {
       const deletedAt = nowIso()
@@ -807,10 +867,11 @@ export const useTaskStore = defineStore('task', () => {
       task.updatedAt = deletedAt
       trash.value = trash.value.filter(item => item.id !== id)
       trash.value.unshift({ ...task, subtasks: [...task.subtasks], attachments: [...task.attachments] })
+      cancelReminder(id)
       removeTaskFromOrders(id)
       if (selectedTaskId.value === id) selectedTaskId.value = null
       showNotice('任务已移入垃圾桶', 'success')
-      playDeleteSound()
+      if (!options.silent) playDeleteSound()
     }
   }
 
@@ -827,9 +888,12 @@ export const useTaskStore = defineStore('task', () => {
       }
       original.deletedByListId = null
       original.updatedAt = nowIso()
+      rescheduleReminder(original)
     } else {
       const listId = lists.value.some(list => list.id === task.listId) ? task.listId : 'inbox'
-      tasks.value.unshift(normalizeTask({ ...task, listId, deleted: false, deletedAt: null, deletedByListId: null, updatedAt: nowIso() }))
+      const restored = normalizeTask({ ...task, listId, deleted: false, deletedAt: null, deletedByListId: null, updatedAt: nowIso() })
+      tasks.value.unshift(restored)
+      rescheduleReminder(restored)
     }
     trash.value.splice(idx, 1)
     showNotice('任务已恢复', 'success')
@@ -837,16 +901,26 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   function permanentDelete(id) {
+    const existed = tasks.value.some(task => task.id === id) || trash.value.some(task => task.id === id)
+    if (!existed) return
+    cancelReminder(id)
     tasks.value = tasks.value.filter(task => task.id !== id)
     trash.value = trash.value.filter(task => task.id !== id)
     removeTaskFromOrders(id)
     if (selectedTaskId.value === id) selectedTaskId.value = null
     showNotice('任务已永久删除', 'success')
+    playClearSound()
+    cleanupAttachmentsAsync()
   }
 
   function updateTask(id, updates) {
     const task = tasks.value.find(item => item.id === id) || trash.value.find(item => item.id === id)
-    if (task) Object.assign(task, updates, { updatedAt: nowIso() })
+    if (task) {
+      Object.assign(task, updates, { updatedAt: nowIso() })
+      if (shouldRescheduleReminder(updates)) {
+        rescheduleReminder(task, { requestPermission: Boolean(updates.reminderAt) })
+      }
+    }
   }
 
   function moveTaskToDate(id, date) {
@@ -857,6 +931,8 @@ export const useTaskStore = defineStore('task', () => {
     next.setHours(previous.getHours() || 9, previous.getMinutes() || 0, 0, 0)
     task.dueDate = next.toISOString()
     task.updatedAt = nowIso()
+    rescheduleReminder(task)
+    playScheduleSound()
   }
 
   function togglePin(id) {
@@ -864,6 +940,7 @@ export const useTaskStore = defineStore('task', () => {
     if (task) {
       task.pinned = !task.pinned
       task.updatedAt = nowIso()
+      playMarkSound()
     }
   }
 
@@ -892,7 +969,8 @@ export const useTaskStore = defineStore('task', () => {
 
   function clearCompletedInCurrentView() {
     const completed = filteredTasks.value.filter(task => task.completed && !task.deleted)
-    completed.forEach(task => deleteTask(task.id))
+    completed.forEach(task => deleteTask(task.id, { silent: true }))
+    if (completed.length) playClearSound()
     return completed.length
   }
 
@@ -910,16 +988,19 @@ export const useTaskStore = defineStore('task', () => {
     if (!subtask || !task) return
     subtask.completed = !subtask.completed
     task.updatedAt = nowIso()
-    // 仅在标记为完成时播放音效
     if (subtask.completed) {
       playSubtaskCompleteSound()
+    } else {
+      playSubtaskUndoSound()
     }
   }
 
   function deleteSubtask(taskId, subId) {
     const task = tasks.value.find(item => item.id === taskId)
     if (!task) return
+    const previousLength = task.subtasks.length
     task.subtasks = task.subtasks.filter(subtask => subtask.id !== subId)
+    if (task.subtasks.length === previousLength) return
     task.updatedAt = nowIso()
     playDeleteSound()
   }
@@ -927,9 +1008,11 @@ export const useTaskStore = defineStore('task', () => {
   function updateSubtask(taskId, subId, title) {
     const task = tasks.value.find(item => item.id === taskId)
     const subtask = task?.subtasks.find(item => item.id === subId)
-    if (!subtask || !title.trim()) return
-    subtask.title = title.trim()
+    const nextTitle = title.trim()
+    if (!subtask || !nextTitle || subtask.title === nextTitle) return
+    subtask.title = nextTitle
     task.updatedAt = nowIso()
+    playToggleSound()
   }
 
   function reorderSubtask(taskId, sourceId, targetId) {
@@ -944,6 +1027,7 @@ export const useTaskStore = defineStore('task', () => {
     })
     task.subtasks = ordered
     task.updatedAt = nowIso()
+    playMoveSound()
   }
 
   function addAttachment(taskId, attachment, imageUrl = '') {
@@ -969,13 +1053,17 @@ export const useTaskStore = defineStore('task', () => {
       lastReferencedAt: source.lastReferencedAt || source.last_referenced_at || createdAt
     })
     task.updatedAt = nowIso()
+    playAttachSound()
   }
 
   function removeAttachment(taskId, attachmentId) {
     const task = tasks.value.find(item => item.id === taskId)
     if (!task) return
+    const previousLength = task.attachments.length
     task.attachments = task.attachments.filter(attachment => attachment.id !== attachmentId)
+    if (task.attachments.length === previousLength) return
     task.updatedAt = nowIso()
+    playAttachSound()
   }
 
   function setView(view) {
@@ -1031,6 +1119,7 @@ export const useTaskStore = defineStore('task', () => {
           group: settings.value.soundGroupEnabled
         })
         purgeExpiredTrash()
+        syncReminderNotifications({ requestPermission: false })
         console.log(`[Store] 数据初始化完成: ${tasks.value.length} 任务, ${lists.value.length} 清单`)
       }
       currentView.value = settings.value.startView || 'today'
@@ -1059,8 +1148,10 @@ export const useTaskStore = defineStore('task', () => {
         await savePlatformData(payload)
       }
       saveError.value = ''
+      playSaveSound()
     } catch (error) {
       saveError.value = error?.message || '保存本地数据失败'
+      playErrorSound()
       showNotice(saveError.value, 'error')
       throw error
     } finally {
@@ -1079,6 +1170,43 @@ export const useTaskStore = defineStore('task', () => {
       saveTimer = null
       saveData().catch(() => {})
     }, 180)
+  }
+
+  /**
+   * 异步清理孤立附件文件（不阻塞主流程）
+   */
+  function cleanupAttachmentsAsync() {
+    const payload = buildSavePayload()
+    cleanupOrphanAttachments(payload).catch(() => {})
+  }
+
+  function shouldRescheduleReminder(updates) {
+    return ['reminderAt', 'dueDate', 'title', 'completed', 'deleted']
+      .some((key) => Object.prototype.hasOwnProperty.call(updates, key))
+  }
+
+  function rescheduleReminder(task, options = {}) {
+    scheduleTaskReminderNotification(task, settings.value, options)
+      .then((result) => {
+        if (options.requestPermission && result.reason === 'permission') {
+          showNotice('通知权限未开启，提醒时间已保存', 'error')
+        }
+      })
+      .catch((error) => {
+        console.error('[Store] 同步提醒失败:', error)
+      })
+  }
+
+  function cancelReminder(taskId) {
+    cancelTaskReminderNotification(taskId).catch((error) => {
+      console.error('[Store] 取消提醒失败:', error)
+    })
+  }
+
+  function syncReminderNotifications(options = {}) {
+    syncTaskReminderNotifications(tasks.value, settings.value, options).catch((error) => {
+      console.error('[Store] 重建提醒失败:', error)
+    })
   }
 
   function buildSavePayload() {
@@ -1199,6 +1327,8 @@ export const useTaskStore = defineStore('task', () => {
     const soundTaskEnabled = rawSettings.soundTaskEnabled !== false
     const soundListEnabled = rawSettings.soundListEnabled !== false
     const soundGroupEnabled = rawSettings.soundGroupEnabled !== false
+    const reminderNotificationsEnabled = rawSettings.reminderNotificationsEnabled !== false
+    const reminderSoundEnabled = rawSettings.reminderSoundEnabled !== false
     return {
       ...DEFAULT_SETTINGS,
       ...rawSettings,
@@ -1206,13 +1336,16 @@ export const useTaskStore = defineStore('task', () => {
       density,
       startView,
       detailOpen: rawSettings.detailOpen !== false,
+      sidebarCollapsed: !!rawSettings.sidebarCollapsed,
       detailWidth,
       completedVisible: rawSettings.completedVisible !== false,
       trashRetentionDays,
       soundEnabled,
       soundTaskEnabled,
       soundListEnabled,
-      soundGroupEnabled
+      soundGroupEnabled,
+      reminderNotificationsEnabled,
+      reminderSoundEnabled
     }
   }
 
@@ -1229,14 +1362,17 @@ export const useTaskStore = defineStore('task', () => {
   function purgeExpiredTrash() {
     const retentionDays = Number(settings.value.trashRetentionDays || DEFAULT_SETTINGS.trashRetentionDays)
     const threshold = Date.now() - retentionDays * 86400000
+    let removedExpiredItems = false
     const expiredTaskIds = trash.value
       .filter(task => task.deletedAt && new Date(task.deletedAt).getTime() < threshold)
       .map(task => task.id)
     if (expiredTaskIds.length) {
       const expired = new Set(expiredTaskIds)
+      expiredTaskIds.forEach(cancelReminder)
       tasks.value = tasks.value.filter(task => !expired.has(task.id))
       trash.value = trash.value.filter(task => !expired.has(task.id))
       expiredTaskIds.forEach(removeTaskFromOrders)
+      removedExpiredItems = true
     }
     const expiredListIds = listTrash.value
       .filter(list => list.deletedAt && new Date(list.deletedAt).getTime() < threshold)
@@ -1244,11 +1380,16 @@ export const useTaskStore = defineStore('task', () => {
     expiredListIds.forEach(id => {
       const idx = listTrash.value.findIndex(list => list.id === id)
       if (idx >= 0) {
+        tasks.value
+          .filter(task => task.deletedByListId === id)
+          .forEach(task => cancelReminder(task.id))
         tasks.value = tasks.value.filter(task => task.deletedByListId !== id)
         trash.value = trash.value.filter(task => task.deletedByListId !== id)
         listTrash.value.splice(idx, 1)
+        removedExpiredItems = true
       }
     })
+    if (removedExpiredItems) cleanupAttachmentsAsync()
   }
 
   function normalizeViewOrders(rawOrders = {}) {
@@ -1420,6 +1561,7 @@ export const useTaskStore = defineStore('task', () => {
     openSettings,
     closeSettings,
     updateSettings,
+    testReminderNotification,
     loadData,
     saveData,
     playDragStartSound,

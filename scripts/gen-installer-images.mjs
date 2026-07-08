@@ -4,12 +4,13 @@
  * 运行方式：node scripts/gen-installer-images.mjs
  * 无需任何第三方依赖，直接写入 BMP 二进制数据。
  */
-import { writeFileSync } from 'node:fs'
+import { writeFileSync, readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const outDir = join(__dirname, '..', 'src-tauri', 'nsis')
+const { version } = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8'))
 
 // ─── 颜色（RGB） ───────────────────────────────────
 const MINT        = [95, 184, 173]
@@ -244,7 +245,7 @@ function genHeader() {
   fn = fillPixels(sub, GRAY, fn)
 
   // 版本号
-  const ver = drawText('v1.0.0', 32, 125, [180, 185, 190], 1)
+  const ver = drawText(`v${version}`, 32, 125, [180, 185, 190], 1)
   fn = fillPixels(ver, [180, 185, 190], fn)
 
   // 底部提示文字
@@ -284,8 +285,8 @@ function genSidebar() {
   const name = drawText('Easy Todo', 38, 210, WHITE, 1)
   fn = fillPixels(name, WHITE, fn)
 
-  // 底部 "v1.0.0"
-  const ver = drawText('v1.0.0', 60, 228, [200, 230, 227], 1)
+  // 底部版本号
+  const ver = drawText(`v${version}`, 60, 228, [200, 230, 227], 1)
   fn = fillPixels(ver, [200, 230, 227], fn)
 
   // 底部装饰横线

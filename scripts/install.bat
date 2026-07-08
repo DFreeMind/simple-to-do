@@ -17,21 +17,25 @@ if %errorlevel% equ 0 (
     echo       未发现正在运行的进程
 )
 
-:: 查找安装包
+:: 查找安装包（通配符匹配，版本号变化时无需修改脚本）
 set "INSTALLER="
-if exist "%~dp0易简清单_1.0.0_x64-setup.exe" (
-    set "INSTALLER=%~dp0易简清单_1.0.0_x64-setup.exe"
-) else if exist "%~dp0nsis-output.exe" (
-    set "INSTALLER=%~dp0nsis-output.exe"
-) else (
-    echo.
-    echo [错误] 未找到安装包！
-    echo 请将此脚本放在安装包所在目录，或确保安装包命名为：
-    echo   易简清单_1.0.0_x64-setup.exe
-    echo   或 nsis-output.exe
-    pause
-    exit /b 1
+for %%f in ("%~dp0易简清单_*_x64-setup.exe") do (
+    set "INSTALLER=%%f"
+    goto :found
 )
+if exist "%~dp0nsis-output.exe" (
+    set "INSTALLER=%~dp0nsis-output.exe"
+    goto :found
+)
+echo.
+echo [错误] 未找到安装包！
+echo 请将此脚本放在安装包所在目录，或确保安装包命名为：
+echo   易简清单_*_x64-setup.exe
+echo   或 nsis-output.exe
+pause
+exit /b 1
+
+:found
 
 echo [2/3] 找到安装包: %INSTALLER%
 echo.

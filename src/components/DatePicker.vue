@@ -56,18 +56,18 @@
       <div class="dp-extras">
         <!-- 时间行 -->
         <button class="dp-extra-row" type="button" @click.stop="toggleExtra('time')">
-          <span class="dp-extra-row__icon">🕐</span>
+          <span class="dp-extra-row__icon"><Clock3 :size="15" /></span>
           <span class="dp-extra-row__label">时间</span>
-          <span class="dp-extra-row__value">{{ selectedTime }}</span>
+          <span class="dp-extra-row__value">{{ selectedTime || '未设置' }}</span>
           <ChevronDown :size="14" :class="{ rotated: expandedSection === 'time' }" />
         </button>
-        <div v-if="expandedSection === 'time'" class="dp-extra-options">
-          <input class="dp-time-input" type="time" :value="selectedTime" aria-label="设置时间" @change="setTime" />
+        <div v-if="expandedSection === 'time'" class="dp-extra-options dp-time-picker-container">
+          <TimePicker v-model="selectedTime" @clear="handleTimeClear" />
         </div>
 
         <!-- 提醒行 -->
         <button class="dp-extra-row" type="button" @click.stop="toggleExtra('reminder')">
-          <span class="dp-extra-row__icon">🔔</span>
+          <span class="dp-extra-row__icon"><Bell :size="15" /></span>
           <span class="dp-extra-row__label">提醒</span>
           <span class="dp-extra-row__value">{{ reminderLabel }}</span>
           <ChevronDown :size="14" :class="{ rotated: expandedSection === 'reminder' }" />
@@ -88,7 +88,7 @@
 
         <!-- 重复行 -->
         <button class="dp-extra-row" type="button" @click.stop="toggleExtra('repeat')">
-          <span class="dp-extra-row__icon">🔄</span>
+          <span class="dp-extra-row__icon"><Repeat2 :size="15" /></span>
           <span class="dp-extra-row__label">重复</span>
           <span class="dp-extra-row__value">{{ repeatLabel }}</span>
           <ChevronDown :size="14" :class="{ rotated: expandedSection === 'repeat' }" />
@@ -112,11 +112,12 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useTaskStore } from '@/stores/task'
 import { getMonthDays, toDateString } from '@/utils/date'
-import { Check, ChevronDown } from 'lucide-vue-next'
+import { Bell, Check, ChevronDown, Clock3, Repeat2 } from 'lucide-vue-next'
 import YearMonthPicker from './YearMonthPicker.vue'
+import TimePicker from './TimePicker.vue'
 
 const props = defineProps({
   task: { type: Object, required: true },
@@ -227,6 +228,18 @@ function setTime(e) {
   if (initialValue.value) applyValue(false)
 }
 
+function handleTimeClear() {
+  selectedTime.value = ''
+  if (initialValue.value) applyValue(false)
+}
+
+// 监听 selectedTime 变化，自动保存
+watch(selectedTime, (newTime) => {
+  if (initialValue.value && newTime) {
+    applyValue(false)
+  }
+})
+
 function setToday() { setSelected(new Date()) }
 function setTomorrow() { const d = new Date(); d.setDate(d.getDate() + 1); setSelected(d) }
 function setNextWeek() { const d = new Date(); d.setDate(d.getDate() + 7); setSelected(d) }
@@ -239,7 +252,9 @@ function setSelected(d) {
 }
 
 function clearDate() {
-  store.updateTask(props.task.id, { [props.field]: null })
+  const updates = { [props.field]: null }
+  if (props.field === 'dueDate') updates.reminderAt = null
+  store.updateTask(props.task.id, updates)
   emit('close')
 }
 
@@ -248,9 +263,13 @@ function confirm() {
 }
 
 function applyValue(shouldClose = true) {
-  const [h, m] = selectedTime.value.split(':').map(Number)
   const d = new Date(selectedDate.value)
-  d.setHours(h, m, 0, 0)
+  if (selectedTime.value) {
+    const [h, m] = selectedTime.value.split(':').map(Number)
+    d.setHours(h, m, 0, 0)
+  } else {
+    d.setHours(0, 0, 0, 0)
+  }
   store.updateTask(props.task.id, { [props.field]: d.toISOString() })
   if (shouldClose) emit('close')
 }
@@ -287,7 +306,9 @@ function chooseReminder(value) {
       reminderDate = new Date(base.getTime() - 604800000)
       break
   }
-  store.updateTask(props.task.id, { reminderAt: reminderDate.toISOString() })
+  const updates = { reminderAt: reminderDate.toISOString() }
+  if (props.field === 'dueDate') updates.dueDate = base.toISOString()
+  store.updateTask(props.task.id, updates)
   expandedSection.value = ''
 }
 </script>

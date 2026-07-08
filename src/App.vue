@@ -2,7 +2,10 @@
   <div class="app" :data-theme="store.settings.theme" :data-density="store.settings.density">
     <div
       class="app-shell"
-      :class="{ 'app-shell--detail-closed': !store.settings.detailOpen }"
+      :class="{
+        'app-shell--detail-closed': !store.settings.detailOpen,
+        'app-shell--sidebar-closed': store.settings.sidebarCollapsed
+      }"
       :style="{ '--detail-w': detailWidth + 'px' }"
     >
       <Sidebar />
@@ -51,7 +54,8 @@ function onResizeStart(e) {
   const startX = e.clientX
   const startWidth = detailWidth.value
   const shellWidth = e.target.parentElement.offsetWidth
-  const maxDetail = Math.max(DETAIL_WIDTH_MIN, Math.min(DETAIL_WIDTH_MAX, shellWidth - 286 - 420))
+  const sidebarW = store.settings.sidebarCollapsed ? 56 : 286
+  const maxDetail = Math.max(DETAIL_WIDTH_MIN, Math.min(DETAIL_WIDTH_MAX, shellWidth - sidebarW - 420))
   const target = e.currentTarget
 
   document.body.classList.add('is-resizing')
