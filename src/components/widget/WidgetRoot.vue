@@ -358,10 +358,10 @@ watch(availableViews, () => {
 })
 
 onMounted(async () => {
-  await store.loadData()
+  await store.loadData({ syncReminders: false })
   Object.assign(widgetState, await loadWidgetWindowState())
   unlistenDataChanged = await listenDataChanged(() => {
-    store.loadData()
+    store.loadData({ syncReminders: false })
   })
   nextTick(() => quickInput.value?.focus())
 })

@@ -101,7 +101,7 @@ function clampDetailWidth(value, max = DETAIL_WIDTH_MAX) {
 onMounted(async () => {
   await store.loadData()
   unlistenDataChanged = await listenDataChanged(() => {
-    store.loadData()
+    store.loadData({ syncReminders: false })
   })
   unlistenOpenTask = await listenOpenTaskDetail((taskId) => {
     if (!taskId) return

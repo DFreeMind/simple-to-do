@@ -45,6 +45,39 @@
       font-weight: 800;
       box-shadow: inset 0 0 0 1px #c7e7e2;
     }
+
+    .boot-fatal {
+      box-sizing: border-box;
+      display: grid;
+      align-content: start;
+      gap: 10px;
+      width: 100%;
+      height: 100%;
+      padding: 18px;
+      color: #17211f;
+      background: #fbfefd;
+      font-size: 13px;
+      overflow: auto;
+    }
+
+    .boot-fatal strong {
+      color: #b42318;
+      font-size: 15px;
+    }
+
+    .boot-fatal span {
+      color: #687674;
+    }
+
+    .boot-fatal pre {
+      margin: 0;
+      padding: 10px;
+      border-radius: 8px;
+      background: #fff1f1;
+      color: #7a1d1d;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
   </style>
 </head>
 <body>
@@ -53,7 +86,7 @@
       <div class="boot-card">
         <div class="boot-logo">✓</div>
         <strong>易简清单</strong>
-        <span>正在加载小组件...</span>
+        <span data-boot-status>正在加载小组件...</span>
       </div>
     </div>
   </div>

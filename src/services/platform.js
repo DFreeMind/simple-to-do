@@ -29,6 +29,11 @@ function isTauri() {
   return typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__)
 }
 
+function isUnsupportedNotificationCancelError(error) {
+  const message = String(error?.message || error || '')
+  return message.includes('Command cancel not found')
+}
+
 export async function loadData() {
   try {
     if (isTauri()) {
@@ -232,7 +237,9 @@ export async function cancelTaskReminderNotification(taskId) {
     await cancel([id])
     return true
   } catch (error) {
-    console.warn('[Platform] 取消提醒失败:', error)
+    if (!isUnsupportedNotificationCancelError(error)) {
+      console.warn('[Platform] 取消提醒失败:', error)
+    }
     return false
   }
 }

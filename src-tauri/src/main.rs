@@ -9,6 +9,7 @@ use std::{
     collections::HashSet,
     fs,
     path::{Path, PathBuf},
+    sync::atomic::{AtomicBool, Ordering},
 };
 use tauri::Manager;
 use tauri::{
@@ -1330,6 +1331,7 @@ fn extension_for_mime(mime: &str) -> Option<&'static str> {
 }
 
 const WIDGET_STATE_KEY: &str = "widget_state";
+static WIDGET_WINDOW_OPENING: AtomicBool = AtomicBool::new(false);
 
 fn default_widget_state(app: &tauri::AppHandle) -> serde_json::Value {
     let (x, y) = app
@@ -1402,6 +1404,7 @@ fn normalize_widget_state(
 }
 
 fn read_widget_state(app: &tauri::AppHandle) -> serde_json::Value {
+    eprintln!("[widget] read_widget_state");
     let fallback = default_widget_state(app);
     let stored = open_database(app)
         .ok()
@@ -1426,6 +1429,7 @@ fn read_widget_state(app: &tauri::AppHandle) -> serde_json::Value {
 }
 
 fn write_widget_state(app: &tauri::AppHandle, state: &serde_json::Value) -> Result<(), String> {
+    eprintln!("[widget] write_widget_state {state}");
     let conn = open_database(app)?;
     conn.execute(
         "INSERT OR REPLACE INTO settings(key, value) VALUES(?1, ?2)",
@@ -1436,6 +1440,7 @@ fn write_widget_state(app: &tauri::AppHandle, state: &serde_json::Value) -> Resu
 }
 
 fn save_current_widget_state(app: &tauri::AppHandle) -> Result<serde_json::Value, String> {
+    eprintln!("[widget] save_current_widget_state");
     let mut state = read_widget_state(app);
     if let Some(window) = app.get_webview_window("widget") {
         if let Ok(position) = window.outer_position() {
@@ -1456,17 +1461,21 @@ fn apply_widget_window_state(window: &tauri::WebviewWindow, state: &serde_json::
     let _ = window.set_always_on_top(boolean_field(state, "alwaysOnTop", true));
 }
 
-#[tauri::command]
-fn open_widget_window(app: tauri::AppHandle) -> Result<(), String> {
-    let state = read_widget_state(&app);
+fn show_widget_window(window: &tauri::WebviewWindow, state: &serde_json::Value) {
+    apply_widget_window_state(window, state);
+    let _ = window.show();
+    let _ = window.set_focus();
+}
+
+fn create_widget_window(app: &tauri::AppHandle, state: serde_json::Value) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("widget") {
-        apply_widget_window_state(&window, &state);
-        let _ = window.show();
-        let _ = window.set_focus();
+        eprintln!("[widget] existing widget window, show and focus");
+        show_widget_window(&window, &state);
         return Ok(());
     }
 
-    let window = WebviewWindowBuilder::new(&app, "widget", WebviewUrl::App("widget.html".into()))
+    eprintln!("[widget] creating widget window with state {state}");
+    let _window = WebviewWindowBuilder::new(app, "widget", WebviewUrl::App("widget.html".into()))
         .title("易简清单 - 小组件")
         .inner_size(
             numeric_field(&state, "width", 340.0, 280.0, 720.0),
@@ -1483,13 +1492,41 @@ fn open_widget_window(app: tauri::AppHandle) -> Result<(), String> {
         .skip_taskbar(true)
         .build()
         .map_err(|err| format!("创建小组件窗口失败: {err}"))?;
-    apply_widget_window_state(&window, &state);
+    eprintln!("[widget] widget window build returned");
+
+    Ok(())
+}
+
+#[tauri::command]
+fn open_widget_window(app: tauri::AppHandle) -> Result<(), String> {
+    eprintln!("[widget] open_widget_window");
+    let state = read_widget_state(&app);
+    if let Some(window) = app.get_webview_window("widget") {
+        eprintln!("[widget] existing widget window, show and focus");
+        show_widget_window(&window, &state);
+        return Ok(());
+    }
+
+    if WIDGET_WINDOW_OPENING.swap(true, Ordering::SeqCst) {
+        eprintln!("[widget] widget window creation already queued");
+        return Ok(());
+    }
+
+    let queued_app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let result = create_widget_window(&queued_app, state);
+        if let Err(err) = result {
+            eprintln!("[widget] create widget window failed: {err}");
+        }
+        WIDGET_WINDOW_OPENING.store(false, Ordering::SeqCst);
+    });
 
     Ok(())
 }
 
 #[tauri::command]
 fn close_widget_window(app: tauri::AppHandle) -> Result<(), String> {
+    eprintln!("[widget] close_widget_window");
     let _ = save_current_widget_state(&app);
     if let Some(window) = app.get_webview_window("widget") {
         let _ = window.close();
@@ -1499,6 +1536,7 @@ fn close_widget_window(app: tauri::AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 fn load_widget_window_state(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    eprintln!("[widget] load_widget_window_state");
     Ok(read_widget_state(&app))
 }
 
@@ -1507,6 +1545,7 @@ fn save_widget_window_state(
     app: tauri::AppHandle,
     state: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
+    eprintln!("[widget] save_widget_window_state input={state}");
     let mut merged = read_widget_state(&app);
     if let (Some(target), Some(source)) = (merged.as_object_mut(), state.as_object()) {
         for (key, value) in source {

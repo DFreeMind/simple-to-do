@@ -1099,7 +1099,7 @@ export const useTaskStore = defineStore('task', () => {
     if (id && !settings.value.detailOpen) settings.value.detailOpen = true
   }
 
-  async function loadData() {
+  async function loadData(options = {}) {
     isLoadingData = true
     try {
       console.log('[Store] 开始加载数据...')
@@ -1121,7 +1121,9 @@ export const useTaskStore = defineStore('task', () => {
           group: settings.value.soundGroupEnabled
         })
         purgeExpiredTrash()
-        syncReminderNotifications({ requestPermission: false })
+        if (options.syncReminders !== false) {
+          syncReminderNotifications({ requestPermission: false })
+        }
         console.log(`[Store] 数据初始化完成: ${tasks.value.length} 任务, ${lists.value.length} 清单`)
       }
       currentView.value = settings.value.startView || 'today'
