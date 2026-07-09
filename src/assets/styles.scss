@@ -74,75 +74,6 @@
   --danger-12-fallback: rgba(217, 77, 77, 0.12);
 }
 
-@supports (color: color-mix(in srgb, red, blue)) {
-  :root {
-    --divider-soft: color-mix(in srgb, var(--border) 48%, transparent);
-    --divider-soft-fallback: color-mix(in srgb, var(--border) 48%, transparent);
-    --accent-soft-70-fallback: color-mix(in srgb, var(--accent-soft) 70%, transparent);
-    --surface-80-accent-tint-fallback: var(--surface-80-accent-tint-fallback);
-    --text-7-fallback: var(--text-7-fallback);
-    --accent-20-fallback: var(--accent-20-fallback);
-    --white-28-fallback: var(--white-28-fallback);
-    --accent-70-white-fallback: var(--accent-70-white-fallback);
-    --accent-tint-86-white-fallback: var(--accent-tint-86-white-fallback);
-    --accent-15-fallback: var(--accent-15-fallback);
-    --white-62-fallback: var(--white-62-fallback);
-    --white-64-fallback: var(--white-64-fallback);
-    --text-6-fallback: var(--text-6-fallback);
-    --accent-16-surface-muted-fallback: var(--accent-16-surface-muted-fallback);
-    --white-24-fallback: var(--white-24-fallback);
-    --text-muted-34-fallback: var(--text-muted-34-fallback);
-    --text-muted-26-fallback: var(--text-muted-26-fallback);
-    --accent-34-text-muted-fallback: var(--accent-34-text-muted-fallback);
-    --accent-58-fallback: var(--accent-58-transparent-fallback);
-    --accent-soft-58-surface-fallback: var(--accent-soft-58-surface-fallback);
-    --border-70-fallback: var(--border-70-fallback);
-    --surface-92-fallback: var(--surface-92-fallback);
-    --surface-muted-fallback: var(--surface-muted);
-    --accent-34-fallback: var(--accent-34-fallback);
-    --accent-9-fallback: color-mix(in srgb, var(--accent) 9%, transparent);
-    --surface-muted-74-surface-fallback: var(--surface-muted-74-surface-fallback);
-    --accent-40-fallback: var(--accent-40-fallback);
-    --accent-42-fallback: var(--accent-42-fallback);
-    --accent-tint-76-surface-fallback: var(--accent-tint-76-surface-fallback);
-    --accent-24-fallback: var(--accent-24-fallback);
-    --surface-90-fallback: var(--surface-90-fallback);
-    --accent-28-fallback: var(--accent-28-fallback);
-    --accent-soft-70-surface-fallback: var(--accent-soft-70-surface-fallback);
-    --danger-10-fallback: var(--danger-10-fallback);
-    --warning-13-fallback: var(--warning-13-fallback);
-    --accent-12-fallback: color-mix(in srgb, var(--accent) 12%, transparent);
-    --accent-18-fallback: var(--accent-18-fallback);
-    --accent-90-fallback: var(--accent-90-fallback);
-    --accent-15-black-fallback: var(--accent-15-black-fallback);
-    --accent-10-fallback: var(--accent-10-fallback);
-    --accent-20-border-fallback: var(--accent-20-border-fallback);
-    --accent-38-fallback: var(--accent-38-fallback);
-    --accent-8-fallback: var(--accent-8-fallback);
-    --surface-muted-86-surface-fallback: var(--surface-muted-86-surface-fallback);
-    --accent-58-transparent-fallback: var(--accent-58-transparent-fallback);
-    --surface-82-accent-tint-fallback: var(--surface-82-accent-tint-fallback);
-    --border-strong-78-border-fallback: var(--border-strong-78-border-fallback);
-    --surface-muted-86-border-fallback: var(--surface-muted-86-border-fallback);
-    --text-8-fallback: var(--text-8-fallback);
-    --accent-82-accent-tint-fallback: var(--accent-82-accent-tint-fallback);
-    --surface-muted-68-surface-fallback: var(--surface-muted-68-surface-fallback);
-    --accent-soft-58-surface-fallback2: var(--accent-soft-58-surface-fallback);
-    --accent-soft-72-surface-fallback: var(--accent-soft-72-surface-fallback);
-    --border-86-transparent-fallback: var(--border-86-transparent-fallback);
-    --surface-92-surface-muted-fallback: var(--surface-92-surface-muted-fallback);
-    --surface-90-surface-muted-fallback: var(--surface-90-surface-muted-fallback);
-    --text-4-fallback: var(--text-4-fallback);
-    --text-5-fallback: var(--text-5-fallback);
-    --accent-soft-50-fallback: var(--accent-soft-50-fallback);
-    --surface-92-transparent-fallback: var(--surface-92-fallback);
-    --border-86-fallback: var(--border-86-transparent-fallback);
-    --accent-soft-86-fallback: var(--accent-soft-86-fallback);
-    --text-3-fallback: var(--text-3-fallback);
-    --danger-12-fallback: var(--danger-12-fallback);
-  }
-}
-
 *, *::before, *::after {
   box-sizing: border-box;
 }
@@ -258,6 +189,75 @@ select:focus-visible,
   --accent-strong: #334155;
   --accent-soft: #e9eef5;
   --accent-tint: #f7f9fc;
+}
+
+@supports (color: color-mix(in srgb, red, blue)) {
+  .app {
+    --divider-soft: color-mix(in srgb, var(--border) 48%, transparent);
+    --divider-soft-fallback: color-mix(in srgb, var(--border) 48%, transparent);
+    --accent-soft-70-fallback: color-mix(in srgb, var(--accent-soft) 70%, transparent);
+    --accent-9-fallback: color-mix(in srgb, var(--accent) 9%, transparent);
+    --accent-12-fallback: color-mix(in srgb, var(--accent) 12%, transparent);
+    --accent-18-fallback: color-mix(in srgb, var(--accent) 18%, var(--surface));
+    --accent-58-fallback: color-mix(in srgb, var(--accent) 58%, transparent);
+    --accent-58-transparent-fallback: color-mix(in srgb, var(--accent) 58%, transparent);
+    --accent-soft-58-surface-fallback: color-mix(in srgb, var(--accent-soft) 58%, var(--surface));
+    --accent-soft-70-surface-fallback: color-mix(in srgb, var(--accent-soft) 70%, var(--surface));
+    --accent-soft-72-surface-fallback: color-mix(in srgb, var(--accent-soft) 72%, var(--surface));
+    --accent-soft-86-fallback: color-mix(in srgb, var(--accent-soft) 86%, transparent);
+    --accent-soft-50-fallback: color-mix(in srgb, var(--accent-soft) 50%, transparent);
+    --accent-soft-58-surface-fallback2: color-mix(in srgb, var(--accent-soft) 58%, var(--surface));
+    --surface-muted-fallback: var(--surface-muted);
+    --surface-muted-68-surface-fallback: color-mix(in srgb, var(--surface-muted) 68%, var(--surface));
+    --surface-muted-74-surface-fallback: color-mix(in srgb, var(--surface-muted) 74%, var(--surface));
+    --surface-muted-86-surface-fallback: color-mix(in srgb, var(--surface-muted) 86%, var(--surface));
+    --surface-muted-86-border-fallback: color-mix(in srgb, var(--surface-muted) 86%, var(--border));
+    --surface-80-accent-tint-fallback: color-mix(in srgb, var(--surface) 80%, var(--accent-tint));
+    --surface-82-accent-tint-fallback: color-mix(in srgb, var(--surface) 82%, var(--accent-tint));
+    --surface-90-fallback: color-mix(in srgb, var(--surface) 90%, transparent);
+    --surface-90-surface-muted-fallback: color-mix(in srgb, var(--surface) 90%, var(--surface-muted));
+    --surface-92-fallback: color-mix(in srgb, var(--surface) 92%, transparent);
+    --surface-92-surface-muted-fallback: color-mix(in srgb, var(--surface) 92%, var(--surface-muted));
+    --surface-92-transparent-fallback: color-mix(in srgb, var(--surface) 92%, transparent);
+    --border-70-fallback: color-mix(in srgb, var(--border) 70%, transparent);
+    --border-86-fallback: color-mix(in srgb, var(--border) 86%, transparent);
+    --border-86-transparent-fallback: color-mix(in srgb, var(--border) 86%, transparent);
+    --border-strong-78-border-fallback: color-mix(in srgb, var(--border-strong) 78%, var(--border));
+    --danger-10-fallback: color-mix(in srgb, var(--danger) 10%, transparent);
+    --danger-12-fallback: color-mix(in srgb, var(--danger) 12%, transparent);
+    --warning-13-fallback: color-mix(in srgb, var(--warning) 13%, var(--surface));
+    --white-24-fallback: color-mix(in srgb, #ffffff 24%, transparent);
+    --white-28-fallback: color-mix(in srgb, #ffffff 28%, transparent);
+    --white-62-fallback: color-mix(in srgb, #ffffff 62%, transparent);
+    --white-64-fallback: color-mix(in srgb, #ffffff 64%, transparent);
+    --text-3-fallback: color-mix(in srgb, var(--text) 3%, transparent);
+    --text-4-fallback: color-mix(in srgb, var(--text) 4%, transparent);
+    --text-5-fallback: color-mix(in srgb, var(--text) 5%, transparent);
+    --text-6-fallback: color-mix(in srgb, var(--text) 6%, transparent);
+    --text-7-fallback: color-mix(in srgb, var(--text) 7%, transparent);
+    --text-8-fallback: color-mix(in srgb, var(--text) 8%, transparent);
+    --text-muted-26-fallback: color-mix(in srgb, var(--text-muted) 26%, transparent);
+    --text-muted-34-fallback: color-mix(in srgb, var(--text-muted) 34%, transparent);
+    --accent-34-fallback: color-mix(in srgb, var(--accent) 34%, transparent);
+    --accent-34-text-muted-fallback: color-mix(in srgb, var(--accent) 34%, var(--text-muted));
+    --accent-38-fallback: color-mix(in srgb, var(--accent) 38%, var(--border));
+    --accent-40-fallback: color-mix(in srgb, var(--accent) 40%, transparent);
+    --accent-42-fallback: color-mix(in srgb, var(--accent) 42%, transparent);
+    --accent-8-fallback: color-mix(in srgb, var(--accent) 8%, transparent);
+    --accent-10-fallback: color-mix(in srgb, var(--accent) 10%, transparent);
+    --accent-15-black-fallback: color-mix(in srgb, var(--accent) 15%, black);
+    --accent-20-fallback: color-mix(in srgb, var(--accent) 20%, transparent);
+    --accent-20-border-fallback: color-mix(in srgb, var(--accent) 20%, var(--border));
+    --accent-20-border-fallback2: color-mix(in srgb, var(--accent) 20%, var(--border));
+    --accent-24-fallback: color-mix(in srgb, var(--accent) 24%, var(--border));
+    --accent-28-fallback: color-mix(in srgb, var(--accent) 28%, var(--border));
+    --accent-70-white-fallback: color-mix(in srgb, var(--accent) 70%, #ffffff);
+    --accent-82-accent-tint-fallback: color-mix(in srgb, var(--accent) 82%, var(--accent-tint));
+    --accent-90-fallback: color-mix(in srgb, var(--accent) 90%, black);
+    --accent-tint-76-surface-fallback: color-mix(in srgb, var(--accent-tint) 76%, var(--surface));
+    --accent-tint-86-white-fallback: color-mix(in srgb, var(--accent-tint) 86%, #ffffff);
+    --accent-16-surface-muted-fallback: color-mix(in srgb, var(--accent) 16%, var(--surface-muted));
+  }
 }
 
 .app[data-density="compact"] {
