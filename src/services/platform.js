@@ -1,4 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
+import { emit, listen } from '@tauri-apps/api/event'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import {
   cancel,
   isPermissionGranted,
@@ -9,7 +11,19 @@ import {
 } from '@tauri-apps/plugin-notification'
 
 const STORAGE_KEY = 'simple-to-do:data'
+const WIDGET_STATE_KEY = 'simple-to-do:widget-state'
 const REMINDER_GROUP = 'simple-to-do-reminders'
+
+export const DEFAULT_WIDGET_STATE = {
+  viewId: 'today',
+  showCompleted: false,
+  alwaysOnTop: true,
+  opacity: 0.96,
+  width: 340,
+  height: 520,
+  x: 100,
+  y: 100
+}
 
 function isTauri() {
   return typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__)
@@ -92,6 +106,89 @@ export async function cleanupOrphanAttachments(data) {
     return invoke('cleanup_orphan_attachments', { data })
   }
   return 0
+}
+
+export async function openWidgetWindow() {
+  if (isTauri()) {
+    return invoke('open_widget_window')
+  }
+  return false
+}
+
+export async function closeWidgetWindow() {
+  if (isTauri()) {
+    return invoke('close_widget_window')
+  }
+  window.close()
+  return true
+}
+
+export async function loadWidgetWindowState() {
+  if (isTauri()) {
+    return normalizeWidgetState(await invoke('load_widget_window_state'))
+  }
+
+  try {
+    const raw = localStorage.getItem(WIDGET_STATE_KEY)
+    return normalizeWidgetState(raw ? JSON.parse(raw) : null)
+  } catch (error) {
+    return { ...DEFAULT_WIDGET_STATE }
+  }
+}
+
+export async function saveWidgetWindowState(state) {
+  const nextState = normalizeWidgetState(state)
+  if (isTauri()) {
+    return normalizeWidgetState(await invoke('save_widget_window_state', { state: nextState }))
+  }
+
+  localStorage.setItem(WIDGET_STATE_KEY, JSON.stringify(nextState))
+  return nextState
+}
+
+export async function focusMainWindowWithTask(taskId = null) {
+  if (isTauri()) {
+    return invoke('focus_main_window_with_task', { taskId })
+  }
+  return false
+}
+
+export async function startCurrentWindowDrag() {
+  if (!isTauri()) return false
+  const currentWindow = getCurrentWindow()
+  await currentWindow.startDragging()
+  return true
+}
+
+export async function listenDataChanged(handler) {
+  if (isTauri()) {
+    return listen('data-changed', handler)
+  }
+
+  const listener = (event) => {
+    if (event.key === STORAGE_KEY || event.type === 'simple-to-do:data-changed') handler(event)
+  }
+  window.addEventListener('storage', listener)
+  window.addEventListener('simple-to-do:data-changed', listener)
+  return () => {
+    window.removeEventListener('storage', listener)
+    window.removeEventListener('simple-to-do:data-changed', listener)
+  }
+}
+
+export async function listenOpenTaskDetail(handler) {
+  if (isTauri()) {
+    return listen('open-task-detail', (event) => handler(event.payload))
+  }
+  return () => {}
+}
+
+export async function emitDataChanged() {
+  if (isTauri()) {
+    return emit('data-changed')
+  }
+  window.dispatchEvent(new Event('simple-to-do:data-changed'))
+  return true
 }
 
 export function reminderNotificationId(taskId) {
@@ -198,6 +295,27 @@ export async function getPendingReminderNotifications() {
     console.warn('[Platform] 读取待提醒列表失败:', error)
     return []
   }
+}
+
+function normalizeWidgetState(state = {}) {
+  return {
+    ...DEFAULT_WIDGET_STATE,
+    ...(state || {}),
+    viewId: typeof state?.viewId === 'string' && state.viewId.trim() ? state.viewId : DEFAULT_WIDGET_STATE.viewId,
+    showCompleted: Boolean(state?.showCompleted),
+    alwaysOnTop: state?.alwaysOnTop !== false,
+    opacity: clampNumber(state?.opacity, 0.72, 1, DEFAULT_WIDGET_STATE.opacity),
+    width: clampNumber(state?.width, 280, 720, DEFAULT_WIDGET_STATE.width),
+    height: clampNumber(state?.height, 360, 900, DEFAULT_WIDGET_STATE.height),
+    x: Number.isFinite(Number(state?.x)) ? Math.round(Number(state.x)) : DEFAULT_WIDGET_STATE.x,
+    y: Number.isFinite(Number(state?.y)) ? Math.round(Number(state.y)) : DEFAULT_WIDGET_STATE.y
+  }
+}
+
+function clampNumber(value, min, max, fallback) {
+  const nextValue = Number(value)
+  if (!Number.isFinite(nextValue)) return fallback
+  return Math.max(min, Math.min(max, nextValue))
 }
 
 function formatPlatformError(error, fallback) {

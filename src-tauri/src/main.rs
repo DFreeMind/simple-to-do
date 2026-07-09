@@ -12,9 +12,9 @@ use std::{
 };
 use tauri::Manager;
 use tauri::{
-    WindowEvent,
     menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem},
-    tray::{TrayIconBuilder, TrayIconEvent, MouseButton, MouseButtonState},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    Emitter, WebviewUrl, WebviewWindowBuilder, WindowEvent,
 };
 
 fn app_data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -50,7 +50,9 @@ fn attachment_file_path(app: &tauri::AppHandle, relative_path: &str) -> Result<P
     let relative_path = normalize_attachment_relative_path(relative_path)?;
     let path = relative_path
         .split('/')
-        .fold(attachment_root(app)?, |path, component| path.join(component));
+        .fold(attachment_root(app)?, |path, component| {
+            path.join(component)
+        });
     Ok(path)
 }
 
@@ -71,6 +73,9 @@ fn save_data(app: tauri::AppHandle, data: serde_json::Value) -> Result<bool, Str
     let data = sanitize_save_data(data);
     let mut conn = open_database(&app)?;
     save_state_to_db(&mut conn, &data)?;
+
+    let _ = app.emit("data-changed", ());
+
     Ok(true)
 }
 
@@ -970,7 +975,11 @@ fn import_image(app: tauri::AppHandle, file_path: String) -> Result<ImportedAtta
 }
 
 #[tauri::command]
-fn import_image_data(app: tauri::AppHandle, data: String, mime: String) -> Result<ImportedAttachment, String> {
+fn import_image_data(
+    app: tauri::AppHandle,
+    data: String,
+    mime: String,
+) -> Result<ImportedAttachment, String> {
     let bytes = general_purpose::STANDARD
         .decode(&data)
         .map_err(|err| format!("解码图片数据失败: {err}"))?;
@@ -980,7 +989,9 @@ fn import_image_data(app: tauri::AppHandle, data: String, mime: String) -> Resul
     }
 
     let sha256 = hex_sha256(&bytes);
-    let ext = extension_for_mime(&mime).unwrap_or("bin").to_ascii_lowercase();
+    let ext = extension_for_mime(&mime)
+        .unwrap_or("bin")
+        .to_ascii_lowercase();
     let now = Local::now();
     let short_hash = &sha256[..16.min(sha256.len())];
     let relative_path = format!(
@@ -1040,7 +1051,9 @@ fn resolve_html_images(app: tauri::AppHandle, html: String) -> Result<String, St
         let Some(offset) = pos else { break };
         let abs_pos = search_start + offset;
         let value_start = abs_pos + 5; // skip 'src="'
-        let Some(value_end) = result[value_start..].find('"') else { break };
+        let Some(value_end) = result[value_start..].find('"') else {
+            break;
+        };
 
         let raw_path = &result[value_start..value_start + value_end];
         let relative_path = normalize_attachment_relative_path(raw_path)?;
@@ -1307,25 +1320,245 @@ fn extension_for_mime(mime: &str) -> Option<&'static str> {
     }
 }
 
+const WIDGET_STATE_KEY: &str = "widget_state";
+
+fn default_widget_state(app: &tauri::AppHandle) -> serde_json::Value {
+    let (x, y) = app
+        .get_webview_window("main")
+        .and_then(|window| window.outer_position().ok())
+        .map(|position| (position.x + 48, position.y + 64))
+        .unwrap_or((100, 100));
+
+    serde_json::json!({
+        "viewId": "today",
+        "showCompleted": false,
+        "alwaysOnTop": true,
+        "opacity": 0.96,
+        "width": 340.0,
+        "height": 520.0,
+        "x": x,
+        "y": y
+    })
+}
+
+fn numeric_field(value: &serde_json::Value, key: &str, fallback: f64, min: f64, max: f64) -> f64 {
+    value
+        .get(key)
+        .and_then(|item| item.as_f64())
+        .unwrap_or(fallback)
+        .clamp(min, max)
+}
+
+fn integer_field(value: &serde_json::Value, key: &str, fallback: i32) -> i32 {
+    value
+        .get(key)
+        .and_then(|item| item.as_i64())
+        .and_then(|item| i32::try_from(item).ok())
+        .unwrap_or(fallback)
+}
+
+fn boolean_field(value: &serde_json::Value, key: &str, fallback: bool) -> bool {
+    value
+        .get(key)
+        .and_then(|item| item.as_bool())
+        .unwrap_or(fallback)
+}
+
+fn text_field<'a>(value: &'a serde_json::Value, key: &str, fallback: &'a str) -> String {
+    value
+        .get(key)
+        .and_then(|item| item.as_str())
+        .filter(|item| !item.trim().is_empty())
+        .unwrap_or(fallback)
+        .to_string()
+}
+
+fn normalize_widget_state(
+    state: serde_json::Value,
+    fallback: serde_json::Value,
+) -> serde_json::Value {
+    let default_x = integer_field(&fallback, "x", 100);
+    let default_y = integer_field(&fallback, "y", 100);
+
+    serde_json::json!({
+        "viewId": text_field(&state, "viewId", "today"),
+        "showCompleted": boolean_field(&state, "showCompleted", false),
+        "alwaysOnTop": boolean_field(&state, "alwaysOnTop", true),
+        "opacity": numeric_field(&state, "opacity", 0.96, 0.72, 1.0),
+        "width": numeric_field(&state, "width", 340.0, 280.0, 720.0),
+        "height": numeric_field(&state, "height", 520.0, 360.0, 900.0),
+        "x": integer_field(&state, "x", default_x),
+        "y": integer_field(&state, "y", default_y)
+    })
+}
+
+fn read_widget_state(app: &tauri::AppHandle) -> serde_json::Value {
+    let fallback = default_widget_state(app);
+    let stored = open_database(app)
+        .ok()
+        .and_then(|conn| {
+            conn.query_row(
+                "SELECT value FROM settings WHERE key = ?1",
+                params![WIDGET_STATE_KEY],
+                |row| row.get::<_, String>(0),
+            )
+            .ok()
+        })
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
+        .unwrap_or_else(|| fallback.clone());
+
+    let mut merged = fallback.clone();
+    if let (Some(target), Some(source)) = (merged.as_object_mut(), stored.as_object()) {
+        for (key, value) in source {
+            target.insert(key.clone(), value.clone());
+        }
+    }
+    normalize_widget_state(merged, fallback)
+}
+
+fn write_widget_state(app: &tauri::AppHandle, state: &serde_json::Value) -> Result<(), String> {
+    let conn = open_database(app)?;
+    conn.execute(
+        "INSERT OR REPLACE INTO settings(key, value) VALUES(?1, ?2)",
+        params![WIDGET_STATE_KEY, state.to_string()],
+    )
+    .map_err(|err| format!("保存小组件设置失败: {err}"))?;
+    Ok(())
+}
+
+fn save_current_widget_state(app: &tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let mut state = read_widget_state(app);
+    if let Some(window) = app.get_webview_window("widget") {
+        if let Ok(position) = window.outer_position() {
+            state["x"] = serde_json::json!(position.x);
+            state["y"] = serde_json::json!(position.y);
+        }
+        if let Ok(size) = window.outer_size() {
+            state["width"] = serde_json::json!(size.width as f64);
+            state["height"] = serde_json::json!(size.height as f64);
+        }
+    }
+    let state = normalize_widget_state(state, default_widget_state(app));
+    write_widget_state(app, &state)?;
+    Ok(state)
+}
+
+fn apply_widget_window_state(window: &tauri::WebviewWindow, state: &serde_json::Value) {
+    let _ = window.set_always_on_top(boolean_field(state, "alwaysOnTop", true));
+}
+
+#[tauri::command]
+fn open_widget_window(app: tauri::AppHandle) -> Result<(), String> {
+    let state = read_widget_state(&app);
+    if let Some(window) = app.get_webview_window("widget") {
+        apply_widget_window_state(&window, &state);
+        let _ = window.show();
+        let _ = window.set_focus();
+        return Ok(());
+    }
+
+    let window = WebviewWindowBuilder::new(&app, "widget", WebviewUrl::App("widget.html".into()))
+        .title("易简清单 - 小组件")
+        .inner_size(
+            numeric_field(&state, "width", 340.0, 280.0, 720.0),
+            numeric_field(&state, "height", 520.0, 360.0, 900.0),
+        )
+        .min_inner_size(280.0, 360.0)
+        .position(
+            integer_field(&state, "x", 100) as f64,
+            integer_field(&state, "y", 100) as f64,
+        )
+        .resizable(true)
+        .decorations(false)
+        .always_on_top(boolean_field(&state, "alwaysOnTop", true))
+        .skip_taskbar(true)
+        .build()
+        .map_err(|err| format!("创建小组件窗口失败: {err}"))?;
+    apply_widget_window_state(&window, &state);
+
+    Ok(())
+}
+
+#[tauri::command]
+fn close_widget_window(app: tauri::AppHandle) -> Result<(), String> {
+    let _ = save_current_widget_state(&app);
+    if let Some(window) = app.get_webview_window("widget") {
+        let _ = window.close();
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn load_widget_window_state(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    Ok(read_widget_state(&app))
+}
+
+#[tauri::command]
+fn save_widget_window_state(
+    app: tauri::AppHandle,
+    state: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let mut merged = read_widget_state(&app);
+    if let (Some(target), Some(source)) = (merged.as_object_mut(), state.as_object()) {
+        for (key, value) in source {
+            target.insert(key.clone(), value.clone());
+        }
+    }
+    if let Some(window) = app.get_webview_window("widget") {
+        if let Ok(position) = window.outer_position() {
+            merged["x"] = serde_json::json!(position.x);
+            merged["y"] = serde_json::json!(position.y);
+        }
+        if let Ok(size) = window.outer_size() {
+            merged["width"] = serde_json::json!(size.width as f64);
+            merged["height"] = serde_json::json!(size.height as f64);
+        }
+    }
+    let normalized = normalize_widget_state(merged, default_widget_state(&app));
+    write_widget_state(&app, &normalized)?;
+    if let Some(window) = app.get_webview_window("widget") {
+        apply_widget_window_state(&window, &normalized);
+    }
+    Ok(normalized)
+}
+
+#[tauri::command]
+fn focus_main_window_with_task(
+    app: tauri::AppHandle,
+    task_id: Option<String>,
+) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.set_focus();
+        if let Some(task_id) = task_id {
+            let _ = window.emit("open-task-detail", task_id);
+        }
+    }
+    Ok(())
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == "widget" {
+                    let app = window.app_handle();
+                    let _ = save_current_widget_state(&app);
+                    return;
+                }
                 api.prevent_close();
                 let _ = window.hide();
             }
         })
         .setup(|app| {
-            let show_item = MenuItemBuilder::new("显示主窗口")
-                .id("show")
-                .build(app)?;
+            let show_item = MenuItemBuilder::new("显示主窗口").id("show").build(app)?;
+            let widget_item = MenuItemBuilder::new("打开小组件").id("widget").build(app)?;
             let separator = PredefinedMenuItem::separator(app)?;
-            let quit_item = MenuItemBuilder::new("退出")
-                .id("quit")
-                .build(app)?;
+            let quit_item = MenuItemBuilder::new("退出").id("quit").build(app)?;
             let menu = MenuBuilder::new(app)
                 .item(&show_item)
+                .item(&widget_item)
                 .item(&separator)
                 .item(&quit_item)
                 .build()?;
@@ -1340,6 +1573,9 @@ fn main() {
                             let _ = window.show();
                             let _ = window.set_focus();
                         }
+                    }
+                    "widget" => {
+                        let _ = open_widget_window(app.clone());
                     }
                     "quit" => {
                         app.exit(0);
@@ -1373,7 +1609,12 @@ fn main() {
             import_image_data,
             read_attachment,
             resolve_html_images,
-            cleanup_orphan_attachments
+            cleanup_orphan_attachments,
+            open_widget_window,
+            close_widget_window,
+            save_widget_window_state,
+            load_widget_window_state,
+            focus_main_window_with_task
         ])
         .run(tauri::generate_context!())
         .expect("运行 Tauri 应用失败");

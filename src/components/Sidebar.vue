@@ -139,6 +139,9 @@
       <div class="rail-spacer"></div>
 
       <div class="rail-bottom">
+        <button class="rail-item" type="button" title="打开小组件" aria-label="打开小组件" @click="openWidget">
+          <LayoutDashboard :size="20" />
+        </button>
         <button class="rail-item" type="button" title="设置" aria-label="设置" @click="store.openSettings">
           <SettingsIcon :size="20" />
         </button>
@@ -161,6 +164,9 @@
           </span>
         </button>
         <div style="display: flex; gap: 2px;">
+          <button class="icon-btn" type="button" aria-label="打开小组件" title="打开小组件" @click="openWidget">
+            <LayoutDashboard :size="18" />
+          </button>
           <button class="icon-btn" type="button" aria-label="折叠侧栏" title="折叠侧栏" @click="collapse">
             <PanelLeft :size="18" />
           </button>
@@ -422,6 +428,7 @@ import {
   GripVertical,
   Folder,
   Inbox,
+  LayoutDashboard,
   ListChecks,
   MoreHorizontal,
   Pencil,
@@ -438,6 +445,7 @@ import {
 } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import { useDragSort } from '@/composables/useDragSort'
+import { openWidgetWindow } from '@/services/platform'
 import appIcon from '@/assets/app-icon.svg'
 import ConfirmDialog from './ConfirmDialog.vue'
 import InputDialog from './InputDialog.vue'
@@ -451,6 +459,14 @@ function collapse() {
 
 function expand() {
   store.updateSettings({ sidebarCollapsed: false })
+}
+
+async function openWidget() {
+  try {
+    await openWidgetWindow()
+  } catch (error) {
+    console.error('打开小组件窗口失败:', error)
+  }
 }
 
 const listsFlyout = ref(false)

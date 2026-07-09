@@ -33,18 +33,21 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onBeforeUnmount, onMounted, watch } from 'vue'
 import Sidebar from './components/Sidebar.vue'
 import TaskList from './components/TaskList.vue'
 import TaskDetail from './components/TaskDetail.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
 import { useTaskStore } from './stores/task'
+import { listenDataChanged, listenOpenTaskDetail } from './services/platform'
 
 const store = useTaskStore()
 const DETAIL_WIDTH_MIN = 320
 const DETAIL_WIDTH_MAX = 800
 
 const detailWidth = ref(store.settings.detailWidth || 380)
+let unlistenDataChanged = null
+let unlistenOpenTask = null
 
 watch(() => store.settings.detailWidth, (v) => {
   if (typeof v === 'number') detailWidth.value = clampDetailWidth(v)
@@ -95,8 +98,20 @@ function clampDetailWidth(value, max = DETAIL_WIDTH_MAX) {
   return Math.max(DETAIL_WIDTH_MIN, Math.min(max, value))
 }
 
-onMounted(() => {
-  store.loadData()
+onMounted(async () => {
+  await store.loadData()
+  unlistenDataChanged = await listenDataChanged(() => {
+    store.loadData()
+  })
+  unlistenOpenTask = await listenOpenTaskDetail((taskId) => {
+    if (!taskId) return
+    store.selectTask(taskId)
+  })
+})
+
+onBeforeUnmount(() => {
+  if (unlistenDataChanged) unlistenDataChanged()
+  if (unlistenOpenTask) unlistenOpenTask()
 })
 
 watch(() => store.notice?.id, (id) => {

@@ -15,6 +15,14 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version)
   },
+  build: {
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        widget: resolve(__dirname, 'widget.html')
+      }
+    }
+  },
   server: {
     port: 5173,
     strictPort: true
