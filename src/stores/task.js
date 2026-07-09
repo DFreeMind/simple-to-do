@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { genId } from '@/utils/id'
 import { getMonthDays, isToday, toDateString } from '@/utils/date'
 import {
@@ -193,6 +193,7 @@ export const useTaskStore = defineStore('task', () => {
   let pendingSavePayload = null
   let activeSavePromise = null
   let saveTimer = null
+  let isLoadingData = false
 
   const trashedListIds = computed(() => new Set(listTrash.value.map(item => item.id)))
   const activeTasks = computed(() => tasks.value.filter(task => !task.deleted && !trashedListIds.value.has(task.listId)))
@@ -1099,6 +1100,7 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   async function loadData() {
+    isLoadingData = true
     try {
       console.log('[Store] 开始加载数据...')
       const data = await loadPlatformData()
@@ -1128,6 +1130,9 @@ export const useTaskStore = defineStore('task', () => {
       console.error('[Store] 数据加载失败:', error)
       saveError.value = error?.message || '读取本地数据失败'
       showNotice(saveError.value, 'error')
+    } finally {
+      await nextTick()
+      isLoadingData = false
     }
   }
 
@@ -1161,6 +1166,7 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   watch([groups, lists, tasks, trash, listTrash, settings, viewOrders], () => {
+    if (isLoadingData) return
     scheduleSave()
   }, { deep: true })
 

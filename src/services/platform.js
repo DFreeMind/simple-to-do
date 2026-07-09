@@ -162,7 +162,11 @@ export async function startCurrentWindowDrag() {
 
 export async function listenDataChanged(handler) {
   if (isTauri()) {
-    return listen('data-changed', handler)
+    const currentLabel = getCurrentWindow().label
+    return listen('data-changed', (event) => {
+      if (event.payload?.source === currentLabel) return
+      handler(event)
+    })
   }
 
   const listener = (event) => {

@@ -69,12 +69,21 @@ fn load_data(app: tauri::AppHandle) -> Result<Option<serde_json::Value>, String>
 }
 
 #[tauri::command]
-fn save_data(app: tauri::AppHandle, data: serde_json::Value) -> Result<bool, String> {
+fn save_data(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    data: serde_json::Value,
+) -> Result<bool, String> {
     let data = sanitize_save_data(data);
     let mut conn = open_database(&app)?;
     save_state_to_db(&mut conn, &data)?;
 
-    let _ = app.emit("data-changed", ());
+    let _ = app.emit(
+        "data-changed",
+        serde_json::json!({
+            "source": window.label()
+        }),
+    );
 
     Ok(true)
 }
