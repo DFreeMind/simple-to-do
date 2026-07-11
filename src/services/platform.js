@@ -41,6 +41,17 @@ export async function saveData(data) {
   }
 }
 
+export async function saveMigrationBackup(data) {
+  try {
+    if (isTauri()) return await invoke('save_migration_backup', { data })
+    const key = `${STORAGE_KEY}:backup:${Date.now()}`
+    localStorage.setItem(key, JSON.stringify(data))
+    return key
+  } catch (error) {
+    throw new Error(formatPlatformError(error, '创建迁移备份失败'))
+  }
+}
+
 export async function selectImage() {
   if (isTauri()) {
     return invoke('select_image')
@@ -87,11 +98,29 @@ export async function readAttachment(relativePath) {
   return null
 }
 
-export async function cleanupOrphanAttachments(data) {
-  if (isTauri()) {
-    return invoke('cleanup_orphan_attachments', { data })
-  }
-  return 0
+export async function scanStorageHealth() {
+  if (isTauri()) return invoke('scan_storage_health')
+  return { supported: false, orphanAttachments: [], quarantinedAttachments: [] }
+}
+
+export async function quarantineOrphanAttachments(relativePaths) {
+  if (isTauri()) return invoke('quarantine_orphan_attachments', { relativePaths })
+  return { affectedCount: 0, affectedBytes: 0 }
+}
+
+export async function readQuarantinedAttachment(itemId) {
+  if (isTauri()) return invoke('read_quarantined_attachment', { itemId })
+  return null
+}
+
+export async function restoreQuarantinedAttachments(itemIds) {
+  if (isTauri()) return invoke('restore_quarantined_attachments', { itemIds })
+  return { affectedCount: 0, affectedBytes: 0 }
+}
+
+export async function purgeQuarantinedAttachments(itemIds) {
+  if (isTauri()) return invoke('purge_quarantined_attachments', { itemIds })
+  return { affectedCount: 0, affectedBytes: 0 }
 }
 
 export function reminderNotificationId(taskId) {

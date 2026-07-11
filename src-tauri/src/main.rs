@@ -30,6 +30,12 @@ fn db_file(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(app_data_dir(app)?.join("simpletodo.db"))
 }
 
+fn backup_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let dir = app_data_dir(app)?.join("backups");
+    fs::create_dir_all(&dir).map_err(|err| format!("创建备份目录失败: {err}"))?;
+    Ok(dir)
+}
+
 fn open_database(app: &tauri::AppHandle) -> Result<Connection, String> {
     let conn = Connection::open(db_file(app)?).map_err(|err| format!("打开数据库失败: {err}"))?;
     init_database(&conn)?;
@@ -74,6 +80,15 @@ fn save_data(app: tauri::AppHandle, data: serde_json::Value) -> Result<bool, Str
     Ok(true)
 }
 
+#[tauri::command]
+fn save_migration_backup(app: tauri::AppHandle, data: serde_json::Value) -> Result<String, String> {
+    let filename = format!("migration-{}.json", Local::now().format("%Y%m%d-%H%M%S%.3f"));
+    let path = backup_dir(&app)?.join(filename);
+    let content = serde_json::to_vec_pretty(&data).map_err(|err| format!("序列化迁移备份失败: {err}"))?;
+    fs::write(&path, content).map_err(|err| format!("写入迁移备份失败: {err}"))?;
+    Ok(path.to_string_lossy().to_string())
+}
+
 fn init_database(conn: &Connection) -> Result<(), String> {
     conn.execute_batch(
         r#"
@@ -94,6 +109,7 @@ fn init_database(conn: &Connection) -> Result<(), String> {
             group_id TEXT NULL,
             color TEXT NOT NULL,
             is_system INTEGER NOT NULL DEFAULT 0,
+            view_mode TEXT NOT NULL DEFAULT 'list',
             sort_order INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL DEFAULT '',
             updated_at TEXT NOT NULL DEFAULT '',
@@ -132,6 +148,7 @@ fn init_database(conn: &Connection) -> Result<(), String> {
             name TEXT NOT NULL,
             group_id TEXT NULL,
             color TEXT NOT NULL,
+            view_mode TEXT NOT NULL DEFAULT 'list',
             sort_order INTEGER NOT NULL DEFAULT 0,
             task_count INTEGER NOT NULL DEFAULT 0,
             deleted_at TEXT NOT NULL
@@ -181,6 +198,18 @@ fn init_database(conn: &Connection) -> Result<(), String> {
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS task_groups (
+            id TEXT PRIMARY KEY,
+            list_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            emoji TEXT NOT NULL DEFAULT '',
+            color TEXT NOT NULL DEFAULT 'auto',
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            collapsed INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT '',
+            updated_at TEXT NOT NULL DEFAULT ''
+        );
+        CREATE INDEX IF NOT EXISTS idx_task_groups_list_sort ON task_groups(list_id, sort_order);
         "#,
     )
     .map_err(|err| format!("初始化数据库失败: {err}"))?;
@@ -191,9 +220,27 @@ fn init_database(conn: &Connection) -> Result<(), String> {
 fn run_database_migrations(conn: &Connection) -> Result<(), String> {
     ensure_column(
         conn,
+        "task_groups",
+        "color",
+        "ALTER TABLE task_groups ADD COLUMN color TEXT NOT NULL DEFAULT 'auto'",
+    )?;
+    ensure_column(
+        conn,
         "tasks",
         "comments",
         "ALTER TABLE tasks ADD COLUMN comments TEXT NOT NULL DEFAULT '[]'",
+    )?;
+    ensure_column(
+        conn,
+        "lists",
+        "view_mode",
+        "ALTER TABLE lists ADD COLUMN view_mode TEXT NOT NULL DEFAULT 'list'",
+    )?;
+    ensure_column(
+        conn,
+        "trash_lists",
+        "view_mode",
+        "ALTER TABLE trash_lists ADD COLUMN view_mode TEXT NOT NULL DEFAULT 'list'",
     )?;
     ensure_column(
         conn,
@@ -224,6 +271,12 @@ fn run_database_migrations(conn: &Connection) -> Result<(), String> {
         "lists",
         "pinned",
         "ALTER TABLE lists ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0",
+    )?;
+    ensure_column(
+        conn,
+        "tasks",
+        "task_group_id",
+        "ALTER TABLE tasks ADD COLUMN task_group_id TEXT NULL",
     )?;
     rebuild_attachments_without_relative_unique(conn)?;
     Ok(())
@@ -313,6 +366,7 @@ fn save_state_to_db(conn: &mut Connection, data: &serde_json::Value) -> Result<(
         DELETE FROM subtasks;
         DELETE FROM view_orders;
         DELETE FROM settings;
+        DELETE FROM task_groups;
         DELETE FROM trash_lists;
         DELETE FROM tasks;
         DELETE FROM lists;
@@ -379,13 +433,14 @@ fn save_state_to_db(conn: &mut Connection, data: &serde_json::Value) -> Result<(
     if let Some(list_trash) = data.get("listTrash").and_then(|value| value.as_array()) {
         for (index, list) in list_trash.iter().enumerate() {
             tx.execute(
-                "INSERT INTO trash_lists(id, name, group_id, color, sort_order, task_count, deleted_at)
-                 VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                "INSERT INTO trash_lists(id, name, group_id, color, view_mode, sort_order, task_count, deleted_at)
+                 VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
                 params![
                     string_field(list, "id", &format!("trash-list-{index}")),
                     string_field(list, "name", "未命名清单"),
                     opt_string_field(list, "groupId"),
                     string_field(list, "color", "#5fb8ad"),
+                    string_field(list, "viewMode", "list"),
                     int_field(list, "sortOrder", ((index + 1) * 1000) as i64),
                     int_field(list, "taskCount", 0),
                     string_field(list, "deletedAt", ""),
@@ -406,6 +461,27 @@ fn save_state_to_db(conn: &mut Connection, data: &serde_json::Value) -> Result<(
                     .map_err(|err| format!("保存视图排序失败: {err}"))?;
                 }
             }
+        }
+    }
+
+    if let Some(task_groups) = data.get("taskGroups").and_then(|value| value.as_array()) {
+        for (index, group) in task_groups.iter().enumerate() {
+            tx.execute(
+                "INSERT INTO task_groups(id, list_id, name, emoji, color, sort_order, collapsed, created_at, updated_at)
+                 VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                params![
+                    string_field(group, "id", &format!("task-group-{index}")),
+                    string_field(group, "listId", ""),
+                    string_field(group, "name", "未命名分组"),
+                    string_field(group, "emoji", ""),
+                    string_field(group, "color", "auto"),
+                    int_field(group, "sortOrder", ((index + 1) * 1000) as i64),
+                    int_bool(group, "collapsed"),
+                    string_field(group, "createdAt", ""),
+                    string_field(group, "updatedAt", ""),
+                ],
+            )
+            .map_err(|err| format!("保存任务分组失败: {err}"))?;
         }
     }
 
@@ -431,8 +507,8 @@ fn insert_list(
 ) -> Result<(), String> {
     let now = Local::now().to_rfc3339();
     tx.execute(
-        "INSERT INTO lists(id, name, group_id, color, is_system, pinned, sort_order, created_at, updated_at, deleted_at)
-         VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+        "INSERT INTO lists(id, name, group_id, color, is_system, pinned, view_mode, sort_order, created_at, updated_at, deleted_at)
+         VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
         params![
             string_field(list, "id", &format!("list-{index}")),
             string_field(list, "name", "未命名清单"),
@@ -440,6 +516,7 @@ fn insert_list(
             string_field(list, "color", "#5fb8ad"),
             int_bool(list, "isSystem"),
             int_bool(list, "pinned"),
+            string_field(list, "viewMode", "list"),
             int_field(list, "sortOrder", ((index + 1) * 1000) as i64),
             string_field(list, "createdAt", &now),
             string_field(list, "updatedAt", &now),
@@ -459,9 +536,9 @@ fn insert_task_tree(tx: &rusqlite::Transaction, task: &serde_json::Value) -> Res
     tx.execute(
         "INSERT OR REPLACE INTO tasks(
             id, title, description, description_html, completed, completed_at, deleted, deleted_at,
-            pinned, important, my_day_date, list_id, due_date, reminder_at, repeat_rule, priority,
+            pinned, important, my_day_date, list_id, task_group_id, due_date, reminder_at, repeat_rule, priority,
             comments, editor_mode, created_at, updated_at, deleted_by_list_id
-         ) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)",
+         ) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)",
         params![
             id,
             string_field(task, "title", "未命名任务"),
@@ -475,6 +552,7 @@ fn insert_task_tree(tx: &rusqlite::Transaction, task: &serde_json::Value) -> Res
             int_bool(task, "important"),
             opt_string_field(task, "myDayDate"),
             string_field(task, "listId", "inbox"),
+            opt_string_field(task, "taskGroupId"),
             opt_string_field(task, "dueDate"),
             opt_string_field(task, "reminderAt"),
             opt_string_field(task, "repeatRule"),
@@ -577,6 +655,7 @@ fn load_state_from_db(
     let list_trash = query_list_trash(conn)?;
     let view_orders = query_view_orders(conn)?;
     let settings = query_settings(conn)?;
+    let task_groups = query_task_groups(conn)?;
 
     Ok(serde_json::json!({
         "schemaVersion": schema_version,
@@ -586,6 +665,7 @@ fn load_state_from_db(
         "trash": trash,
         "listTrash": list_trash,
         "viewOrders": view_orders,
+        "taskGroups": task_groups,
         "settings": settings,
     }))
 }
@@ -607,9 +687,31 @@ fn query_groups(conn: &Connection) -> Result<Vec<serde_json::Value>, String> {
     collect_rows(rows, "读取分组失败")
 }
 
+fn query_task_groups(conn: &Connection) -> Result<Vec<serde_json::Value>, String> {
+    let mut stmt = conn
+        .prepare("SELECT id, list_id, name, emoji, color, sort_order, collapsed, created_at, updated_at FROM task_groups ORDER BY sort_order, rowid")
+        .map_err(|err| format!("读取任务分组失败: {err}"))?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(serde_json::json!({
+                "id": row.get::<_, String>(0)?,
+                "listId": row.get::<_, String>(1)?,
+                "name": row.get::<_, String>(2)?,
+                "emoji": row.get::<_, String>(3)?,
+                "color": row.get::<_, String>(4)?,
+                "sortOrder": row.get::<_, i64>(5)?,
+                "collapsed": row.get::<_, i64>(6)? != 0,
+                "createdAt": row.get::<_, String>(7)?,
+                "updatedAt": row.get::<_, String>(8)?,
+            }))
+        })
+        .map_err(|err| format!("读取任务分组失败: {err}"))?;
+    collect_rows(rows, "读取任务分组失败")
+}
+
 fn query_lists(conn: &Connection) -> Result<Vec<serde_json::Value>, String> {
     let mut stmt = conn
-        .prepare("SELECT id, name, group_id, color, is_system, pinned, sort_order FROM lists WHERE deleted_at IS NULL ORDER BY sort_order, rowid")
+        .prepare("SELECT id, name, group_id, color, is_system, pinned, view_mode, sort_order FROM lists WHERE deleted_at IS NULL ORDER BY sort_order, rowid")
         .map_err(|err| format!("读取清单失败: {err}"))?;
     let rows = stmt
         .query_map([], |row| {
@@ -620,7 +722,8 @@ fn query_lists(conn: &Connection) -> Result<Vec<serde_json::Value>, String> {
                 "color": row.get::<_, String>(3)?,
                 "isSystem": row.get::<_, i64>(4)? != 0,
                 "pinned": row.get::<_, i64>(5)? != 0,
-                "sortOrder": row.get::<_, i64>(6)?,
+                "viewMode": row.get::<_, String>(6)?,
+                "sortOrder": row.get::<_, i64>(7)?,
             }))
         })
         .map_err(|err| format!("读取清单失败: {err}"))?;
@@ -634,12 +737,12 @@ fn query_tasks(
 ) -> Result<Vec<serde_json::Value>, String> {
     let sql = if deleted_only {
         "SELECT id, title, description, description_html, completed, completed_at, deleted, deleted_at,
-                pinned, important, my_day_date, list_id, due_date, reminder_at, repeat_rule, priority,
+                pinned, important, my_day_date, list_id, task_group_id, due_date, reminder_at, repeat_rule, priority,
                 comments, editor_mode, created_at, updated_at, deleted_by_list_id
          FROM tasks WHERE deleted = 1 ORDER BY deleted_at DESC, updated_at DESC"
     } else {
         "SELECT id, title, description, description_html, completed, completed_at, deleted, deleted_at,
-                pinned, important, my_day_date, list_id, due_date, reminder_at, repeat_rule, priority,
+                pinned, important, my_day_date, list_id, task_group_id, due_date, reminder_at, repeat_rule, priority,
                 comments, editor_mode, created_at, updated_at, deleted_by_list_id
          FROM tasks ORDER BY created_at DESC"
     };
@@ -663,18 +766,19 @@ fn query_tasks(
                 "important": row.get::<_, i64>(9)? != 0,
                 "myDayDate": row.get::<_, Option<String>>(10)?,
                 "listId": row.get::<_, String>(11)?,
-                "dueDate": row.get::<_, Option<String>>(12)?,
-                "reminderAt": row.get::<_, Option<String>>(13)?,
-                "repeatRule": row.get::<_, Option<String>>(14)?,
-                "priority": row.get::<_, i64>(15)?,
+                "taskGroupId": row.get::<_, Option<String>>(12)?,
+                "dueDate": row.get::<_, Option<String>>(13)?,
+                "reminderAt": row.get::<_, Option<String>>(14)?,
+                "repeatRule": row.get::<_, Option<String>>(15)?,
+                "priority": row.get::<_, i64>(16)?,
                 "tags": query_task_tags(conn, row.get::<_, String>(0)?.as_str()).unwrap_or_default(),
                 "subtasks": query_subtasks(conn, row.get::<_, String>(0)?.as_str()).unwrap_or_default(),
                 "attachments": attachments,
-                "comments": parse_json_array(&row.get::<_, String>(16)?),
-                "editorMode": row.get::<_, String>(17)?,
-                "createdAt": row.get::<_, String>(18)?,
-                "updatedAt": row.get::<_, String>(19)?,
-                "deletedByListId": row.get::<_, Option<String>>(20)?,
+                "comments": parse_json_array(&row.get::<_, String>(17)?),
+                "editorMode": row.get::<_, String>(18)?,
+                "createdAt": row.get::<_, String>(19)?,
+                "updatedAt": row.get::<_, String>(20)?,
+                "deletedByListId": row.get::<_, Option<String>>(21)?,
             }))
         })
         .map_err(|err| format!("读取任务失败: {err}"))?;
@@ -752,7 +856,7 @@ fn query_task_attachments(
 
 fn query_list_trash(conn: &Connection) -> Result<Vec<serde_json::Value>, String> {
     let mut stmt = conn
-        .prepare("SELECT id, name, group_id, color, sort_order, task_count, deleted_at FROM trash_lists ORDER BY deleted_at DESC")
+        .prepare("SELECT id, name, group_id, color, view_mode, sort_order, task_count, deleted_at FROM trash_lists ORDER BY deleted_at DESC")
         .map_err(|err| format!("读取回收站清单失败: {err}"))?;
     let rows = stmt
         .query_map([], |row| {
@@ -762,10 +866,11 @@ fn query_list_trash(conn: &Connection) -> Result<Vec<serde_json::Value>, String>
                 "groupId": row.get::<_, Option<String>>(2)?,
                 "color": row.get::<_, String>(3)?,
                 "isSystem": false,
-                "sortOrder": row.get::<_, i64>(4)?,
-                "taskCount": row.get::<_, i64>(5)?,
+                "viewMode": row.get::<_, String>(4)?,
+                "sortOrder": row.get::<_, i64>(5)?,
+                "taskCount": row.get::<_, i64>(6)?,
                 "deleted": true,
-                "deletedAt": row.get::<_, String>(6)?,
+                "deletedAt": row.get::<_, String>(7)?,
             }))
         })
         .map_err(|err| format!("读取回收站清单失败: {err}"))?;
@@ -1098,6 +1203,225 @@ fn cleanup_orphan_attachments(
     Ok(removed)
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StorageItem {
+    id: String,
+    relative_path: String,
+    name: String,
+    size_bytes: u64,
+    modified_at: String,
+    is_image: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StorageHealth {
+    supported: bool,
+    attachment_bytes: u64,
+    orphan_bytes: u64,
+    orphan_attachments: Vec<StorageItem>,
+    missing_references: Vec<String>,
+    quarantined_attachments: Vec<StorageItem>,
+    quarantined_bytes: u64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StorageOperation {
+    affected_count: usize,
+    affected_bytes: u64,
+}
+
+fn cleanup_root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let dir = app_data_dir(app)?.join("cleanup-bin");
+    fs::create_dir_all(&dir).map_err(|err| format!("创建清理站目录失败: {err}"))?;
+    Ok(dir)
+}
+
+fn referenced_attachment_paths(app: &tauri::AppHandle) -> Result<HashSet<String>, String> {
+    let conn = open_database(app)?;
+    let mut referenced = HashSet::new();
+    let mut embedded_hashes = HashSet::new();
+    let mut attachment_stmt = conn.prepare(
+        "SELECT a.relative_path FROM attachments a INNER JOIN task_attachments ta ON ta.attachment_id = a.id"
+    ).map_err(|err| format!("读取附件引用失败: {err}"))?;
+    let paths = attachment_stmt.query_map([], |row| row.get::<_, String>(0))
+        .map_err(|err| format!("读取附件引用失败: {err}"))?;
+    for path in paths {
+        if let Ok(path) = normalize_attachment_relative_path(&path.map_err(|err| format!("读取附件引用失败: {err}"))?) {
+            referenced.insert(path);
+        }
+    }
+    let mut html_stmt = conn.prepare("SELECT description_html FROM tasks")
+        .map_err(|err| format!("读取备注图片引用失败: {err}"))?;
+    let htmls = html_stmt.query_map([], |row| row.get::<_, String>(0))
+        .map_err(|err| format!("读取备注图片引用失败: {err}"))?;
+    for html in htmls {
+        let html = html.map_err(|err| format!("读取备注图片引用失败: {err}"))?;
+        collect_html_attachment_paths(&html, &mut referenced);
+        embedded_hashes.extend(collect_embedded_image_hash_prefixes(&html));
+    }
+    // 兼容旧富文本：部分历史备注只保存 data URL，附件路径已被 base64 覆盖。
+    // 附件文件名使用内容 SHA-256 的前 16 位，借此恢复引用关系，避免误清理。
+    if !embedded_hashes.is_empty() {
+        let root = attachment_root(app)?;
+        let mut files = Vec::new();
+        collect_files(&root, &mut files)?;
+        for file in files {
+            let stem = file.file_stem().and_then(|value| value.to_str()).unwrap_or("");
+            if embedded_hashes.iter().any(|prefix| stem.starts_with(prefix)) {
+                let relative = file.strip_prefix(&root)
+                    .map_err(|err| format!("计算附件相对路径失败: {err}"))?
+                    .to_string_lossy().replace('\\', "/");
+                referenced.insert(relative);
+            }
+        }
+    }
+    Ok(referenced)
+}
+
+fn storage_item(root: &Path, path: &Path, id: String) -> Result<StorageItem, String> {
+    let relative_path = path.strip_prefix(root)
+        .map_err(|err| format!("计算附件相对路径失败: {err}"))?
+        .to_string_lossy().replace('\\', "/");
+    let metadata = fs::metadata(path).map_err(|err| format!("读取附件信息失败: {err}"))?;
+    let modified_at = metadata.modified().ok()
+        .map(|time| chrono::DateTime::<Local>::from(time).to_rfc3339())
+        .unwrap_or_default();
+    let extension = path.extension().and_then(|value| value.to_str()).unwrap_or("").to_ascii_lowercase();
+    Ok(StorageItem {
+        id,
+        name: path.file_name().and_then(|value| value.to_str()).unwrap_or("附件").to_string(),
+        relative_path,
+        size_bytes: metadata.len(),
+        modified_at,
+        is_image: matches!(extension.as_str(), "jpg" | "jpeg" | "png" | "gif" | "webp"),
+    })
+}
+
+fn collect_files(dir: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {
+    if !dir.exists() { return Ok(()); }
+    for entry in fs::read_dir(dir).map_err(|err| format!("读取附件目录失败: {err}"))? {
+        let path = entry.map_err(|err| format!("读取附件目录失败: {err}"))?.path();
+        if path.is_dir() { collect_files(&path, files)?; } else { files.push(path); }
+    }
+    Ok(())
+}
+
+fn compact_empty_dirs(dir: &Path) {
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() { compact_empty_dirs(&path); let _ = fs::remove_dir(&path); }
+        }
+    }
+}
+
+#[tauri::command]
+fn scan_storage_health(app: tauri::AppHandle) -> Result<StorageHealth, String> {
+    let referenced = referenced_attachment_paths(&app)?;
+    let attachment_root = attachment_root(&app)?;
+    let mut files = Vec::new();
+    collect_files(&attachment_root, &mut files)?;
+    let mut attachment_bytes = 0;
+    let mut orphan_attachments = Vec::new();
+    let mut present = HashSet::new();
+    for path in files {
+        let item = storage_item(&attachment_root, &path, String::new())?;
+        attachment_bytes += item.size_bytes;
+        present.insert(item.relative_path.clone());
+        if !referenced.contains(&item.relative_path) { orphan_attachments.push(StorageItem { id: item.relative_path.clone(), ..item }); }
+    }
+    let missing_references = referenced.into_iter().filter(|path| !present.contains(path)).collect();
+    let cleanup_root = cleanup_root(&app)?;
+    let mut cleanup_files = Vec::new();
+    collect_files(&cleanup_root, &mut cleanup_files)?;
+    let mut quarantined_bytes = 0;
+    let mut quarantined_attachments = Vec::new();
+    for path in cleanup_files {
+        let item = storage_item(&cleanup_root, &path, String::new())?;
+        quarantined_bytes += item.size_bytes;
+        quarantined_attachments.push(StorageItem { id: item.relative_path.clone(), ..item });
+    }
+    let orphan_bytes = orphan_attachments.iter().map(|item| item.size_bytes).sum();
+    Ok(StorageHealth { supported: true, attachment_bytes, orphan_bytes, orphan_attachments, missing_references, quarantined_attachments, quarantined_bytes })
+}
+
+#[tauri::command]
+fn quarantine_orphan_attachments(app: tauri::AppHandle, relative_paths: Vec<String>) -> Result<StorageOperation, String> {
+    let referenced = referenced_attachment_paths(&app)?;
+    let root = attachment_root(&app)?;
+    let batch = Local::now().format("%Y%m%d-%H%M%S").to_string();
+    let cleanup = cleanup_root(&app)?.join(batch);
+    let mut affected_count = 0;
+    let mut affected_bytes = 0;
+    for relative in relative_paths {
+        let relative = normalize_attachment_relative_path(&relative)?;
+        if referenced.contains(&relative) { continue; }
+        let source = attachment_file_path(&app, &relative)?;
+        if !source.is_file() { continue; }
+        let target = relative.split('/').fold(cleanup.clone(), |path, part| path.join(part));
+        if let Some(parent) = target.parent() { fs::create_dir_all(parent).map_err(|err| format!("创建清理站目录失败: {err}"))?; }
+        affected_bytes += fs::metadata(&source).map_err(|err| format!("读取附件信息失败: {err}"))?.len();
+        fs::rename(&source, &target).map_err(|err| format!("移入清理站失败: {err}"))?;
+        affected_count += 1;
+    }
+    compact_empty_dirs(&root);
+    Ok(StorageOperation { affected_count, affected_bytes })
+}
+
+fn cleanup_item_path(app: &tauri::AppHandle, id: &str) -> Result<PathBuf, String> {
+    let relative = normalize_attachment_relative_path(id)?;
+    let path = relative.split('/').fold(cleanup_root(app)?, |path, part| path.join(part));
+    Ok(path)
+}
+
+#[tauri::command]
+fn read_quarantined_attachment(
+    app: tauri::AppHandle,
+    item_id: String,
+) -> Result<Option<String>, String> {
+    let path = cleanup_item_path(&app, &item_id)?;
+    if !path.exists() {
+        return Ok(None);
+    }
+    let data = fs::read(&path).map_err(|err| format!("读取清理站附件失败: {err}"))?;
+    let mime = mime_from_path(&path);
+    let encoded = general_purpose::STANDARD.encode(data);
+    Ok(Some(format!("data:{mime};base64,{encoded}")))
+}
+
+#[tauri::command]
+fn restore_quarantined_attachments(app: tauri::AppHandle, item_ids: Vec<String>) -> Result<StorageOperation, String> {
+    let mut affected_count = 0; let mut affected_bytes = 0;
+    for id in item_ids {
+        let source = cleanup_item_path(&app, &id)?;
+        if !source.is_file() { continue; }
+        let relative = id.split_once('/').map(|(_, path)| path).ok_or("清理站项目不合法")?;
+        let target = attachment_file_path(&app, relative)?;
+        if target.exists() { continue; }
+        if let Some(parent) = target.parent() { fs::create_dir_all(parent).map_err(|err| format!("恢复附件失败: {err}"))?; }
+        affected_bytes += fs::metadata(&source).map_err(|err| format!("读取附件信息失败: {err}"))?.len();
+        fs::rename(&source, &target).map_err(|err| format!("恢复附件失败: {err}"))?; affected_count += 1;
+    }
+    compact_empty_dirs(&cleanup_root(&app)?);
+    Ok(StorageOperation { affected_count, affected_bytes })
+}
+
+#[tauri::command]
+fn purge_quarantined_attachments(app: tauri::AppHandle, item_ids: Vec<String>) -> Result<StorageOperation, String> {
+    let mut affected_count = 0; let mut affected_bytes = 0;
+    for id in item_ids {
+        let path = cleanup_item_path(&app, &id)?;
+        if !path.is_file() { continue; }
+        affected_bytes += fs::metadata(&path).map_err(|err| format!("读取附件信息失败: {err}"))?.len();
+        fs::remove_file(path).map_err(|err| format!("永久删除附件失败: {err}"))?; affected_count += 1;
+    }
+    compact_empty_dirs(&cleanup_root(&app)?);
+    Ok(StorageOperation { affected_count, affected_bytes })
+}
+
 fn sanitize_save_data(mut data: serde_json::Value) -> serde_json::Value {
     strip_hydrated_urls(&mut data);
     data
@@ -1186,29 +1510,47 @@ fn collect_attachment_paths(
 }
 
 fn collect_html_attachment_paths(html: &str, paths: &mut std::collections::HashSet<String>) {
-    let mut remaining = html;
-    loop {
-        let pos_a = remaining.find("src=\"attachments/");
-        let pos_b = remaining.find("src=\"images/");
-        let pos = match (pos_a, pos_b) {
-            (Some(a), Some(b)) => Some(a.min(b)),
-            (Some(a), None) => Some(a),
-            (None, Some(b)) => Some(b),
-            (None, None) => None,
-        };
-
-        let Some(offset) = pos else { break };
-        let value_start = offset + 5; // skip 'src="'
-        if let Some(value_end) = remaining[value_start..].find('"') {
-            let raw = &remaining[value_start..value_start + value_end];
-            if let Ok(path) = normalize_attachment_relative_path(raw) {
-                paths.insert(path);
+    // 富文本在展示时会把 src 解析为 data URL，并保留 data-attachment-src。
+    // 保存时通常会还原 src，但旧数据或未触发重序列化的数据仍可能只剩该属性。
+    for attribute in ["src", "data-attachment-src"] {
+        for quote in ['\"', '\''] {
+            let marker = format!("{attribute}={quote}");
+            let mut remaining = html;
+            while let Some(offset) = remaining.find(&marker) {
+                let value_start = offset + marker.len();
+                let Some(value_end) = remaining[value_start..].find(quote) else { break };
+                let raw = &remaining[value_start..value_start + value_end];
+                if raw.starts_with("attachments/") || raw.starts_with("images/") {
+                    if let Ok(path) = normalize_attachment_relative_path(raw) {
+                        paths.insert(path);
+                    }
+                }
+                remaining = &remaining[value_start + value_end + 1..];
             }
-            remaining = &remaining[value_start + value_end + 1..];
-        } else {
-            break;
         }
     }
+}
+
+fn collect_embedded_image_hash_prefixes(html: &str) -> HashSet<String> {
+    let mut prefixes = HashSet::new();
+    let mut remaining = html;
+    while let Some(offset) = remaining.find("data:image/") {
+        let source = &remaining[offset..];
+        let Some(base64_offset) = source.find(";base64,") else {
+            remaining = &source["data:image/".len()..];
+            continue;
+        };
+        let encoded_start = base64_offset + ";base64,".len();
+        let encoded = &source[encoded_start..];
+        let end = encoded.find(|ch: char| matches!(ch, '\"' | '\'' | '<' | '>' | ' '))
+            .unwrap_or(encoded.len());
+        if let Ok(bytes) = general_purpose::STANDARD.decode(&encoded[..end]) {
+            let hash = hex_sha256(&bytes);
+            prefixes.insert(hash[..16.min(hash.len())].to_string());
+        }
+        remaining = &encoded[end..];
+    }
+    prefixes
 }
 
 fn normalize_attachment_relative_path(path: &str) -> Result<String, String> {
@@ -1367,13 +1709,19 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             load_data,
             save_data,
+            save_migration_backup,
             select_image,
             read_image,
             import_image,
             import_image_data,
             read_attachment,
             resolve_html_images,
-            cleanup_orphan_attachments
+            cleanup_orphan_attachments,
+            scan_storage_health,
+            quarantine_orphan_attachments,
+            read_quarantined_attachment,
+            restore_quarantined_attachments,
+            purge_quarantined_attachments
         ])
         .run(tauri::generate_context!())
         .expect("运行 Tauri 应用失败");

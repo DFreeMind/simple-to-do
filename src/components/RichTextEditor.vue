@@ -73,14 +73,52 @@ function serializeEditorHtml(html) {
   container.innerHTML = html
   container.querySelectorAll('img[data-attachment-src]').forEach((img) => {
     const attachmentSrc = img.getAttribute('data-attachment-src')
-    if (attachmentSrc) img.setAttribute('src', attachmentSrc)
+    if (isAttachmentPath(attachmentSrc)) {
+      // 持久化时只写应用附件相对路径，绝不把预览 data URL 写回数据库。
+      img.setAttribute('src', attachmentSrc)
+      img.setAttribute('data-attachment-src', attachmentSrc)
+    }
   })
   return container.innerHTML
+}
+
+function isAttachmentPath(value) {
+  return typeof value === 'string' && (value.startsWith('attachments/') || value.startsWith('images/'))
 }
 
 async function resolveEditorHtml(html) {
   if (!html || (!html.includes('attachments/') && !html.includes('src="images/'))) return html
   return await resolveHtmlImages(html)
+}
+
+async function repairEmbeddedImages() {
+  if (!editor.value) return
+  const container = document.createElement('div')
+  container.innerHTML = editor.value.getHTML()
+  const images = Array.from(container.querySelectorAll('img'))
+  let changed = false
+
+  for (const image of images) {
+    const previewSrc = image.getAttribute('src') || ''
+    const attachmentSrc = image.getAttribute('data-attachment-src') || ''
+    if (isAttachmentPath(attachmentSrc)) continue
+    if (!previewSrc.startsWith('data:image/')) continue
+
+    try {
+      const attachment = await importImageData(previewSrc)
+      if (!attachment?.relativePath) continue
+      image.setAttribute('data-attachment-src', `attachments/${attachment.relativePath}`)
+      // 保留 data URL 供编辑器即时展示；serializeEditorHtml 会在保存时替换成路径。
+      changed = true
+    } catch (error) {
+      console.error('[RichTextEditor] 修复历史图片引用失败:', error)
+    }
+  }
+
+  if (changed && editor.value) {
+    editor.value.commands.setContent(container.innerHTML, false)
+    emit('update:modelValue', serializeEditorHtml(editor.value.getHTML()))
+  }
 }
 
 const editor = useEditor({
@@ -152,6 +190,7 @@ onMounted(async () => {
   if (editor.value && resolved !== props.modelValue) {
     editor.value.commands.setContent(resolved, false)
   }
+  await repairEmbeddedImages()
 })
 
 // 监听外部内容变化

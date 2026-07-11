@@ -324,22 +324,85 @@
               </div>
             </div>
 
-            <div class="status-grid">
-              <div class="status-card">
+            <div class="data-feature-strip">
+              <div class="data-feature">
                 <Database :size="18" />
                 <span>
                   <strong>{{ store.isSaving ? '正在保存' : '本地自动保存' }}</strong>
-                  <small>{{ store.saveError || '数据保存在本机，暂不启用账号和同步。' }}</small>
+                  <small>{{ store.saveError || '数据保存在本机，无需手动保存。' }}</small>
                 </span>
               </div>
-              <div class="status-card">
+              <div class="data-feature">
                 <ShieldCheck :size="18" />
                 <span>
                   <strong>本地优先</strong>
-                  <small>任务、清单和设置只写入当前设备。</small>
+                  <small>数据仅保存在当前设备。</small>
                 </span>
               </div>
             </div>
+
+            <div class="settings-block storage-manager">
+              <div class="settings-block__title">
+                <h4>存储清理</h4>
+                <span>{{ storageSummary }}</span>
+              </div>
+              <p class="storage-manager__hint">扫描只检查本机附件。备注图片、任务附件和回收站中的引用都会保留，不会自动删除。</p>
+              <div class="storage-manager__toolbar">
+                <span><strong>本机附件</strong><small>查看未引用附件、失效引用和清理站</small></span>
+                <button class="small-btn" type="button" :disabled="storageLoading" @click="scanStorage">{{ storageLoading ? '扫描中…' : '扫描' }}</button>
+              </div>
+
+              <template v-if="storageReport">
+                <div class="storage-stats">
+                  <span>附件 {{ formatBytes(storageReport.attachmentBytes) }}</span>
+                  <span>可清理 {{ formatBytes(storageReport.orphanBytes) }}</span>
+                  <span>清理站 {{ formatBytes(storageReport.quarantinedBytes) }}</span>
+                </div>
+
+                <div v-if="storageReport.orphanAttachments.length" class="storage-result">
+                  <div class="storage-result__head">
+                    <span><strong>未引用附件</strong><small>{{ storageReport.orphanAttachments.length }} 项 · {{ formatBytes(storageReport.orphanBytes) }}</small></span>
+                    <span class="storage-result__actions"><button v-if="storageReport.orphanAttachments.length > inlineLimit" class="text-btn" type="button" @click="openStorageBrowser('orphan')">查看全部</button><button class="small-btn" type="button" :disabled="storageAction" @click="quarantineAll">移入清理站</button></span>
+                  </div>
+                  <section v-for="group in inlineOrphanGroups" :key="group.id" class="storage-type-group">
+                    <p v-if="orphanGroups.length > 1" class="storage-type-group__title">{{ group.label }} · {{ group.items.length }} 项</p>
+                    <div class="storage-item-list">
+                      <article v-for="item in group.items" :key="item.id" class="storage-item">
+                        <button v-if="item.isImage && previews[item.relativePath]" class="storage-item__preview" type="button" title="查看大图" @click="openPreview(item)"><img :src="previews[item.relativePath]" alt="" /></button>
+                        <span v-else class="storage-item__file"><Database :size="16" /></span>
+                        <span><strong :title="item.relativePath">{{ item.name }}</strong><small :title="item.relativePath">{{ formatBytes(item.sizeBytes) }} · {{ item.relativePath }}</small></span>
+                        <button class="text-btn" type="button" :disabled="storageAction" @click="quarantineItem(item)">清理</button>
+                      </article>
+                    </div>
+                  </section>
+                </div>
+                <p v-else class="storage-manager__empty">没有发现未引用附件。</p>
+
+                <div v-if="storageReport.missingReferences.length" class="storage-warning">
+                  发现 {{ storageReport.missingReferences.length }} 个失效引用：原数据仍保留，暂不会自动移除。
+                </div>
+
+                <div v-if="storageReport.quarantinedAttachments.length" class="storage-result storage-result--quarantine">
+                  <div class="storage-result__head">
+                    <span><strong>清理站</strong><small>{{ storageReport.quarantinedAttachments.length }} 项 · {{ formatBytes(storageReport.quarantinedBytes) }} · 可恢复</small></span>
+                    <span class="storage-result__actions"><button v-if="storageReport.quarantinedAttachments.length > inlineLimit" class="text-btn" type="button" @click="openStorageBrowser('quarantine')">查看全部</button><button class="text-btn" type="button" :disabled="storageAction" @click="restoreAll">全部恢复</button><button class="text-btn danger" type="button" :disabled="storageAction" @click="requestPurge(storageReport.quarantinedAttachments)">永久删除</button></span>
+                  </div>
+                  <p class="storage-manager__hint storage-result__note">这是一个可恢复的暂存区。恢复后文件回到附件目录；若仍无引用，下次扫描仍会显示为可清理项。</p>
+                  <section v-for="group in inlineQuarantinedGroups" :key="group.id" class="storage-type-group">
+                    <p v-if="quarantinedGroups.length > 1" class="storage-type-group__title">{{ group.label }} · {{ group.items.length }} 项</p>
+                    <div class="storage-item-list">
+                      <article v-for="item in group.items" :key="item.id" class="storage-item">
+                        <button v-if="item.isImage && quarantinedPreviews[item.id]" class="storage-item__preview" type="button" title="查看大图" @click="openQuarantinedPreview(item)"><img :src="quarantinedPreviews[item.id]" alt="" /></button>
+                        <span v-else class="storage-item__file"><Database :size="16" /></span>
+                        <span><strong :title="item.relativePath">{{ item.name }}</strong><small :title="item.relativePath">{{ formatBytes(item.sizeBytes) }} · {{ item.relativePath }}</small></span>
+                        <span class="storage-item__actions"><button class="text-btn" type="button" :disabled="storageAction" @click="restoreItem(item)">恢复</button><button class="text-btn danger" type="button" :disabled="storageAction" @click="requestPurge([item])">删除</button></span>
+                      </article>
+                    </div>
+                  </section>
+                </div>
+              </template>
+            </div>
+            <ImageLightbox :visible="previewOpen" :images="previewImages" :start-index="previewIndex" @close="previewOpen = false" />
           </section>
 
           <section v-else class="settings-section">
@@ -363,18 +426,63 @@
       </div>
     </aside>
   </div>
+  <Teleport to="body">
+    <div v-if="storageBrowserOpen" class="storage-browser-layer" role="dialog" aria-modal="true" aria-label="清理附件">
+      <button class="storage-browser-layer__scrim" type="button" aria-label="关闭" @click="closeStorageBrowser"></button>
+      <section class="storage-browser">
+        <header><div><h2>清理附件</h2><small>检查未引用附件，恢复或清理暂存文件。</small></div><button class="icon-btn" type="button" aria-label="关闭" @click="closeStorageBrowser"><X :size="18" /></button></header>
+        <div class="storage-browser__toolbar"><div class="storage-browser__tabs"><button :class="{ active: storageBrowserTab === 'orphan' }" type="button" @click="setStorageBrowserTab('orphan')">未引用 {{ storageReport?.orphanAttachments.length || 0 }}</button><button :class="{ active: storageBrowserTab === 'quarantine' }" type="button" @click="setStorageBrowserTab('quarantine')">清理站 {{ storageReport?.quarantinedAttachments.length || 0 }}</button></div><div class="segmented storage-browser__filter"><button type="button" :class="{ active: storageFilter === 'all' }" @click="setStorageFilter('all')">全部</button><button type="button" :class="{ active: storageFilter === 'image' }" @click="setStorageFilter('image')">图片</button><button type="button" :class="{ active: storageFilter === 'file' }" @click="setStorageFilter('file')">文件</button></div><span class="storage-browser__count">{{ browserItems.length }} 项</span><span class="storage-browser__actions"><button v-if="storageBrowserTab === 'orphan'" class="small-btn" type="button" :disabled="storageAction || !browserItems.length" @click="quarantineAll">全部移入</button><template v-else><button class="text-btn" type="button" :disabled="storageAction || !browserItems.length" @click="restoreAll">全部恢复</button><button class="text-btn danger storage-browser__purge" type="button" :disabled="storageAction || !browserItems.length" @click="requestPurge(storageReport?.quarantinedAttachments || [])">清空清理站</button></template></span></div>
+        <div class="storage-browser__list">
+          <article v-for="item in browserPageItems" :key="item.id" class="storage-item">
+            <button v-if="item.isImage && browserPreview(item)" class="storage-item__preview" type="button" @click="openBrowserPreview(item)"><img :src="browserPreview(item)" alt="" /></button><span v-else class="storage-item__file"><Database :size="16" /></span>
+            <span><strong :title="item.relativePath">{{ item.name }}</strong><small :title="item.relativePath">{{ formatBytes(item.sizeBytes) }} · {{ item.relativePath }}</small></span>
+            <span class="storage-item__actions"><button v-if="storageBrowserTab === 'quarantine'" class="text-btn" type="button" @click="restoreItem(item)">恢复</button><button v-if="storageBrowserTab === 'orphan'" class="text-btn" type="button" @click="quarantineItem(item)">清理</button><button v-else class="text-btn danger" type="button" @click="requestPurge([item])">删除</button></span>
+          </article>
+        </div>
+        <footer v-if="browserPageCount > 1" class="storage-browser__pagination"><button class="text-btn" type="button" :disabled="storageBrowserPage === 0" @click="changeBrowserPage(-1)">上一页</button><span>{{ storageBrowserPage + 1 }} / {{ browserPageCount }}</span><button class="text-btn" type="button" :disabled="storageBrowserPage + 1 >= browserPageCount" @click="changeBrowserPage(1)">下一页</button></footer>
+      </section>
+    </div>
+  </Teleport>
+  <Teleport to="body">
+    <div v-if="pendingPurgeIds.length" class="storage-delete-dialog-layer" role="presentation">
+      <button class="storage-delete-dialog-layer__scrim" type="button" aria-label="取消永久删除" @click="pendingPurgeIds = []"></button>
+      <section class="storage-delete-dialog" role="alertdialog" aria-modal="true" aria-labelledby="storage-delete-title">
+        <span class="storage-delete-dialog__icon"><Trash2 :size="22" /></span>
+        <div><h2 id="storage-delete-title">永久删除 {{ pendingPurgeIds.length }} 项文件？</h2><p>文件将从本机彻底移除，且无法恢复。</p></div>
+        <div class="storage-delete-dialog__targets"><strong>将删除</strong><ul><li v-for="item in purgeTargets" :key="item.id"><span>{{ item.name }}</span><small>{{ item.relativePath }}</small></li></ul><small v-if="pendingPurgeIds.length > purgeTargets.length">另有 {{ pendingPurgeIds.length - purgeTargets.length }} 项文件</small></div>
+        <footer><button class="small-btn" type="button" @click="pendingPurgeIds = []">取消</button><button class="small-btn danger" type="button" :disabled="storageAction" @click="confirmPurge">永久删除</button></footer>
+      </section>
+    </div>
+  </Teleport>
 </template>
 
 <script setup>
 import { computed, ref } from 'vue'
 import { Bell, Check, Database, Info, PanelTop, Palette, ShieldCheck, SlidersHorizontal, Trash2, X, Volume2, CheckSquare, Folder, Tag } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
+import { purgeQuarantinedAttachments, quarantineOrphanAttachments, readAttachment, readQuarantinedAttachment, restoreQuarantinedAttachments, scanStorageHealth } from '@/services/platform'
+import ImageLightbox from './ImageLightbox.vue'
 import appIcon from '@/assets/app-icon.svg'
 
 const version = __APP_VERSION__
 
 const store = useTaskStore()
 const activeSection = ref('appearance')
+const storageReport = ref(null)
+const storageLoading = ref(false)
+const storageAction = ref(false)
+const previews = ref({})
+const quarantinedPreviews = ref({})
+const previewOpen = ref(false)
+const previewImages = ref([])
+const previewIndex = ref(0)
+const pendingPurgeIds = ref([])
+const storageBrowserOpen = ref(false)
+const storageBrowserTab = ref('orphan')
+const storageBrowserPage = ref(0)
+const storageFilter = ref('all')
+const inlineLimit = 3
+const browserPageSize = 40
 
 const sections = [
   { id: 'appearance', label: '外观', summary: '主题与布局', icon: Palette },
@@ -407,4 +515,102 @@ const enabledSoundCount = computed(() => [
 ].filter(Boolean).length)
 const soundSummary = computed(() => store.settings.soundEnabled ? `${enabledSoundCount.value}/3 已启用` : '已关闭')
 const reminderSummary = computed(() => store.settings.reminderNotificationsEnabled ? (store.settings.reminderSoundEnabled ? '通知和声音' : '仅通知') : '已关闭')
+const storageSummary = computed(() => storageReport.value ? `${storageReport.value.orphanAttachments.length} 项可清理` : '按需扫描')
+const orphanGroups = computed(() => {
+  const items = storageReport.value?.orphanAttachments || []
+  const images = items.filter(item => item.isImage)
+  const files = items.filter(item => !item.isImage)
+  const groups = []
+  if (images.length) groups.push({ id: 'images', label: '图片', items: images })
+  if (files.length) groups.push({ id: 'files', label: '文件', items: files })
+  return groups
+})
+const quarantinedGroups = computed(() => groupAttachments(storageReport.value?.quarantinedAttachments || []))
+const inlineOrphanGroups = computed(() => groupAttachments((storageReport.value?.orphanAttachments || []).slice(0, inlineLimit)))
+const inlineQuarantinedGroups = computed(() => groupAttachments((storageReport.value?.quarantinedAttachments || []).slice(0, inlineLimit)))
+const browserItems = computed(() => {
+  const items = storageBrowserTab.value === 'orphan' ? (storageReport.value?.orphanAttachments || []) : (storageReport.value?.quarantinedAttachments || [])
+  return storageFilter.value === 'all' ? items : items.filter(item => storageFilter.value === 'image' ? item.isImage : !item.isImage)
+})
+const browserPageCount = computed(() => Math.max(1, Math.ceil(browserItems.value.length / browserPageSize)))
+const browserPageItems = computed(() => browserItems.value.slice(storageBrowserPage.value * browserPageSize, (storageBrowserPage.value + 1) * browserPageSize))
+const purgeTargets = computed(() => (storageReport.value?.quarantinedAttachments || []).filter(item => pendingPurgeIds.value.includes(item.id)).slice(0, 3))
+
+function groupAttachments(items) {
+  const images = items.filter(item => item.isImage)
+  const files = items.filter(item => !item.isImage)
+  const groups = []
+  if (images.length) groups.push({ id: 'images', label: '图片', items: images })
+  if (files.length) groups.push({ id: 'files', label: '文件', items: files })
+  return groups
+}
+
+function formatBytes(value = 0) {
+  if (value < 1024) return `${value} B`
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function formatDate(value) {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '未知时间' : date.toLocaleDateString('zh-CN')
+}
+
+async function scanStorage() {
+  storageLoading.value = true
+  try {
+    const report = await scanStorageHealth()
+    storageReport.value = report
+    previews.value = {}
+    quarantinedPreviews.value = {}
+    await hydrateVisiblePreviews(report.orphanAttachments.slice(0, inlineLimit), 'orphan')
+    await hydrateVisiblePreviews(report.quarantinedAttachments.slice(0, inlineLimit), 'quarantine')
+    pendingPurgeIds.value = []
+  } catch (error) {
+    store.showNotice(error?.message || '扫描本机存储失败', 'error')
+  } finally { storageLoading.value = false }
+}
+
+async function runStorageAction(action, successText) {
+  if (!storageReport.value) return
+  storageAction.value = true
+  try {
+    const result = await action()
+    store.showNotice(`${successText} ${result.affectedCount} 项，${formatBytes(result.affectedBytes)}`, 'success')
+    await scanStorage()
+  } catch (error) {
+    store.showNotice(error?.message || '操作失败', 'error')
+  } finally { storageAction.value = false }
+}
+
+function quarantineAll() { return runStorageAction(() => quarantineOrphanAttachments(storageReport.value.orphanAttachments.map(item => item.relativePath)), '已移入清理站') }
+function quarantineItem(item) { return runStorageAction(() => quarantineOrphanAttachments([item.relativePath]), '已移入清理站') }
+function restoreAll() { return runStorageAction(() => restoreQuarantinedAttachments(storageReport.value.quarantinedAttachments.map(item => item.id)), '已恢复') }
+function restoreItem(item) { return runStorageAction(() => restoreQuarantinedAttachments([item.id]), '已恢复') }
+function requestPurge(items) { pendingPurgeIds.value = items.map(item => item.id) }
+function confirmPurge() { return runStorageAction(() => purgeQuarantinedAttachments(pendingPurgeIds.value), '已永久删除') }
+function openPreview(item) {
+  const images = (storageReport.value?.orphanAttachments || []).filter(candidate => candidate.isImage).map(candidate => previews.value[candidate.relativePath]).filter(Boolean)
+  previewIndex.value = images.indexOf(previews.value[item.relativePath])
+  previewImages.value = images
+  previewOpen.value = true
+}
+function openQuarantinedPreview(item) {
+  const images = (storageReport.value?.quarantinedAttachments || []).filter(candidate => candidate.isImage).map(candidate => quarantinedPreviews.value[candidate.id]).filter(Boolean)
+  previewIndex.value = images.indexOf(quarantinedPreviews.value[item.id])
+  previewImages.value = images
+  previewOpen.value = true
+}
+async function hydrateVisiblePreviews(items, kind) {
+  const pairs = await Promise.all(items.filter(item => item.isImage).map(async (item) => [kind === 'orphan' ? item.relativePath : item.id, kind === 'orphan' ? await readAttachment(item.relativePath) : await readQuarantinedAttachment(item.id)]))
+  const target = kind === 'orphan' ? previews : quarantinedPreviews
+  target.value = { ...target.value, ...Object.fromEntries(pairs.filter(([, url]) => url)) }
+}
+async function openStorageBrowser(tab) { storageBrowserTab.value = tab; storageFilter.value = 'all'; storageBrowserPage.value = 0; storageBrowserOpen.value = true; await hydrateVisiblePreviews(browserPageItems.value, tab) }
+function closeStorageBrowser() { pendingPurgeIds.value = []; storageBrowserOpen.value = false }
+async function setStorageBrowserTab(tab) { storageBrowserTab.value = tab; storageBrowserPage.value = 0; await hydrateVisiblePreviews(browserPageItems.value, tab) }
+async function setStorageFilter(filter) { storageFilter.value = filter; storageBrowserPage.value = 0; await hydrateVisiblePreviews(browserPageItems.value, storageBrowserTab.value) }
+async function changeBrowserPage(delta) { storageBrowserPage.value = Math.max(0, Math.min(browserPageCount.value - 1, storageBrowserPage.value + delta)); await hydrateVisiblePreviews(browserPageItems.value, storageBrowserTab.value) }
+function browserPreview(item) { return storageBrowserTab.value === 'orphan' ? previews.value[item.relativePath] : quarantinedPreviews.value[item.id] }
+function openBrowserPreview(item) { storageBrowserTab.value === 'orphan' ? openPreview(item) : openQuarantinedPreview(item) }
 </script>
