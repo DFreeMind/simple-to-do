@@ -9,7 +9,8 @@ export default defineConfig({
   plugins: [vue()],
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src')
+      '@': resolve(__dirname, 'src'),
+      'vue3-emoji-picker/dist/style.css': resolve(__dirname, 'node_modules/vue3-emoji-picker/dist/style.css')
     }
   },
   define: {
