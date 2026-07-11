@@ -4,9 +4,9 @@ import { genId } from '@/utils/id'
 import { getMonthDays, isToday, toDateString } from '@/utils/date'
 import {
   cancelTaskReminderNotification,
-  cleanupOrphanAttachments,
   loadData as loadPlatformData,
   saveData as savePlatformData,
+  saveMigrationBackup,
   scheduleTaskReminderNotification,
   sendReminderTestNotification,
   syncTaskReminderNotifications
@@ -25,7 +25,6 @@ import {
   playScheduleSound,
   playAttachSound,
   playClearSound,
-  playSaveSound,
   playErrorSound,
   playDragStartSound,
   playDragOverSound,
@@ -40,10 +39,12 @@ import {
   setSoundEnabled,
   setSoundCategories
 } from '@/utils/sound'
+import { migrateData, validateData, createBackup, getCurrentVersion } from '@/utils/migrator'
 
 const SYSTEM_VIEW_IDS = ['today', 'inbox', 'planned', 'important', 'completed', 'trash', 'search']
 const READONLY_VIEWS = ['planned', 'completed', 'trash']
 const THEME_IDS = ['mint', 'blue', 'violet', 'graphite']
+const TASK_GROUP_COLOR_IDS = ['auto', 'accent', 'blue', 'violet', 'amber', 'rose', 'green']
 const DETAIL_WIDTH_MIN = 320
 const DETAIL_WIDTH_MAX = 800
 
@@ -174,6 +175,7 @@ function parseQuickTitle(input) {
 
 export const useTaskStore = defineStore('task', () => {
   const groups = ref(DEFAULT_GROUPS.map(group => ({ ...group })))
+  const taskGroups = ref([])
   const lists = ref(DEFAULT_LISTS.map(list => ({ ...list })))
   const tasks = ref([])
   const trash = ref([])
@@ -183,6 +185,7 @@ export const useTaskStore = defineStore('task', () => {
   const sortBy = ref('default')
   const searchQuery = ref('')
   const saveError = ref('')
+  const migrationBlocked = ref(false)
   const isSaving = ref(false)
   const notice = ref(null)
   const settings = ref({ ...DEFAULT_SETTINGS })
@@ -678,7 +681,6 @@ export const useTaskStore = defineStore('task', () => {
     listTrash.value.splice(idx, 1)
     showNotice('清单已永久删除', 'success')
     playListDeleteSound()
-    cleanupAttachmentsAsync()
     return true
   }
 
@@ -704,6 +706,122 @@ export const useTaskStore = defineStore('task', () => {
       if (target) target.sortOrder = (index + 1) * 1000
     })
     playMoveSound()
+  }
+
+  // ==================== 任务分组操作 ====================
+
+  const currentViewMode = computed(() => {
+    const list = lists.value.find(l => l.id === currentView.value)
+    return list?.viewMode || 'list'
+  })
+
+  const currentListGroups = computed(() => {
+    return taskGroups.value
+      .filter(g => g.listId === currentView.value)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+  })
+
+  const groupedTasks = computed(() => {
+    const groups = currentListGroups.value
+    // 置顶任务在分组模式中单独渲染，避免同时出现在所属分组内。
+    const tasks = filteredTasks.value.filter(t => !t.completed && !t.pinned)
+
+    const result = groups.map(group => ({
+      ...group,
+      tasks: tasks.filter(t => t.taskGroupId === group.id)
+    }))
+
+    // 添加"未分组"分组
+    const ungrouped = tasks.filter(t => !t.taskGroupId)
+    if (ungrouped.length > 0) {
+      result.unshift({ id: null, name: '未分组', emoji: '🗂️', tasks: ungrouped })
+    }
+
+    return result
+  })
+
+  function setViewMode(listId, mode) {
+    const list = lists.value.find(l => l.id === listId)
+    if (list) {
+      list.viewMode = mode
+    }
+  }
+
+  function addTaskGroup(name, listId, emoji, color = 'auto') {
+    const groupId = genId()
+    const maxSort = Math.max(0, ...taskGroups.value.filter(g => g.listId === listId).map(g => g.sortOrder || 0))
+    taskGroups.value.push({
+      id: groupId,
+      name: name || '新分组',
+      emoji: emoji || '',
+      color: TASK_GROUP_COLOR_IDS.includes(color) ? color : 'auto',
+      listId,
+      sortOrder: maxSort + 1000,
+      collapsed: false,
+      createdAt: nowIso(),
+      updatedAt: nowIso()
+    })
+    playGroupAddSound()
+    return groupId
+  }
+
+  function renameTaskGroup(groupId, name, emoji, color) {
+    const group = taskGroups.value.find(g => g.id === groupId)
+    if (group) {
+      if (name !== undefined) group.name = name || '未命名分组'
+      if (emoji !== undefined) group.emoji = emoji
+      if (color !== undefined) group.color = TASK_GROUP_COLOR_IDS.includes(color) ? color : 'auto'
+      group.updatedAt = nowIso()
+    }
+  }
+
+  function deleteTaskGroup(groupId) {
+    const index = taskGroups.value.findIndex(g => g.id === groupId)
+    if (index === -1) return
+
+    // 将该分组的任务移回未分组
+    tasks.value.forEach(task => {
+      if (task.taskGroupId === groupId) {
+        task.taskGroupId = null
+      }
+    })
+
+    taskGroups.value.splice(index, 1)
+    playGroupDeleteSound()
+  }
+
+  function moveTaskToGroup(taskId, groupId) {
+    const task = tasks.value.find(t => t.id === taskId)
+    if (task) {
+      task.taskGroupId = groupId || null
+      task.updatedAt = nowIso()
+    }
+  }
+
+  function reorderTaskGroup(sourceId, targetId, position) {
+    if (!sourceId || !targetId || sourceId === targetId) return
+    const ordered = [...taskGroups.value].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+    const sourceIndex = ordered.findIndex(group => group.id === sourceId)
+    const targetIndex = ordered.findIndex(group => group.id === targetId)
+    if (sourceIndex === -1 || targetIndex === -1) return
+    const [source] = ordered.splice(sourceIndex, 1)
+    const nextTargetIndex = ordered.findIndex(group => group.id === targetId)
+    ordered.splice(nextTargetIndex + (position === 'after' ? 1 : 0), 0, source)
+    ordered.forEach((group, index) => {
+      const target = taskGroups.value.find(item => item.id === group.id)
+      if (target) {
+        target.sortOrder = (index + 1) * 1000
+        target.updatedAt = nowIso()
+      }
+    })
+    playMoveSound()
+  }
+
+  function setTaskGroupCollapsed(groupId, collapsed) {
+    const group = taskGroups.value.find(item => item.id === groupId)
+    if (!group) return
+    group.collapsed = Boolean(collapsed)
+    group.updatedAt = nowIso()
   }
 
   function reorderList(sourceId, targetId, groupId = null) {
@@ -910,7 +1028,6 @@ export const useTaskStore = defineStore('task', () => {
     if (selectedTaskId.value === id) selectedTaskId.value = null
     showNotice('任务已永久删除', 'success')
     playClearSound()
-    cleanupAttachmentsAsync()
   }
 
   function updateTask(id, updates) {
@@ -1012,7 +1129,6 @@ export const useTaskStore = defineStore('task', () => {
     if (!subtask || !nextTitle || subtask.title === nextTitle) return
     subtask.title = nextTitle
     task.updatedAt = nowIso()
-    playToggleSound()
   }
 
   function reorderSubtask(taskId, sourceId, targetId) {
@@ -1101,8 +1217,28 @@ export const useTaskStore = defineStore('task', () => {
   async function loadData() {
     try {
       console.log('[Store] 开始加载数据...')
-      const data = await loadPlatformData()
-      console.log('[Store] 数据加载完成', data ? `${Object.keys(data).length} 个顶级字段` : '空数据')
+      const rawData = await loadPlatformData()
+      console.log('[Store] 数据加载完成', rawData ? `${Object.keys(rawData).length} 个顶级字段` : '空数据')
+
+      migrationBlocked.value = Boolean(rawData)
+      const sourceVersion = rawData?.schemaVersion || 1
+      if (rawData && sourceVersion < getCurrentVersion()) {
+        const backupLocation = await saveMigrationBackup(createBackup(rawData))
+        console.log(`[Store] 已创建迁移备份: ${backupLocation}`)
+      }
+
+      const data = migrateData(rawData)
+      if (data) {
+        const { valid, errors } = validateData(data)
+        if (!valid) {
+          throw new Error(`数据验证失败：${errors.join('；')}`)
+        }
+        if (rawData && sourceVersion < getCurrentVersion()) {
+          await savePlatformData(data)
+          console.log(`[Store] 数据已从 v${sourceVersion} 迁移到 v${getCurrentVersion()}`)
+        }
+      }
+
       if (data) {
         groups.value = normalizeGroups(data.groups)
         lists.value = normalizeLists(data.lists)
@@ -1111,6 +1247,7 @@ export const useTaskStore = defineStore('task', () => {
         listTrash.value = normalizeListTrash(data.listTrash)
         settings.value = normalizeSettings(data.settings)
         viewOrders.value = normalizeViewOrders(data.viewOrders)
+        taskGroups.value = (data.taskGroups || []).map(normalizeTaskGroup)
         // 根据用户设置更新音效开关
         setSoundEnabled(settings.value.soundEnabled)
         setSoundCategories({
@@ -1123,9 +1260,11 @@ export const useTaskStore = defineStore('task', () => {
         console.log(`[Store] 数据初始化完成: ${tasks.value.length} 任务, ${lists.value.length} 清单`)
       }
       currentView.value = settings.value.startView || 'today'
+      migrationBlocked.value = false
       saveError.value = ''
     } catch (error) {
       console.error('[Store] 数据加载失败:', error)
+      migrationBlocked.value = true
       saveError.value = error?.message || '读取本地数据失败'
       showNotice(saveError.value, 'error')
     }
@@ -1148,7 +1287,6 @@ export const useTaskStore = defineStore('task', () => {
         await savePlatformData(payload)
       }
       saveError.value = ''
-      playSaveSound()
     } catch (error) {
       saveError.value = error?.message || '保存本地数据失败'
       playErrorSound()
@@ -1160,11 +1298,12 @@ export const useTaskStore = defineStore('task', () => {
     }
   }
 
-  watch([groups, lists, tasks, trash, listTrash, settings, viewOrders], () => {
+  watch([groups, lists, tasks, trash, listTrash, settings, viewOrders, taskGroups], () => {
     scheduleSave()
   }, { deep: true })
 
   function scheduleSave() {
+    if (migrationBlocked.value) return
     if (saveTimer) window.clearTimeout(saveTimer)
     saveTimer = window.setTimeout(() => {
       saveTimer = null
@@ -1172,13 +1311,6 @@ export const useTaskStore = defineStore('task', () => {
     }, 180)
   }
 
-  /**
-   * 异步清理孤立附件文件（不阻塞主流程）
-   */
-  function cleanupAttachmentsAsync() {
-    const payload = buildSavePayload()
-    cleanupOrphanAttachments(payload).catch(() => {})
-  }
 
   function shouldRescheduleReminder(updates) {
     return ['reminderAt', 'dueDate', 'title', 'completed', 'deleted']
@@ -1211,13 +1343,14 @@ export const useTaskStore = defineStore('task', () => {
 
   function buildSavePayload() {
     const payload = JSON.parse(JSON.stringify({
-      schemaVersion: 2,
+      schemaVersion: 4,
       groups: groups.value,
       lists: lists.value,
       tasks: tasks.value,
       trash: trash.value,
       listTrash: listTrash.value,
       viewOrders: viewOrders.value,
+      taskGroups: taskGroups.value,
       settings: settings.value
     }))
     stripHydratedAttachmentUrls(payload)
@@ -1244,6 +1377,20 @@ export const useTaskStore = defineStore('task', () => {
     }))
   }
 
+  function normalizeTaskGroup(rawGroup) {
+    return {
+      id: rawGroup?.id || genId(),
+      name: rawGroup?.name || '未命名分组',
+      emoji: rawGroup?.emoji || '',
+      color: TASK_GROUP_COLOR_IDS.includes(rawGroup?.color) ? rawGroup.color : 'auto',
+      listId: rawGroup?.listId || '',
+      sortOrder: Number.isFinite(Number(rawGroup?.sortOrder)) ? Number(rawGroup.sortOrder) : 1000,
+      collapsed: Boolean(rawGroup?.collapsed),
+      createdAt: rawGroup?.createdAt || new Date().toISOString(),
+      updatedAt: rawGroup?.updatedAt || new Date().toISOString()
+    }
+  }
+
   function normalizeLists(rawLists) {
     const source = Array.isArray(rawLists) && rawLists.length ? rawLists : DEFAULT_LISTS
     const normalized = source.map(normalizeList)
@@ -1258,6 +1405,7 @@ export const useTaskStore = defineStore('task', () => {
       name: list?.name || fallback?.name || '未命名清单',
       groupId: list?.groupId ?? fallback?.groupId ?? null,
       color: list?.color || fallback?.color || pickListColor(),
+      viewMode: list?.viewMode || 'list',
       isSystem: Boolean(list?.isSystem || list?.id === 'inbox'),
       pinned: Boolean(list?.pinned),
       sortOrder: Number.isFinite(Number(list?.sortOrder)) ? Number(list.sortOrder) : (fallback?.sortOrder ?? (index + 1) * 1000)
@@ -1280,6 +1428,7 @@ export const useTaskStore = defineStore('task', () => {
       important: Boolean(task.important || task.priority === 3),
       myDayDate: task.myDayDate || null,
       listId: task.listId || 'inbox',
+      taskGroupId: task.taskGroupId || null,
       dueDate: task.dueDate || null,
       reminderAt: task.reminderAt || null,
       repeatRule: task.repeatRule || null,
@@ -1389,7 +1538,6 @@ export const useTaskStore = defineStore('task', () => {
         removedExpiredItems = true
       }
     })
-    if (removedExpiredItems) cleanupAttachmentsAsync()
   }
 
   function normalizeViewOrders(rawOrders = {}) {
@@ -1473,6 +1621,7 @@ export const useTaskStore = defineStore('task', () => {
 
   return {
     groups,
+    taskGroups,
     lists,
     tasks,
     trash,
@@ -1484,6 +1633,7 @@ export const useTaskStore = defineStore('task', () => {
     calendarCursor,
     searchQuery,
     saveError,
+    migrationBlocked,
     isSaving,
     notice,
     settings,
@@ -1511,6 +1661,9 @@ export const useTaskStore = defineStore('task', () => {
     statsSummary,
     statsTrend7Days,
     listDistribution,
+    currentViewMode,
+    currentListGroups,
+    groupedTasks,
     isInMyDay,
     getPlanBucket,
     cycleSort,
@@ -1549,6 +1702,13 @@ export const useTaskStore = defineStore('task', () => {
     reorderSubtask,
     addAttachment,
     removeAttachment,
+    setViewMode,
+    addTaskGroup,
+    renameTaskGroup,
+    deleteTaskGroup,
+    moveTaskToGroup,
+    reorderTaskGroup,
+    setTaskGroupCollapsed,
     setView,
     setCalendarMonth,
     shiftCalendarMonth,

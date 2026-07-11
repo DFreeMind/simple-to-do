@@ -17,6 +17,7 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
   const draggingId = ref('')
   const dragOverId = ref('')
   const dropPosition = ref('') // 'before' or 'after'
+  let targetGroupId = undefined
   let ghostEl = null
   let pendingItem = null
   let pendingItemId = ''
@@ -126,6 +127,7 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
     if (result && result.id !== draggingId.value) {
       dragOverId.value = result.id
       dropPosition.value = result.position || 'after'
+      targetGroupId = result.groupId
       // 播放拖动经过目标音效（仅在目标变化时）
       if (onDragOver && result.id !== lastDragOverId) {
         onDragOver()
@@ -134,6 +136,7 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
     } else {
       dragOverId.value = ''
       dropPosition.value = ''
+      targetGroupId = undefined
       lastDragOverId = ''
     }
   }
@@ -179,7 +182,7 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
     }
 
     if (draggingId.value && dragOverId.value) {
-      onDrop(draggingId.value, dragOverId.value, dropPosition.value)
+      onDrop(draggingId.value, dragOverId.value, dropPosition.value, targetGroupId)
     }
 
     // 播放拖动结束音效
@@ -197,6 +200,7 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
     draggingId.value = ''
     dragOverId.value = ''
     dropPosition.value = ''
+    targetGroupId = undefined
     lastDragOverId = ''
   }
 
@@ -226,6 +230,7 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
     draggingId.value = ''
     dragOverId.value = ''
     dropPosition.value = ''
+    targetGroupId = undefined
     lastDragOverId = ''
   }
 

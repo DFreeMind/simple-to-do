@@ -49,6 +49,9 @@
           <span class="color-dot" :style="{ backgroundColor: list.color }"></span>
           {{ list.name }}
         </span>
+        <span v-if="store.currentView === 'search' && taskGroup" class="meta-chip">
+          {{ taskGroup.emoji || '📂' }} {{ taskGroup.name }}
+        </span>
         <span v-if="task.dueDate" class="meta-chip" :class="{ overdue: isOverdue }">
           <CalendarClock :size="13" />
           {{ formatDate(task.dueDate) }}
@@ -70,6 +73,10 @@
           {{ task.attachments.length }}
         </span>
         <span v-for="tag in task.tags || []" :key="tag" class="meta-chip">#{{ tag }}</span>
+        <span v-if="task.createdAt" class="meta-chip meta-chip--muted">
+          <Clock :size="12" />
+          {{ formatCreatedAt(task.createdAt) }}
+        </span>
       </div>
     </div>
 
@@ -130,6 +137,21 @@
       <button class="context-item" role="menuitem" type="button" @click="openMoveModal">
         <FolderInput :size="15" /> 移动到清单
       </button>
+      <template v-if="canMoveToGroup">
+        <div class="context-separator"></div>
+        <button class="context-item" role="menuitem" type="button" @click="openGroupMoveModal">
+          <FolderInput :size="15" /> 移动至分组…
+        </button>
+        <div v-if="groupMoveSubmenuOpen" class="context-menu group-move-submenu" :style="groupMoveSubmenuStyle" @click.stop>
+          <div class="group-move-submenu__head"><strong>移动至分组</strong><span>{{ filteredMoveGroups.length }} 项</span></div>
+          <label class="group-move-submenu__search"><Search :size="14" /><input ref="groupMoveSearchInput" v-model="groupMoveQuery" type="search" placeholder="搜索分组" /></label>
+          <div class="group-move-submenu__options">
+            <button class="context-item" :class="{ active: !task.taskGroupId }" type="button" @click="moveToGroup(null)"><FolderInput :size="15" /> 未分组</button>
+            <button v-for="group in filteredMoveGroups" :key="group.id" class="context-item" :class="{ active: task.taskGroupId === group.id }" type="button" :disabled="task.taskGroupId === group.id" @click="moveToGroup(group.id)"><span class="group-move-submenu__emoji">{{ group.emoji || '📂' }}</span> {{ group.name }}<small v-if="task.taskGroupId === group.id">当前</small></button>
+            <p v-if="!filteredMoveGroups.length" class="group-move-submenu__empty">未找到匹配分组</p>
+          </div>
+        </div>
+      </template>
       <div class="context-separator"></div>
       <button class="context-item context-item--danger" role="menuitem" type="button" @click="deleteTask">
         <Trash2 :size="15" /> 删除
@@ -142,6 +164,7 @@
       @close="moveModalOpen = false"
       @select="moveToList"
     />
+
 
     <ConfirmDialog
       :visible="confirmDialog.visible"
@@ -160,6 +183,7 @@ import { computed, ref, reactive, nextTick, onMounted, onBeforeUnmount } from 'v
 import {
   CalendarClock,
   Check,
+  Clock,
   Copy,
   FolderInput,
   GripVertical,
@@ -170,12 +194,13 @@ import {
   Pin,
   Repeat2,
   RotateCcw,
+  Search,
   Star,
   Sun,
   Trash2
 } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
-import { formatDate as fmtDate } from '@/utils/date'
+import { formatDate as fmtDate, formatCreatedAt } from '@/utils/date'
 import MoveToListModal from './MoveToListModal.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
 
@@ -191,6 +216,10 @@ const props = defineProps({
 const store = useTaskStore()
 const menuOpen = ref(false)
 const moveModalOpen = ref(false)
+const groupMoveSubmenuOpen = ref(false)
+const groupMoveQuery = ref('')
+const groupMoveSearchInput = ref(null)
+const groupMoveSubmenuPos = ref({ x: 0, y: 0 })
 const menuPos = ref({ x: 0, y: 0 })
 const menuEl = ref(null)
 const confirmDialog = reactive({
@@ -203,6 +232,16 @@ const confirmDialog = reactive({
 })
 
 const list = computed(() => store.lists.find(item => item.id === props.task.listId))
+const taskGroup = computed(() => store.taskGroups.find(group => group.id === props.task.taskGroupId) || null)
+const canMoveToGroup = computed(() => {
+  return store.currentViewMode === 'group' && store.currentList?.id === props.task.listId
+})
+const filteredMoveGroups = computed(() => {
+  const query = groupMoveQuery.value.trim().toLowerCase()
+  const groups = store.groupedTasks.filter(group => group.id)
+  return query ? groups.filter(group => `${group.name} ${group.emoji || ''}`.toLowerCase().includes(query)) : groups
+})
+const groupMoveSubmenuStyle = computed(() => ({ left: `${groupMoveSubmenuPos.value.x}px`, top: `${groupMoveSubmenuPos.value.y}px` }))
 const completedSubtasks = computed(() => props.task.subtasks?.filter(item => item.completed).length || 0)
 const isOverdue = computed(() => props.task.dueDate && !props.task.completed && new Date(props.task.dueDate) < new Date())
 const repeatLabel = computed(() => {
@@ -217,17 +256,33 @@ function formatDate(date) {
 function openMenu(event) {
   menuPos.value = clampMenuPosition(event.clientX, event.clientY, 220, 320)
   menuOpen.value = true
-  showMoveMenu.value = false
   nextTick(() => menuEl.value?.focus())
 }
 
 function closeMenu() {
   menuOpen.value = false
+  groupMoveSubmenuOpen.value = false
+  groupMoveQuery.value = ''
 }
 
 function openMoveModal() {
   menuOpen.value = false
   moveModalOpen.value = true
+}
+
+function openGroupMoveModal() {
+  groupMoveQuery.value = ''
+  groupMoveSubmenuOpen.value = true
+  nextTick(() => {
+    const rect = menuEl.value?.getBoundingClientRect()
+    if (!rect) return
+    const width = 280
+    const height = Math.min(390, window.innerHeight - 20)
+    const x = rect.right + width + 8 <= window.innerWidth ? rect.right + 8 : Math.max(10, rect.left - width - 8)
+    const y = Math.max(10, Math.min(rect.top, window.innerHeight - height - 10))
+    groupMoveSubmenuPos.value = { x, y }
+    groupMoveSearchInput.value?.focus()
+  })
 }
 
 function togglePin() {
@@ -255,8 +310,14 @@ async function copyLink() {
 }
 
 function moveToList(listId) {
-  store.updateTask(props.task.id, { listId })
+  store.updateTask(props.task.id, { listId, taskGroupId: null })
   store.showNotice('任务已移动', 'success')
+  closeMenu()
+}
+
+function moveToGroup(groupId) {
+  store.moveTaskToGroup(props.task.id, groupId)
+  store.showNotice(groupId ? '任务已移动到分组' : '任务已移至未分组', 'success')
   closeMenu()
 }
 

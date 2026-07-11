@@ -172,14 +172,14 @@ function cancel() {
 
   &--edit {
     background: white;
-    color: #3b82f6;
-    box-shadow: 0 8px 32px rgba(59, 130, 246, 0.2);
+    color: var(--accent, #5fb8ad);
+    box-shadow: 0 8px 32px rgba(95, 184, 173, 0.2);
   }
 
   &--move {
     background: white;
-    color: #10b981;
-    box-shadow: 0 8px 32px rgba(16, 185, 129, 0.2);
+    color: var(--accent, #5fb8ad);
+    box-shadow: 0 8px 32px rgba(95, 184, 173, 0.2);
   }
 
   &--danger {
@@ -265,13 +265,13 @@ function cancel() {
   }
 
   &--edit {
-    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    background: var(--accent, #5fb8ad);
     color: white;
-    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+    box-shadow: 0 4px 14px rgba(95, 184, 173, 0.35);
 
     &:hover:not(:disabled) {
       transform: translateY(-1px);
-      box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+      box-shadow: 0 6px 20px rgba(95, 184, 173, 0.4);
     }
 
     &:disabled {
@@ -281,9 +281,9 @@ function cancel() {
   }
 
   &--move {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    background: var(--accent, #5fb8ad);
     color: white;
-    box-shadow: 0 4px 14px rgba(5, 150, 105, 0.35);
+    box-shadow: 0 4px 14px rgba(95, 184, 173, 0.35);
 
     &:hover:not(:disabled) {
       transform: translateY(-1px);

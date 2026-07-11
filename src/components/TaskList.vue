@@ -6,6 +6,20 @@
         <h1>{{ viewMeta.title }}</h1>
       </div>
       <div class="header-actions">
+        <ViewModeToggle v-if="showTaskActions && !['planned', 'completed', 'trash'].includes(store.currentView)" v-model="viewMode" />
+        <button v-if="showTaskActions && viewMode === 'group' && !['planned', 'completed', 'trash'].includes(store.currentView)" class="icon-btn" type="button" title="新建分组" @click="addGroup">
+          <Plus :size="18" />
+        </button>
+        <button
+          v-if="showTaskActions && viewMode === 'group' && store.currentListGroups.length && !['planned', 'completed', 'trash'].includes(store.currentView)"
+          class="icon-btn"
+          type="button"
+          :title="allGroupsExpanded ? '折叠全部' : '展开全部'"
+          @click="toggleAllGroups"
+        >
+          <ChevronsDown v-if="!allGroupsExpanded" :size="18" />
+          <ChevronsUp v-else :size="18" />
+        </button>
         <div v-if="showTaskActions" class="sort-select">
           <button class="pill-btn" type="button" :title="sortLabel" :aria-label="sortLabel" @click.stop="sortMenuOpen = !sortMenuOpen">
             <ArrowUpDown :size="16" />
@@ -51,7 +65,6 @@
         @input="store.setSearch($event.target.value)"
       />
     </section>
-
     <section v-else-if="store.canQuickAddTask" class="quick-add">
       <div class="quick-add__row">
         <Plus :size="19" />
@@ -78,9 +91,11 @@
     </section>
 
     <section
+      ref="contentRef"
       class="task-list__content"
-      :class="{ 'task-list__content--empty': isEmpty }"
+      :class="{ 'task-list__content--empty': isEmpty, 'is-scrolling': isScrolling }"
       @mousedown="handleMouseDown"
+      @scroll.passive="onContentScroll"
     >
       <template v-if="store.currentView === 'planned' && store.plannedSections.length">
         <div v-for="section in store.plannedSections" :key="section.id" class="task-section">
@@ -122,41 +137,162 @@
       </template>
 
       <template v-else>
-        <template v-if="store.pinnedTasks.length">
-          <div class="task-section pinned-section">
-            <button class="pinned-toggle" type="button" @click="pinnedVisible = !pinnedVisible">
-              <ChevronRight :size="16" :class="{ rotated: pinnedVisible }" />
-              <Pin :size="13" />
-              <span>置顶 {{ store.pinnedTasks.length }}</span>
-            </button>
-            <TaskItem
-              v-if="pinnedVisible"
-              v-for="task in store.pinnedTasks"
-              :key="task.id"
-              :task="task"
-              :draggable="store.canDragTasks"
-              :is-dragging="taskDrag.draggingId.value === task.id"
-              :is-drop-target="taskDrag.dragOverId.value === task.id"
-              :drop-position="taskDrag.dragOverId.value === task.id ? taskDrag.dropPosition.value : ''"
+        <!-- 列表模式 -->
+        <template v-if="viewMode === 'list'">
+          <template v-if="store.pinnedTasks.length">
+            <div class="pinned-section">
+              <div class="task-group-header is-system pinned-header">
+                <div class="task-group-header__main">
+                  <button class="task-group-header__toggle" type="button" :title="pinnedVisible ? '折叠置顶' : '展开置顶'" @click="pinnedVisible = !pinnedVisible">
+                  <ChevronDown :size="16" :class="{ rotated: !pinnedVisible }" />
+                  </button>
+                  <span class="task-group-header__emoji">📌</span>
+                  <span class="task-group-header__name">置顶</span>
+                  <span class="task-group-header__count">{{ store.pinnedTasks.length }}</span>
+                </div>
+              </div>
+              <TaskItem
+                v-if="pinnedVisible"
+                v-for="task in store.pinnedTasks"
+                :key="task.id"
+                :task="task"
+                :draggable="store.canDragTasks"
+                :is-dragging="taskDrag.draggingId.value === task.id"
+                :is-drop-target="taskDrag.dragOverId.value === task.id"
+                :drop-position="taskDrag.dragOverId.value === task.id ? taskDrag.dropPosition.value : ''"
+              />
+            </div>
+          </template>
+
+          <TaskItem
+            v-for="task in store.unpinnedTasks"
+            :key="task.id"
+            :task="task"
+            :draggable="store.canDragTasks"
+            :is-dragging="taskDrag.draggingId.value === task.id"
+            :is-drop-target="taskDrag.dragOverId.value === task.id"
+            :drop-position="taskDrag.dragOverId.value === task.id ? taskDrag.dropPosition.value : ''"
+          />
+        </template>
+
+        <!-- 分组模式 -->
+        <template v-else>
+          <template v-if="store.pinnedTasks.length">
+            <div class="pinned-section">
+              <div class="task-group-header is-system pinned-header">
+                <div class="task-group-header__main">
+                  <button class="task-group-header__toggle" type="button" :title="pinnedVisible ? '折叠置顶' : '展开置顶'" @click="pinnedVisible = !pinnedVisible">
+                  <ChevronDown :size="16" :class="{ rotated: !pinnedVisible }" />
+                  </button>
+                  <span class="task-group-header__emoji">📌</span>
+                  <span class="task-group-header__name">置顶</span>
+                  <span class="task-group-header__count">{{ store.pinnedTasks.length }}</span>
+                </div>
+              </div>
+              <TaskItem
+                v-if="pinnedVisible"
+                v-for="task in store.pinnedTasks"
+                :key="task.id"
+                :task="task"
+                :draggable="store.canDragTasks"
+                :is-dragging="taskDrag.draggingId.value === task.id"
+                :is-drop-target="taskDrag.dragOverId.value === task.id"
+                :drop-position="taskDrag.dragOverId.value === task.id ? taskDrag.dropPosition.value : ''"
+              />
+            </div>
+          </template>
+
+          <div v-for="group in store.groupedTasks" :key="group.id || 'ungrouped'" class="task-group" :class="[getGroupToneClass(group), { 'is-dragging': groupDrag.draggingId.value === group.id, 'is-drop-target': groupDrag.dragOverId.value === group.id, [`drop-${groupDrag.dropPosition.value}`]: groupDrag.dragOverId.value === group.id }]">
+            <TaskGroupHeader
+              :group="{ ...group, collapsed: isGroupCollapsed(group.id) }"
+              @mousedown="handleGroupMouseDown($event, group.id)"
+              @toggle="toggleGroupCollapse"
+              @addTask="addGroupTask"
+              @menu="showGroupMenu"
             />
+            <template v-if="!isGroupCollapsed(group.id)">
+              <TaskItem
+                v-for="task in group.tasks"
+                :key="task.id"
+                :task="task"
+                :draggable="store.canDragTasks"
+                :is-dragging="taskDrag.draggingId.value === task.id"
+                :is-drop-target="taskDrag.dragOverId.value === task.id"
+                :drop-position="taskDrag.dragOverId.value === task.id ? taskDrag.dropPosition.value : ''"
+              />
+            </template>
           </div>
         </template>
 
-        <TaskItem
-          v-for="task in store.unpinnedTasks"
-          :key="task.id"
-          :task="task"
-          :draggable="store.canDragTasks"
-          :is-dragging="taskDrag.draggingId.value === task.id"
-          :is-drop-target="taskDrag.dragOverId.value === task.id"
-          :drop-position="taskDrag.dragOverId.value === task.id ? taskDrag.dropPosition.value : ''"
-        />
-
-        <div v-if="store.completedTasks.length" class="task-section completed-section">
-          <button class="completed-toggle" type="button" @click="toggleCompleted">
-            <ChevronRight :size="16" :class="{ rotated: store.settings.completedVisible }" />
-            <span>已完成 {{ store.completedTasks.length }}</span>
+        <!-- 分组右键菜单 -->
+        <div
+          v-if="groupMenu.visible"
+          ref="groupMenuRef"
+          class="context-menu"
+          :style="groupMenuStyle"
+          role="menu"
+          tabindex="-1"
+          @click.stop
+          @keydown.esc="closeGroupMenu"
+        >
+          <button class="context-item" role="menuitem" type="button" @click="renameGroup">
+            <Pencil :size="15" /> 重命名
           </button>
+          <button class="context-item context-item--danger" role="menuitem" type="button" @click="deleteGroup">
+            <Trash2 :size="15" /> 删除分组
+          </button>
+        </div>
+
+        <!-- 分组添加任务弹出框 -->
+        <div
+          v-if="activeGroupAddId"
+          class="group-add-popup-overlay"
+          @click="cancelGroupAdd"
+        >
+          <div class="group-add-popup" :style="groupAddPopupStyle" @click.stop>
+            <div class="group-add-popup__row">
+              <Plus :size="19" />
+              <input
+                ref="groupAddInputRef"
+                v-model="groupAddTitle"
+                type="text"
+                placeholder="添加任务，可输入'明天 18点''每周''#标签'"
+                aria-label="快速添加任务"
+                @keydown.enter="submitGroupAdd"
+                @keydown.escape="cancelGroupAdd"
+              />
+              <button class="primary-btn" type="button" :disabled="!groupAddTitle.trim()" @click="submitGroupAdd">添加</button>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="store.completedTasks.length" class="completed-section">
+          <div class="task-group-header is-system completed-header">
+            <div class="task-group-header__main">
+              <button
+                class="task-group-header__toggle"
+                type="button"
+                :title="store.settings.completedVisible ? '折叠已完成' : '展开已完成'"
+                @click="toggleCompleted"
+              >
+                <ChevronDown :size="16" :class="{ rotated: !store.settings.completedVisible }" />
+              </button>
+              <span class="task-group-header__emoji">🎉</span>
+              <span class="task-group-header__name">已完成</span>
+              <span class="task-group-header__count">{{ store.completedTasks.length }}</span>
+            </div>
+            <div class="task-group-header__actions">
+              <button
+                class="task-group-header__menu"
+                type="button"
+                title="清除已完成"
+                aria-label="清除已完成"
+                @click.stop="clearCompleted"
+              >
+                <ArchiveX :size="14" />
+              </button>
+            </div>
+          </div>
           <TaskItem
             v-if="store.settings.completedVisible"
             v-for="task in store.completedTasks"
@@ -175,6 +311,14 @@
       </div>
     </section>
 
+    <div
+      v-show="scrollIndicator.visible"
+      class="task-list__scroll-indicator"
+      :class="{ 'is-visible': isScrolling }"
+      :style="{ top: `${scrollIndicator.top}px`, height: `${scrollIndicator.height}px` }"
+      aria-hidden="true"
+    ></div>
+
     <ConfirmDialog
       :visible="confirmDialog.visible"
       :title="confirmDialog.title"
@@ -183,6 +327,106 @@
       :type="confirmDialog.type"
       @confirm="confirmDialog.onConfirm"
       @cancel="confirmDialog.visible = false"
+    />
+
+    <InputDialog
+      :visible="inputDialog.visible"
+      :title="inputDialog.title"
+      :message="inputDialog.message"
+      :placeholder="inputDialog.placeholder"
+      :default-value="inputDialog.defaultValue"
+      :confirm-text="inputDialog.confirmText"
+      :type="inputDialog.type"
+      @confirm="inputDialog.onConfirm"
+      @cancel="inputDialog.visible = false"
+    />
+
+    <!-- 分组创建/重命名弹窗 -->
+    <Teleport to="body">
+      <div v-if="groupDialog.visible" class="input-overlay" @click.self="closeGroupDialog">
+        <div class="input-dialog group-dialog" @click.stop>
+          <button class="input-close" type="button" title="关闭" @click="closeGroupDialog">
+            <X :size="18" />
+          </button>
+          <div class="input-header input-header--edit">
+            <div class="input-icon-wrapper">
+              <div class="input-icon input-icon--edit">
+                <FolderInput :size="28" />
+              </div>
+            </div>
+          </div>
+          <div class="input-body group-dialog__body">
+            <h3>{{ groupDialog.title }}</h3>
+            <p class="input-description">为任务分组，方便按主题整理和回顾</p>
+
+            <div class="group-dialog__name-row">
+              <button ref="emojiButtonRef" type="button" class="group-dialog__emoji-trigger" title="选择 Emoji" @click.stop="toggleEmojiPicker">
+                <span v-if="groupDialog.emoji">{{ groupDialog.emoji }}</span>
+                <Smile v-else :size="20" />
+              </button>
+              <div class="input-field-wrapper group-dialog__name-field">
+                <input
+                  ref="groupDialogInput"
+                  v-model="groupDialog.name"
+                  type="text"
+                  placeholder="分组名称，例如：工作"
+                  class="input-field"
+                  maxlength="30"
+                  @keydown.enter="confirmGroupDialog"
+                />
+              </div>
+            </div>
+
+            <div class="group-dialog__section">
+              <div class="group-dialog__section-title"><span>背景颜色</span></div>
+              <button type="button" class="group-dialog__auto-color" :class="{ active: groupDialog.color === 'auto' }" @click="groupDialog.color = 'auto'">
+                <span class="group-dialog__auto-swatch">✦</span>
+                <span><strong>自动配色</strong><small>根据当前主题生成协调色</small></span>
+                <Check v-if="groupDialog.color === 'auto'" :size="16" />
+              </button>
+              <div class="group-dialog__manual-colors">
+                <span>手动选择</span>
+                <div class="group-dialog__color-options">
+                <button
+                  v-for="option in groupColorOptions.filter(option => option.id !== 'auto')"
+                  :key="option.id"
+                  type="button"
+                  class="group-dialog__color-option"
+                  :class="{ active: groupDialog.color === option.id }"
+                  :title="option.label"
+                  :aria-label="option.label"
+                  :style="{ '--swatch-color': option.color }"
+                  @click="groupDialog.color = option.id"
+                >
+                  <span class="group-dialog__color-swatch"></span>
+                  <Check v-if="groupDialog.color === option.id" :size="13" />
+                </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="input-footer">
+            <button class="input-btn input-btn--cancel" type="button" @click="closeGroupDialog">
+              取消
+            </button>
+            <button
+              class="input-btn input-btn--edit"
+              type="button"
+              :disabled="!groupDialog.name.trim()"
+              @click="confirmGroupDialog"
+            >
+              {{ groupDialog.confirmText }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <EmojiPicker
+      v-model="groupDialog.emoji"
+      :visible="groupDialog.showEmoji"
+      :anchor-el="emojiButtonEl"
+      @update:visible="groupDialog.showEmoji = $event"
     />
   </main>
 </template>
@@ -193,38 +437,114 @@ import {
   ArchiveX,
   ArrowUpDown,
   CalendarClock,
+  FolderInput,
+  Pencil,
   Check,
   CheckCheck,
   ChevronDown,
-  ChevronRight,
+  ChevronsDown,
+  ChevronsUp,
   Flag,
   Folder,
   Info,
   PanelRight,
-  Pin,
   Plus,
   Repeat2,
   RotateCcw,
   Search,
+  Smile,
   Tags,
-  Trash2
+  Trash2,
+  X
 } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import { useDragSort } from '@/composables/useDragSort'
 import TaskItem from './TaskItem.vue'
+import TaskGroupHeader from './TaskGroupHeader.vue'
+import EmojiPicker from './EmojiPicker.vue'
+import ViewModeToggle from './ViewModeToggle.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
+import InputDialog from './InputDialog.vue'
 
 const store = useTaskStore()
 const newTaskTitle = ref('')
 const quickInput = ref(null)
 const sortMenuOpen = ref(false)
 const pinnedVisible = ref(true)
+const groupCollapseState = reactive({})
+const contentRef = ref(null)
+const isScrolling = ref(false)
+const scrollIndicator = reactive({ visible: false, top: 0, height: 0 })
+let scrollTimer = null
+const groupMenu = reactive({ visible: false, x: 0, y: 0, groupId: null })
+const groupMenuRef = ref(null)
+const groupDialog = reactive({
+  visible: false,
+  title: '新建分组',
+  name: '',
+  emoji: '',
+  color: 'auto',
+  showEmoji: false,
+  confirmText: '创建',
+  editingGroupId: null
+})
+const groupDialogInput = ref(null)
+const emojiButtonRef = ref(null)
+const emojiButtonEl = computed(() => emojiButtonRef.value?.$el || emojiButtonRef.value)
+const groupColorOptions = [
+  { id: 'auto', label: '自动', color: '' },
+  { id: 'accent', label: '主题', color: 'var(--accent)' },
+  { id: 'blue', label: '海蓝', color: '#5b8def' },
+  { id: 'violet', label: '紫罗兰', color: '#8b76df' },
+  { id: 'amber', label: '暖橙', color: '#d99a42' },
+  { id: 'rose', label: '玫瑰', color: '#d97991' },
+  { id: 'green', label: '草绿', color: '#62a97b' }
+]
+const activeGroupAddId = ref(null)
+const activeGroupAddGroupId = ref(null)
+const groupAddTitle = ref('')
+const groupAddInputRef = ref(null)
+const groupAddPopupPos = reactive({ x: 0, y: 0 })
+const groupAddPopupStyle = computed(() => {
+  const w = 420
+  const h = 52
+  const pad = 12
+  let x = groupAddPopupPos.x
+  let y = groupAddPopupPos.y
+  if (x + w > window.innerWidth - pad) x = window.innerWidth - w - pad
+  if (y + h > window.innerHeight - pad) y = window.innerHeight - h - pad
+  if (x < pad) x = pad
+  if (y < pad) y = pad
+  return { left: `${x}px`, top: `${y}px` }
+})
+const groupMenuStyle = computed(() => {
+  const menuW = 140
+  const menuH = 80
+  const pad = 8
+  let x = groupMenu.x
+  let y = groupMenu.y
+  if (x + menuW > window.innerWidth - pad) x = window.innerWidth - menuW - pad
+  if (y + menuH > window.innerHeight - pad) y = window.innerHeight - menuH - pad
+  if (x < pad) x = pad
+  if (y < pad) y = pad
+  return { left: `${x}px`, top: `${y}px` }
+})
 const confirmDialog = reactive({
   visible: false,
   title: '',
   message: '',
   confirmText: '确定',
   type: 'danger',
+  onConfirm: () => {}
+})
+const inputDialog = reactive({
+  visible: false,
+  title: '',
+  message: '',
+  placeholder: '',
+  defaultValue: '',
+  confirmText: '保存',
+  type: 'edit',
   onConfirm: () => {}
 })
 const sortOptions = [
@@ -241,7 +561,15 @@ const taskDrag = useDragSort({
   onDragStart: () => store.playDragStartSound(),
   onDragOver: () => store.playDragOverSound(),
   onDragEnd: () => store.playDragEndSound(),
-  onDrop(sourceId, targetId, position) {
+  onDrop(sourceId, targetId, position, groupId) {
+    // 如果是分组模式且有目标分组，移动任务到分组
+    if (viewMode.value === 'group' && groupId !== undefined) {
+      store.moveTaskToGroup(sourceId, groupId)
+    }
+
+    // 如果是拖到分组头部（__group__前缀），只移动分组，不重排序
+    if (targetId.startsWith('__group__')) return
+
     // Find which scope the tasks belong to
     if (store.currentView === 'planned') {
       const section = store.plannedSections.find(s => s.tasks.some(t => t.id === sourceId || t.id === targetId))
@@ -261,6 +589,16 @@ const taskDrag = useDragSort({
   findItemAtPoint(x, y) {
     const elements = document.elementsFromPoint(x, y)
     for (const el of elements) {
+      // 检查是否拖到了分组头部区域
+      const groupHeader = el.closest?.('.task-group-header')
+      if (groupHeader) {
+        const groupId = groupHeader.dataset.groupId
+        if (groupId) {
+          // 返回分组ID作为目标
+          return { id: '__group__' + groupId, position: 'after', groupId }
+        }
+      }
+
       const article = el.closest?.('.task-item')
       if (!article) continue
       const taskId = article.dataset.taskId
@@ -269,9 +607,39 @@ const taskDrag = useDragSort({
       const rect = article.getBoundingClientRect()
       const midY = rect.top + rect.height / 2
       const position = y < midY ? 'before' : 'after'
-      return { id: taskId, position }
+
+      // 查找任务所属的分组
+      const groupEl = article.closest('.task-group')
+      const groupId = groupEl?.querySelector('.task-group-header')?.dataset.groupId || null
+
+      return { id: taskId, position, groupId }
     }
     return null
+  }
+})
+
+const groupDrag = useDragSort({
+  scrollContainerSelector: '.task-list__content',
+  onDragStart: () => store.playDragStartSound(),
+  onDragOver: () => store.playDragOverSound(),
+  onDragEnd: () => store.playDragEndSound(),
+  onDrop(sourceId, targetId, position) {
+    store.reorderTaskGroup(sourceId, targetId, position)
+  },
+  getItemEl(target) {
+    const header = target.closest?.('.task-group-header:not(.is-system)')
+    const groupId = header?.dataset.groupId
+    return groupId ? { id: groupId, el: header } : null
+  },
+  findItemAtPoint(x, y) {
+    const group = document.elementsFromPoint(x, y)
+      .map(el => el.closest?.('.task-group'))
+      .find(Boolean)
+    const header = group?.querySelector('.task-group-header:not(.is-system)')
+    const groupId = header?.dataset.groupId
+    if (!groupId) return null
+    const rect = group.getBoundingClientRect()
+    return { id: groupId, position: y < rect.top + rect.height / 2 ? 'before' : 'after' }
   }
 })
 
@@ -284,8 +652,44 @@ function handleMouseDown(e) {
   if (taskId) taskDrag.startDrag(e, taskId)
 }
 
+function handleGroupMouseDown(e, groupId) {
+  if (isDragIgnored(e.target)) return
+  groupDrag.startDrag(e, groupId)
+}
+
 function isDragIgnored(target) {
   return Boolean(target.closest?.('button, input, textarea, select, a, .context-menu'))
+}
+
+function getGroupToneClass(group) {
+  if (!group.id) return 'task-group--ungrouped'
+  if (group.color && group.color !== 'auto') return `task-group--color-${group.color}`
+  const groupId = group.id
+  let hash = 0
+  for (const char of groupId) hash = ((hash << 5) - hash) + char.charCodeAt(0)
+  return `task-group--tone-${Math.abs(hash) % 4}`
+}
+
+function updateScrollIndicator(element = contentRef.value) {
+  if (!element) return
+  const { clientHeight, scrollHeight, scrollTop, offsetTop } = element
+  const hasOverflow = scrollHeight > clientHeight + 1
+  scrollIndicator.visible = hasOverflow
+  if (!hasOverflow) return
+  const height = Math.max(32, Math.round((clientHeight * clientHeight) / scrollHeight))
+  const maxTop = Math.max(0, clientHeight - height)
+  const progress = (scrollHeight - clientHeight) > 0 ? scrollTop / (scrollHeight - clientHeight) : 0
+  scrollIndicator.height = height
+  scrollIndicator.top = offsetTop + Math.round(maxTop * progress)
+}
+
+function onContentScroll(event) {
+  updateScrollIndicator(event?.currentTarget)
+  isScrolling.value = true
+  if (scrollTimer) clearTimeout(scrollTimer)
+  scrollTimer = setTimeout(() => {
+    isScrolling.value = false
+  }, 850)
 }
 
 const viewMeta = computed(() => {
@@ -358,6 +762,38 @@ const isEmpty = computed(() => {
   return store.filteredTasks.length === 0
 })
 
+const viewMode = computed({
+  get: () => store.currentViewMode,
+  set: (mode) => store.setViewMode(store.currentView, mode)
+})
+
+function toggleGroupCollapse(groupId) {
+  if (groupId) {
+    store.setTaskGroupCollapsed(groupId, !isGroupCollapsed(groupId))
+    return
+  }
+  groupCollapseState.__ungrouped__ = !groupCollapseState.__ungrouped__
+}
+
+function isGroupCollapsed(groupId) {
+  if (!groupId) return !!groupCollapseState.__ungrouped__
+  return !!store.currentListGroups.find(group => group.id === groupId)?.collapsed
+}
+
+const allGroupsExpanded = computed(() => {
+  const allKeys = store.groupedTasks.map(g => g.id || '__ungrouped__')
+  return allKeys.length > 0 && allKeys.every(key => !isGroupCollapsed(key === '__ungrouped__' ? null : key))
+})
+
+function toggleAllGroups() {
+  const allExpanded = allGroupsExpanded.value
+  const allKeys = store.groupedTasks.map(g => g.id || '__ungrouped__')
+  allKeys.forEach(key => {
+    if (key === '__ungrouped__') groupCollapseState.__ungrouped__ = allExpanded
+    else store.setTaskGroupCollapsed(key, allExpanded)
+  })
+}
+
 const emptyTitle = computed(() => {
   const map = {
     today: '今天很清爽',
@@ -392,6 +828,144 @@ function addTask() {
   nextTick(() => quickInput.value?.focus())
 }
 
+function addGroupTask(groupId, event) {
+  const key = groupId || '__ungrouped__'
+  // 点击同一个分组的添加按钮则关闭
+  if (activeGroupAddId.value === key) {
+    cancelGroupAdd()
+    return
+  }
+  // 定位弹出框到按钮附近
+  if (event) {
+    const rect = event.target.getBoundingClientRect()
+    groupAddPopupPos.x = rect.left
+    groupAddPopupPos.y = rect.bottom + 6
+  }
+  activeGroupAddId.value = key
+  activeGroupAddGroupId.value = groupId
+  groupAddTitle.value = ''
+  nextTick(() => groupAddInputRef.value?.focus())
+}
+
+function submitGroupAdd() {
+  const title = groupAddTitle.value.trim()
+  if (!title) return
+  const task = store.addTask(title)
+  if (task && activeGroupAddGroupId.value) {
+    store.moveTaskToGroup(task.id, activeGroupAddGroupId.value)
+  }
+  groupAddTitle.value = ''
+  nextTick(() => groupAddInputRef.value?.focus())
+}
+
+function cancelGroupAdd() {
+  activeGroupAddId.value = null
+  activeGroupAddGroupId.value = null
+  groupAddTitle.value = ''
+}
+
+function showGroupMenu({ groupId, event }) {
+  groupMenu.groupId = groupId
+  groupMenu.x = event.clientX
+  groupMenu.y = event.clientY
+  groupMenu.visible = true
+  nextTick(() => {
+    document.addEventListener('click', closeGroupMenu, { once: true })
+  })
+}
+
+function closeGroupMenu() {
+  groupMenu.visible = false
+  groupMenu.groupId = null
+}
+
+function renameGroup() {
+  const groupId = groupMenu.groupId
+  closeGroupMenu()
+  if (!groupId) return
+  const group = store.currentListGroups.find(g => g.id === groupId)
+  if (!group) return
+  groupDialog.title = '重命名分组'
+  groupDialog.name = group.name
+  groupDialog.emoji = group.emoji || ''
+  groupDialog.color = group.color || 'auto'
+  groupDialog.showEmoji = false
+  groupDialog.confirmText = '保存'
+  groupDialog.editingGroupId = groupId
+  groupDialog.visible = true
+  nextTick(() => groupDialogInput.value?.focus())
+}
+
+function closeGroupDialog() {
+  groupDialog.visible = false
+  groupDialog.showEmoji = false
+  groupDialog.editingGroupId = null
+}
+
+function toggleEmojiPicker() {
+  groupDialog.showEmoji = !groupDialog.showEmoji
+  if (groupDialog.showEmoji) {
+    nextTick(() => groupDialogInput.value?.focus())
+  }
+}
+
+function handleGroupDialogKeydown(event) {
+  if (event.key === 'Escape') {
+    if (groupDialog.showEmoji) {
+      groupDialog.showEmoji = false
+    } else {
+      closeGroupDialog()
+    }
+  }
+}
+
+function deleteGroup() {
+  const groupId = groupMenu.groupId
+  closeGroupMenu()
+  if (!groupId) return
+  const group = store.currentListGroups.find(g => g.id === groupId)
+  if (!group) return
+  const taskCount = store.groupedTasks.find(g => g.id === groupId)?.tasks?.length || 0
+  confirmDialog.title = '删除分组'
+  confirmDialog.message = taskCount > 0
+    ? `分组"${group.name}"下有 ${taskCount} 个任务，删除后任务将移至"未分组"。确定删除？`
+    : `确定删除分组"${group.name}"？`
+  confirmDialog.confirmText = '删除'
+  confirmDialog.type = 'danger'
+  confirmDialog.onConfirm = () => {
+    // 把分组内的任务移到未分组
+    const tasks = store.groupedTasks.find(g => g.id === groupId)?.tasks || []
+    tasks.forEach(t => store.moveTaskToGroup(t.id, null))
+    store.deleteTaskGroup(groupId)
+    store.showNotice(`已删除分组"${group.name}"`, 'success')
+    confirmDialog.visible = false
+  }
+  confirmDialog.visible = true
+}
+
+function addGroup() {
+  groupDialog.title = '新建分组'
+  groupDialog.name = ''
+  groupDialog.emoji = ''
+  groupDialog.color = 'auto'
+  groupDialog.showEmoji = false
+  groupDialog.confirmText = '创建'
+  groupDialog.editingGroupId = null
+  groupDialog.visible = true
+  nextTick(() => groupDialogInput.value?.focus())
+}
+
+function confirmGroupDialog() {
+  const name = groupDialog.name.trim()
+  if (!name) return
+  if (groupDialog.editingGroupId) {
+    store.renameTaskGroup(groupDialog.editingGroupId, name, groupDialog.emoji, groupDialog.color)
+  } else {
+    store.addTaskGroup(name, store.currentView, groupDialog.emoji, groupDialog.color)
+  }
+  closeGroupDialog()
+}
+
 function selectSort(value) {
   store.setSort(value)
   sortMenuOpen.value = false
@@ -408,11 +982,15 @@ function handleSortKeydown(event) {
 onMounted(() => {
   window.addEventListener('click', closeSortMenu)
   window.addEventListener('keydown', handleSortKeydown)
+  window.addEventListener('keydown', handleGroupDialogKeydown)
+  nextTick(() => updateScrollIndicator())
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('click', closeSortMenu)
   window.removeEventListener('keydown', handleSortKeydown)
+  window.removeEventListener('keydown', handleGroupDialogKeydown)
+  if (scrollTimer) clearTimeout(scrollTimer)
 })
 
 function toggleCompleted() {

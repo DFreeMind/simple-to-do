@@ -1,6 +1,6 @@
 {
   "name": "simple-to-do",
-  "version": "0.1.1",
+  "version": "0.2.1",
   "description": "易简清单，本地优先的桌面待办应用",
   "scripts": {
     "dev": "tauri dev",
@@ -21,6 +21,8 @@
     "@tiptap/extension-task-list": "^3.27.1",
     "@tiptap/starter-kit": "^3.27.1",
     "@tiptap/vue-3": "^3.27.1",
+    "emoji-picker-element": "^1.29.1",
+    "emoji-picker-element-data": "^1.8.0",
     "lucide-vue-next": "^0.577.0",
     "pinia": "^3.0.4",
     "vue": "^3.5.39"

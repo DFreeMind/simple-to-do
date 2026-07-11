@@ -65,9 +65,15 @@
             placeholder="任务标题"
             @input="updateTitle"
           ></textarea>
-          <div v-if="task.subtasks.length" class="detail-hero-progress">
-            <div class="detail-hero-progress__ring" :style="{ '--progress': subtaskProgressPercent * 3.6 + 'deg' }"></div>
-            <span class="detail-hero-progress__count">{{ completedSubtasks }}/{{ task.subtasks.length }}</span>
+          <div class="detail-hero__footer">
+            <div v-if="task.subtasks.length" class="detail-hero-progress">
+              <div class="detail-hero-progress__ring" :style="{ '--progress': subtaskProgressPercent * 3.6 + 'deg' }"></div>
+              <span class="detail-hero-progress__count">{{ completedSubtasks }}/{{ task.subtasks.length }}</span>
+            </div>
+            <div class="detail-hero__meta">
+              <Clock :size="12" />
+              <span :title="formatFullDate(task.createdAt)">{{ formatCreatedAt(task.createdAt) }}</span>
+            </div>
           </div>
         </div>
       </header>
@@ -312,6 +318,7 @@ import {
   CalendarClock,
   Check,
   ChevronDown,
+  Clock,
   Copy,
   Flag,
   GripVertical,
@@ -331,6 +338,7 @@ import {
 } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import { useDragSort } from '@/composables/useDragSort'
+import { formatCreatedAt, formatFullDate } from '@/utils/date'
 import FormatMenu from './FormatMenu.vue'
 import DatePicker from './DatePicker.vue'
 import ImageLightbox from './ImageLightbox.vue'
