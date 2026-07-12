@@ -1111,7 +1111,14 @@ export const useTaskStore = defineStore('task', () => {
   function addSubtask(taskId, title) {
     const task = tasks.value.find(item => item.id === taskId)
     if (!task || !title.trim()) return
-    task.subtasks.push({ id: genId(), title: title.trim(), completed: false, sortOrder: nextSubtaskSortOrder(task) })
+    task.subtasks.push({
+      id: genId(),
+      title: title.trim(),
+      completed: false,
+      createdAt: nowIso(),
+      completedAt: null,
+      sortOrder: nextSubtaskSortOrder(task)
+    })
     task.updatedAt = nowIso()
     playAddSound()
   }
@@ -1123,8 +1130,10 @@ export const useTaskStore = defineStore('task', () => {
     subtask.completed = !subtask.completed
     task.updatedAt = nowIso()
     if (subtask.completed) {
+      subtask.completedAt = nowIso()
       playSubtaskCompleteSound()
     } else {
+      subtask.completedAt = null
       playSubtaskUndoSound()
     }
   }
@@ -1460,6 +1469,8 @@ export const useTaskStore = defineStore('task', () => {
         id: sub.id || genId(),
         title: sub.title || '',
         completed: Boolean(sub.completed),
+        createdAt: sub.createdAt || null,
+        completedAt: sub.completedAt || null,
         sortOrder: Number.isFinite(Number(sub.sortOrder)) ? Number(sub.sortOrder) : (index + 1) * 1000
       })).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)) : [],
       attachments: Array.isArray(task.attachments) ? task.attachments.map(att => ({
