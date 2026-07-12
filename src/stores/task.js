@@ -3,13 +3,12 @@ import { ref, computed, watch } from 'vue'
 import { genId } from '@/utils/id'
 import { getMonthDays, isToday, toDateString } from '@/utils/date'
 import {
-  cancelTaskReminderNotification,
+  ensureReminderNotificationPermission,
   loadData as loadPlatformData,
   saveData as savePlatformData,
   saveMigrationBackup,
-  scheduleTaskReminderNotification,
   sendReminderTestNotification,
-  syncTaskReminderNotifications
+  sendTaskReminderNotification
 } from '@/services/platform'
 import {
   playCompleteSound,
@@ -200,6 +199,10 @@ export const useTaskStore = defineStore('task', () => {
   let pendingSavePayload = null
   let activeSavePromise = null
   let saveTimer = null
+  let reminderTimer = null
+  let reminderSyncing = false
+  let reminderSyncPending = false
+  let pendingPermissionRequest = false
 
   const trashedListIds = computed(() => new Set(listTrash.value.map(item => item.id)))
   const activeTasks = computed(() => tasks.value.filter(task => !task.deleted && !trashedListIds.value.has(task.listId)))
@@ -1050,7 +1053,16 @@ export const useTaskStore = defineStore('task', () => {
   function updateTask(id, updates) {
     const task = tasks.value.find(item => item.id === id) || trash.value.find(item => item.id === id)
     if (task) {
+      const previousDueTime = task.dueDate ? new Date(task.dueDate).getTime() : Number.NaN
+      const previousReminderTime = task.reminderAt ? new Date(task.reminderAt).getTime() : Number.NaN
+      const isReminderChanged = Object.prototype.hasOwnProperty.call(updates, 'reminderAt')
+      const isDueDateChanged = Object.prototype.hasOwnProperty.call(updates, 'dueDate')
       Object.assign(task, updates, { updatedAt: nowIso() })
+      if (isDueDateChanged && !isReminderChanged && Number.isFinite(previousDueTime) && Number.isFinite(previousReminderTime) && task.dueDate) {
+        const nextDueTime = new Date(task.dueDate).getTime()
+        if (Number.isFinite(nextDueTime)) task.reminderAt = new Date(nextDueTime + previousReminderTime - previousDueTime).toISOString()
+      }
+      if (isReminderChanged || isDueDateChanged) task.reminderNotifiedAt = null
       if (shouldRescheduleReminder(updates)) {
         rescheduleReminder(task, { requestPermission: Boolean(updates.reminderAt) })
       }
@@ -1061,9 +1073,14 @@ export const useTaskStore = defineStore('task', () => {
     const task = tasks.value.find(item => item.id === id)
     if (!task || task.deleted) return
     const previous = task.dueDate ? new Date(task.dueDate) : new Date(date)
+    const previousReminderTime = task.reminderAt ? new Date(task.reminderAt).getTime() : Number.NaN
     const next = date instanceof Date ? new Date(date) : new Date(date)
     next.setHours(previous.getHours() || 9, previous.getMinutes() || 0, 0, 0)
     task.dueDate = next.toISOString()
+    if (Number.isFinite(previousReminderTime)) {
+      task.reminderAt = new Date(next.getTime() + previousReminderTime - previous.getTime()).toISOString()
+    }
+    task.reminderNotifiedAt = null
     task.updatedAt = nowIso()
     rescheduleReminder(task)
     playScheduleSound()
@@ -1344,32 +1361,91 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   function rescheduleReminder(task, options = {}) {
-    scheduleTaskReminderNotification(task, settings.value, options)
-      .then((result) => {
-        if (options.requestPermission && result.reason === 'permission') {
-          showNotice('通知权限未开启，提醒时间已保存', 'error')
-        }
-      })
-      .catch((error) => {
-        console.error('[Store] 同步提醒失败:', error)
-      })
+    syncReminderNotifications(options)
   }
 
   function cancelReminder(taskId) {
-    cancelTaskReminderNotification(taskId).catch((error) => {
-      console.error('[Store] 取消提醒失败:', error)
-    })
+    syncReminderNotifications()
   }
 
   function syncReminderNotifications(options = {}) {
-    syncTaskReminderNotifications(tasks.value, settings.value, options).catch((error) => {
-      console.error('[Store] 重建提醒失败:', error)
+    if (reminderSyncing) {
+      reminderSyncPending = true
+      pendingPermissionRequest = pendingPermissionRequest || Boolean(options.requestPermission)
+      return
+    }
+
+    reminderSyncing = true
+    void runReminderSync(options).catch((error) => {
+      console.error('[Store] 同步提醒失败:', error)
+    }).finally(() => {
+      reminderSyncing = false
+      if (reminderSyncPending) {
+        const requestPermission = pendingPermissionRequest
+        reminderSyncPending = false
+        pendingPermissionRequest = false
+        syncReminderNotifications({ requestPermission })
+      }
     })
+  }
+
+  function clearReminderTimer() {
+    if (reminderTimer) window.clearTimeout(reminderTimer)
+    reminderTimer = null
+  }
+
+  function isReminderPending(task) {
+    if (!task?.reminderAt || task.completed || task.deleted || settings.value.reminderNotificationsEnabled === false) return false
+    const reminderTime = new Date(task.reminderAt).getTime()
+    if (!Number.isFinite(reminderTime)) return false
+    const notifiedTime = task.reminderNotifiedAt ? new Date(task.reminderNotifiedAt).getTime() : Number.NaN
+    return !Number.isFinite(notifiedTime) || notifiedTime < reminderTime
+  }
+
+  async function runReminderSync(options = {}) {
+    clearReminderTimer()
+    if (settings.value.reminderNotificationsEnabled === false) return
+
+    if (options.requestPermission) {
+      const granted = await ensureReminderNotificationPermission({ request: true })
+      if (!granted) {
+        showNotice('通知权限未开启，提醒时间已保存', 'error')
+        return
+      }
+    }
+
+    const now = Date.now()
+    const pendingTasks = tasks.value.filter(isReminderPending)
+    const overdueTasks = pendingTasks.filter(task => new Date(task.reminderAt).getTime() <= now)
+    let retryNeeded = false
+
+    for (const task of overdueTasks) {
+      const result = await sendTaskReminderNotification(task, settings.value, { catchUp: new Date(task.reminderAt).getTime() < now })
+      if (result.sent) {
+        task.reminderNotifiedAt = nowIso()
+        task.updatedAt = nowIso()
+      } else if (result.reason !== 'not-active') {
+        retryNeeded = true
+      }
+    }
+
+    const nextTask = pendingTasks
+      .filter(task => new Date(task.reminderAt).getTime() > now)
+      .sort((a, b) => new Date(a.reminderAt).getTime() - new Date(b.reminderAt).getTime())[0]
+    const nextDelay = nextTask ? Math.max(0, new Date(nextTask.reminderAt).getTime() - Date.now()) : null
+    const retryDelay = retryNeeded ? 60 * 1000 : null
+    const delay = [nextDelay, retryDelay]
+      .filter(value => value !== null)
+      .reduce((earliest, value) => earliest === null ? value : Math.min(earliest, value), null)
+
+    if (delay !== null) {
+      reminderTimer = window.setTimeout(() => syncReminderNotifications(), Math.min(delay, 2_147_483_647))
+    }
   }
 
   function buildSavePayload() {
     const payload = JSON.parse(JSON.stringify({
-      schemaVersion: 5,
+      schemaVersion: 6,
       groups: groups.value,
       lists: lists.value,
       tasks: tasks.value,
@@ -1462,6 +1538,7 @@ export const useTaskStore = defineStore('task', () => {
       taskGroupId: task.taskGroupId || null,
       dueDate: task.dueDate || null,
       reminderAt: task.reminderAt || null,
+      reminderNotifiedAt: task.reminderNotifiedAt || null,
       repeatRule: task.repeatRule || null,
       priority: Number(task.priority || 0),
       tags: Array.isArray(task.tags) ? task.tags : [],
