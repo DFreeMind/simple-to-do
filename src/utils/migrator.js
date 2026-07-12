@@ -1,6 +1,6 @@
 /** 前端状态结构迁移。数据库表结构迁移由 Rust 侧负责。 */
-const CURRENT_VERSION = 4
-const TASK_GROUP_COLOR_IDS = ['auto', 'accent', 'blue', 'violet', 'amber', 'rose', 'green']
+const CURRENT_VERSION = 5
+const TASK_GROUP_COLOR_IDS = ['auto', 'accent', 'blue', 'violet', 'amber', 'rose', 'green', 'cyan', 'coral', 'indigo', 'teal', 'brick', 'custom']
 
 export class MigrationError extends Error {
   constructor(message, code = 'migration-failed') {
@@ -13,7 +13,8 @@ export class MigrationError extends Error {
 const migrations = {
   1: migrateV1ToV2,
   2: migrateV2ToV3,
-  3: migrateV3ToV4
+  3: migrateV3ToV4,
+  4: migrateV4ToV5
 }
 
 export function migrateData(data) {
@@ -78,6 +79,22 @@ function migrateV3ToV4(data) {
   }
 }
 
+function migrateV4ToV5(data) {
+  const settings = data.settings && typeof data.settings === 'object' && !Array.isArray(data.settings)
+    ? data.settings
+    : {}
+  return {
+    ...data,
+    settings: {
+      ...settings,
+      groupCompletedDisplayMode: ['in-group', 'separate-section'].includes(settings.groupCompletedDisplayMode)
+        ? settings.groupCompletedDisplayMode
+        : 'in-group',
+      groupCompletedVisibleByDefault: settings.groupCompletedVisibleByDefault !== false
+    }
+  }
+}
+
 export function validateData(data) {
   const errors = []
   if (!data || typeof data !== 'object' || Array.isArray(data)) return { valid: false, errors: ['数据不是有效的对象'] }
@@ -101,6 +118,7 @@ export function validateData(data) {
     groupIds.add(group?.id)
     if (!listIds.has(group?.listId)) errors.push(`任务分组 ${group?.id || '(空)'} 引用了不存在的清单`)
     if (!TASK_GROUP_COLOR_IDS.includes(group?.color || 'auto')) errors.push(`任务分组 ${group?.id || '(空)'} 的颜色值无效`)
+    if (group?.color === 'custom' && !/^#[0-9a-f]{6}$/i.test(group?.customColor || '')) errors.push(`任务分组 ${group?.id || '(空)'} 的自定义颜色无效`)
   })
   ;[...data.tasks, ...data.trash].forEach(task => {
     if (task?.taskGroupId && !groupIds.has(task.taskGroupId)) errors.push(`任务 ${task?.id || '(空)'} 引用了不存在的任务分组`)
@@ -115,4 +133,4 @@ export function createBackup(data) {
 }
 
 export function getCurrentVersion() { return CURRENT_VERSION }
-export function getSupportedVersions() { return [1, 2, 3, 4] }
+export function getSupportedVersions() { return [1, 2, 3, 4, 5] }

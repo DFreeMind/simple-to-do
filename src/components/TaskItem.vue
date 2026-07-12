@@ -41,15 +41,26 @@
 
     <div class="task-main">
       <div class="task-title-row">
-        <span class="task-title">{{ task.title }}</span>
+        <span v-if="priorityInfo" class="task-priority" :class="`task-priority--${task.priority}`" :title="priorityInfo.label">
+          <Flag :size="15" />
+          <span>{{ priorityInfo.shortLabel }}</span>
+        </span>
+        <span class="task-title">
+          <template v-for="(segment, index) in highlightSegments(task.title)" :key="`${segment.text}-${index}`">
+            <mark v-if="segment.match">{{ segment.text }}</mark><template v-else>{{ segment.text }}</template>
+          </template>
+        </span>
         <Pin v-if="task.pinned" :size="13" class="inline-icon" />
       </div>
+      <div v-if="searchMatchKinds.length" class="task-search-match" aria-label="搜索命中位置">
+        命中：{{ searchMatchKinds.join('、') }}
+      </div>
       <div class="task-meta">
-        <span v-if="list" class="meta-chip">
+        <span v-if="list && !hideListMeta" class="meta-chip">
           <span class="color-dot" :style="{ backgroundColor: list.color }"></span>
           {{ list.name }}
         </span>
-        <span v-if="store.currentView === 'search' && taskGroup" class="meta-chip">
+        <span v-if="showTaskGroup && taskGroup" class="meta-chip">
           {{ taskGroup.emoji || '📂' }} {{ taskGroup.name }}
         </span>
         <span v-if="task.dueDate" class="meta-chip" :class="{ overdue: isOverdue }">
@@ -72,10 +83,18 @@
           <Paperclip :size="13" />
           {{ task.attachments.length }}
         </span>
-        <span v-for="tag in task.tags || []" :key="tag" class="meta-chip">#{{ tag }}</span>
-        <span v-if="task.createdAt" class="meta-chip meta-chip--muted">
+        <span v-if="task.createdAt" class="meta-chip meta-chip--muted" :title="`创建于 ${formatFullDate(task.createdAt)}`">
           <Clock :size="12" />
           {{ formatCreatedAt(task.createdAt) }}
+        </span>
+        <span v-if="task.completed && task.completedAt" class="meta-chip meta-chip--muted" :title="`完成于 ${formatFullDate(task.completedAt)}`">
+          <CheckCheck :size="13" />
+          {{ formatCreatedAt(task.completedAt) }}
+        </span>
+        <span v-for="tag in task.tags || []" :key="tag" class="meta-chip">
+          <template v-for="(segment, index) in highlightSegments(`#${tag}`)" :key="`${segment.text}-${index}`">
+            <mark v-if="segment.match">{{ segment.text }}</mark><template v-else>{{ segment.text }}</template>
+          </template>
         </span>
       </div>
     </div>
@@ -183,8 +202,10 @@ import { computed, ref, reactive, nextTick, onMounted, onBeforeUnmount } from 'v
 import {
   CalendarClock,
   Check,
+  CheckCheck,
   Clock,
   Copy,
+  Flag,
   FolderInput,
   GripVertical,
   Link as LinkIcon,
@@ -200,12 +221,15 @@ import {
   Trash2
 } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
-import { formatDate as fmtDate, formatCreatedAt } from '@/utils/date'
+import { formatDate as fmtDate, formatCreatedAt, formatFullDate } from '@/utils/date'
+import { getTaskSearchMatchKinds, normalizeSearchQuery } from '@/utils/search'
 import MoveToListModal from './MoveToListModal.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
 
 const props = defineProps({
   task: { type: Object, required: true },
+  searchQuery: { type: String, default: '' },
+  hideListMeta: Boolean,
   isTrash: Boolean,
   draggable: Boolean,
   isDragging: Boolean,
@@ -233,6 +257,7 @@ const confirmDialog = reactive({
 
 const list = computed(() => store.lists.find(item => item.id === props.task.listId))
 const taskGroup = computed(() => store.taskGroups.find(group => group.id === props.task.taskGroupId) || null)
+const showTaskGroup = computed(() => !store.currentList && !['inbox', 'trash'].includes(store.currentView))
 const canMoveToGroup = computed(() => {
   return store.currentViewMode === 'group' && store.currentList?.id === props.task.listId
 })
@@ -243,6 +268,17 @@ const filteredMoveGroups = computed(() => {
 })
 const groupMoveSubmenuStyle = computed(() => ({ left: `${groupMoveSubmenuPos.value.x}px`, top: `${groupMoveSubmenuPos.value.y}px` }))
 const completedSubtasks = computed(() => props.task.subtasks?.filter(item => item.completed).length || 0)
+const normalizedSearchQuery = computed(() => normalizeSearchQuery(props.searchQuery))
+const searchMatchKinds = computed(() => getTaskSearchMatchKinds(props.task, normalizedSearchQuery.value))
+const priorityInfo = computed(() => {
+  const value = Number(props.task.priority || 0)
+  const labels = {
+    1: { label: '低优先级', shortLabel: '低' },
+    2: { label: '中优先级', shortLabel: '中' },
+    3: { label: '高优先级', shortLabel: '高' }
+  }
+  return labels[value] || null
+})
 const isOverdue = computed(() => props.task.dueDate && !props.task.completed && new Date(props.task.dueDate) < new Date())
 const repeatLabel = computed(() => {
   const map = { daily: '每天', weekly: '每周', monthly: '每月', yearly: '每年' }
@@ -253,7 +289,27 @@ function formatDate(date) {
   return fmtDate(date)
 }
 
+function highlightSegments(value) {
+  const text = String(value || '')
+  const query = normalizedSearchQuery.value
+  if (!query) return [{ text, match: false }]
+
+  const lowerText = text.toLocaleLowerCase()
+  const segments = []
+  let start = 0
+  let index = lowerText.indexOf(query, start)
+  while (index !== -1) {
+    if (index > start) segments.push({ text: text.slice(start, index), match: false })
+    segments.push({ text: text.slice(index, index + query.length), match: true })
+    start = index + query.length
+    index = lowerText.indexOf(query, start)
+  }
+  if (start < text.length) segments.push({ text: text.slice(start), match: false })
+  return segments.length ? segments : [{ text, match: false }]
+}
+
 function openMenu(event) {
+  window.dispatchEvent(new Event('task-list:close-transient-menus'))
   menuPos.value = clampMenuPosition(event.clientX, event.clientY, 220, 320)
   menuOpen.value = true
   nextTick(() => menuEl.value?.focus())
@@ -357,10 +413,12 @@ function onDocumentKeydown(event) {
 onMounted(() => {
   document.addEventListener('click', onDocumentClick)
   document.addEventListener('keydown', onDocumentKeydown)
+  window.addEventListener('task-list:close-transient-menus', closeMenu)
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', onDocumentClick)
   document.removeEventListener('keydown', onDocumentKeydown)
+  window.removeEventListener('task-list:close-transient-menus', closeMenu)
 })
 </script>

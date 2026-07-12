@@ -65,98 +65,82 @@
             placeholder="任务标题"
             @input="updateTitle"
           ></textarea>
-          <div class="detail-hero__footer">
+          <div class="detail-hero__meta-row" aria-label="任务状态与属性">
             <div v-if="task.subtasks.length" class="detail-hero-progress">
               <div class="detail-hero-progress__ring" :style="{ '--progress': subtaskProgressPercent * 3.6 + 'deg' }"></div>
-              <span class="detail-hero-progress__count">{{ completedSubtasks }}/{{ task.subtasks.length }}</span>
+              <span>{{ completedSubtasks }}/{{ task.subtasks.length }}</span>
             </div>
-            <div class="detail-hero__meta">
+            <div v-if="task.createdAt" class="detail-hero__meta">
               <Clock :size="12" />
-              <span :title="formatFullDate(task.createdAt)">{{ formatCreatedAt(task.createdAt) }}</span>
+              <span :title="`创建于 ${formatFullDate(task.createdAt)}`">{{ formatCreatedAt(task.createdAt) }}</span>
             </div>
+            <div v-if="task.completed && task.completedAt" class="detail-hero__meta">
+              <CheckCheck :size="13" />
+              <span :title="`完成于 ${formatFullDate(task.completedAt)}`">{{ formatCreatedAt(task.completedAt) }}</span>
+            </div>
+            <button ref="dateTrigger" class="detail-meta-action" :class="{ empty: !task.dueDate }" type="button" @click.stop="toggleDatePicker('dueDate')">
+              <CalendarClock :size="14" />
+              <span>{{ task.dueDate ? dateSummaryText : '设置日期' }}</span>
+              <Bell v-if="task.reminderAt" :size="12" :title="`提醒 ${formatTime(task.reminderAt)}`" />
+              <Repeat2 v-if="task.repeatRule" :size="12" :title="repeatLabel" />
+            </button>
+            <button ref="priorityTrigger" class="detail-meta-action" :class="priorityClass" type="button" @click.stop="toggleSelect('priority')">
+              <Flag :size="14" />
+              <span>{{ priorityLabel }}</span>
+            </button>
+            <button ref="listTrigger" class="detail-hero__list" type="button" :title="`清单：${selectedListName}`" @click.stop="toggleSelect('list')">
+              <ListChecks :size="13" />
+              <span class="color-dot" :style="{ backgroundColor: selectedListColor }"></span>
+              <span>{{ selectedListName }}</span>
+            </button>
           </div>
         </div>
       </header>
 
-      <section class="detail-section detail-section--grid" aria-label="任务属性">
-        <div class="field">
-          <span><ListChecks :size="15" /> 清单</span>
-          <div class="detail-select">
-            <button class="detail-select__button detail-select__button--list" type="button" :title="selectedListName" @click.stop="toggleSelect('list')">
-              <span class="color-dot" :style="{ backgroundColor: selectedListColor }"></span>
-              <span class="detail-select__text">{{ selectedListName }}</span>
-              <ChevronDown :size="16" :class="{ rotated: openSelect === 'list' }" />
-            </button>
-            <div v-if="openSelect === 'list'" class="detail-select__menu">
-              <button
-                v-for="list in store.lists"
-                :key="list.id"
-                class="detail-select__option"
-                :class="{ active: task.listId === list.id }"
-                type="button"
-                @click="chooseList(list.id)"
-              >
-                <span class="color-dot" :style="{ backgroundColor: list.color }"></span>
-                <span>{{ list.name }}</span>
-                <Check v-if="task.listId === list.id" :size="15" />
-              </button>
-            </div>
-          </div>
+      <Teleport to="body">
+        <div v-if="openSelect === 'list'" class="detail-global-menu" :style="popoverStyles.list" @click.stop>
+          <button
+            v-for="list in store.lists"
+            :key="list.id"
+            class="detail-select__option"
+            :class="{ active: task.listId === list.id }"
+            type="button"
+            @click="chooseList(list.id)"
+          >
+            <span class="color-dot" :style="{ backgroundColor: list.color }"></span>
+            <span>{{ list.name }}</span>
+            <Check v-if="task.listId === list.id" :size="15" />
+          </button>
         </div>
-
-        <div class="field">
-          <span><CalendarClock :size="15" /> 日期</span>
-          <div class="date-field">
-            <button class="detail-select__button" type="button" @click.stop="toggleDatePicker('dueDate')">
-              <span class="date-field__value" :class="{ empty: !task.dueDate }">
-                <span class="date-field__main">{{ task.dueDate ? dateSummaryText : '设置日期' }}</span>
-                <span v-if="task.reminderAt" class="date-field__meta" :title="`提醒 ${formatTime(task.reminderAt)}`">
-                  <Bell :size="12" />
-                  <span>{{ formatTime(task.reminderAt) }}</span>
-                </span>
-                <span v-if="task.repeatRule" class="date-field__meta" :title="repeatLabel">
-                  <Repeat2 :size="12" />
-                  <span>{{ repeatLabel }}</span>
-                </span>
-              </span>
-              <ChevronDown :size="16" :class="{ rotated: openDatePicker === 'dueDate' }" />
-            </button>
-            <DatePicker
-              v-if="openDatePicker === 'dueDate'"
-              :task="task"
-              field="dueDate"
-              title="日期"
-              :show-extras="true"
-              @close="openDatePicker = ''"
-            />
-          </div>
+        <DatePicker
+          v-if="openDatePicker === 'dueDate'"
+          class="detail-global-datepicker"
+          :style="popoverStyles.date"
+          :task="task"
+          field="dueDate"
+          title="日期"
+          :show-extras="true"
+          @close="openDatePicker = ''"
+        />
+        <div v-if="openSelect === 'priority'" class="detail-global-menu" :style="popoverStyles.priority" @click.stop>
+          <button
+            v-for="option in priorityOptions"
+            :key="option.value"
+            class="detail-select__option"
+            :class="[{ active: Number(task.priority || 0) === option.value }, `priority-option--${option.value}`]"
+            type="button"
+            @click="choosePriority(option.value)"
+          >
+            <Flag :size="14" />
+            <span>{{ option.label }}</span>
+            <Check v-if="Number(task.priority || 0) === option.value" :size="15" />
+          </button>
         </div>
+      </Teleport>
 
-        <div class="field">
-          <span><Flag :size="15" /> 优先级</span>
-          <div class="detail-select">
-            <button class="detail-select__button" type="button" @click.stop="toggleSelect('priority')">
-              <span>{{ priorityLabel }}</span>
-              <ChevronDown :size="16" :class="{ rotated: openSelect === 'priority' }" />
-            </button>
-            <div v-if="openSelect === 'priority'" class="detail-select__menu">
-              <button
-                v-for="option in priorityOptions"
-                :key="option.value"
-                class="detail-select__option"
-                :class="{ active: Number(task.priority || 0) === option.value }"
-                type="button"
-                @click="choosePriority(option.value)"
-              >
-                <span>{{ option.label }}</span>
-                <Check v-if="Number(task.priority || 0) === option.value" :size="15" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div class="field">
-          <span><Tags :size="15" /> 标签</span>
+      <section class="detail-section detail-section--tags" aria-label="标签">
+        <div class="detail-tags-row">
+          <span class="detail-tags-row__label"><Tags :size="14" /> 标签</span>
           <div class="tag-editor">
             <button
               v-for="tag in task.tags || []"
@@ -179,7 +163,6 @@
           </div>
         </div>
       </section>
-
 
       <section class="detail-section">
         <div class="section-heading">
@@ -233,37 +216,11 @@
         </div>
       </section>
 
-      <section ref="editorSection" class="detail-section detail-section--editor" @click="onEditorSectionClick">
+      <section class="detail-section detail-section--editor">
         <div class="section-heading">
           <h2>备注</h2>
-          <button class="small-btn" type="button" @click.stop="openFormatMenu">
-            <Pilcrow :size="15" />
-            插入块
-          </button>
         </div>
         <RichTextEditor ref="richTextEditor" v-model="editorContent" placeholder="写下背景、链接、待办块或粘贴图片..." />
-      </section>
-
-      <section class="detail-section">
-        <div class="section-heading">
-          <h2>附件</h2>
-          <button class="small-btn" type="button" @click="triggerImageUpload">
-            <ImagePlus :size="15" />
-            添加图片
-          </button>
-        </div>
-        <div v-if="task.attachments.length" class="attachment-grid">
-          <figure v-for="attachment in task.attachments" :key="attachment.id" class="attachment-card">
-            <img :src="attachment.url" :alt="attachment.originalName || attachment.path || '任务附件'" @click="openLightbox(attachmentIndex(attachment))" />
-            <figcaption>
-              <span>{{ attachment.originalName || attachment.path || '图片附件' }}</span>
-              <button class="ghost-icon danger" type="button" aria-label="移除附件" @click="removeAttachment(attachment.id)">
-                <Trash2 :size="15" />
-              </button>
-            </figcaption>
-          </figure>
-        </div>
-        <p v-else class="muted-text">还没有附件。</p>
       </section>
 
       <footer class="detail-footer">
@@ -280,23 +237,6 @@
           删除
         </button>
       </footer>
-
-      <FormatMenu
-        :show="formatMenuVisible"
-        :editor="richTextEditor?.editor"
-        :position="formatMenuPos"
-        @close="formatMenuVisible = false"
-        @insertImage="triggerImageUpload"
-      />
-
-      <input ref="fileInput" type="file" accept="image/*" multiple class="hidden-file-input" @change="onFileSelected" />
-
-      <ImageLightbox
-        :images="previewImages"
-        :startIndex="previewIndex"
-        :visible="previewVisible"
-        @close="previewVisible = false"
-      />
 
       <ConfirmDialog
         :visible="confirmDialog.visible"
@@ -317,16 +257,15 @@ import {
   Bell,
   CalendarClock,
   Check,
+  CheckCheck,
   ChevronDown,
   Clock,
   Copy,
   Flag,
   GripVertical,
-  ImagePlus,
   Link as LinkIcon,
   ListChecks,
   PanelRightOpen,
-  Pilcrow,
   Pin,
   Plus,
   Repeat2,
@@ -339,11 +278,8 @@ import {
 import { useTaskStore } from '@/stores/task'
 import { useDragSort } from '@/composables/useDragSort'
 import { formatCreatedAt, formatFullDate } from '@/utils/date'
-import FormatMenu from './FormatMenu.vue'
 import DatePicker from './DatePicker.vue'
-import ImageLightbox from './ImageLightbox.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
-import { importImage, readImage, selectImage } from '@/services/platform'
 
 const RichTextEditor = defineAsyncComponent({
   loader: () => import('./RichTextEditor.vue'),
@@ -357,14 +293,6 @@ const newSubtask = ref('')
 const editorContent = ref('')
 const richTextEditor = ref(null)
 const titleInput = ref(null)
-const editorSection = ref(null)
-const formatMenuVisible = ref(false)
-const formatMenuPos = ref({ x: 0, y: 0 })
-const fileInput = ref(null)
-const previewVisible = ref(false)
-const previewIndex = ref(0)
-const editorImageUrls = ref([])
-const previewImages = ref([])
 const confirmDialog = reactive({
   visible: false,
   title: '',
@@ -374,44 +302,17 @@ const confirmDialog = reactive({
   onConfirm: () => {}
 })
 
-const allImageUrls = computed(() => {
-  if (!task.value) return []
-  const urls = []
-  if (task.value.attachments) {
-    for (const a of task.value.attachments) {
-      if (a.url) urls.push(a.url)
-    }
-  }
-  editorImageUrls.value.forEach(url => {
-    if (url && !urls.includes(url)) urls.push(url)
-  })
-  return urls
-})
-
-function attachmentIndex(attachment) {
-  return allImageUrls.value.indexOf(attachment.url)
-}
-
-function openLightbox(index, images = allImageUrls.value) {
-  if (index < 0) return
-  previewImages.value = images
-  previewIndex.value = index
-  previewVisible.value = true
-}
-
-function onEditorSectionClick(e) {
-  const img = e.target.closest('.editor-content img')
-  if (!img || !img.src) return
-  const urls = collectEditorImageUrls()
-  editorImageUrls.value = urls
-  const src = img.currentSrc || img.src
-  const idx = urls.indexOf(src)
-  if (idx >= 0) openLightbox(idx, urls)
-  else openLightbox(0, [src])
-}
 const openSelect = ref('')
 const openDatePicker = ref('')
 const tagInput = ref('')
+const listTrigger = ref(null)
+const dateTrigger = ref(null)
+const priorityTrigger = ref(null)
+const popoverStyles = reactive({
+  list: {},
+  date: {},
+  priority: {}
+})
 const subtaskDrag = useDragSort({
   scrollContainerSelector: '.subtask-list',
   onDrop(sourceId, targetId, position) {
@@ -473,14 +374,15 @@ const subtaskProgressPercent = computed(() => {
   return Math.round((completedSubtasks.value / total) * 100)
 })
 const priorityOptions = [
-  { value: 0, label: '无优先级' },
+  { value: 0, label: '无' },
   { value: 1, label: '低' },
   { value: 2, label: '中' },
   { value: 3, label: '高' }
 ]
 const selectedListName = computed(() => store.selectedList?.name || '收集箱')
 const selectedListColor = computed(() => store.selectedList?.color || '#5fb8ad')
-const priorityLabel = computed(() => priorityOptions.find(option => option.value === Number(task.value?.priority || 0))?.label || '无优先级')
+const priorityLabel = computed(() => priorityOptions.find(option => option.value === Number(task.value?.priority || 0))?.label || '无')
+const priorityClass = computed(() => `detail-meta-action--priority-${Number(task.value?.priority || 0)}`)
 
 // 日期摘要文本，如 "7月8日 · 明天"
 const summaryWeekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
@@ -529,19 +431,7 @@ watch(editorContent, (value) => {
   if (task.value && value !== task.value.descriptionHtml) {
     store.updateTask(task.value.id, { descriptionHtml: value })
   }
-  nextTick(refreshEditorImageUrls)
 })
-
-function collectEditorImageUrls() {
-  if (!editorSection.value) return []
-  return Array.from(editorSection.value.querySelectorAll('.editor-content img'))
-    .map(img => img.currentSrc || img.src)
-    .filter(Boolean)
-}
-
-function refreshEditorImageUrls() {
-  editorImageUrls.value = collectEditorImageUrls()
-}
 
 function updateTitle(event) {
   store.updateTask(task.value.id, { title: event.target.value })
@@ -551,6 +441,7 @@ function updateTitle(event) {
 function toggleSelect(name) {
   openSelect.value = openSelect.value === name ? '' : name
   openDatePicker.value = ''
+  if (openSelect.value) nextTick(() => updatePopoverPosition(openSelect.value))
 }
 
 function chooseList(listId) {
@@ -571,6 +462,31 @@ function closeSelect() {
 function toggleDatePicker(field) {
   openDatePicker.value = openDatePicker.value === field ? '' : field
   openSelect.value = ''
+  if (openDatePicker.value) nextTick(() => updatePopoverPosition('date'))
+}
+
+function updatePopoverPosition(name) {
+  const triggers = { list: listTrigger, date: dateTrigger, priority: priorityTrigger }
+  const trigger = triggers[name]?.value
+  if (!trigger) return
+  const rect = trigger.getBoundingClientRect()
+  const size = {
+    list: { width: 220, height: 250 },
+    date: { width: 306, height: 500 },
+    priority: { width: 210, height: 180 }
+  }[name]
+  const margin = 10
+  const left = Math.max(margin, Math.min(rect.left, window.innerWidth - size.width - margin))
+  const below = rect.bottom + 8
+  const top = below + size.height <= window.innerHeight
+    ? below
+    : Math.max(margin, rect.top - size.height - 8)
+  popoverStyles[name] = { left: `${left}px`, top: `${top}px` }
+}
+
+function updateOpenPopoverPosition() {
+  if (openSelect.value) updatePopoverPosition(openSelect.value)
+  if (openDatePicker.value) updatePopoverPosition('date')
 }
 
 function commitTagInput() {
@@ -613,70 +529,6 @@ function addSubtask() {
 }
 
 
-function openFormatMenu(event) {
-  const rect = event.currentTarget.getBoundingClientRect()
-  formatMenuPos.value = clampFloatingPosition(rect.left - 120, rect.bottom + 8, 240, 340)
-  formatMenuVisible.value = true
-}
-
-function onFormatMenuOutsideClick(e) {
-  if (formatMenuVisible.value) {
-    formatMenuVisible.value = false
-  }
-}
-
-watch(formatMenuVisible, (visible) => {
-  if (visible) {
-    setTimeout(() => document.addEventListener('click', onFormatMenuOutsideClick, { once: true }), 0)
-  }
-})
-
-function clampFloatingPosition(x, y, width, height) {
-  const margin = 12
-  return {
-    x: Math.max(margin, Math.min(x, window.innerWidth - width - margin)),
-    y: Math.max(margin, Math.min(y, window.innerHeight - height - margin))
-  }
-}
-
-async function triggerImageUpload() {
-  if (!task.value) return
-  try {
-    const path = await selectImage()
-    if (!path) {
-      fileInput.value?.click()
-      return
-    }
-    const attachment = await importImage(path)
-    if (attachment) {
-      const url = await readImage(path)
-      store.addAttachment(task.value.id, { ...attachment, path, url })
-      store.showNotice('图片已添加', 'success')
-    }
-  } catch (error) {
-    store.showNotice(error?.message || '添加图片失败', 'error')
-  }
-}
-
-function onFileSelected(event) {
-  const files = event.target.files
-  if (!files?.length || !task.value) return
-  for (const file of files) {
-    const reader = new FileReader()
-    reader.onload = (readerEvent) => {
-      store.addAttachment(task.value.id, file.name, readerEvent.target.result)
-    }
-    reader.readAsDataURL(file)
-  }
-  event.target.value = ''
-  store.showNotice('图片已添加', 'success')
-}
-
-function removeAttachment(id) {
-  store.removeAttachment(task.value.id, id)
-  store.showNotice('附件已移除', 'success')
-}
-
 function copyTask() {
   const copied = store.copyTask(task.value.id)
   if (copied) {
@@ -718,11 +570,14 @@ function handleSelectKeydown(event) {
 onMounted(() => {
   window.addEventListener('click', closeSelect)
   window.addEventListener('keydown', handleSelectKeydown)
-  nextTick(refreshEditorImageUrls)
+  window.addEventListener('resize', updateOpenPopoverPosition)
+  window.addEventListener('scroll', updateOpenPopoverPosition, true)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('click', closeSelect)
   window.removeEventListener('keydown', handleSelectKeydown)
+  window.removeEventListener('resize', updateOpenPopoverPosition)
+  window.removeEventListener('scroll', updateOpenPopoverPosition, true)
 })
 </script>

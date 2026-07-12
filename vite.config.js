@@ -16,6 +16,7 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version)
   },
+  publicDir: 'public',
   server: {
     port: 5173,
     strictPort: true

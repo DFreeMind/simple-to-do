@@ -7,42 +7,72 @@
       </div>
       <div class="header-actions">
         <ViewModeToggle v-if="showTaskActions && !['planned', 'completed', 'trash'].includes(store.currentView)" v-model="viewMode" />
-        <button v-if="showTaskActions && viewMode === 'group' && !['planned', 'completed', 'trash'].includes(store.currentView)" class="icon-btn" type="button" title="新建分组" @click="addGroup">
-          <Plus :size="18" />
-        </button>
         <button
-          v-if="showTaskActions && viewMode === 'group' && store.currentListGroups.length && !['planned', 'completed', 'trash'].includes(store.currentView)"
+          v-if="showTaskActions && !isSearchView && isGroupCompletedInGroups && store.completedTasks.length"
           class="icon-btn"
           type="button"
-          :title="allGroupsExpanded ? '折叠全部' : '展开全部'"
-          @click="toggleAllGroups"
+          :title="allGroupCompletedVisible ? '已显示所有完成任务，点击全部隐藏' : '已隐藏部分或全部完成任务，点击全部显示'"
+          :aria-label="allGroupCompletedVisible ? '全部隐藏完成任务' : '全部显示完成任务'"
+          @click="toggleAllGroupCompletedVisibility"
         >
-          <ChevronsDown v-if="!allGroupsExpanded" :size="18" />
-          <ChevronsUp v-else :size="18" />
+          <Eye v-if="allGroupCompletedVisible" :size="18" />
+          <EyeOff v-else :size="18" />
         </button>
-        <div v-if="showTaskActions" class="sort-select">
-          <button class="pill-btn" type="button" :title="sortLabel" :aria-label="sortLabel" @click.stop="sortMenuOpen = !sortMenuOpen">
-            <ArrowUpDown :size="16" />
-            <span>{{ sortLabel }}</span>
-            <ChevronDown :size="15" :class="{ rotated: sortMenuOpen }" />
+        <div v-if="showTaskActions && !isSearchView && viewMode === 'group' && !['planned', 'completed', 'trash'].includes(store.currentView)" class="header-actions__secondary">
+          <button class="icon-btn" type="button" title="新建分组" aria-label="新建分组" @click="addGroup">
+            <Plus :size="18" />
           </button>
-          <div v-if="sortMenuOpen" class="sort-menu" @click.stop>
-            <button
-              v-for="option in sortOptions"
-              :key="option.value"
-              class="sort-menu__item"
-              :class="{ active: store.sortBy === option.value }"
-              type="button"
-              @click="selectSort(option.value)"
-            >
-              <span>{{ option.label }}</span>
-              <Check v-if="store.sortBy === option.value" :size="15" />
-            </button>
+          <button
+            v-if="store.currentListGroups.length"
+            class="icon-btn"
+            type="button"
+            :title="allGroupsExpanded ? '折叠全部分组' : '展开全部分组'"
+            :aria-label="allGroupsExpanded ? '折叠全部分组' : '展开全部分组'"
+            @click="toggleAllGroups"
+          >
+            <ChevronsDown v-if="!allGroupsExpanded" :size="18" />
+            <ChevronsUp v-else :size="18" />
+          </button>
+        </div>
+        <div v-if="showTaskActions && !isSearchView && viewMode === 'group' && !['planned', 'completed', 'trash'].includes(store.currentView)" class="header-actions__more">
+          <button class="icon-btn" type="button" title="更多分组操作" aria-label="更多分组操作" @click.stop="toggleHeaderMoreMenu">
+            <MoreHorizontal :size="18" />
+          </button>
+          <div v-if="headerMoreOpen" class="sort-menu header-actions__more-menu" @click.stop>
+            <button class="sort-menu__item" type="button" @click="addGroupFromHeaderMenu"><Plus :size="15" /><span>新建分组</span></button>
+            <button v-if="store.currentListGroups.length" class="sort-menu__item" type="button" @click="toggleAllGroupsFromHeaderMenu"><ChevronsDown v-if="!allGroupsExpanded" :size="15" /><ChevronsUp v-else :size="15" /><span>{{ allGroupsExpanded ? '折叠全部分组' : '展开全部分组' }}</span></button>
           </div>
         </div>
-        <button v-if="showTaskActions" class="icon-btn" type="button" title="清除已完成" aria-label="清除已完成" @click="clearCompleted">
-          <ArchiveX :size="18" />
-        </button>
+        <div v-if="showTaskActions" class="sort-select">
+          <button
+            class="icon-btn"
+            :class="{ active: store.sortBy !== 'default' || sortMenuOpen }"
+            type="button"
+            :title="`排序：${sortLabel}`"
+            :aria-label="`排序：${sortLabel}`"
+            @click.stop="toggleSortMenu"
+          >
+            <ArrowUpDown :size="18" />
+          </button>
+          <div v-if="sortMenuOpen" class="sort-menu" @click.stop>
+            <div class="sort-menu__title">排序方式</div>
+            <template v-for="option in sortOptions" :key="option.value">
+              <div v-if="option.secondary" class="sort-menu__separator"></div>
+              <button
+                class="sort-menu__item"
+                :class="{ active: store.sortBy === option.value }"
+                type="button"
+                @click="selectSort(option.value)"
+              >
+                <span class="sort-menu__copy">
+                  <strong>{{ option.label }}</strong>
+                  <small v-if="option.description">{{ option.description }}</small>
+                </span>
+                <Check v-if="store.sortBy === option.value" :size="15" />
+              </button>
+            </template>
+          </div>
+        </div>
         <button
           class="icon-btn"
           type="button"
@@ -58,6 +88,7 @@
     <section v-if="store.currentView === 'search'" class="search-panel">
       <Search :size="18" />
       <input
+        ref="searchInput"
         :value="store.searchQuery"
         type="search"
         placeholder="输入关键词搜索标题、备注或标签"
@@ -136,6 +167,54 @@
         <TaskItem v-for="task in store.visibleTrashTasks" :key="task.id" :task="task" is-trash />
       </template>
 
+      <template v-else-if="isSearchView">
+        <div v-if="viewMode === 'list'" class="search-result-list">
+          <div v-if="searchResultCount" class="search-result-summary">
+            <span>找到 {{ searchResultCount }} 个结果</span>
+            <span>连续列表</span>
+          </div>
+          <TaskItem
+            v-for="task in store.filteredTasks"
+            :key="task.id"
+            :task="task"
+            :search-query="store.searchQuery"
+          />
+        </div>
+
+        <div v-else class="search-result-groups">
+          <div v-if="searchResultCount" class="search-result-summary">
+            <span>找到 {{ searchResultCount }} 个结果</span>
+            <span>按清单分组</span>
+          </div>
+          <section v-for="group in searchResultGroups" :key="group.id" class="search-result-group">
+            <button
+              class="search-result-group__header"
+              type="button"
+              :aria-expanded="!isSearchGroupCollapsed(group.id)"
+              :title="isSearchGroupCollapsed(group.id) ? '展开清单结果' : '折叠清单结果'"
+              @click="toggleSearchGroup(group.id)"
+            >
+              <span class="search-result-group__accent" :style="{ backgroundColor: group.color }"></span>
+              <Folder :size="16" />
+              <span class="search-result-group__copy">
+                <strong>{{ group.name }}</strong>
+                <small>清单 · {{ group.tasks.length }} 个结果</small>
+              </span>
+              <ChevronDown :size="16" :class="{ rotated: isSearchGroupCollapsed(group.id) }" />
+            </button>
+            <div v-show="!isSearchGroupCollapsed(group.id)" class="search-result-group__items">
+              <TaskItem
+                v-for="task in group.tasks"
+                :key="task.id"
+                :task="task"
+                :search-query="store.searchQuery"
+                hide-list-meta
+              />
+            </div>
+          </section>
+        </div>
+      </template>
+
       <template v-else>
         <!-- 列表模式 -->
         <template v-if="viewMode === 'list'">
@@ -202,23 +281,30 @@
             </div>
           </template>
 
-          <div v-for="group in store.groupedTasks" :key="group.id || 'ungrouped'" class="task-group" :class="[getGroupToneClass(group), { 'is-dragging': groupDrag.draggingId.value === group.id, 'is-drop-target': groupDrag.dragOverId.value === group.id, [`drop-${groupDrag.dropPosition.value}`]: groupDrag.dragOverId.value === group.id }]">
+          <div v-for="group in store.groupedTasks" :key="group.id || 'ungrouped'" class="task-group" :class="[getGroupToneClass(group), { 'is-dragging': groupDrag.draggingId.value === group.id, 'is-drop-target': groupDrag.dragOverId.value === group.id, [`drop-${groupDrag.dropPosition.value}`]: groupDrag.dragOverId.value === group.id }]" :style="getGroupToneStyle(group)">
             <TaskGroupHeader
-              :group="{ ...group, collapsed: isGroupCollapsed(group.id) }"
+              :group="{ ...group, collapsed: isGroupCollapsed(group.id), completedVisible: isGroupCompletedVisible(group.id), canToggleCompleted: isGroupCompletedInGroups }"
               @mousedown="handleGroupMouseDown($event, group.id)"
               @toggle="toggleGroupCollapse"
+              @toggleCompleted="toggleGroupCompletedVisibility"
               @addTask="addGroupTask"
               @menu="showGroupMenu"
             />
             <template v-if="!isGroupCollapsed(group.id)">
               <TaskItem
-                v-for="task in group.tasks"
+                v-for="task in group.openTasks"
                 :key="task.id"
                 :task="task"
                 :draggable="store.canDragTasks"
                 :is-dragging="taskDrag.draggingId.value === task.id"
                 :is-drop-target="taskDrag.dragOverId.value === task.id"
                 :drop-position="taskDrag.dragOverId.value === task.id ? taskDrag.dropPosition.value : ''"
+              />
+              <TaskItem
+                v-if="isGroupCompletedInGroups && isGroupCompletedVisible(group.id)"
+                v-for="task in group.completedTasks"
+                :key="task.id"
+                :task="task"
               />
             </template>
           </div>
@@ -266,7 +352,7 @@
           </div>
         </div>
 
-        <div v-if="store.completedTasks.length" class="completed-section">
+        <div v-if="store.completedTasks.length && !isGroupCompletedInGroups" class="completed-section">
           <div class="task-group-header is-system completed-header">
             <div class="task-group-header__main">
               <button
@@ -280,17 +366,6 @@
               <span class="task-group-header__emoji">🎉</span>
               <span class="task-group-header__name">已完成</span>
               <span class="task-group-header__count">{{ store.completedTasks.length }}</span>
-            </div>
-            <div class="task-group-header__actions">
-              <button
-                class="task-group-header__menu"
-                type="button"
-                title="清除已完成"
-                aria-label="清除已完成"
-                @click.stop="clearCompleted"
-              >
-                <ArchiveX :size="14" />
-              </button>
             </div>
           </div>
           <TaskItem
@@ -345,24 +420,17 @@
     <Teleport to="body">
       <div v-if="groupDialog.visible" class="input-overlay" @click.self="closeGroupDialog">
         <div class="input-dialog group-dialog" @click.stop>
-          <button class="input-close" type="button" title="关闭" @click="closeGroupDialog">
-            <X :size="18" />
-          </button>
-          <div class="input-header input-header--edit">
-            <div class="input-icon-wrapper">
-              <div class="input-icon input-icon--edit">
-                <FolderInput :size="28" />
-              </div>
-            </div>
+          <div class="group-dialog__header">
+            <h3 class="group-dialog__title">{{ groupDialog.title }}</h3>
+            <button class="group-dialog__close" type="button" title="关闭" @click="closeGroupDialog">
+              <X :size="16" />
+            </button>
           </div>
           <div class="input-body group-dialog__body">
-            <h3>{{ groupDialog.title }}</h3>
-            <p class="input-description">为任务分组，方便按主题整理和回顾</p>
-
             <div class="group-dialog__name-row">
               <button ref="emojiButtonRef" type="button" class="group-dialog__emoji-trigger" title="选择 Emoji" @click.stop="toggleEmojiPicker">
                 <span v-if="groupDialog.emoji">{{ groupDialog.emoji }}</span>
-                <Smile v-else :size="20" />
+                <Smile v-else :size="18" />
               </button>
               <div class="input-field-wrapper group-dialog__name-field">
                 <input
@@ -371,46 +439,68 @@
                   type="text"
                   placeholder="分组名称，例如：工作"
                   class="input-field"
-                  maxlength="30"
+                  maxlength="20"
                   @keydown.enter="confirmGroupDialog"
                 />
+                <span class="group-dialog__char-count">{{ groupDialog.name.length }}/20</span>
               </div>
             </div>
 
             <div class="group-dialog__section">
-              <div class="group-dialog__section-title"><span>背景颜色</span></div>
-              <button type="button" class="group-dialog__auto-color" :class="{ active: groupDialog.color === 'auto' }" @click="groupDialog.color = 'auto'">
-                <span class="group-dialog__auto-swatch">✦</span>
-                <span><strong>自动配色</strong><small>根据当前主题生成协调色</small></span>
-                <Check v-if="groupDialog.color === 'auto'" :size="16" />
-              </button>
-              <div class="group-dialog__manual-colors">
-                <span>手动选择</span>
-                <div class="group-dialog__color-options">
-                <button
-                  v-for="option in groupColorOptions.filter(option => option.id !== 'auto')"
-                  :key="option.id"
-                  type="button"
-                  class="group-dialog__color-option"
-                  :class="{ active: groupDialog.color === option.id }"
-                  :title="option.label"
-                  :aria-label="option.label"
-                  :style="{ '--swatch-color': option.color }"
-                  @click="groupDialog.color = option.id"
-                >
-                  <span class="group-dialog__color-swatch"></span>
-                  <Check v-if="groupDialog.color === option.id" :size="13" />
-                </button>
+              <div class="group-dialog__color-header">
+                <div>
+                  <span class="group-dialog__color-label">分组强调色</span>
+                  <small class="group-dialog__color-hint">仅用于标题标识，不影响任务阅读</small>
                 </div>
+                <label class="group-dialog__auto-toggle" :class="{ active: groupDialog.color === 'auto' }">
+                  <input type="checkbox" :checked="groupDialog.color === 'auto'" @change="toggleAutoColor" />
+                  <span class="group-dialog__auto-toggle-track">
+                    <span class="group-dialog__auto-toggle-thumb"></span>
+                  </span>
+                  <span class="group-dialog__auto-toggle-label">自动配色</span>
+                </label>
+              </div>
+              <div class="group-dialog__color-grid">
+                <button
+                  v-for="preset in mergedColorPresets"
+                  :key="preset.id"
+                  type="button"
+                  class="group-dialog__color-swatch"
+                  :class="{ active: groupDialog.color === preset.id, 'is-auto': preset.id === 'auto' }"
+                  :title="preset.label"
+                  :aria-label="preset.label"
+                  :style="preset.id !== 'auto' ? { '--swatch-color': preset.color } : {}"
+                  @click="selectPresetColor(preset)"
+                >
+                  <span v-if="preset.id === 'auto'" class="group-dialog__auto-icon">✦</span>
+                  <svg v-else-if="groupDialog.color === preset.id" class="group-dialog__check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
+              </div>
+              <div class="group-dialog__custom-input">
+                <div class="group-dialog__custom-color-control">
+                  <button
+                    ref="customColorPreview"
+                    type="button"
+                    class="group-dialog__color-preview"
+                    :style="{ '--preview-color': groupDialog.customColor }"
+                    aria-label="打开自定义颜色选择器"
+                    :aria-expanded="customColorPickerOpen"
+                    @click.stop="toggleCustomColorPicker"
+                  ></button>
+                </div>
+                <input v-model="groupDialog.customColor" class="group-dialog__hex-field" type="text" maxlength="7" placeholder="#000000" aria-label="十六进制颜色" @change="syncCustomColor" />
+                <button type="button" class="group-dialog__clear" @click="clearCustomColor">清空</button>
               </div>
             </div>
           </div>
-          <div class="input-footer">
-            <button class="input-btn input-btn--cancel" type="button" @click="closeGroupDialog">
+          <div class="group-dialog__footer">
+            <button class="group-dialog__btn group-dialog__btn--cancel" type="button" @click="closeGroupDialog">
               取消
             </button>
             <button
-              class="input-btn input-btn--edit"
+              class="group-dialog__btn group-dialog__btn--confirm"
               type="button"
               :disabled="!groupDialog.name.trim()"
               @click="confirmGroupDialog"
@@ -419,6 +509,12 @@
             </button>
           </div>
         </div>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div v-if="customColorPickerOpen" class="group-dialog__color-picker-popover" :style="customColorPickerStyle" @click.stop>
+        <ColorPicker v-model="groupDialog.customColor" @update:model-value="selectCustomColor" />
       </div>
     </Teleport>
 
@@ -432,9 +528,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
 import {
-  ArchiveX,
   ArrowUpDown,
   CalendarClock,
   FolderInput,
@@ -446,7 +541,10 @@ import {
   ChevronsUp,
   Flag,
   Folder,
+  Eye,
+  EyeOff,
   Info,
+  MoreHorizontal,
   PanelRight,
   Plus,
   Repeat2,
@@ -465,13 +563,19 @@ import EmojiPicker from './EmojiPicker.vue'
 import ViewModeToggle from './ViewModeToggle.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
 import InputDialog from './InputDialog.vue'
+import ColorPicker from './ColorPicker.vue'
 
 const store = useTaskStore()
 const newTaskTitle = ref('')
 const quickInput = ref(null)
+const searchInput = ref(null)
+const searchViewMode = ref('list')
 const sortMenuOpen = ref(false)
+const headerMoreOpen = ref(false)
 const pinnedVisible = ref(true)
+const groupCompletedVisibility = reactive({})
 const groupCollapseState = reactive({})
+const searchGroupCollapseState = reactive({})
 const contentRef = ref(null)
 const isScrolling = ref(false)
 const scrollIndicator = reactive({ visible: false, top: 0, height: 0 })
@@ -484,21 +588,36 @@ const groupDialog = reactive({
   name: '',
   emoji: '',
   color: 'auto',
+  customColor: '#5b8def',
   showEmoji: false,
   confirmText: '创建',
   editingGroupId: null
 })
 const groupDialogInput = ref(null)
 const emojiButtonRef = ref(null)
+const customColorPickerOpen = ref(false)
+const customColorPreview = ref(null)
+const customColorPickerPosition = reactive({ top: 0, left: 0 })
 const emojiButtonEl = computed(() => emojiButtonRef.value?.$el || emojiButtonRef.value)
-const groupColorOptions = [
-  { id: 'auto', label: '自动', color: '' },
-  { id: 'accent', label: '主题', color: 'var(--accent)' },
-  { id: 'blue', label: '海蓝', color: '#5b8def' },
-  { id: 'violet', label: '紫罗兰', color: '#8b76df' },
-  { id: 'amber', label: '暖橙', color: '#d99a42' },
-  { id: 'rose', label: '玫瑰', color: '#d97991' },
-  { id: 'green', label: '草绿', color: '#62a97b' }
+const customColorPickerStyle = computed(() => ({
+  top: `${customColorPickerPosition.top}px`,
+  left: `${customColorPickerPosition.left}px`
+}))
+// 预设 ID 必须与 TaskGroup 的可持久化颜色 ID 保持一致，
+// 否则 store 在保存时会将未知值回退为“自动配色”。
+const mergedColorPresets = [
+  { id: 'auto', label: '自动配色', color: '' },
+  { id: 'accent', label: '主题色', color: 'var(--accent)' },
+  { id: 'blue', label: '海蓝', color: '#4A90D9' },
+  { id: 'violet', label: '紫罗兰', color: '#8B6FD8' },
+  { id: 'amber', label: '琥珀', color: '#E3A43A' },
+  { id: 'rose', label: '玫瑰', color: '#D46F8C' },
+  { id: 'green', label: '绿色', color: '#4EAA70' },
+  { id: 'cyan', label: '青蓝', color: '#38AFC2' },
+  { id: 'coral', label: '珊瑚', color: '#DE7D69' },
+  { id: 'indigo', label: '靛蓝', color: '#6275C9' },
+  { id: 'teal', label: '松绿', color: '#3D9A7D' },
+  { id: 'brick', label: '砖红', color: '#C9685A' }
 ]
 const activeGroupAddId = ref(null)
 const activeGroupAddGroupId = ref(null)
@@ -548,11 +667,11 @@ const inputDialog = reactive({
   onConfirm: () => {}
 })
 const sortOptions = [
-  { value: 'default', label: '智能排序' },
+  { value: 'default', label: '智能排序（推荐）', description: '重要、置顶和截止日期优先' },
   { value: 'date', label: '截止日期近' },
   { value: 'dateDesc', label: '截止日期远' },
   { value: 'priority', label: '重要优先' },
-  { value: 'createdDesc', label: '最近创建' },
+  { value: 'createdDesc', label: '最近创建', secondary: true },
   { value: 'name', label: '按名称' }
 ]
 
@@ -663,11 +782,42 @@ function isDragIgnored(target) {
 
 function getGroupToneClass(group) {
   if (!group.id) return 'task-group--ungrouped'
+  if (group.color === 'custom') return 'task-group--custom'
   if (group.color && group.color !== 'auto') return `task-group--color-${group.color}`
-  const groupId = group.id
+  return 'task-group--auto'
+}
+
+const autoGroupPalettes = [
+  '#2f8f86', '#4a7fd1', '#7a62c8', '#c8862f',
+  '#c35d7b', '#4b9a68', '#3f99ab', '#8b7c38'
+]
+
+function getGroupToneStyle(group) {
+  if (!group?.id) return {}
+  if (group.color === 'custom' && isValidHexColor(group.customColor)) {
+    return {
+      '--group-accent': group.customColor,
+      '--group-header-surface': hexToRgba(group.customColor, 0.08)
+    }
+  }
+  if (group.color && group.color !== 'auto') return {}
+  const groupId = `${group.name || ''}${group.id}`
   let hash = 0
   for (const char of groupId) hash = ((hash << 5) - hash) + char.charCodeAt(0)
-  return `task-group--tone-${Math.abs(hash) % 4}`
+  const accent = autoGroupPalettes[Math.abs(hash) % autoGroupPalettes.length]
+  return { '--group-accent': accent, '--group-header-surface': hexToRgba(accent, 0.08) }
+}
+
+function isValidHexColor(value) {
+  return /^#[0-9a-f]{6}$/i.test(value || '')
+}
+
+function hexToRgba(hex, alpha) {
+  const value = hex.replace('#', '')
+  const r = Number.parseInt(value.slice(0, 2), 16)
+  const g = Number.parseInt(value.slice(2, 4), 16)
+  const b = Number.parseInt(value.slice(4, 6), 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
 function updateScrollIndicator(element = contentRef.value) {
@@ -714,6 +864,7 @@ const sortLabel = computed(() => {
 })
 
 const showTaskActions = computed(() => true)
+const isSearchView = computed(() => store.currentView === 'search')
 
 const quickPlaceholder = computed(() => {
   if (store.currentView === 'today') return '添加到今日，例如：明天 9点 写周报 #工作'
@@ -763,9 +914,75 @@ const isEmpty = computed(() => {
 })
 
 const viewMode = computed({
-  get: () => store.currentViewMode,
-  set: (mode) => store.setViewMode(store.currentView, mode)
+  get: () => isSearchView.value ? searchViewMode.value : store.currentViewMode,
+  set: (mode) => {
+    if (isSearchView.value) {
+      searchViewMode.value = mode
+      return
+    }
+    store.setViewMode(store.currentView, mode)
+  }
 })
+const isGroupCompletedInGroups = computed(() => {
+  return !isSearchView.value && viewMode.value === 'group' && store.settings.groupCompletedDisplayMode === 'in-group'
+})
+const searchResultGroups = computed(() => {
+  const listOrder = new Map(store.lists.map((list, index) => [list.id, index]))
+  const groups = new Map()
+
+  store.filteredTasks.forEach(task => {
+    const list = store.lists.find(item => item.id === task.listId)
+    const id = list?.id || task.listId || 'unknown'
+    if (!groups.has(id)) {
+      groups.set(id, {
+        id,
+        name: list?.name || '未归属清单',
+        color: list?.color || 'var(--text-subtle)',
+        order: listOrder.get(id) ?? Number.MAX_SAFE_INTEGER,
+        tasks: []
+      })
+    }
+    groups.get(id).tasks.push(task)
+  })
+
+  return [...groups.values()].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, 'zh-CN'))
+})
+const searchResultCount = computed(() => store.filteredTasks.length)
+const allGroupCompletedVisible = computed(() => {
+  const groups = store.groupedTasks.filter(group => group.completedCount)
+  return groups.length > 0 && groups.every(group => isGroupCompletedVisible(group.id))
+})
+
+watch(
+  () => `${store.currentView}:${viewMode.value}`,
+  () => {
+    Object.keys(groupCompletedVisibility).forEach(key => delete groupCompletedVisibility[key])
+  },
+  { immediate: true }
+)
+
+function getGroupCompletedVisibilityKey(groupId) {
+  return groupId || '__ungrouped__'
+}
+
+function isGroupCompletedVisible(groupId) {
+  const key = getGroupCompletedVisibilityKey(groupId)
+  return groupCompletedVisibility[key] ?? store.settings.groupCompletedVisibleByDefault
+}
+
+function toggleGroupCompletedVisibility(groupId) {
+  const key = getGroupCompletedVisibilityKey(groupId)
+  groupCompletedVisibility[key] = !isGroupCompletedVisible(groupId)
+}
+
+function toggleAllGroupCompletedVisibility() {
+  const nextVisible = !allGroupCompletedVisible.value
+  store.groupedTasks
+    .filter(group => group.completedCount)
+    .forEach(group => {
+      groupCompletedVisibility[getGroupCompletedVisibilityKey(group.id)] = nextVisible
+    })
+}
 
 function toggleGroupCollapse(groupId) {
   if (groupId) {
@@ -865,6 +1082,7 @@ function cancelGroupAdd() {
 }
 
 function showGroupMenu({ groupId, event }) {
+  closeHeaderTransientMenus()
   groupMenu.groupId = groupId
   groupMenu.x = event.clientX
   groupMenu.y = event.clientY
@@ -889,7 +1107,9 @@ function renameGroup() {
   groupDialog.name = group.name
   groupDialog.emoji = group.emoji || ''
   groupDialog.color = group.color || 'auto'
+  groupDialog.customColor = group.customColor || '#5b8def'
   groupDialog.showEmoji = false
+  customColorPickerOpen.value = false
   groupDialog.confirmText = '保存'
   groupDialog.editingGroupId = groupId
   groupDialog.visible = true
@@ -899,19 +1119,49 @@ function renameGroup() {
 function closeGroupDialog() {
   groupDialog.visible = false
   groupDialog.showEmoji = false
+  customColorPickerOpen.value = false
   groupDialog.editingGroupId = null
+}
+
+function isSearchGroupCollapsed(groupId) {
+  return Boolean(searchGroupCollapseState[groupId])
+}
+
+function toggleSearchGroup(groupId) {
+  searchGroupCollapseState[groupId] = !isSearchGroupCollapsed(groupId)
+}
+
+function toggleCustomColorPicker() {
+  if (customColorPickerOpen.value) {
+    customColorPickerOpen.value = false
+    return
+  }
+  const rect = customColorPreview.value?.getBoundingClientRect()
+  if (!rect) return
+  const pickerWidth = 302
+  groupDialog.showEmoji = false
+  customColorPickerPosition.top = rect.bottom + 8
+  customColorPickerPosition.left = Math.max(12, Math.min(rect.left, window.innerWidth - pickerWidth - 12))
+  customColorPickerOpen.value = true
+}
+
+function closeCustomColorPicker() {
+  customColorPickerOpen.value = false
 }
 
 function toggleEmojiPicker() {
   groupDialog.showEmoji = !groupDialog.showEmoji
   if (groupDialog.showEmoji) {
+    closeCustomColorPicker()
     nextTick(() => groupDialogInput.value?.focus())
   }
 }
 
 function handleGroupDialogKeydown(event) {
   if (event.key === 'Escape') {
-    if (groupDialog.showEmoji) {
+    if (customColorPickerOpen.value) {
+      closeCustomColorPicker()
+    } else if (groupDialog.showEmoji) {
       groupDialog.showEmoji = false
     } else {
       closeGroupDialog()
@@ -925,7 +1175,7 @@ function deleteGroup() {
   if (!groupId) return
   const group = store.currentListGroups.find(g => g.id === groupId)
   if (!group) return
-  const taskCount = store.groupedTasks.find(g => g.id === groupId)?.tasks?.length || 0
+  const taskCount = store.groupedTasks.find(g => g.id === groupId)?.totalCount || 0
   confirmDialog.title = '删除分组'
   confirmDialog.message = taskCount > 0
     ? `分组"${group.name}"下有 ${taskCount} 个任务，删除后任务将移至"未分组"。确定删除？`
@@ -948,7 +1198,9 @@ function addGroup() {
   groupDialog.name = ''
   groupDialog.emoji = ''
   groupDialog.color = 'auto'
+  groupDialog.customColor = '#5b8def'
   groupDialog.showEmoji = false
+  customColorPickerOpen.value = false
   groupDialog.confirmText = '创建'
   groupDialog.editingGroupId = null
   groupDialog.visible = true
@@ -959,11 +1211,46 @@ function confirmGroupDialog() {
   const name = groupDialog.name.trim()
   if (!name) return
   if (groupDialog.editingGroupId) {
-    store.renameTaskGroup(groupDialog.editingGroupId, name, groupDialog.emoji, groupDialog.color)
+    store.renameTaskGroup(groupDialog.editingGroupId, name, groupDialog.emoji, groupDialog.color, groupDialog.customColor)
   } else {
-    store.addTaskGroup(name, store.currentView, groupDialog.emoji, groupDialog.color)
+    store.addTaskGroup(name, store.currentView, groupDialog.emoji, groupDialog.color, groupDialog.customColor)
   }
   closeGroupDialog()
+}
+
+function setCustomColor(color) {
+  groupDialog.customColor = color
+  groupDialog.color = 'custom'
+}
+
+function selectPresetColor(preset) {
+  if (preset.id === 'auto') {
+    groupDialog.color = 'auto'
+  } else {
+    groupDialog.color = preset.id
+    groupDialog.customColor = preset.color
+  }
+}
+
+function toggleAutoColor() {
+  groupDialog.color = groupDialog.color === 'auto' ? 'blue-gray' : 'auto'
+}
+
+function clearCustomColor() {
+  groupDialog.customColor = '#5b8def'
+  groupDialog.color = 'auto'
+  customColorPickerOpen.value = false
+}
+
+function selectCustomColor() {
+  if (!isValidHexColor(groupDialog.customColor)) groupDialog.customColor = '#5b8def'
+  groupDialog.color = 'custom'
+}
+
+function syncCustomColor() {
+  const normalized = groupDialog.customColor.trim()
+  groupDialog.customColor = isValidHexColor(normalized) ? normalized.toUpperCase() : '#5b8def'
+  groupDialog.color = 'custom'
 }
 
 function selectSort(value) {
@@ -971,48 +1258,83 @@ function selectSort(value) {
   sortMenuOpen.value = false
 }
 
+function closeHeaderTransientMenus() {
+  sortMenuOpen.value = false
+  headerMoreOpen.value = false
+  window.dispatchEvent(new Event('task-list:close-transient-menus'))
+}
+
+function toggleSortMenu() {
+  const willOpen = !sortMenuOpen.value
+  closeHeaderTransientMenus()
+  if (willOpen) {
+    closeGroupMenu()
+    sortMenuOpen.value = true
+  }
+}
+
+function toggleHeaderMoreMenu() {
+  const willOpen = !headerMoreOpen.value
+  closeHeaderTransientMenus()
+  if (willOpen) {
+    closeGroupMenu()
+    headerMoreOpen.value = true
+  }
+}
+
+function addGroupFromHeaderMenu() {
+  headerMoreOpen.value = false
+  addGroup()
+}
+
+function toggleAllGroupsFromHeaderMenu() {
+  headerMoreOpen.value = false
+  toggleAllGroups()
+}
+
 function closeSortMenu() {
   sortMenuOpen.value = false
 }
 
+function closeHeaderMoreMenu() {
+  headerMoreOpen.value = false
+}
+
 function handleSortKeydown(event) {
-  if (event.key === 'Escape') closeSortMenu()
+  if (event.key !== 'Escape') return
+  if (sortMenuOpen.value || headerMoreOpen.value) {
+    closeHeaderTransientMenus()
+  } else if (groupMenu.visible) {
+    closeGroupMenu()
+  }
+}
+
+function focusSearchInput() {
+  nextTick(() => searchInput.value?.focus())
 }
 
 onMounted(() => {
   window.addEventListener('click', closeSortMenu)
+  window.addEventListener('click', closeHeaderMoreMenu)
+  window.addEventListener('click', closeCustomColorPicker)
   window.addEventListener('keydown', handleSortKeydown)
   window.addEventListener('keydown', handleGroupDialogKeydown)
+  window.addEventListener('task-list:focus-search', focusSearchInput)
   nextTick(() => updateScrollIndicator())
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('click', closeSortMenu)
+  window.removeEventListener('click', closeHeaderMoreMenu)
+  window.removeEventListener('click', closeCustomColorPicker)
   window.removeEventListener('keydown', handleSortKeydown)
   window.removeEventListener('keydown', handleGroupDialogKeydown)
+  window.removeEventListener('task-list:focus-search', focusSearchInput)
   if (scrollTimer) clearTimeout(scrollTimer)
 })
 
 function toggleCompleted() {
   store.updateSettings({ completedVisible: !store.settings.completedVisible })
-}
-
-function clearCompleted() {
-  const count = store.filteredTasks.filter(task => task.completed && !task.deleted).length
-  if (!count) {
-    store.showNotice('没有可清理的已完成任务', 'info')
-    return
-  }
-  confirmDialog.title = '清理已完成任务'
-  confirmDialog.message = `清理 ${count} 个已完成任务？它们会进入垃圾桶。`
-  confirmDialog.confirmText = '清理'
-  confirmDialog.type = 'danger'
-  confirmDialog.onConfirm = () => {
-    store.clearCompletedInCurrentView()
-    store.showNotice(`已清理 ${count} 个任务`, 'success')
-    confirmDialog.visible = false
-  }
-  confirmDialog.visible = true
 }
 
 function formatTrashDate(value) {

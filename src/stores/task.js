@@ -40,11 +40,12 @@ import {
   setSoundCategories
 } from '@/utils/sound'
 import { migrateData, validateData, createBackup, getCurrentVersion } from '@/utils/migrator'
+import { matchesTaskSearch, normalizeSearchQuery } from '@/utils/search'
 
 const SYSTEM_VIEW_IDS = ['today', 'inbox', 'planned', 'important', 'completed', 'trash', 'search']
 const READONLY_VIEWS = ['planned', 'completed', 'trash']
 const THEME_IDS = ['mint', 'blue', 'violet', 'graphite']
-const TASK_GROUP_COLOR_IDS = ['auto', 'accent', 'blue', 'violet', 'amber', 'rose', 'green']
+const TASK_GROUP_COLOR_IDS = ['auto', 'accent', 'blue', 'violet', 'amber', 'rose', 'green', 'cyan', 'coral', 'indigo', 'teal', 'brick', 'custom']
 const DETAIL_WIDTH_MIN = 320
 const DETAIL_WIDTH_MAX = 800
 
@@ -67,6 +68,8 @@ const DEFAULT_SETTINGS = {
   detailWidth: 380,
   startView: 'today',
   completedVisible: true,
+  groupCompletedDisplayMode: 'in-group',
+  groupCompletedVisibleByDefault: true,
   trashRetentionDays: 30,
   soundEnabled: true,
   soundTaskEnabled: true,
@@ -190,6 +193,7 @@ export const useTaskStore = defineStore('task', () => {
   const notice = ref(null)
   const settings = ref({ ...DEFAULT_SETTINGS })
   const settingsOpen = ref(false)
+  const helpCenterOpen = ref(false)
   const ungroupedCollapsed = ref(false)
   const calendarCursor = ref(new Date())
   const viewOrders = ref({})
@@ -216,7 +220,7 @@ export const useTaskStore = defineStore('task', () => {
 
   const filteredTasks = computed(() => {
     let result = []
-    const query = searchQuery.value.trim().toLowerCase()
+    const query = normalizeSearchQuery(searchQuery.value)
 
     switch (currentView.value) {
       case 'today':
@@ -238,16 +242,7 @@ export const useTaskStore = defineStore('task', () => {
         result = [...visibleTrashTasks.value]
         break
       case 'search':
-        result = query ? activeTasks.value.filter(task => {
-          const fields = [
-            task.title,
-            task.description,
-            task.descriptionHtml,
-            task.repeatRule,
-            ...(task.tags || [])
-          ].filter(Boolean).join(' ').toLowerCase()
-          return fields.includes(query)
-        }) : []
+        result = query ? activeTasks.value.filter(task => matchesTaskSearch(task, query)) : []
         break
       default:
         result = activeTasks.value.filter(task => task.listId === currentView.value)
@@ -454,7 +449,7 @@ export const useTaskStore = defineStore('task', () => {
 
   function getTaskOrderKey() {
     if (currentView.value === 'search') {
-      const query = searchQuery.value.trim().toLowerCase()
+      const query = normalizeSearchQuery(searchQuery.value)
       return query ? `search:${query}` : null
     }
     if (['today', 'inbox', 'planned', 'important'].includes(currentView.value)) return currentView.value
@@ -511,6 +506,14 @@ export const useTaskStore = defineStore('task', () => {
 
   function closeSettings() {
     settingsOpen.value = false
+  }
+
+  function openHelpCenter() {
+    helpCenterOpen.value = true
+  }
+
+  function closeHelpCenter() {
+    helpCenterOpen.value = false
   }
 
   function updateSettings(updates) {
@@ -723,18 +726,30 @@ export const useTaskStore = defineStore('task', () => {
 
   const groupedTasks = computed(() => {
     const groups = currentListGroups.value
-    // 置顶任务在分组模式中单独渲染，避免同时出现在所属分组内。
-    const tasks = filteredTasks.value.filter(t => !t.completed && !t.pinned)
+    // 未完成置顶任务单独渲染；已完成任务始终回到所属分组。
+    const tasks = filteredTasks.value.filter(t => t.completed || !t.pinned)
 
-    const result = groups.map(group => ({
-      ...group,
-      tasks: tasks.filter(t => t.taskGroupId === group.id)
-    }))
+    function makeTaskBuckets(group, groupTasks) {
+      const openTasks = groupTasks.filter(task => !task.completed)
+      const completedTasks = groupTasks
+        .filter(task => task.completed)
+        .sort((a, b) => new Date(b.completedAt || 0) - new Date(a.completedAt || 0))
+      return {
+        ...group,
+        tasks: [...openTasks, ...completedTasks],
+        openTasks,
+        completedTasks,
+        totalCount: groupTasks.length,
+        completedCount: completedTasks.length
+      }
+    }
+
+    const result = groups.map(group => makeTaskBuckets(group, tasks.filter(t => t.taskGroupId === group.id)))
 
     // 添加"未分组"分组
     const ungrouped = tasks.filter(t => !t.taskGroupId)
     if (ungrouped.length > 0) {
-      result.unshift({ id: null, name: '未分组', emoji: '🗂️', tasks: ungrouped })
+      result.unshift(makeTaskBuckets({ id: null, name: '未分组', emoji: '🗂️' }, ungrouped))
     }
 
     return result
@@ -747,7 +762,7 @@ export const useTaskStore = defineStore('task', () => {
     }
   }
 
-  function addTaskGroup(name, listId, emoji, color = 'auto') {
+  function addTaskGroup(name, listId, emoji, color = 'auto', customColor = '') {
     const groupId = genId()
     const maxSort = Math.max(0, ...taskGroups.value.filter(g => g.listId === listId).map(g => g.sortOrder || 0))
     taskGroups.value.push({
@@ -755,6 +770,7 @@ export const useTaskStore = defineStore('task', () => {
       name: name || '新分组',
       emoji: emoji || '',
       color: TASK_GROUP_COLOR_IDS.includes(color) ? color : 'auto',
+      customColor: normalizeGroupCustomColor(customColor),
       listId,
       sortOrder: maxSort + 1000,
       collapsed: false,
@@ -765,12 +781,13 @@ export const useTaskStore = defineStore('task', () => {
     return groupId
   }
 
-  function renameTaskGroup(groupId, name, emoji, color) {
+  function renameTaskGroup(groupId, name, emoji, color, customColor) {
     const group = taskGroups.value.find(g => g.id === groupId)
     if (group) {
       if (name !== undefined) group.name = name || '未命名分组'
       if (emoji !== undefined) group.emoji = emoji
       if (color !== undefined) group.color = TASK_GROUP_COLOR_IDS.includes(color) ? color : 'auto'
+      if (customColor !== undefined) group.customColor = normalizeGroupCustomColor(customColor)
       group.updatedAt = nowIso()
     }
   }
@@ -1343,7 +1360,7 @@ export const useTaskStore = defineStore('task', () => {
 
   function buildSavePayload() {
     const payload = JSON.parse(JSON.stringify({
-      schemaVersion: 4,
+      schemaVersion: 5,
       groups: groups.value,
       lists: lists.value,
       tasks: tasks.value,
@@ -1383,12 +1400,17 @@ export const useTaskStore = defineStore('task', () => {
       name: rawGroup?.name || '未命名分组',
       emoji: rawGroup?.emoji || '',
       color: TASK_GROUP_COLOR_IDS.includes(rawGroup?.color) ? rawGroup.color : 'auto',
+      customColor: normalizeGroupCustomColor(rawGroup?.customColor),
       listId: rawGroup?.listId || '',
       sortOrder: Number.isFinite(Number(rawGroup?.sortOrder)) ? Number(rawGroup.sortOrder) : 1000,
       collapsed: Boolean(rawGroup?.collapsed),
       createdAt: rawGroup?.createdAt || new Date().toISOString(),
       updatedAt: rawGroup?.updatedAt || new Date().toISOString()
     }
+  }
+
+  function normalizeGroupCustomColor(value) {
+    return /^#[0-9a-f]{6}$/i.test(value || '') ? value.toUpperCase() : '#5B8DEF'
   }
 
   function normalizeLists(rawLists) {
@@ -1488,6 +1510,10 @@ export const useTaskStore = defineStore('task', () => {
       sidebarCollapsed: !!rawSettings.sidebarCollapsed,
       detailWidth,
       completedVisible: rawSettings.completedVisible !== false,
+      groupCompletedDisplayMode: ['in-group', 'separate-section'].includes(rawSettings.groupCompletedDisplayMode)
+        ? rawSettings.groupCompletedDisplayMode
+        : DEFAULT_SETTINGS.groupCompletedDisplayMode,
+      groupCompletedVisibleByDefault: rawSettings.groupCompletedVisibleByDefault !== false,
       trashRetentionDays,
       soundEnabled,
       soundTaskEnabled,
@@ -1638,6 +1664,7 @@ export const useTaskStore = defineStore('task', () => {
     notice,
     settings,
     settingsOpen,
+    helpCenterOpen,
     activeTasks,
     visibleTrashTasks,
     currentList,
@@ -1720,6 +1747,8 @@ export const useTaskStore = defineStore('task', () => {
     clearNotice,
     openSettings,
     closeSettings,
+    openHelpCenter,
+    closeHelpCenter,
     updateSettings,
     testReminderNotification,
     loadData,

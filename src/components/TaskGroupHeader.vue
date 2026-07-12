@@ -4,22 +4,33 @@
     :class="{ 'is-system': !group.id }"
     :data-group-id="group.id"
   >
-    <div class="task-group-header__main">
+    <div class="task-group-header__main" title="点击展开或收起分组" @click="toggleCollapse">
       <button
         class="task-group-header__toggle"
         type="button"
         :title="group.collapsed ? '展开分组' : '折叠分组'"
-        @click="toggleCollapse"
+        @click.stop="toggleCollapse"
       >
         <ChevronDown :size="16" :class="{ rotated: group.collapsed }" />
       </button>
       <span v-if="group.emoji" class="task-group-header__emoji">{{ group.emoji }}</span>
-      <span class="task-group-header__name" @dblclick="startRename">{{ group.name }}</span>
-      <span class="task-group-header__count">{{ group.tasks?.length || 0 }}</span>
+      <span class="task-group-header__name" title="双击重命名分组" @dblclick="startRename">{{ group.name }}</span>
+      <span class="task-group-header__count">{{ group.completedCount || 0 }} / {{ group.totalCount ?? group.tasks?.length ?? 0 }}</span>
     </div>
     <div class="task-group-header__actions">
-      <button class="task-group-header__add" type="button" @click.stop="$emit('addTask', group.id, $event)">
+      <button class="task-group-header__add" type="button" title="添加任务到此分组" @click.stop="$emit('addTask', group.id, $event)">
         添加任务
+      </button>
+      <button
+        v-if="group.canToggleCompleted && group.completedCount"
+        class="task-group-header__menu"
+        type="button"
+        :title="group.completedVisible ? '已显示完成任务，点击隐藏' : '已隐藏完成任务，点击显示'"
+        :aria-label="group.completedVisible ? '隐藏完成任务' : '显示完成任务'"
+        @click.stop="toggleCompleted"
+      >
+        <Eye v-if="group.completedVisible" :size="14" />
+        <EyeOff v-else :size="14" />
       </button>
       <button
         class="task-group-header__menu"
@@ -34,7 +45,7 @@
 </template>
 
 <script setup>
-import { ChevronDown, MoreHorizontal } from 'lucide-vue-next'
+import { ChevronDown, Eye, EyeOff, MoreHorizontal } from 'lucide-vue-next'
 
 const props = defineProps({
   group: {
@@ -43,10 +54,14 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['toggle', 'rename', 'menu', 'addTask'])
+const emit = defineEmits(['toggle', 'toggleCompleted', 'rename', 'menu', 'addTask'])
 
 function toggleCollapse() {
   emit('toggle', props.group.id)
+}
+
+function toggleCompleted() {
+  emit('toggleCompleted', props.group.id)
 }
 
 function startRename() {
@@ -63,15 +78,24 @@ function showMenu(e) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px 6px;
+  padding: 10px 12px;
+  border-left: 4px solid var(--group-accent, var(--accent-strong));
+  background: transparent;
+  transition: background 0.15s ease;
   user-select: none;
+}
+
+.task-group:hover .task-group-header {
+  background: var(--group-header-surface, var(--surface-muted));
 }
 
 .task-group-header__main {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex: 1;
   min-width: 0;
+  cursor: pointer;
 }
 
 .task-group-header__toggle {
@@ -85,7 +109,7 @@ function showMenu(e) {
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: var(--accent-strong);
+  color: var(--group-accent, var(--accent-strong));
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -111,7 +135,7 @@ function showMenu(e) {
 .task-group-header__name {
   font-size: 15px;
   font-weight: 600;
-  color: var(--accent-strong);
+  color: var(--group-accent, var(--accent-strong));
   cursor: default;
   white-space: nowrap;
   overflow: hidden;
@@ -130,8 +154,8 @@ function showMenu(e) {
   height: 20px;
   padding: 0 6px;
   border-radius: 10px;
-  background: rgba(0, 0, 0, 0.05);
-  color: var(--accent-strong);
+  background: var(--group-header-surface, var(--surface-muted));
+  color: var(--group-accent, var(--accent-strong));
   font-size: 12px;
   font-weight: 600;
   flex-shrink: 0;
