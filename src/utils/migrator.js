@@ -1,5 +1,5 @@
 /** 前端状态结构迁移。数据库表结构迁移由 Rust 侧负责。 */
-const CURRENT_VERSION = 5
+const CURRENT_VERSION = 6
 const TASK_GROUP_COLOR_IDS = ['auto', 'accent', 'blue', 'violet', 'amber', 'rose', 'green', 'cyan', 'coral', 'indigo', 'teal', 'brick', 'custom']
 
 export class MigrationError extends Error {
@@ -14,7 +14,8 @@ const migrations = {
   1: migrateV1ToV2,
   2: migrateV2ToV3,
   3: migrateV3ToV4,
-  4: migrateV4ToV5
+  4: migrateV4ToV5,
+  5: migrateV5ToV6
 }
 
 export function migrateData(data) {
@@ -95,6 +96,18 @@ function migrateV4ToV5(data) {
   }
 }
 
+function migrateV5ToV6(data) {
+  const addReminderDeliveryState = (task) => ({
+    ...task,
+    reminderNotifiedAt: task?.reminderNotifiedAt || null
+  })
+  return {
+    ...data,
+    tasks: (data.tasks || []).map(addReminderDeliveryState),
+    trash: (data.trash || []).map(addReminderDeliveryState)
+  }
+}
+
 export function validateData(data) {
   const errors = []
   if (!data || typeof data !== 'object' || Array.isArray(data)) return { valid: false, errors: ['数据不是有效的对象'] }
@@ -133,4 +146,4 @@ export function createBackup(data) {
 }
 
 export function getCurrentVersion() { return CURRENT_VERSION }
-export function getSupportedVersions() { return [1, 2, 3, 4, 5] }
+export function getSupportedVersions() { return [1, 2, 3, 4, 5, 6] }

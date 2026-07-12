@@ -1,10 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import {
-  cancel,
   isPermissionGranted,
-  pending,
   requestPermission,
-  Schedule,
   sendNotification
 } from '@tauri-apps/plugin-notification'
 
@@ -153,55 +150,30 @@ export async function ensureReminderNotificationPermission({ request = false } =
   return permission === 'granted'
 }
 
-export async function cancelTaskReminderNotification(taskId) {
-  if (!isTauri()) return false
-  const id = reminderNotificationId(taskId)
-  try {
-    await cancel([id])
-    return true
-  } catch (error) {
-    console.warn('[Platform] 取消提醒失败:', error)
-    return false
-  }
-}
-
-export async function scheduleTaskReminderNotification(task, settings = {}, options = {}) {
-  if (!isTauri() || !task?.id) return { scheduled: false, reason: 'unsupported' }
-  const id = reminderNotificationId(task.id)
-  await cancelTaskReminderNotification(task.id)
-
-  const enabled = settings.reminderNotificationsEnabled !== false
-  const reminderAt = task.reminderAt ? new Date(task.reminderAt) : null
-  if (!enabled || !reminderAt || Number.isNaN(reminderAt.getTime())) {
-    return { scheduled: false, reason: 'disabled-or-empty' }
-  }
-  if (task.completed || task.deleted || reminderAt.getTime() <= Date.now()) {
-    return { scheduled: false, reason: 'not-active' }
+export async function sendTaskReminderNotification(task, settings = {}, options = {}) {
+  if (!isTauri() || !task?.id) return { sent: false, reason: 'unsupported' }
+  if (settings.reminderNotificationsEnabled === false || task.completed || task.deleted) {
+    return { sent: false, reason: 'not-active' }
   }
 
   const granted = await ensureReminderNotificationPermission({ request: Boolean(options.requestPermission) })
-  if (!granted) return { scheduled: false, reason: 'permission' }
+  if (!granted) return { sent: false, reason: 'permission' }
 
-  sendNotification({
-    id,
-    title: '任务提醒',
-    body: task.title || '未命名任务',
-    schedule: Schedule.at(reminderAt),
-    group: REMINDER_GROUP,
-    autoCancel: true,
-    silent: settings.reminderSoundEnabled === false,
-    extra: { taskId: task.id }
-  })
-  return { scheduled: true, id }
-}
-
-export async function syncTaskReminderNotifications(tasks = [], settings = {}, options = {}) {
-  if (!isTauri()) return { synced: 0, supported: false }
-  const results = []
-  for (const task of tasks) {
-    results.push(await scheduleTaskReminderNotification(task, settings, options))
+  try {
+    sendNotification({
+      id: reminderNotificationId(task.id),
+      title: options.catchUp ? '任务提醒（补发）' : '任务提醒',
+      body: options.catchUp ? `已到期：${task.title || '未命名任务'}` : (task.title || '未命名任务'),
+      group: REMINDER_GROUP,
+      autoCancel: true,
+      silent: settings.reminderSoundEnabled === false,
+      extra: { taskId: task.id }
+    })
+    return { sent: true }
+  } catch (error) {
+    console.error('[Platform] 发送提醒失败:', error)
+    return { sent: false, reason: 'send-failed', error }
   }
-  return { synced: results.filter((item) => item.scheduled).length, supported: true }
 }
 
 export async function sendReminderTestNotification(settings = {}) {
@@ -217,16 +189,6 @@ export async function sendReminderTestNotification(settings = {}) {
     silent: settings.reminderSoundEnabled === false
   })
   return { sent: true }
-}
-
-export async function getPendingReminderNotifications() {
-  if (!isTauri()) return []
-  try {
-    return await pending()
-  } catch (error) {
-    console.warn('[Platform] 读取待提醒列表失败:', error)
-    return []
-  }
 }
 
 function formatPlatformError(error, fallback) {
