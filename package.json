@@ -1,6 +1,6 @@
 {
   "name": "simple-to-do",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "易简清单，本地优先的桌面待办应用",
   "scripts": {
     "dev": "tauri dev",
