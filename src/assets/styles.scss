@@ -1,5 +1,5 @@
 :root {
-  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Microsoft YaHei UI", "Source Han Sans CN", "Noto Sans SC", "WenQuanYi Micro Hei", sans-serif;
   --radius-xs: 6px;
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -158,6 +158,7 @@ select:focus-visible,
   --border-strong: #cdd8d5;
   --divider-soft: var(--divider-soft-fallback);
   --text: #17211f;
+  --text-strong: #0a1311;
   --text-muted: #687674;
   --text-subtle: #8c9996;
   --danger: #d94d4d;
@@ -2834,6 +2835,9 @@ body.is-resizing {
 
 .task-main {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .task-title-row {
@@ -2846,11 +2850,12 @@ body.is-resizing {
 .task-title {
   display: -webkit-box;
   overflow: hidden;
-  color: var(--text);
-  font-weight: 560;
-  line-height: 1.35;
+  color: var(--text-strong, var(--text));
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.005em;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
 }
 
 .inline-icon {
@@ -2901,8 +2906,8 @@ body.is-resizing {
   padding: 2px 6px;
   border-radius: 999px;
   background: var(--surface-muted);
-  color: var(--text-muted);
-  font-size: 11px;
+  color: var(--text-subtle);
+  font-size: 11.5px;
   line-height: 1.2;
 
   &.overdue {
@@ -4147,6 +4152,7 @@ body.is-resizing {
   --border: #e2e8e6;
   --border-strong: #cdd8d5;
   --text: #17211f;
+  --text-strong: #0a1311;
   --text-muted: #687674;
   --text-subtle: #8c9996;
   --accent: #2f8f86;
