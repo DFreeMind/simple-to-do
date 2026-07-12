@@ -171,6 +171,14 @@
         </div>
 
         <div class="subtask-panel">
+          <div
+            v-if="task.subtasks.length"
+            class="subtask-panel__progress"
+            :aria-label="`子任务进度 ${completedSubtasks}/${task.subtasks.length}`"
+          >
+            <div class="subtask-panel__progress-bar" :style="{ width: subtaskProgressPercent + '%' }"></div>
+          </div>
+
           <div class="subtask-list" @mousedown="handleSubtaskMouseDown">
           <div
             v-for="subtask in task.subtasks"
@@ -188,7 +196,6 @@
             <button class="subtask-check" :class="{ checked: subtask.completed }" type="button" :aria-label="subtask.completed ? '标记为未完成' : '标记为完成'" @click="store.toggleSubtask(task.id, subtask.id)">
               <span class="sr-only">{{ subtask.completed ? '已完成' : '未完成' }}</span>
               <Check v-if="subtask.completed" :size="14" />
-              <Minus v-else :size="14" />
             </button>
             <input
               class="subtask-title"
@@ -280,7 +287,6 @@ import {
   Flag,
   Link as LinkIcon,
   ListChecks,
-  Minus,
   PanelRightOpen,
   Pin,
   Plus,
