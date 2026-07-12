@@ -13,6 +13,15 @@
 - 提交粒度按功能划分，避免把文档、运行时迁移、业务功能修复混在一个提交里。
 - 代码变更后至少运行 `npm run build`；涉及 Tauri 时还要运行 `npm run tauri build` 或说明无法运行的原因。
 
+## GitHub 发布规范
+- GitHub Release 由 agent 发布时，Release title 必须只使用应用版本号，与 `src-tauri/tauri.conf.json` 中的 `version` 完全一致，例如 `0.2.2`；不要加入“发布”“更新”等前缀。
+- Release tag 统一使用 `v<version>`，例如 `v0.2.2`；发布前确认 tag、Release title、安装包内版本三者对应同一版本。
+- Release Assets 必须使用英文文件名，禁止上传中文名或依赖 GitHub 自动生成下载名。Windows NSIS 安装包统一重命名为 `simple-to-do_<version>_x64-setup.exe`，例如 `simple-to-do_0.2.2_x64-setup.exe`。macOS 包按架构命名为 `simple-to-do_<version>_<arch>.dmg`，例如 `simple-to-do_0.2.2_aarch64.dmg` 或 `simple-to-do_0.2.2_x64.dmg`。
+- Release notes 使用中文，包含本版本的主要更新、修复和已知限制（如有）；不设置“安装”章节，也不重复通用安装步骤。可按需要增加“数据与兼容性”“已知限制”“后续计划”等对用户有价值的内容。
+- Release notes 可增加“贡献者”章节，仅列出可从本次发布提交记录或 GitHub 记录确认的贡献者，使用 GitHub 用户名或公开姓名；不能猜测或虚构贡献者。
+- 发布顺序：Windows 构建验证通过后先创建或更新该版本 Release 并上传 Windows Asset；macOS 构建完成后向同一个 Release 追加 macOS Asset 和对应 Release notes，不新建重复 Release。
+- 上传前必须核验 Asset 可下载、文件名正确、版本正确且无重复或过期资产；如需替换，先删除同名旧 Asset 再上传新文件。
+
 ## 代码约定
 - Vue 组件保持组合式 API 写法。
 - Pinia store 只负责任务状态、派生数据和业务操作；平台文件读写通过 `src/services/platform.js` 统一封装。
