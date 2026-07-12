@@ -1942,8 +1942,7 @@ body.is-resizing {
   .task-group-header + .task-item,
   .task-group-header + template + .task-item {
     border-top: 1px solid var(--divider-soft);
-    margin-top: 0;
-    padding-top: 8px;
+    margin-top: 8px;
   }
 
   .task-item {
@@ -2662,7 +2661,7 @@ body.is-resizing {
   grid-template-columns: 32px minmax(0, 1fr) auto;
   align-items: center;
   min-height: var(--row-height);
-  padding: 9px 10px;
+  padding: 7px 10px;
   margin-bottom: 4px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -2837,7 +2836,7 @@ body.is-resizing {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 3px;
 }
 
 .task-title-row {
@@ -2894,7 +2893,7 @@ body.is-resizing {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin-top: 5px;
+  margin-top: 2px;
 }
 
 .meta-chip {
