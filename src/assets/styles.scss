@@ -2802,35 +2802,7 @@ body.is-resizing {
 }
 
 .subtask-drag-handle {
-  position: absolute;
-  left: -10px;
-  top: 50%;
-  transform: translateY(-50%);
   display: none;
-  width: 24px;
-  height: 30px;
-  place-items: center;
-  padding: 0;
-  border-radius: var(--radius-sm);
-  background: var(--surface-92-fallback);
-  color: var(--text-subtle);
-  cursor: grab;
-  opacity: 0;
-  box-shadow: 0 0 0 1px var(--border-70-fallback);
-  transition: opacity var(--transition-fast), background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
-
-  &:hover,
-  &:focus-visible {
-    opacity: 1;
-    transform: translateY(-50%) translateX(-2px);
-    background: var(--surface-muted);
-    color: var(--accent-strong);
-  }
-
-  &:active {
-    cursor: grabbing;
-    color: var(--accent);
-  }
 }
 
 .task-check {
@@ -3793,91 +3765,307 @@ body.is-resizing {
   }
 }
 
-.subtask-list {
-  display: grid;
-  gap: 7px;
+/* 子任务面板：浅色圆角容器 + 横排行（仿 Notion/TickTick 风格） */
+.detail-section--subtasks {
+  padding-bottom: 4px;
 }
 
-.subtask-item,
-.subtask-add {
+.subtask-panel {
+  background: var(--surface-92-fallback);
+  border: 1px solid var(--border-86-transparent-fallback);
+  border-radius: 12px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.subtask-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.subtask-item {
+  position: relative;
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) auto;
+  grid-template-columns: 22px minmax(0, 1fr) max-content;
+  align-items: center;
+  column-gap: 12px;
+  min-height: 38px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: grab;
+  transition: background var(--transition-fast), opacity var(--transition-fast);
+
+  &:hover,
+  &:focus-within {
+    background: var(--accent-9-fallback);
+  }
+
+  &.is-dragging {
+    cursor: grabbing;
+    opacity: 0.55;
+    background: var(--surface);
+  }
+
+  &.drop-target-before::before {
+    content: '';
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    top: -2px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--accent);
+    z-index: 2;
+  }
+
+  &.drop-target-after::after {
+    content: '';
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    bottom: -2px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--accent);
+    z-index: 2;
+  }
+}
+
+.subtask-check {
+  display: inline-grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  padding: 0;
+  margin: 1px;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-subtle);
+  line-height: 0;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), border-style var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+
+  &:hover {
+    border-style: solid;
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  &.checked {
+    border-style: solid;
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 0 0 3px var(--accent-15-fallback);
+    animation: subtask-check-pop 260ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+
+  svg { display: block; }
+}
+
+@keyframes subtask-check-pop {
+  0% { transform: scale(0.55); }
+  60% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+.subtask-title {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  padding: 3px 6px;
+  margin: -3px -6px;
+  border-radius: 6px;
+  transition: background var(--transition-fast), box-shadow var(--transition-fast);
+
+  &:focus {
+    background: var(--surface);
+    box-shadow: inset 0 0 0 1px rgba(47, 143, 134, 0.18);
+  }
+}
+
+.subtask-tail {
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 38px;
-  padding: 6px 9px;
-  border: 1px solid var(--border-86-transparent-fallback);
-  border-radius: var(--radius-sm);
-  background: var(--surface-90-surface-muted-fallback);
-  box-shadow: 0 1px 1px var(--text-3-fallback);
-  transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+  min-width: 0;
+}
+
+.subtask-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  color: var(--text-subtle);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  cursor: help;
+  border-radius: 4px;
+  padding: 1px 2px;
+  transition: background var(--transition-fast);
+
+  &:hover {
+    background: var(--accent-9-fallback);
+  }
+
+  svg {
+    display: block;
+    flex-shrink: 0;
+    opacity: 0.85;
+  }
+
+  &--done {
+    color: var(--accent);
+    font-weight: 500;
+
+    svg { opacity: 1; }
+  }
+}
+
+.subtask-item.is-completed .subtask-title {
+  color: var(--text-subtle);
+  text-decoration: line-through;
+}
+
+.subtask-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-fast);
+}
+
+.subtask-item:hover .subtask-actions,
+.subtask-item:focus-within .subtask-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.subtask-action-btn {
+  width: 26px;
+  height: 26px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 6px;
+  color: var(--text-subtle);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+
+  &:hover {
+    background: var(--danger-10-fallback);
+    color: var(--danger);
+  }
+
+  &:active {
+    transform: scale(0.92);
+  }
+
+  svg { display: block; }
+}
+
+.subtask-add {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  min-height: 36px;
+  padding: 6px 10px;
+  margin-top: 2px;
+  border-radius: 8px;
+  color: var(--text-muted);
+  transition: background var(--transition-fast);
+
+  &:hover,
+  &.has-value {
+    background: var(--accent-9-fallback);
+  }
+
+  &:focus-within {
+    background: var(--accent-9-fallback);
+  }
 
   input {
     width: 100%;
     border: 0;
     outline: 0;
     background: transparent;
+    color: var(--text);
+    font: inherit;
+    padding: 4px 6px;
+    margin: -4px -6px;
+    border-radius: 6px;
+    transition: box-shadow var(--transition-fast);
+
+    &::placeholder {
+      color: var(--text-muted);
+    }
+
+    &:focus {
+      box-shadow: inset 0 0 0 1px rgba(47, 143, 134, 0.18);
+    }
   }
 }
 
-.subtask-item {
-  position: relative;
-  cursor: grab;
-
-  &:hover,
-  &:focus-within {
-    border-color: rgba(47, 143, 134, 0.24);
-    background: var(--surface);
-    box-shadow: 0 2px 8px var(--text-5-fallback);
-  }
-
-  &.is-dragging {
-    border-color: rgba(47, 143, 134, 0.34);
-    background: var(--surface);
-    cursor: grabbing;
-    opacity: 1;
-  }
-
-  &.drop-target-before::before {
-    content: '';
-    position: absolute;
-    left: 8px;
-    right: 8px;
-    top: -1px;
-    height: 3px;
-    background: var(--accent);
-    border-radius: 2px;
-    z-index: 1;
-  }
-
-  &.drop-target-after::after {
-    content: '';
-    position: absolute;
-    left: 8px;
-    right: 8px;
-    bottom: -1px;
-    height: 3px;
-    background: var(--accent);
-    border-radius: 2px;
-    z-index: 1;
-  }
-}
-
-.subtask-item.completed input {
-  color: var(--text-subtle);
-  text-decoration: line-through;
-}
-
-.subtask-add {
-  grid-template-columns: auto minmax(0, 1fr) auto;
+.subtask-add__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin: 1px;
   color: var(--text-muted);
-  border-style: dashed;
+  border: 1.5px dashed transparent;
+  border-radius: 999px;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
 
-  &:focus-within {
-    border-style: solid;
-    border-color: rgba(47, 143, 134, 0.28);
-    background: var(--surface);
+.subtask-add:focus-within .subtask-add__icon,
+.subtask-add.has-value .subtask-add__icon {
+  color: var(--accent);
+  border-color: rgba(47, 143, 134, 0.45);
+}
+
+.subtask-add__btn {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  padding: 4px 10px;
+  margin: -4px -4px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background var(--transition-fast), transform var(--transition-fast);
+
+  &:hover {
+    background: var(--accent-9-fallback);
   }
+
+  &:active {
+    transform: scale(0.96);
+  }
+}
+
+.subtask-add-fade-enter-active,
+.subtask-add-fade-leave-active {
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+.subtask-add-fade-enter-from,
+.subtask-add-fade-leave-to {
+  opacity: 0;
+  transform: translateX(6px);
 }
 
 .detail-section--editor {

@@ -164,13 +164,14 @@
         </div>
       </section>
 
-      <section class="detail-section">
+      <section class="detail-section detail-section--subtasks">
         <div class="section-heading">
           <h2>子任务</h2>
           <span>{{ completedSubtasks }}/{{ task.subtasks.length }}</span>
         </div>
 
-        <div class="subtask-list" @mousedown="handleSubtaskMouseDown">
+        <div class="subtask-panel">
+          <div class="subtask-list" @mousedown="handleSubtaskMouseDown">
           <div
             v-for="subtask in task.subtasks"
             :key="subtask.id"
@@ -184,34 +185,49 @@
               'drop-target-after': subtaskDrag.dragOverId.value === subtask.id && subtaskDrag.dropPosition.value === 'after'
             }"
           >
-            <span
-              class="subtask-drag-handle"
-              role="button"
-              tabindex="-1"
-              title="拖动排序"
-              aria-label="拖动子任务排序"
-            >
-              <GripVertical :size="15" />
-            </span>
-            <button class="task-check" :class="{ checked: subtask.completed }" type="button" aria-label="切换子任务完成状态" @click="store.toggleSubtask(task.id, subtask.id)">
+            <button class="subtask-check" :class="{ checked: subtask.completed }" type="button" :aria-label="subtask.completed ? '标记为未完成' : '标记为完成'" @click="store.toggleSubtask(task.id, subtask.id)">
               <span class="sr-only">{{ subtask.completed ? '已完成' : '未完成' }}</span>
               <Check v-if="subtask.completed" :size="14" />
+              <Minus v-else :size="14" />
             </button>
             <input
+              class="subtask-title"
               :value="subtask.title"
               aria-label="子任务标题"
               @change="store.updateSubtask(task.id, subtask.id, $event.target.value)"
               @keydown.enter="$event.target.blur()"
             />
-            <button class="ghost-icon danger" type="button" aria-label="删除子任务" @click="store.deleteSubtask(task.id, subtask.id)">
-              <X :size="15" />
-            </button>
+            <div class="subtask-tail">
+              <span v-if="subtask.completed && subtask.completedAt" class="subtask-meta subtask-meta--done" :title="formatSubtaskTitle(subtask, true)">
+                <CheckCheck :size="11" />
+                <span>{{ formatSubtaskTime(subtask.completedAt) }}</span>
+              </span>
+              <span v-else-if="subtask.createdAt" class="subtask-meta" :title="formatSubtaskTitle(subtask, false)">
+                <Clock :size="11" />
+                <span>{{ formatSubtaskTime(subtask.createdAt) }}</span>
+              </span>
+              <div class="subtask-actions">
+                <button class="subtask-action-btn danger" type="button" title="删除子任务" aria-label="删除子任务" @click="store.deleteSubtask(task.id, subtask.id)">
+                  <Trash2 :size="14" />
+                </button>
+              </div>
+            </div>
           </div>
 
-          <div class="subtask-add">
-            <Plus :size="16" />
-            <input v-model="newSubtask" placeholder="添加子任务" @keydown.enter="addSubtask" />
-            <button class="small-btn" type="button" :disabled="!newSubtask.trim()" @click="addSubtask">添加</button>
+          </div>
+
+          <div class="subtask-add" :class="{ 'has-value': Boolean(newSubtask.trim()) }">
+            <span class="subtask-add__icon" aria-hidden="true">
+              <Plus :size="16" />
+            </span>
+            <input
+              v-model="newSubtask"
+              placeholder="添加子任务"
+              @keydown.enter="addSubtask"
+            />
+            <transition name="subtask-add-fade">
+              <button v-if="newSubtask.trim()" class="subtask-add__btn" type="button" @click="addSubtask">添加</button>
+            </transition>
           </div>
         </div>
       </section>
@@ -262,9 +278,9 @@ import {
   Clock,
   Copy,
   Flag,
-  GripVertical,
   Link as LinkIcon,
   ListChecks,
+  Minus,
   PanelRightOpen,
   Pin,
   Plus,
@@ -415,6 +431,23 @@ function formatTime(value) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+function formatSubtaskTime(value) {
+  return formatCreatedAt(value)
+}
+
+function formatSubtaskTitle(subtask, isCompleted) {
+  const lines = []
+  if (isCompleted && subtask.completedAt) {
+    lines.push(`完成于 ${formatFullDate(subtask.completedAt)}`)
+  } else if (!isCompleted && subtask.createdAt) {
+    lines.push(`创建于 ${formatFullDate(subtask.createdAt)}`)
+  }
+  if (isCompleted && subtask.createdAt) {
+    lines.push(`创建于 ${formatFullDate(subtask.createdAt)}`)
+  }
+  return lines.join('\n')
 }
 
 watch(task, (nextTask) => {
