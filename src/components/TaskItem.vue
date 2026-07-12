@@ -56,7 +56,7 @@
         命中：{{ searchMatchKinds.join('、') }}
       </div>
       <div class="task-meta">
-        <span v-if="list && !hideListMeta" class="meta-chip">
+        <span v-if="list && !shouldHideListMeta" class="meta-chip">
           <span class="color-dot" :style="{ backgroundColor: list.color }"></span>
           {{ list.name }}
         </span>
@@ -91,10 +91,14 @@
           <CheckCheck :size="13" />
           {{ formatCreatedAt(task.completedAt) }}
         </span>
-        <span v-for="tag in task.tags || []" :key="tag" class="meta-chip">
-          <template v-for="(segment, index) in highlightSegments(`#${tag}`)" :key="`${segment.text}-${index}`">
-            <mark v-if="segment.match">{{ segment.text }}</mark><template v-else>{{ segment.text }}</template>
-          </template>
+        <span
+          v-if="tagSummary.first"
+          class="meta-chip meta-chip--tag"
+          :title="tagSummary.tooltip"
+        >
+          <Tags :size="13" />
+          <span class="meta-chip__tag-text">#{{ tagSummary.first }}</span>
+          <span v-if="tagSummary.extraCount" class="meta-chip__more">+{{ tagSummary.extraCount }}</span>
         </span>
       </div>
     </div>
@@ -218,6 +222,7 @@ import {
   Search,
   Star,
   Sun,
+  Tags,
   Trash2
 } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
@@ -257,6 +262,24 @@ const confirmDialog = reactive({
 
 const list = computed(() => store.lists.find(item => item.id === props.task.listId))
 const taskGroup = computed(() => store.taskGroups.find(group => group.id === props.task.taskGroupId) || null)
+// 在用户当前打开的清单视图下，任务属于该清单时不需要再显示清单名
+// 收集箱视图（inbox）也走相同规则
+// 全局视图（计划/重要/今日/已完成/垃圾桶）保留清单名提示任务归属
+const shouldHideListMeta = computed(() => {
+  if (props.hideListMeta) return true
+  if (store.currentList && store.currentList.id === props.task.listId) return true
+  if (store.currentView === 'inbox' && props.task.listId === 'inbox') return true
+  return false
+})
+const tagSummary = computed(() => {
+  const tags = Array.isArray(props.task.tags) ? props.task.tags : []
+  if (!tags.length) return { first: null, extraCount: 0, tooltip: '' }
+  return {
+    first: tags[0],
+    extraCount: tags.length - 1,
+    tooltip: tags.map(t => `#${t}`).join(' / ')
+  }
+})
 const showTaskGroup = computed(() => !store.currentList && !['inbox', 'trash'].includes(store.currentView))
 const canMoveToGroup = computed(() => {
   return store.currentViewMode === 'group' && store.currentList?.id === props.task.listId

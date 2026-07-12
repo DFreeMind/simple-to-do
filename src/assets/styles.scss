@@ -2915,6 +2915,33 @@ body.is-resizing {
     color: #9ca3af;
     padding: 2px 4px;
   }
+
+  &--tag {
+    background: var(--surface-muted);
+    color: var(--text-muted);
+  }
+
+  &__tag-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__more {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 1px;
+    padding: 0 5px;
+    min-width: 16px;
+    height: 15px;
+    border-radius: 999px;
+    background: var(--accent-15-fallback);
+    color: var(--accent-strong);
+    font-size: 10.5px;
+    font-weight: 600;
+    line-height: 1;
+  }
 }
 
 .task-actions {
