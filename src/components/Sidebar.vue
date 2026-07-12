@@ -2,6 +2,23 @@
   <aside class="sidebar" :class="{ 'sidebar--collapsed': collapsed }">
     <!-- 折叠 Rail 模式 -->
     <template v-if="collapsed">
+      <nav class="rail-nav" aria-label="搜索">
+        <button
+          class="rail-item"
+          :class="{ active: store.currentView === 'search' }"
+          type="button"
+          title="搜索（Ctrl/Cmd + K）"
+          aria-label="搜索（Ctrl/Cmd + K）"
+          aria-keyshortcuts="Control+K Meta+K"
+          :aria-current="store.currentView === 'search' ? 'page' : undefined"
+          @click="openSearch"
+        >
+          <Search :size="20" />
+        </button>
+      </nav>
+
+      <div class="rail-divider"></div>
+
       <nav class="rail-nav" aria-label="主要视图">
         <button
           v-for="item in primaryViews"
@@ -11,6 +28,7 @@
           type="button"
           :title="item.label"
           :aria-label="item.label"
+          :aria-current="store.currentView === item.id ? 'page' : undefined"
           @click="store.setView(item.id)"
         >
           <component :is="item.icon" :size="20" />
@@ -129,6 +147,7 @@
           type="button"
           :title="item.label"
           :aria-label="item.label"
+          :aria-current="store.currentView === item.id ? 'page' : undefined"
           @click="store.setView(item.id)"
         >
           <component :is="item.icon" :size="20" />
@@ -139,6 +158,9 @@
       <div class="rail-spacer"></div>
 
       <div class="rail-bottom">
+        <button class="rail-item" type="button" title="使用指南" aria-label="使用指南" @click="store.openHelpCenter">
+          <Compass :size="20" />
+        </button>
         <button class="rail-item" type="button" title="设置" aria-label="设置" @click="store.openSettings">
           <SettingsIcon :size="20" />
         </button>
@@ -173,12 +195,12 @@
       <div class="sidebar-search">
         <Search :size="17" />
         <input
-          v-model="searchText"
+          :value="store.searchQuery"
           type="search"
           placeholder="搜索任务、标签、备注"
           aria-label="搜索任务"
-          @focus="store.setSearch(searchText)"
-          @input="store.setSearch(searchText)"
+          @focus="store.setSearch(store.searchQuery)"
+          @input="store.setSearch($event.target.value)"
         />
       </div>
 
@@ -347,6 +369,10 @@
           <span class="nav-label">{{ item.label }}</span>
           <span v-if="store.listTaskCounts[item.id]" class="nav-badge">{{ store.listTaskCounts[item.id] }}</span>
         </button>
+        <button class="nav-item nav-item--utility" type="button" @click="store.openHelpCenter">
+          <Compass :size="18" />
+          <span class="nav-label">使用指南</span>
+        </button>
       </nav>
     </template>
 
@@ -434,7 +460,8 @@ import {
   Star,
   Trash2,
   Users,
-  CheckCircle2
+  CheckCircle2,
+  Compass
 } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import { useDragSort } from '@/composables/useDragSort'
@@ -451,6 +478,18 @@ function collapse() {
 
 function expand() {
   store.updateSettings({ sidebarCollapsed: false })
+}
+
+function openSearch() {
+  store.setSearch(store.searchQuery)
+  nextTick(() => window.dispatchEvent(new Event('task-list:focus-search')))
+}
+
+function handleSearchShortcut(event) {
+  const isSearchShortcut = (event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'k'
+  if (!isSearchShortcut || event.defaultPrevented || event.isComposing || store.settingsOpen) return
+  event.preventDefault()
+  openSearch()
 }
 
 const listsFlyout = ref(false)
@@ -503,7 +542,6 @@ function selectList(id) {
   flyoutSearch.value = ''
 }
 
-const searchText = ref('')
 const addingGroup = ref(false)
 const addingListGroupId = ref(undefined)
 const newGroupName = ref('')
@@ -822,10 +860,12 @@ function onDocumentKeydown(event) {
 onMounted(() => {
   document.addEventListener('click', onDocumentClick)
   document.addEventListener('keydown', onDocumentKeydown)
+  window.addEventListener('keydown', handleSearchShortcut)
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', onDocumentClick)
   document.removeEventListener('keydown', onDocumentKeydown)
+  window.removeEventListener('keydown', handleSearchShortcut)
 })
 </script>

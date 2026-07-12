@@ -19,6 +19,7 @@
             :key="section.id"
             class="settings-nav__item"
             :class="{ active: activeSection === section.id }"
+            :aria-current="activeSection === section.id ? 'page' : undefined"
             type="button"
             @click="activeSection = section.id"
           >
@@ -94,7 +95,7 @@
             <div class="settings-block">
               <div class="settings-block__title">
                 <h4>界面</h4>
-                <span>{{ enabledInterfaceCount }}/3 已启用</span>
+                <span>{{ enabledInterfaceCount }}/2 已启用</span>
               </div>
               <label class="switch-row">
                 <span>
@@ -120,10 +121,27 @@
                 />
                 <span class="switch-control" aria-hidden="true"></span>
               </label>
+            </div>
+          </section>
+
+          <section v-else-if="activeSection === 'task-display'" class="settings-section">
+            <div class="settings-section__head settings-section__head--accent">
+              <span class="settings-section__icon"><CheckSquare :size="20" /></span>
+              <div>
+                <h3>任务显示</h3>
+                <p>统一设置已完成任务在列表和分组中的展示方式。</p>
+              </div>
+            </div>
+
+            <div class="settings-block completed-display-settings">
+              <div class="settings-block__title">
+                <h4>已完成任务</h4>
+                <span>{{ completedDisplaySummary }}</span>
+              </div>
               <label class="switch-row">
                 <span>
-                  <strong>显示已完成分组</strong>
-                  <small>在普通列表下折叠或展开已完成任务</small>
+                  <strong>列表模式显示已完成任务</strong>
+                  <small>在普通列表底部折叠或展开已完成任务</small>
                 </span>
                 <input
                   type="checkbox"
@@ -132,15 +150,41 @@
                 />
                 <span class="switch-control" aria-hidden="true"></span>
               </label>
+              <label class="switch-row">
+                <span>
+                  <strong>分组模式下保留已完成任务</strong>
+                  <small>完成后留在原分组底部；关闭后集中显示在列表底部</small>
+                </span>
+                <input
+                  type="checkbox"
+                  :checked="store.settings.groupCompletedDisplayMode === 'in-group'"
+                  @change="store.updateSettings({ groupCompletedDisplayMode: $event.target.checked ? 'in-group' : 'separate-section' })"
+                />
+                <span class="switch-control" aria-hidden="true"></span>
+              </label>
+              <label class="switch-row" :class="{ disabled: store.settings.groupCompletedDisplayMode !== 'in-group' }" :aria-disabled="store.settings.groupCompletedDisplayMode !== 'in-group'">
+                <span>
+                  <strong>默认显示已完成任务</strong>
+                  <small v-if="store.settings.groupCompletedDisplayMode === 'in-group'">进入分组模式时默认展开已完成任务，可在任务列表中临时切换</small>
+                  <small v-else>需先开启“保留在分组”</small>
+                </span>
+                <input
+                  type="checkbox"
+                  :checked="store.settings.groupCompletedVisibleByDefault"
+                  :disabled="store.settings.groupCompletedDisplayMode !== 'in-group'"
+                  @change="store.updateSettings({ groupCompletedVisibleByDefault: $event.target.checked })"
+                />
+                <span class="switch-control" aria-hidden="true"></span>
+              </label>
             </div>
           </section>
 
-          <section v-else-if="activeSection === 'behavior'" class="settings-section">
+          <section v-else-if="activeSection === 'preferences'" class="settings-section">
             <div class="settings-section__head settings-section__head--accent">
               <span class="settings-section__icon"><SlidersHorizontal :size="20" /></span>
               <div>
-                <h3>行为</h3>
-                <p>设置应用启动后的默认位置和常用流程。</p>
+                <h3>偏好与提醒</h3>
+                <p>设置启动页、系统提醒和操作反馈。</p>
               </div>
             </div>
 
@@ -160,28 +204,6 @@
                   <option value="inbox">收集箱</option>
                   <option value="planned">计划</option>
                   <option value="important">重要</option>
-                </select>
-              </label>
-            </div>
-
-            <div class="settings-block">
-              <div class="settings-block__title">
-                <h4>垃圾桶</h4>
-                <span>{{ store.settings.trashRetentionDays }} 天</span>
-              </div>
-              <label class="setting-select-card">
-                <span class="setting-select-card__icon"><Trash2 :size="17" /></span>
-                <span class="setting-select-card__copy">
-                  <strong>保留时间</strong>
-                  <small>过期删除项会在本地自动清理</small>
-                </span>
-                <select :value="store.settings.trashRetentionDays" @change="store.updateSettings({ trashRetentionDays: Number($event.target.value) })">
-                  <option :value="7">7 天</option>
-                  <option :value="30">30 天</option>
-                  <option :value="60">60 天</option>
-                  <option :value="90">90 天</option>
-                  <option :value="180">180 天</option>
-                  <option :value="365">365 天</option>
                 </select>
               </label>
             </div>
@@ -208,7 +230,8 @@
                   <span class="switch-control" aria-hidden="true"></span>
                 </label>
 
-                <div class="sound-categories sound-categories--two" :class="{ disabled: !store.settings.reminderNotificationsEnabled }">
+                <p v-if="!store.settings.reminderNotificationsEnabled" class="setting-summary">通知已关闭；重新开启后会保留当前的声音偏好。</p>
+                <div v-else class="sound-categories sound-categories--two">
                   <label class="sound-item">
                     <span class="sound-item-icon">
                       <Volume2 :size="16" />
@@ -226,7 +249,7 @@
                     <span class="switch-control" aria-hidden="true"></span>
                   </label>
 
-                  <button class="setting-action-card" type="button" :disabled="!store.settings.reminderNotificationsEnabled" @click="store.testReminderNotification">
+                  <button class="setting-action-card" type="button" @click="store.testReminderNotification">
                     <Bell :size="16" />
                     <span>
                       <strong>发送测试提醒</strong>
@@ -259,7 +282,8 @@
                   <span class="switch-control" aria-hidden="true"></span>
                 </label>
 
-                <div class="sound-categories" :class="{ disabled: !store.settings.soundEnabled }">
+                <p v-if="!store.settings.soundEnabled" class="setting-summary">音效已关闭；重新开启后会保留各类操作的开关状态。</p>
+                <div v-else class="sound-categories">
                   <label class="sound-item">
                     <span class="sound-item-icon">
                       <CheckSquare :size="16" />
@@ -319,8 +343,8 @@
             <div class="settings-section__head settings-section__head--accent">
               <span class="settings-section__icon"><Database :size="20" /></span>
               <div>
-                <h3>本地数据</h3>
-                <p>当前 MVP 以本地自动保存为主，后续导入导出可以放在这里。</p>
+                <h3>数据与维护</h3>
+                <p>管理本机保存、垃圾桶保留期和附件维护操作。</p>
               </div>
             </div>
 
@@ -341,10 +365,32 @@
               </div>
             </div>
 
-            <div class="settings-block storage-manager">
+            <div class="settings-block">
+              <div class="settings-block__title">
+                <h4>垃圾桶</h4>
+                <span>{{ store.settings.trashRetentionDays }} 天</span>
+              </div>
+              <label class="setting-select-card">
+                <span class="setting-select-card__icon"><Trash2 :size="17" /></span>
+                <span class="setting-select-card__copy">
+                  <strong>保留时间</strong>
+                  <small>到期的删除项会在本机自动清理</small>
+                </span>
+                <select :value="store.settings.trashRetentionDays" @change="store.updateSettings({ trashRetentionDays: Number($event.target.value) })">
+                  <option :value="7">7 天</option>
+                  <option :value="30">30 天</option>
+                  <option :value="60">60 天</option>
+                  <option :value="90">90 天</option>
+                  <option :value="180">180 天</option>
+                  <option :value="365">365 天</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="settings-block settings-block--maintenance storage-manager">
               <div class="settings-block__title">
                 <h4>存储清理</h4>
-                <span>{{ storageSummary }}</span>
+                <span>维护操作 · {{ storageSummary }}</span>
               </div>
               <p class="storage-manager__hint">扫描只检查本机附件。备注图片、任务附件和回收站中的引用都会保留，不会自动删除。</p>
               <div class="storage-manager__toolbar">
@@ -414,12 +460,16 @@
               </div>
             </div>
 
-            <div class="about-card">
+              <div class="about-card">
               <img :src="appIcon" alt="" />
               <div>
                 <strong>易简清单</strong>
                 <small>版本 {{ version }} · Tauri 本地应用</small>
               </div>
+              <button class="settings-help-link" type="button" @click="store.openHelpCenter">
+                <Compass :size="17" />
+                <span><strong>打开使用指南</strong><small>快速开始、功能说明、常见问题与更新内容</small></span>
+              </button>
             </div>
           </section>
         </div>
@@ -458,7 +508,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { Bell, Check, Database, Info, PanelTop, Palette, ShieldCheck, SlidersHorizontal, Trash2, X, Volume2, CheckSquare, Folder, Tag } from 'lucide-vue-next'
+import { Bell, Check, Compass, Database, Info, PanelTop, Palette, ShieldCheck, SlidersHorizontal, Trash2, X, Volume2, CheckSquare, Folder, Tag } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import { purgeQuarantinedAttachments, quarantineOrphanAttachments, readAttachment, readQuarantinedAttachment, restoreQuarantinedAttachments, scanStorageHealth } from '@/services/platform'
 import ImageLightbox from './ImageLightbox.vue'
@@ -486,8 +536,9 @@ const browserPageSize = 40
 
 const sections = [
   { id: 'appearance', label: '外观', summary: '主题与布局', icon: Palette },
-  { id: 'behavior', label: '行为', summary: '启动与音效', icon: SlidersHorizontal },
-  { id: 'data', label: '数据', summary: '保存状态', icon: Database },
+  { id: 'task-display', label: '任务显示', summary: '完成任务', icon: CheckSquare },
+  { id: 'preferences', label: '偏好与提醒', summary: '启动与反馈', icon: SlidersHorizontal },
+  { id: 'data', label: '数据与维护', summary: '保存与清理', icon: Database },
   { id: 'about', label: '关于', summary: '版本信息', icon: Info }
 ]
 
@@ -507,7 +558,12 @@ const startViewLabels = {
 
 const currentThemeLabel = computed(() => themes.find((theme) => theme.id === store.settings.theme)?.label || '青绿')
 const startViewLabel = computed(() => startViewLabels[store.settings.startView] || '今日')
-const enabledInterfaceCount = computed(() => Number(!store.settings.sidebarCollapsed) + Number(store.settings.detailOpen) + Number(store.settings.completedVisible))
+const enabledInterfaceCount = computed(() => Number(!store.settings.sidebarCollapsed) + Number(store.settings.detailOpen))
+const completedDisplaySummary = computed(() => {
+  const listVisible = store.settings.completedVisible ? '列表显示' : '列表隐藏'
+  const groupMode = store.settings.groupCompletedDisplayMode === 'in-group' ? '分组保留' : '集中到底部'
+  return `${listVisible} · ${groupMode}`
+})
 const enabledSoundCount = computed(() => [
   store.settings.soundTaskEnabled,
   store.settings.soundListEnabled,

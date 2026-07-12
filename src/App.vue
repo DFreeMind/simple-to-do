@@ -19,6 +19,7 @@
     </div>
 
     <SettingsPanel />
+    <HelpCenter />
 
     <div
       v-if="store.notice"
@@ -33,16 +34,24 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import Sidebar from './components/Sidebar.vue'
 import TaskList from './components/TaskList.vue'
 import TaskDetail from './components/TaskDetail.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
+import HelpCenter from './components/HelpCenter.vue'
 import { useTaskStore } from './stores/task'
+import { useTheme } from './composables/useTheme'
 
 const store = useTaskStore()
+
+// 动态计算主题派生色变量，兼容不支持 color-mix 内 var() 引用的 WebView
+const themeRef = computed(() => store.settings.theme)
+useTheme(themeRef)
+
 const DETAIL_WIDTH_MIN = 320
 const DETAIL_WIDTH_MAX = 800
+const TASK_LIST_WIDTH_MIN = 300
 
 const detailWidth = ref(store.settings.detailWidth || 380)
 
@@ -55,7 +64,7 @@ function onResizeStart(e) {
   const startWidth = detailWidth.value
   const shellWidth = e.target.parentElement.offsetWidth
   const sidebarW = store.settings.sidebarCollapsed ? 56 : 286
-  const maxDetail = Math.max(DETAIL_WIDTH_MIN, Math.min(DETAIL_WIDTH_MAX, shellWidth - sidebarW - 420))
+  const maxDetail = Math.max(DETAIL_WIDTH_MIN, Math.min(DETAIL_WIDTH_MAX, shellWidth - sidebarW - TASK_LIST_WIDTH_MIN))
   const target = e.currentTarget
 
   document.body.classList.add('is-resizing')
