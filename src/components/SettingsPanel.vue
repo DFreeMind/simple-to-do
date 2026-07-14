@@ -67,6 +67,18 @@
                   </span>
                 </button>
               </div>
+              <label class="switch-row theme-background-option">
+                <span>
+                  <strong>背景色随主题变化</strong>
+                  <small>为侧栏、任务区和详情区应用当前主题的低饱和搭配色</small>
+                </span>
+                <input
+                  type="checkbox"
+                  :checked="store.settings.themeBackgrounds"
+                  @change="store.updateSettings({ themeBackgrounds: $event.target.checked })"
+                />
+                <span class="switch-control" aria-hidden="true"></span>
+              </label>
             </div>
 
             <div class="settings-block">
@@ -538,7 +550,6 @@ const sections = [
   { id: 'appearance', label: '外观', summary: '主题与布局', icon: Palette },
   { id: 'task-display', label: '任务显示', summary: '完成任务', icon: CheckSquare },
   { id: 'preferences', label: '偏好与提醒', summary: '启动与反馈', icon: SlidersHorizontal },
-  { id: 'data', label: '数据与维护', summary: '保存与清理', icon: Database },
   { id: 'about', label: '关于', summary: '版本信息', icon: Info }
 ]
 

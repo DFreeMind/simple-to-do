@@ -70,6 +70,11 @@ export async function importImage(filePath) {
   return null
 }
 
+export async function importProfileAvatar(filePath) {
+  if (isTauri()) return invoke('import_profile_avatar', { filePath })
+  return null
+}
+
 export async function importImageData(dataUrl) {
   if (isTauri()) {
     // 解析 data:image/png;base64,xxxxx
@@ -92,6 +97,11 @@ export async function readAttachment(relativePath) {
   if (isTauri()) {
     return invoke('read_attachment', { relativePath })
   }
+  return null
+}
+
+export async function readProfileAvatar(relativePath) {
+  if (isTauri()) return invoke('read_profile_avatar', { relativePath })
   return null
 }
 

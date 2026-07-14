@@ -1,5 +1,10 @@
 <template>
-  <div class="app" :data-theme="store.settings.theme" :data-density="store.settings.density">
+  <div
+    class="app"
+    :class="{ 'app--theme-backgrounds': store.settings.themeBackgrounds }"
+    :data-theme="store.settings.theme"
+    :data-density="store.settings.density"
+  >
     <div
       class="app-shell"
       :class="{

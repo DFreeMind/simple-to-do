@@ -60,6 +60,15 @@ fn attachment_file_path(app: &tauri::AppHandle, relative_path: &str) -> Result<P
     Ok(path)
 }
 
+fn profile_avatar_file_path(app: &tauri::AppHandle, relative_path: &str) -> Result<PathBuf, String> {
+    if !relative_path.starts_with("profile/avatars/") || relative_path.contains("..") {
+        return Err("无效的头像路径".to_string());
+    }
+    Ok(relative_path
+        .split('/')
+        .fold(app_data_dir(app)?, |path, component| path.join(component)))
+}
+
 #[tauri::command]
 fn load_data(app: tauri::AppHandle) -> Result<Option<serde_json::Value>, String> {
     if !db_file(&app)?.exists() {
@@ -138,7 +147,8 @@ fn init_database(conn: &Connection) -> Result<(), String> {
             editor_mode TEXT NOT NULL DEFAULT 'detail',
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
-            deleted_by_list_id TEXT NULL
+            deleted_by_list_id TEXT NULL,
+            reminder_disabled INTEGER NOT NULL DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS idx_tasks_list_deleted ON tasks(list_id, deleted);
         CREATE INDEX IF NOT EXISTS idx_tasks_deleted_at ON tasks(deleted_at);
@@ -197,6 +207,16 @@ fn init_database(conn: &Connection) -> Result<(), String> {
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS profile (
+            id TEXT PRIMARY KEY,
+            nickname TEXT NOT NULL,
+            avatar_relative_path TEXT NULL,
+            avatar_sha256 TEXT NULL,
+            avatar_updated_at TEXT NULL,
+            account_id TEXT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS task_groups (
             id TEXT PRIMARY KEY,
@@ -277,6 +297,12 @@ fn run_database_migrations(conn: &Connection) -> Result<(), String> {
         "tasks",
         "task_group_id",
         "ALTER TABLE tasks ADD COLUMN task_group_id TEXT NULL",
+    )?;
+    ensure_column(
+        conn,
+        "tasks",
+        "reminder_disabled",
+        "ALTER TABLE tasks ADD COLUMN reminder_disabled INTEGER NOT NULL DEFAULT 0",
     )?;
     rebuild_attachments_without_relative_unique(conn)?;
     Ok(())
@@ -366,6 +392,7 @@ fn save_state_to_db(conn: &mut Connection, data: &serde_json::Value) -> Result<(
         DELETE FROM subtasks;
         DELETE FROM view_orders;
         DELETE FROM settings;
+        DELETE FROM profile;
         DELETE FROM task_groups;
         DELETE FROM trash_lists;
         DELETE FROM tasks;
@@ -495,6 +522,25 @@ fn save_state_to_db(conn: &mut Connection, data: &serde_json::Value) -> Result<(
         }
     }
 
+    if let Some(profile) = data.get("profile").and_then(|value| value.as_object()) {
+        let now = Local::now().to_rfc3339();
+        tx.execute(
+            "INSERT INTO profile(id, nickname, avatar_relative_path, avatar_sha256, avatar_updated_at, account_id, created_at, updated_at)
+             VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                string_field(&serde_json::Value::Object(profile.clone()), "id", "profile-local"),
+                string_field(&serde_json::Value::Object(profile.clone()), "nickname", "易简用户"),
+                opt_string_field(&serde_json::Value::Object(profile.clone()), "avatarRelativePath"),
+                opt_string_field(&serde_json::Value::Object(profile.clone()), "avatarSha256"),
+                opt_string_field(&serde_json::Value::Object(profile.clone()), "avatarUpdatedAt"),
+                opt_string_field(&serde_json::Value::Object(profile.clone()), "accountId"),
+                string_field(&serde_json::Value::Object(profile.clone()), "createdAt", &now),
+                string_field(&serde_json::Value::Object(profile.clone()), "updatedAt", &now),
+            ],
+        )
+        .map_err(|err| format!("保存个人资料失败: {err}"))?;
+    }
+
     tx.commit()
         .map_err(|err| format!("提交数据库事务失败: {err}"))?;
     Ok(())
@@ -537,8 +583,8 @@ fn insert_task_tree(tx: &rusqlite::Transaction, task: &serde_json::Value) -> Res
         "INSERT OR REPLACE INTO tasks(
             id, title, description, description_html, completed, completed_at, deleted, deleted_at,
             pinned, important, my_day_date, list_id, task_group_id, due_date, reminder_at, repeat_rule, priority,
-            comments, editor_mode, created_at, updated_at, deleted_by_list_id
-         ) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)",
+            comments, editor_mode, created_at, updated_at, deleted_by_list_id, reminder_disabled
+         ) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23)",
         params![
             id,
             string_field(task, "title", "未命名任务"),
@@ -562,6 +608,7 @@ fn insert_task_tree(tx: &rusqlite::Transaction, task: &serde_json::Value) -> Res
             string_field(task, "createdAt", &now),
             string_field(task, "updatedAt", &now),
             opt_string_field(task, "deletedByListId"),
+            int_bool(task, "reminderDisabled"),
         ],
     )
     .map_err(|err| format!("保存任务失败: {err}"))?;
@@ -656,6 +703,7 @@ fn load_state_from_db(
     let view_orders = query_view_orders(conn)?;
     let settings = query_settings(conn)?;
     let task_groups = query_task_groups(conn)?;
+    let profile = query_profile(conn)?;
 
     Ok(serde_json::json!({
         "schemaVersion": schema_version,
@@ -666,8 +714,29 @@ fn load_state_from_db(
         "listTrash": list_trash,
         "viewOrders": view_orders,
         "taskGroups": task_groups,
+        "profile": profile,
         "settings": settings,
     }))
+}
+
+fn query_profile(conn: &Connection) -> Result<serde_json::Value, String> {
+    conn.query_row(
+        "SELECT id, nickname, avatar_relative_path, avatar_sha256, avatar_updated_at, account_id, created_at, updated_at FROM profile LIMIT 1",
+        [],
+        |row| Ok(serde_json::json!({
+            "id": row.get::<_, String>(0)?,
+            "nickname": row.get::<_, String>(1)?,
+            "avatarRelativePath": row.get::<_, Option<String>>(2)?,
+            "avatarSha256": row.get::<_, Option<String>>(3)?,
+            "avatarUpdatedAt": row.get::<_, Option<String>>(4)?,
+            "accountId": row.get::<_, Option<String>>(5)?,
+            "createdAt": row.get::<_, String>(6)?,
+            "updatedAt": row.get::<_, String>(7)?,
+        })),
+    )
+    .optional()
+    .map_err(|err| format!("读取个人资料失败: {err}"))
+    .map(|value| value.unwrap_or(serde_json::Value::Null))
 }
 
 fn query_groups(conn: &Connection) -> Result<Vec<serde_json::Value>, String> {
@@ -738,12 +807,12 @@ fn query_tasks(
     let sql = if deleted_only {
         "SELECT id, title, description, description_html, completed, completed_at, deleted, deleted_at,
                 pinned, important, my_day_date, list_id, task_group_id, due_date, reminder_at, repeat_rule, priority,
-                comments, editor_mode, created_at, updated_at, deleted_by_list_id
+                comments, editor_mode, created_at, updated_at, deleted_by_list_id, reminder_disabled
          FROM tasks WHERE deleted = 1 ORDER BY deleted_at DESC, updated_at DESC"
     } else {
         "SELECT id, title, description, description_html, completed, completed_at, deleted, deleted_at,
                 pinned, important, my_day_date, list_id, task_group_id, due_date, reminder_at, repeat_rule, priority,
-                comments, editor_mode, created_at, updated_at, deleted_by_list_id
+                comments, editor_mode, created_at, updated_at, deleted_by_list_id, reminder_disabled
          FROM tasks ORDER BY created_at DESC"
     };
     let mut stmt = conn
@@ -779,6 +848,7 @@ fn query_tasks(
                 "createdAt": row.get::<_, String>(19)?,
                 "updatedAt": row.get::<_, String>(20)?,
                 "deletedByListId": row.get::<_, Option<String>>(21)?,
+                "reminderDisabled": row.get::<_, i64>(22)? != 0,
             }))
         })
         .map_err(|err| format!("读取任务失败: {err}"))?;
@@ -1075,6 +1145,39 @@ fn import_image(app: tauri::AppHandle, file_path: String) -> Result<ImportedAtta
 }
 
 #[tauri::command]
+fn import_profile_avatar(app: tauri::AppHandle, file_path: String) -> Result<ImportedAttachment, String> {
+    let source = PathBuf::from(file_path);
+    let data = fs::read(&source).map_err(|err| format!("读取头像失败: {err}"))?;
+    let mime = mime_from_path(&source);
+    if !mime.starts_with("image/") {
+        return Err("请选择图片文件".to_string());
+    }
+    let sha256 = hex_sha256(&data);
+    let ext = extension_for_mime(&mime)
+        .or_else(|| source.extension().and_then(|value| value.to_str()))
+        .unwrap_or("bin")
+        .to_ascii_lowercase();
+    let relative_path = format!("profile/avatars/{}.{}", &sha256[..16.min(sha256.len())], ext);
+    let destination = profile_avatar_file_path(&app, &relative_path)?;
+    if let Some(parent) = destination.parent() {
+        fs::create_dir_all(parent).map_err(|err| format!("创建头像目录失败: {err}"))?;
+    }
+    if !destination.exists() {
+        fs::write(&destination, &data).map_err(|err| format!("写入头像失败: {err}"))?;
+    }
+    let (width, height) = image::image_dimensions(&destination)
+        .map(|(width, height)| (Some(width), Some(height)))
+        .unwrap_or((None, None));
+    let timestamp = Local::now().to_rfc3339();
+    Ok(ImportedAttachment {
+        kind: "image".to_string(), mime,
+        original_name: source.file_name().and_then(|value| value.to_str()).unwrap_or("avatar").to_string(),
+        relative_path, sha256, size_bytes: data.len() as u64, width, height,
+        created_at: timestamp.clone(), last_referenced_at: timestamp,
+    })
+}
+
+#[tauri::command]
 fn import_image_data(app: tauri::AppHandle, data: String, mime: String) -> Result<ImportedAttachment, String> {
     let bytes = general_purpose::STANDARD
         .decode(&data)
@@ -1188,6 +1291,14 @@ fn read_attachment(app: tauri::AppHandle, relative_path: String) -> Result<Optio
     let mime = mime_from_path(&path);
     let encoded = general_purpose::STANDARD.encode(data);
     Ok(Some(format!("data:{mime};base64,{encoded}")))
+}
+
+#[tauri::command]
+fn read_profile_avatar(app: tauri::AppHandle, relative_path: String) -> Result<Option<String>, String> {
+    let path = profile_avatar_file_path(&app, &relative_path)?;
+    if !path.exists() { return Ok(None); }
+    let data = fs::read(&path).map_err(|err| format!("读取头像失败: {err}"))?;
+    Ok(Some(format!("data:{};base64,{}", mime_from_path(&path), general_purpose::STANDARD.encode(data))))
 }
 
 #[tauri::command]
@@ -1713,8 +1824,10 @@ fn main() {
             select_image,
             read_image,
             import_image,
+            import_profile_avatar,
             import_image_data,
             read_attachment,
+            read_profile_avatar,
             resolve_html_images,
             cleanup_orphan_attachments,
             scan_storage_health,

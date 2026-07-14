@@ -2,6 +2,16 @@
   <aside class="sidebar" :class="{ 'sidebar--collapsed': collapsed }">
     <!-- 折叠 Rail 模式 -->
     <template v-if="collapsed">
+      <nav class="rail-nav" aria-label="侧栏控制">
+        <button class="rail-item rail-profile" type="button" :title="`${store.profile.nickname} · 个人资料`" :aria-label="`${store.profile.nickname}，打开个人资料`" @click="profilePanelOpen = true">
+          <img v-if="profileAvatarSrc" :src="profileAvatarSrc" alt="" />
+          <span v-else>{{ profileInitial }}</span>
+        </button>
+        <button class="rail-item" type="button" aria-label="展开侧栏" title="展开侧栏" @click="expand">
+          <PanelLeft :size="20" />
+        </button>
+      </nav>
+
       <nav class="rail-nav" aria-label="搜索">
         <button
           class="rail-item"
@@ -164,29 +174,22 @@
         <button class="rail-item" type="button" title="设置" aria-label="设置" @click="store.openSettings">
           <SettingsIcon :size="20" />
         </button>
-        <button class="rail-item" type="button" aria-label="展开侧栏" title="展开侧栏" @click="expand">
-          <PanelLeft :size="20" />
-        </button>
       </div>
     </template>
 
     <!-- 展开完整模式 -->
     <template v-else>
       <header class="sidebar__header">
-        <button class="brand" type="button" aria-label="回到今日" @click="store.setView('today')">
-          <span class="brand-mark">
-            <img :src="appIcon" alt="" />
-          </span>
-          <span>
-            <strong>易简清单</strong>
-            <small>本地优先</small>
-          </span>
+        <button class="profile-entry" type="button" aria-label="打开个人资料" @click="profilePanelOpen = true">
+          <img v-if="profileAvatarSrc" class="profile-avatar" :src="profileAvatarSrc" alt="" />
+          <span v-else class="profile-avatar">{{ profileInitial }}</span>
+          <span class="profile-entry__copy"><strong>{{ store.profile.nickname }}</strong><small><i></i>本地空间</small></span>
         </button>
-        <div style="display: flex; gap: 2px;">
-          <button class="icon-btn" type="button" aria-label="折叠侧栏" title="折叠侧栏" @click="collapse">
+        <div class="sidebar__header-actions">
+          <button class="icon-btn sidebar-header-action" type="button" aria-label="折叠侧栏" title="收起侧栏" @click="collapse">
             <PanelLeft :size="18" />
           </button>
-          <button class="icon-btn" type="button" aria-label="打开设置" title="设置" @click="store.openSettings">
+          <button class="icon-btn sidebar-header-action" type="button" aria-label="打开设置" title="应用设置" @click="store.openSettings">
             <SettingsIcon :size="18" />
           </button>
         </div>
@@ -433,11 +436,12 @@
       @confirm="inputDialog.onConfirm"
       @cancel="inputDialog.visible = false"
     />
+    <ProfilePanel v-if="profilePanelOpen" @close="profilePanelOpen = false" />
   </aside>
 </template>
 
 <script setup>
-import { ref, reactive, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
 import {
   BarChart3,
   CalendarCheck,
@@ -465,12 +469,29 @@ import {
 } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import { useDragSort } from '@/composables/useDragSort'
-import appIcon from '@/assets/app-icon.svg'
+import { readProfileAvatar } from '@/services/platform'
 import ConfirmDialog from './ConfirmDialog.vue'
 import InputDialog from './InputDialog.vue'
+import ProfilePanel from './ProfilePanel.vue'
 
 const store = useTaskStore()
 const collapsed = computed(() => store.settings.sidebarCollapsed)
+const profilePanelOpen = ref(false)
+const profileAvatarUrl = ref('')
+const profileInitial = computed(() => Array.from(store.profile.nickname?.trim() || '易')[0] || '易')
+const builtInAvatarModules = import.meta.glob('@/assets/avatars/*.png', { eager: true, import: 'default' })
+const profileAvatarSrc = computed(() => {
+  if (profileAvatarUrl.value) return profileAvatarUrl.value
+  const id = store.profile.avatarRelativePath?.startsWith('builtin:') ? store.profile.avatarRelativePath.slice(8) : ''
+  return Object.entries(builtInAvatarModules).find(([path]) => path.endsWith(`/${id}.png`))?.[1] || ''
+})
+
+async function loadProfileAvatar() {
+  if (store.profile.avatarRelativePath?.startsWith('builtin:')) { profileAvatarUrl.value = ''; return }
+  if (!store.profile.avatarRelativePath) { profileAvatarUrl.value = ''; return }
+  try { profileAvatarUrl.value = await readProfileAvatar(store.profile.avatarRelativePath) || '' } catch { profileAvatarUrl.value = '' }
+}
+watch(() => store.profile.avatarRelativePath, loadProfileAvatar, { immediate: true })
 
 function collapse() {
   store.updateSettings({ sidebarCollapsed: true })

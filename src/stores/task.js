@@ -61,6 +61,7 @@ const DEFAULT_LISTS = [
 
 const DEFAULT_SETTINGS = {
   theme: 'mint',
+  themeBackgrounds: false,
   density: 'comfortable',
   sidebarCollapsed: false,
   detailOpen: false,
@@ -76,6 +77,17 @@ const DEFAULT_SETTINGS = {
   soundGroupEnabled: true,
   reminderNotificationsEnabled: true,
   reminderSoundEnabled: true
+}
+
+const DEFAULT_PROFILE = {
+  id: '',
+  nickname: '易简用户',
+  avatarRelativePath: null,
+  avatarSha256: null,
+  avatarUpdatedAt: null,
+  accountId: null,
+  createdAt: '',
+  updatedAt: ''
 }
 
 function nowIso() {
@@ -191,6 +203,7 @@ export const useTaskStore = defineStore('task', () => {
   const isSaving = ref(false)
   const notice = ref(null)
   const settings = ref({ ...DEFAULT_SETTINGS })
+  const profile = ref({ ...DEFAULT_PROFILE })
   const settingsOpen = ref(false)
   const helpCenterOpen = ref(false)
   const ungroupedCollapsed = ref(false)
@@ -1062,9 +1075,12 @@ export const useTaskStore = defineStore('task', () => {
         const nextDueTime = new Date(task.dueDate).getTime()
         if (Number.isFinite(nextDueTime)) task.reminderAt = new Date(nextDueTime + previousReminderTime - previousDueTime).toISOString()
       }
+      if (isDueDateChanged && !isReminderChanged && task.dueDate && !task.reminderAt && !task.reminderDisabled) {
+        task.reminderAt = task.dueDate
+      }
       if (isReminderChanged || isDueDateChanged) task.reminderNotifiedAt = null
       if (shouldRescheduleReminder(updates)) {
-        rescheduleReminder(task, { requestPermission: Boolean(updates.reminderAt) })
+        rescheduleReminder(task, { requestPermission: Boolean(updates.reminderAt) || (isDueDateChanged && Boolean(task.reminderAt)) })
       }
     }
   }
@@ -1079,6 +1095,8 @@ export const useTaskStore = defineStore('task', () => {
     task.dueDate = next.toISOString()
     if (Number.isFinite(previousReminderTime)) {
       task.reminderAt = new Date(next.getTime() + previousReminderTime - previous.getTime()).toISOString()
+    } else if (!task.reminderDisabled) {
+      task.reminderAt = task.dueDate
     }
     task.reminderNotifiedAt = null
     task.updatedAt = nowIso()
@@ -1289,6 +1307,7 @@ export const useTaskStore = defineStore('task', () => {
         trash.value = (data.trash || []).map(task => normalizeTask({ ...task, deleted: true }))
         listTrash.value = normalizeListTrash(data.listTrash)
         settings.value = normalizeSettings(data.settings)
+        profile.value = normalizeProfile(data.profile)
         viewOrders.value = normalizeViewOrders(data.viewOrders)
         taskGroups.value = (data.taskGroups || []).map(normalizeTaskGroup)
         // 根据用户设置更新音效开关
@@ -1341,7 +1360,7 @@ export const useTaskStore = defineStore('task', () => {
     }
   }
 
-  watch([groups, lists, tasks, trash, listTrash, settings, viewOrders, taskGroups], () => {
+  watch([groups, lists, tasks, trash, listTrash, settings, profile, viewOrders, taskGroups], () => {
     scheduleSave()
   }, { deep: true })
 
@@ -1445,7 +1464,7 @@ export const useTaskStore = defineStore('task', () => {
 
   function buildSavePayload() {
     const payload = JSON.parse(JSON.stringify({
-      schemaVersion: 6,
+      schemaVersion: 8,
       groups: groups.value,
       lists: lists.value,
       tasks: tasks.value,
@@ -1453,6 +1472,7 @@ export const useTaskStore = defineStore('task', () => {
       listTrash: listTrash.value,
       viewOrders: viewOrders.value,
       taskGroups: taskGroups.value,
+      profile: profile.value,
       settings: settings.value
     }))
     stripHydratedAttachmentUrls(payload)
@@ -1521,6 +1541,9 @@ export const useTaskStore = defineStore('task', () => {
 
   function normalizeTask(task = {}) {
     const createdAt = task.createdAt || nowIso()
+    const dueDate = task.dueDate || null
+    const reminderDisabled = task.reminderDisabled === true
+    const reminderAt = task.reminderAt || (dueDate && !reminderDisabled ? dueDate : null)
     return {
       id: task.id || genId(),
       title: task.title || '未命名任务',
@@ -1536,8 +1559,9 @@ export const useTaskStore = defineStore('task', () => {
       myDayDate: task.myDayDate || null,
       listId: task.listId || 'inbox',
       taskGroupId: task.taskGroupId || null,
-      dueDate: task.dueDate || null,
-      reminderAt: task.reminderAt || null,
+      dueDate,
+      reminderAt,
+      reminderDisabled,
       reminderNotifiedAt: task.reminderNotifiedAt || null,
       repeatRule: task.repeatRule || null,
       priority: Number(task.priority || 0),
@@ -1592,6 +1616,7 @@ export const useTaskStore = defineStore('task', () => {
       ...DEFAULT_SETTINGS,
       ...rawSettings,
       theme,
+      themeBackgrounds: rawSettings.themeBackgrounds === true,
       density,
       startView,
       detailOpen: rawSettings.detailOpen !== false,
@@ -1610,6 +1635,31 @@ export const useTaskStore = defineStore('task', () => {
       reminderNotificationsEnabled,
       reminderSoundEnabled
     }
+  }
+
+  function normalizeProfile(rawProfile = {}) {
+    const now = nowIso()
+    const nickname = String(rawProfile?.nickname || DEFAULT_PROFILE.nickname).trim().slice(0, 24) || DEFAULT_PROFILE.nickname
+    return {
+      ...DEFAULT_PROFILE,
+      ...rawProfile,
+      id: rawProfile?.id || genId(),
+      nickname,
+      avatarRelativePath: rawProfile?.avatarRelativePath || null,
+      avatarSha256: rawProfile?.avatarSha256 || null,
+      avatarUpdatedAt: rawProfile?.avatarUpdatedAt || null,
+      accountId: rawProfile?.accountId || null,
+      createdAt: rawProfile?.createdAt || now,
+      updatedAt: rawProfile?.updatedAt || now
+    }
+  }
+
+  function updateProfile(updates = {}) {
+    profile.value = normalizeProfile({
+      ...profile.value,
+      ...updates,
+      updatedAt: nowIso()
+    })
   }
 
   function normalizeListTrash(rawListTrash = []) {
@@ -1751,6 +1801,7 @@ export const useTaskStore = defineStore('task', () => {
     isSaving,
     notice,
     settings,
+    profile,
     settingsOpen,
     helpCenterOpen,
     activeTasks,
@@ -1838,6 +1889,7 @@ export const useTaskStore = defineStore('task', () => {
     openHelpCenter,
     closeHelpCenter,
     updateSettings,
+    updateProfile,
     testReminderNotification,
     loadData,
     saveData,

@@ -408,6 +408,13 @@ const priorityClass = computed(() => `detail-meta-action--priority-${Number(task
 
 // 日期摘要文本，如 "7月8日 · 明天"
 const summaryWeekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+function startOfWeek(date) {
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const daysSinceMonday = (start.getDay() + 6) % 7
+  start.setDate(start.getDate() - daysSinceMonday)
+  return start
+}
+
 const dateSummaryText = computed(() => {
   if (!task.value?.dueDate) return ''
   const d = new Date(task.value.dueDate)
@@ -421,8 +428,14 @@ const dateSummaryText = computed(() => {
   if (diff === 0) relative = '今天'
   else if (diff === 1) relative = '明天'
   else if (diff === -1) relative = '昨天'
-  else if (diff > 0 && diff <= 7) relative = '本' + summaryWeekdays[d.getDay()]
-  else if (diff > 7 && diff <= 14) relative = '下周' + summaryWeekdays[d.getDay()]
+  else {
+    const weekDiff = Math.round((startOfWeek(target) - startOfWeek(today)) / 604800000)
+    if (weekDiff === 0) relative = '本' + summaryWeekdays[d.getDay()]
+    else if (weekDiff === 1) relative = '下周' + summaryWeekdays[d.getDay()]
+    else if (diff > 0 && diff < 60) relative = `${Math.round(diff / 7)}周后`
+    else if (diff > 0 && diff < 365) relative = `${Math.round(diff / 30)}月后`
+    else if (diff > 0) relative = `${Math.round(diff / 365)}年后`
+  }
   return relative ? `${month}月${day}日 · ${relative}` : `${month}月${day}日`
 })
 const repeatLabels = {

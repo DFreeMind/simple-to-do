@@ -11,24 +11,44 @@ const THEME_PALETTES = {
     accentStrong:'#1f6f68',
     accentSoft:  '#e5f5f2',
     accentTint:  '#f3fbf9',
+    sidebarBg:   '#edf5f2',
+    mainBg:      '#f9fbfa',
+    detailBg:    '#f3f8f6',
+    detailCardBg:'#c9e6df',
+    detailCardTint:'#e2f2ee',
   },
   blue: {
     accent:      '#346fd8',
     accentStrong:'#2455ad',
     accentSoft:  '#e6efff',
     accentTint:  '#f4f8ff',
+    sidebarBg:   '#eef3fc',
+    mainBg:      '#fafbfe',
+    detailBg:    '#f3f6fc',
+    detailCardBg:'#cddffc',
+    detailCardTint:'#e3edfc',
   },
   violet: {
     accent:      '#6d5bd7',
     accentStrong:'#5442bd',
     accentSoft:  '#eeeaff',
     accentTint:  '#f8f6ff',
+    sidebarBg:   '#f3f1fb',
+    mainBg:      '#fbfaff',
+    detailBg:    '#f6f4fb',
+    detailCardBg:'#ddd5f7',
+    detailCardTint:'#eeeafa',
   },
   graphite: {
     accent:      '#475569',
     accentStrong:'#334155',
     accentSoft:  '#e9eef5',
     accentTint:  '#f7f9fc',
+    sidebarBg:   '#f0f3f6',
+    mainBg:      '#fafbfc',
+    detailBg:    '#f4f6f8',
+    detailCardBg:'#dce5ee',
+    detailCardTint:'#eaf0f5',
   },
 }
 
@@ -78,11 +98,12 @@ const WARNING       = '#cc7a22'
  * 返回的对象可以直接 apply 到 DOM 上。
  */
 function computeAccentVars(palette) {
-  const { accent, accentSoft, accentTint } = palette
+  const { accent, accentSoft, accentTint, sidebarBg, mainBg, detailBg, detailCardBg, detailCardTint } = palette
 
   return {
     // ── accent 衍生 ──
     '--accent-70-white-fallback':           mix(accent, WHITE, 0.70),
+    '--accent-52-white-fallback':           mix(accent, WHITE, 0.52),
     '--accent-82-accent-tint-fallback':     mix(accent, accentTint, 0.82),
     '--accent-90-fallback':                 mixBlack(accent, 0.90),
     '--accent-16-surface-muted-fallback':   mix(accent, SURFACE_MUTED, 0.16),
@@ -123,6 +144,14 @@ function computeAccentVars(palette) {
     // ── surface + accent-tint 混合 ──
     '--surface-80-accent-tint-fallback':    mix(SURFACE, accentTint, 0.80),
     '--surface-82-accent-tint-fallback':    mix(SURFACE, accentTint, 0.82),
+
+    // ── 分栏主题背景 ──
+    // 白色内容卡片不参与着色，仅为三栏画布生成低饱和层次。
+    '--theme-sidebar-bg': sidebarBg,
+    '--theme-main-bg':    mainBg,
+    '--theme-detail-bg':  detailBg,
+    '--theme-detail-card-bg': detailCardBg,
+    '--theme-detail-card-tint': detailCardTint,
   }
 }
 

@@ -1,10 +1,12 @@
 <template>
   <main class="task-list">
     <header class="task-list__header">
-      <div>
-        <p class="eyebrow">{{ viewMeta.eyebrow }}</p>
-        <h1>{{ viewMeta.title }}</h1>
+      <div v-if="store.currentList" ref="listSwitcherRef" class="list-switcher" @click.stop>
+        <button class="list-switcher__trigger" type="button" :aria-expanded="listSwitcherOpen" @click="toggleListSwitcher"><span>{{ store.currentList.name }}</span><ChevronDown :size="18" /></button>
+        <div class="list-switcher__stats-area" @mouseenter="listSummaryOpen = true" @mouseleave="listSummaryOpen = false"><div class="list-switcher__stats" aria-label="清单统计"><span><Folder :size="14" />{{ listStats.groups }}</span><span><CheckCircle2 :size="14" />{{ listStats.completed }}/{{ listStats.total }}</span><span><ListChecks :size="14" />{{ listStats.completedSubtasks }}/{{ listStats.subtasks }}</span></div><div v-if="listSummaryOpen && !listSwitcherOpen" class="list-switcher__summary"><div class="list-switcher__summary-grid"><div class="list-switcher__summary-metric"><i><Folder :size="15" /></i><span><small>分组</small><b>{{ listStats.groups }}</b></span></div><div class="list-switcher__summary-metric"><i><CheckCircle2 :size="15" /></i><span><small>任务</small><b>{{ listStats.completed }}<em>/{{ listStats.total }}</em></b></span></div><div class="list-switcher__summary-metric"><i><ListChecks :size="15" /></i><span><small>子任务</small><b>{{ listStats.completedSubtasks }}<em>/{{ listStats.subtasks }}</em></b></span></div></div><footer :class="{ 'is-overdue': listStats.overdue }"><AlertCircle v-if="listStats.overdue" :size="16" /><CheckCircle2 v-else :size="16" />{{ listStats.overdue ? `${listStats.overdue} 项任务已逾期` : '进度正常，没有逾期任务' }}</footer></div></div>
+        <div v-if="listSwitcherOpen" class="list-switcher__menu"><template v-for="group in store.groupedLists" :key="group.id"><p class="list-switcher__group-label">{{ group.name }}</p><button v-for="list in group.lists" :key="list.id" type="button" :class="{ active: list.id === store.currentList.id }" @click="switchList(list.id)"><i :style="{ background: list.color }"></i><span>{{ list.name }}</span><Check v-if="list.id === store.currentList.id" :size="15" /></button></template></div>
       </div>
+      <div v-else><p class="eyebrow">{{ viewMeta.eyebrow }}</p><h1>{{ viewMeta.title }}</h1></div>
       <div class="header-actions">
         <ViewModeToggle v-if="showTaskActions && !['planned', 'completed', 'trash'].includes(store.currentView)" v-model="viewMode" />
         <button
@@ -531,11 +533,13 @@
 import { ref, reactive, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
 import {
   ArrowUpDown,
+  AlertCircle,
   CalendarClock,
   FolderInput,
   Pencil,
   Check,
   CheckCheck,
+  CheckCircle2,
   ChevronDown,
   ChevronsDown,
   ChevronsUp,
@@ -544,6 +548,7 @@ import {
   Eye,
   EyeOff,
   Info,
+  ListChecks,
   MoreHorizontal,
   PanelRight,
   Plus,
@@ -572,6 +577,9 @@ const searchInput = ref(null)
 const searchViewMode = ref('list')
 const sortMenuOpen = ref(false)
 const headerMoreOpen = ref(false)
+const listSwitcherOpen = ref(false)
+const listSummaryOpen = ref(false)
+const listSwitcherRef = ref(null)
 const pinnedVisible = ref(true)
 const groupCompletedVisibility = reactive({})
 const groupCollapseState = reactive({})
@@ -858,6 +866,36 @@ const viewMeta = computed(() => {
     eyebrow: '当前清单'
   }
 })
+
+const listStats = computed(() => {
+  const tasks = store.tasks.filter(task => task.listId === store.currentList?.id && !task.deleted)
+  const subtasks = tasks.flatMap(task => task.subtasks || [])
+  const now = Date.now()
+  return {
+    groups: store.currentListGroups.length,
+    total: tasks.length,
+    active: tasks.filter(task => !task.completed).length,
+    completed: tasks.filter(task => task.completed).length,
+    subtasks: subtasks.length,
+    completedSubtasks: subtasks.filter(task => task.completed).length,
+    overdue: tasks.filter(task => !task.completed && task.dueDate && new Date(task.dueDate).getTime() < now).length
+  }
+})
+
+function switchList(id) {
+  store.setView(id)
+  listSwitcherOpen.value = false
+}
+
+function toggleListSwitcher() {
+  listSwitcherOpen.value = !listSwitcherOpen.value
+  listSummaryOpen.value = false
+}
+
+function closeListSwitcher() {
+  listSwitcherOpen.value = false
+  listSummaryOpen.value = false
+}
 
 const sortLabel = computed(() => {
   return sortOptions.find(option => option.value === store.sortBy)?.label || '智能排序'
@@ -1302,7 +1340,9 @@ function closeHeaderMoreMenu() {
 
 function handleSortKeydown(event) {
   if (event.key !== 'Escape') return
-  if (sortMenuOpen.value || headerMoreOpen.value) {
+  if (listSwitcherOpen.value) {
+    closeListSwitcher()
+  } else if (sortMenuOpen.value || headerMoreOpen.value) {
     closeHeaderTransientMenus()
   } else if (groupMenu.visible) {
     closeGroupMenu()
@@ -1314,6 +1354,7 @@ function focusSearchInput() {
 }
 
 onMounted(() => {
+  window.addEventListener('click', closeListSwitcher)
   window.addEventListener('click', closeSortMenu)
   window.addEventListener('click', closeHeaderMoreMenu)
   window.addEventListener('click', closeCustomColorPicker)
@@ -1324,6 +1365,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('click', closeListSwitcher)
   window.removeEventListener('click', closeSortMenu)
   window.removeEventListener('click', closeHeaderMoreMenu)
   window.removeEventListener('click', closeCustomColorPicker)

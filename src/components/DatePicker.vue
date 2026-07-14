@@ -107,6 +107,7 @@
           </button>
         </div>
       </div>
+      <button class="dp-done" type="button" @click="emit('close')">完成</button>
     </template>
   </div>
 </template>
@@ -166,7 +167,17 @@ const reminderOptions = [
 ]
 const currentReminderValue = computed(() => {
   if (!props.task?.reminderAt) return ''
-  return '' // 无法精确还原快捷值，显示自定义
+  const diff = new Date(props.task.reminderAt).getTime() - new Date(props.task.dueDate || props.task.reminderAt).getTime()
+  const match = reminderOptions.find(option => {
+    if (!option.value) return false
+    if (option.value === 'at-time') return Math.abs(diff) < 60000
+    if (option.value === '15m') return Math.abs(diff + 15 * 60000) < 60000
+    if (option.value === '1h') return Math.abs(diff + 3600000) < 60000
+    if (option.value === '1d') return Math.abs(diff + 86400000) < 60000
+    if (option.value === '1w') return Math.abs(diff + 604800000) < 60000
+    return false
+  })
+  return match?.value || ''
 })
 const reminderLabel = computed(() => {
   if (!props.task?.reminderAt) return '未设置'
@@ -220,7 +231,7 @@ function isSelected(d) {
 
 function selectDate(d) {
   selectedDate.value = new Date(d)
-  confirm()
+  applyValue(false)
 }
 
 function setTime(e) {
@@ -248,7 +259,7 @@ function setSelected(d) {
   selectedDate.value = d
   calYear.value = d.getFullYear()
   calMonth.value = d.getMonth()
-  confirm()
+  applyValue(false)
 }
 
 function clearDate() {
@@ -258,11 +269,7 @@ function clearDate() {
   emit('close')
 }
 
-function confirm() {
-  applyValue()
-}
-
-function applyValue(shouldClose = true) {
+function applyValue(shouldClose = false) {
   const d = new Date(selectedDate.value)
   if (selectedTime.value) {
     const [h, m] = selectedTime.value.split(':').map(Number)
@@ -281,7 +288,7 @@ function chooseRepeat(value) {
 
 function chooseReminder(value) {
   if (!value) {
-    store.updateTask(props.task.id, { reminderAt: null })
+    store.updateTask(props.task.id, { reminderAt: null, reminderDisabled: true })
     expandedSection.value = ''
     return
   }
@@ -306,7 +313,7 @@ function chooseReminder(value) {
       reminderDate = new Date(base.getTime() - 604800000)
       break
   }
-  const updates = { reminderAt: reminderDate.toISOString() }
+  const updates = { reminderAt: reminderDate.toISOString(), reminderDisabled: false }
   if (props.field === 'dueDate') updates.dueDate = base.toISOString()
   store.updateTask(props.task.id, updates)
   expandedSection.value = ''

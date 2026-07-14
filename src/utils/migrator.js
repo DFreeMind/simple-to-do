@@ -1,5 +1,5 @@
 /** 前端状态结构迁移。数据库表结构迁移由 Rust 侧负责。 */
-const CURRENT_VERSION = 6
+const CURRENT_VERSION = 8
 const TASK_GROUP_COLOR_IDS = ['auto', 'accent', 'blue', 'violet', 'amber', 'rose', 'green', 'cyan', 'coral', 'indigo', 'teal', 'brick', 'custom']
 
 export class MigrationError extends Error {
@@ -15,7 +15,9 @@ const migrations = {
   2: migrateV2ToV3,
   3: migrateV3ToV4,
   4: migrateV4ToV5,
-  5: migrateV5ToV6
+  5: migrateV5ToV6,
+  6: migrateV6ToV7,
+  7: migrateV7ToV8
 }
 
 export function migrateData(data) {
@@ -108,6 +110,37 @@ function migrateV5ToV6(data) {
   }
 }
 
+function migrateV6ToV7(data) {
+  const now = new Date().toISOString()
+  return {
+    ...data,
+    profile: data.profile && typeof data.profile === 'object' && !Array.isArray(data.profile)
+      ? data.profile
+      : {
+          id: `profile-${Date.now().toString(36)}`,
+          nickname: '易简用户',
+          avatarRelativePath: null,
+          avatarSha256: null,
+          avatarUpdatedAt: null,
+          accountId: null,
+          createdAt: now,
+          updatedAt: now
+        }
+  }
+}
+
+function migrateV7ToV8(data) {
+  const addReminderPreference = (task) => ({
+    ...task,
+    reminderDisabled: task?.reminderDisabled === true
+  })
+  return {
+    ...data,
+    tasks: (data.tasks || []).map(addReminderPreference),
+    trash: (data.trash || []).map(addReminderPreference)
+  }
+}
+
 export function validateData(data) {
   const errors = []
   if (!data || typeof data !== 'object' || Array.isArray(data)) return { valid: false, errors: ['数据不是有效的对象'] }
@@ -116,6 +149,7 @@ export function validateData(data) {
     if (!Array.isArray(data[field])) errors.push(`缺少数组字段: ${field}`)
   }
   if (!data.settings || typeof data.settings !== 'object' || Array.isArray(data.settings)) errors.push('缺少有效的 settings 字段')
+  if (!data.profile || typeof data.profile !== 'object' || Array.isArray(data.profile)) errors.push('缺少有效的 profile 字段')
   if (!data.viewOrders || typeof data.viewOrders !== 'object' || Array.isArray(data.viewOrders)) errors.push('缺少有效的 viewOrders 字段')
   if (errors.length) return { valid: false, errors }
 
@@ -146,4 +180,4 @@ export function createBackup(data) {
 }
 
 export function getCurrentVersion() { return CURRENT_VERSION }
-export function getSupportedVersions() { return [1, 2, 3, 4, 5, 6] }
+export function getSupportedVersions() { return [1, 2, 3, 4, 5, 6, 7] }
