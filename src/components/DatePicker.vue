@@ -55,57 +55,63 @@
     <template v-if="showExtras">
       <div class="dp-extras">
         <!-- 时间行 -->
-        <button class="dp-extra-row" type="button" @click.stop="toggleExtra('time')">
-          <span class="dp-extra-row__icon"><Clock3 :size="15" /></span>
-          <span class="dp-extra-row__label">时间</span>
-          <span class="dp-extra-row__value">{{ selectedTime || '未设置' }}</span>
-          <ChevronDown :size="14" :class="{ rotated: expandedSection === 'time' }" />
-        </button>
-        <div v-if="expandedSection === 'time'" class="dp-extra-options dp-time-picker-container">
-          <TimePicker v-model="selectedTime" @clear="handleTimeClear" />
-        </div>
+        <section class="dp-extra-block" :class="{ 'is-expanded': expandedSection === 'time' }">
+          <button class="dp-extra-row" type="button" @click.stop="toggleExtra('time')">
+            <span class="dp-extra-row__icon"><Clock3 :size="15" /></span>
+            <span class="dp-extra-row__label">时间</span>
+            <span class="dp-extra-row__value">{{ selectedTime || '未设置' }}</span>
+            <ChevronDown :size="14" :class="{ rotated: expandedSection === 'time' }" />
+          </button>
+          <div v-if="expandedSection === 'time'" class="dp-extra-options dp-time-picker-container">
+            <TimePicker v-model="selectedTime" @clear="handleTimeClear" />
+          </div>
+        </section>
 
         <!-- 提醒行 -->
-        <button class="dp-extra-row" type="button" @click.stop="toggleExtra('reminder')">
-          <span class="dp-extra-row__icon"><Bell :size="15" /></span>
-          <span class="dp-extra-row__label">提醒</span>
-          <span class="dp-extra-row__value">{{ reminderLabel }}</span>
-          <ChevronDown :size="14" :class="{ rotated: expandedSection === 'reminder' }" />
-        </button>
-        <div v-if="expandedSection === 'reminder'" class="dp-extra-options">
-          <button
-            v-for="option in reminderOptions"
-            :key="option.value"
-            class="dp-extra-option"
-            :class="{ active: option.value === currentReminderValue }"
-            type="button"
-            @click="chooseReminder(option.value)"
-          >
-            <span>{{ option.label }}</span>
-            <Check v-if="option.value === currentReminderValue" :size="14" />
+        <section class="dp-extra-block" :class="{ 'is-expanded': expandedSection === 'reminder' }">
+          <button class="dp-extra-row" type="button" @click.stop="toggleExtra('reminder')">
+            <span class="dp-extra-row__icon"><Bell :size="15" /></span>
+            <span class="dp-extra-row__label">提醒</span>
+            <span class="dp-extra-row__value">{{ reminderLabel }}</span>
+            <ChevronDown :size="14" :class="{ rotated: expandedSection === 'reminder' }" />
           </button>
-        </div>
+          <div v-if="expandedSection === 'reminder'" class="dp-extra-options">
+            <button
+              v-for="option in reminderOptions"
+              :key="option.value"
+              class="dp-extra-option"
+              :class="{ active: option.value === currentReminderValue }"
+              type="button"
+              @click="chooseReminder(option.value)"
+            >
+              <span>{{ option.label }}</span>
+              <Check v-if="option.value === currentReminderValue" :size="14" />
+            </button>
+          </div>
+        </section>
 
         <!-- 重复行 -->
-        <button class="dp-extra-row" type="button" @click.stop="toggleExtra('repeat')">
-          <span class="dp-extra-row__icon"><Repeat2 :size="15" /></span>
-          <span class="dp-extra-row__label">重复</span>
-          <span class="dp-extra-row__value">{{ repeatLabel }}</span>
-          <ChevronDown :size="14" :class="{ rotated: expandedSection === 'repeat' }" />
-        </button>
-        <div v-if="expandedSection === 'repeat'" class="dp-extra-options">
-          <button
-            v-for="option in repeatOptions"
-            :key="option.value || 'none'"
-            class="dp-extra-option"
-            :class="{ active: option.value === (task.repeatRule || '') }"
-            type="button"
-            @click="chooseRepeat(option.value)"
-          >
-            <span>{{ option.label }}</span>
-            <Check v-if="option.value === (task.repeatRule || '')" :size="14" />
+        <section class="dp-extra-block" :class="{ 'is-expanded': expandedSection === 'repeat' }">
+          <button class="dp-extra-row" type="button" @click.stop="toggleExtra('repeat')">
+            <span class="dp-extra-row__icon"><Repeat2 :size="15" /></span>
+            <span class="dp-extra-row__label">重复</span>
+            <span class="dp-extra-row__value">{{ repeatLabel }}</span>
+            <ChevronDown :size="14" :class="{ rotated: expandedSection === 'repeat' }" />
           </button>
-        </div>
+          <div v-if="expandedSection === 'repeat'" class="dp-extra-options">
+            <button
+              v-for="option in repeatOptions"
+              :key="option.value || 'none'"
+              class="dp-extra-option"
+              :class="{ active: option.value === (task.repeatRule || '') }"
+              type="button"
+              @click="chooseRepeat(option.value)"
+            >
+              <span>{{ option.label }}</span>
+              <Check v-if="option.value === (task.repeatRule || '')" :size="14" />
+            </button>
+          </div>
+        </section>
       </div>
       <button class="dp-done" type="button" @click="emit('close')">完成</button>
     </template>
@@ -134,7 +140,7 @@ const initialDate = initialValue.value ? new Date(initialValue.value) : new Date
 const calYear = ref(initialDate.getFullYear())
 const calMonth = ref(initialDate.getMonth())
 const selectedDate = ref(initialDate)
-const selectedTime = ref(initialValue.value ? initialDate.toTimeString().slice(0, 5) : '09:00')
+const selectedTime = ref(initialValue.value ? initialDate.toTimeString().slice(0, 5) : '')
 const monthPickerOpen = ref(false)
 const calendarWeekdays = ['日', '一', '二', '三', '四', '五', '六']
 
