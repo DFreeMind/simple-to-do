@@ -188,6 +188,18 @@
                 />
                 <span class="switch-control" aria-hidden="true"></span>
               </label>
+              <label class="switch-row">
+                <span>
+                  <strong>显示完成用时</strong>
+                  <small>在已完成的主任务和子任务旁显示从创建到完成的时长</small>
+                </span>
+                <input
+                  type="checkbox"
+                  :checked="store.settings.showCompletionDuration"
+                  @change="store.updateSettings({ showCompletionDuration: $event.target.checked })"
+                />
+                <span class="switch-control" aria-hidden="true"></span>
+              </label>
             </div>
           </section>
 

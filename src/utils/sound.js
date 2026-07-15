@@ -404,18 +404,6 @@ export function playListRestoreSound() {
 }
 
 /**
- * 清单置顶/取消置顶音效
- * 明亮双音，切换感
- */
-export function playListPinSound() {
-  if (!isCategoryEnabled('list')) return
-  playSequence([
-    { frequency: 698, duration: 0.05, type: 'sine', volume: 0.14 },
-    { frequency: 880, duration: 0.08, type: 'sine', volume: 0.13 }
-  ])
-}
-
-/**
  * 清单/分组重命名音效
  * 柔和单音，确认感
  */

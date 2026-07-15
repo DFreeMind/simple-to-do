@@ -76,7 +76,7 @@
             </div>
             <div v-if="task.completed && task.completedAt" class="detail-hero__meta">
               <CheckCheck :size="13" />
-              <span :title="`完成于 ${formatFullDate(task.completedAt)}`">{{ formatCreatedAt(task.completedAt) }}</span>
+              <span :title="formatTaskCompletionTitle(task)">{{ formatCreatedAt(task.completedAt) }}<template v-if="formatTaskDuration(task)"> · {{ formatTaskDuration(task) }}</template></span>
             </div>
             <button ref="dateTrigger" class="detail-meta-action" :class="{ empty: !task.dueDate }" type="button" @click.stop="toggleDatePicker('dueDate')">
               <CalendarClock :size="14" />
@@ -207,7 +207,7 @@
             <div class="subtask-tail">
               <span v-if="subtask.completed && subtask.completedAt" class="subtask-meta subtask-meta--done" :title="formatSubtaskTitle(subtask, true)">
                 <CheckCheck :size="11" />
-                <span>{{ formatSubtaskTime(subtask.completedAt) }}</span>
+                <span>{{ formatSubtaskTime(subtask.completedAt) }}<template v-if="formatSubtaskDuration(subtask)"> · {{ formatSubtaskDuration(subtask) }}</template></span>
               </span>
               <span v-else-if="subtask.createdAt" class="subtask-meta" :title="formatSubtaskTitle(subtask, false)">
                 <Clock :size="11" />
@@ -299,7 +299,7 @@ import {
 } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import { useDragSort } from '@/composables/useDragSort'
-import { formatCreatedAt, formatFullDate } from '@/utils/date'
+import { formatCreatedAt, formatDuration, formatFullDate } from '@/utils/date'
 import DatePicker from './DatePicker.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
 
@@ -456,6 +456,22 @@ function formatSubtaskTime(value) {
   return formatCreatedAt(value)
 }
 
+function formatTaskDuration(item) {
+  return store.settings.showCompletionDuration ? formatDuration(item?.createdAt, item?.completedAt) : ''
+}
+
+function formatSubtaskDuration(subtask) {
+  return store.settings.showCompletionDuration ? formatDuration(subtask?.createdAt, subtask?.completedAt) : ''
+}
+
+function formatTaskCompletionTitle(item) {
+  const lines = [`完成于 ${formatFullDate(item.completedAt)}`]
+  if (item.createdAt) lines.push(`创建于 ${formatFullDate(item.createdAt)}`)
+  const duration = formatTaskDuration(item)
+  if (duration) lines.push(`用时 ${duration}`)
+  return lines.join('\n')
+}
+
 function formatSubtaskTitle(subtask, isCompleted) {
   const lines = []
   if (isCompleted && subtask.completedAt) {
@@ -466,6 +482,8 @@ function formatSubtaskTitle(subtask, isCompleted) {
   if (isCompleted && subtask.createdAt) {
     lines.push(`创建于 ${formatFullDate(subtask.createdAt)}`)
   }
+  const duration = formatSubtaskDuration(subtask)
+  if (duration) lines.push(`用时 ${duration}`)
   return lines.join('\n')
 }
 

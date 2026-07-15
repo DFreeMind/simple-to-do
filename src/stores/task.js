@@ -31,7 +31,6 @@ import {
   playListAddSound,
   playListDeleteSound,
   playListRestoreSound,
-  playListPinSound,
   playRenameSound,
   playGroupAddSound,
   playGroupDeleteSound,
@@ -54,9 +53,9 @@ const DEFAULT_GROUPS = [
 ]
 
 const DEFAULT_LISTS = [
-  { id: 'inbox', name: '收集箱', groupId: null, color: '#5fb8ad', isSystem: true, pinned: false, sortOrder: 0 },
-  { id: 'work', name: '工作任务', groupId: 'work', color: '#4f8de8', isSystem: false, pinned: false, sortOrder: 1000 },
-  { id: 'personal', name: '个人备忘', groupId: 'life', color: '#e0a54f', isSystem: false, pinned: false, sortOrder: 2000 }
+  { id: 'inbox', name: '收集箱', groupId: null, color: '#5fb8ad', isSystem: true, sortOrder: 0 },
+  { id: 'work', name: '工作任务', groupId: 'work', color: '#4f8de8', isSystem: false, sortOrder: 1000 },
+  { id: 'personal', name: '个人备忘', groupId: 'life', color: '#e0a54f', isSystem: false, sortOrder: 2000 }
 ]
 
 const DEFAULT_SETTINGS = {
@@ -70,6 +69,7 @@ const DEFAULT_SETTINGS = {
   completedVisible: true,
   groupCompletedDisplayMode: 'in-group',
   groupCompletedVisibleByDefault: true,
+  showCompletionDuration: true,
   trashRetentionDays: 30,
   soundEnabled: true,
   soundTaskEnabled: true,
@@ -197,6 +197,7 @@ export const useTaskStore = defineStore('task', () => {
   const currentView = ref(DEFAULT_SETTINGS.startView)
   const selectedTaskId = ref(null)
   const sortBy = ref('default')
+  const listTaskFilters = ref({ status: 'all', date: 'all', priority: 'all' })
   const searchQuery = ref('')
   const saveError = ref('')
   const migrationBlocked = ref(false)
@@ -264,6 +265,19 @@ export const useTaskStore = defineStore('task', () => {
         result = activeTasks.value.filter(task => task.listId === currentView.value)
     }
 
+    if (currentList.value) {
+      const { status, date, priority } = listTaskFilters.value
+      if (status === 'open') result = result.filter(task => !task.completed)
+      if (status === 'done') result = result.filter(task => task.completed)
+
+      if (date === 'overdue') result = result.filter(task => !task.completed && getPlanBucket(task) === 'overdue')
+      if (date === 'today') result = result.filter(task => getPlanBucket(task) === 'today')
+      if (date === 'future') result = result.filter(task => ['tomorrow', 'week', 'later'].includes(getPlanBucket(task)))
+      if (date === 'none') result = result.filter(task => !task.dueDate)
+
+      if (priority !== 'all') result = result.filter(task => Number(task.priority || 0) === Number(priority))
+    }
+
     return sortTasks(result)
   })
 
@@ -303,28 +317,16 @@ export const useTaskStore = defineStore('task', () => {
     const customLists = lists.value
       .filter(list => !list.isSystem)
       .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-    const pinnedLists = customLists.filter(list => list.pinned)
-    const unpinnedLists = customLists.filter(list => !list.pinned)
     const allGroups = [...groups.value].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
     const result = allGroups.map(group => ({
       ...group,
-      lists: unpinnedLists.filter(list => list.groupId === group.id)
+      lists: customLists.filter(list => list.groupId === group.id)
     })).concat({
       id: 'ungrouped',
       name: '未分组',
       collapsed: ungroupedCollapsed.value,
-      lists: unpinnedLists.filter(list => !list.groupId || !allGroups.some(group => group.id === list.groupId))
+      lists: customLists.filter(list => !list.groupId || !allGroups.some(group => group.id === list.groupId))
     }).filter(group => group.lists.length || group.id !== 'ungrouped')
-    // 置顶分组始终显示在最前面
-    if (pinnedLists.length) {
-      result.unshift({
-        id: 'pinned',
-        name: '置顶',
-        collapsed: false,
-        lists: pinnedLists,
-        isSystem: true
-      })
-    }
     return result
   })
 
@@ -420,6 +422,7 @@ export const useTaskStore = defineStore('task', () => {
   const canDragTasks = computed(() => {
     return sortBy.value === 'default' &&
       Boolean(currentTaskOrderKey.value) &&
+      !isListTaskFilterActive.value &&
       !['completed', 'trash'].includes(currentView.value)
   })
 
@@ -576,6 +579,25 @@ export const useTaskStore = defineStore('task', () => {
     if (['default', 'date', 'dateDesc', 'priority', 'createdDesc', 'name'].includes(value)) sortBy.value = value
   }
 
+  const isListTaskFilterActive = computed(() => {
+    const { status, date, priority } = listTaskFilters.value
+    return status !== 'all' || date !== 'all' || priority !== 'all'
+  })
+
+  function setListTaskFilters(updates = {}) {
+    if (!currentList.value) {
+      listTaskFilters.value = { status: 'all', date: 'all', priority: 'all' }
+      return
+    }
+    const next = { ...listTaskFilters.value, ...updates }
+    if (!['all', 'open', 'done'].includes(next.status)) next.status = 'all'
+    if (!['all', 'overdue', 'today', 'future', 'none'].includes(next.date)) next.date = 'all'
+    if (!['all', '1', '2', '3'].includes(String(next.priority))) next.priority = 'all'
+    else next.priority = String(next.priority)
+
+    listTaskFilters.value = next
+  }
+
   function addGroup(name) {
     const group = { id: genId(), name, collapsed: false, sortOrder: nextGroupSortOrder() }
     groups.value.push(group)
@@ -615,20 +637,11 @@ export const useTaskStore = defineStore('task', () => {
       groupId,
       color: pickListColor(),
       isSystem: false,
-      pinned: false,
       sortOrder: nextListSortOrder(groupId || null)
     }
     lists.value.push(list)
     playListAddSound()
     return list
-  }
-
-  function toggleListPin(id) {
-    const list = lists.value.find(item => item.id === id)
-    if (list && !list.isSystem) {
-      list.pinned = !list.pinned
-      playListPinSound()
-    }
   }
 
   function deleteList(id) {
@@ -768,7 +781,9 @@ export const useTaskStore = defineStore('task', () => {
       result.unshift(makeTaskBuckets({ id: null, name: '未分组', emoji: '🗂️' }, ungrouped))
     }
 
-    return result
+    return isListTaskFilterActive.value
+      ? result.filter(group => group.totalCount > 0)
+      : result
   })
 
   function setViewMode(listId, mode) {
@@ -982,8 +997,17 @@ export const useTaskStore = defineStore('task', () => {
     const task = tasks.value.find(item => item.id === id)
     if (!task) return
     task.completed = !task.completed
-    task.completedAt = task.completed ? nowIso() : null
-    task.updatedAt = nowIso()
+    const completedAt = task.completed ? nowIso() : null
+    task.completedAt = completedAt
+    // 主任务完成会收拢未完成子任务；子任务完成不反向影响主任务。
+    if (task.completed) {
+      task.subtasks.forEach((subtask) => {
+        if (subtask.completed) return
+        subtask.completed = true
+        subtask.completedAt = completedAt
+      })
+    }
+    task.updatedAt = completedAt || nowIso()
     rescheduleReminder(task)
     if (task.completed) {
       playCompleteSound()
@@ -1245,6 +1269,7 @@ export const useTaskStore = defineStore('task', () => {
 
   function setView(view) {
     currentView.value = view
+    listTaskFilters.value = { status: 'all', date: 'all', priority: 'all' }
     selectedTaskId.value = null
   }
 
@@ -1534,7 +1559,6 @@ export const useTaskStore = defineStore('task', () => {
       color: list?.color || fallback?.color || pickListColor(),
       viewMode: list?.viewMode || 'list',
       isSystem: Boolean(list?.isSystem || list?.id === 'inbox'),
-      pinned: Boolean(list?.pinned),
       sortOrder: Number.isFinite(Number(list?.sortOrder)) ? Number(list.sortOrder) : (fallback?.sortOrder ?? (index + 1) * 1000)
     }
   }
@@ -1570,7 +1594,8 @@ export const useTaskStore = defineStore('task', () => {
         id: sub.id || genId(),
         title: sub.title || '',
         completed: Boolean(sub.completed),
-        createdAt: sub.createdAt || null,
+        // 旧版子任务没有独立创建时间；使用父任务创建时间补齐，保证时间元信息稳定展示。
+        createdAt: sub.createdAt || createdAt,
         completedAt: sub.completedAt || null,
         sortOrder: Number.isFinite(Number(sub.sortOrder)) ? Number(sub.sortOrder) : (index + 1) * 1000
       })).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)) : [],
@@ -1627,6 +1652,7 @@ export const useTaskStore = defineStore('task', () => {
         ? rawSettings.groupCompletedDisplayMode
         : DEFAULT_SETTINGS.groupCompletedDisplayMode,
       groupCompletedVisibleByDefault: rawSettings.groupCompletedVisibleByDefault !== false,
+      showCompletionDuration: rawSettings.showCompletionDuration !== false,
       trashRetentionDays,
       soundEnabled,
       soundTaskEnabled,
@@ -1793,6 +1819,8 @@ export const useTaskStore = defineStore('task', () => {
     currentView,
     selectedTaskId,
     sortBy,
+    listTaskFilters,
+    isListTaskFilterActive,
     viewOrders,
     calendarCursor,
     searchQuery,
@@ -1834,6 +1862,7 @@ export const useTaskStore = defineStore('task', () => {
     getPlanBucket,
     cycleSort,
     setSort,
+    setListTaskFilters,
     reorderGroup,
     reorderList,
     reorderTask,

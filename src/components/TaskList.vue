@@ -45,6 +45,38 @@
             <button v-if="store.currentListGroups.length" class="sort-menu__item" type="button" @click="toggleAllGroupsFromHeaderMenu"><ChevronsDown v-if="!allGroupsExpanded" :size="15" /><ChevronsUp v-else :size="15" /><span>{{ allGroupsExpanded ? '折叠全部分组' : '展开全部分组' }}</span></button>
           </div>
         </div>
+        <div v-if="store.currentList" class="sort-select">
+          <button
+            class="icon-btn"
+            :class="{ active: store.isListTaskFilterActive || filterMenuOpen }"
+            type="button"
+            :title="`筛选：${listFilterLabel}`"
+            :aria-label="`筛选当前清单：${listFilterLabel}`"
+            @click.stop="toggleFilterMenu"
+          >
+            <Funnel :size="18" />
+          </button>
+          <div v-if="filterMenuOpen" class="sort-menu filter-menu" @click.stop>
+            <div class="filter-menu__header">
+              <span>筛选任务</span>
+              <button v-if="store.isListTaskFilterActive" type="button" @click="resetListFilters">重置</button>
+            </div>
+            <div v-for="section in listFilterSections" :key="section.key" class="filter-menu__row">
+              <span class="filter-menu__label">{{ section.compactLabel }}</span>
+              <div class="filter-menu__options">
+                <button
+                  v-for="option in section.options"
+                  :key="option.value"
+                  class="filter-menu__option"
+                  :class="{ active: store.listTaskFilters[section.key] === option.value }"
+                  type="button"
+                  :title="option.label"
+                  @click="selectListFilter(section.key, option.value)"
+                >{{ option.compactLabel || option.label }}</button>
+              </div>
+            </div>
+          </div>
+        </div>
         <div v-if="showTaskActions" class="sort-select">
           <button
             class="icon-btn"
@@ -360,10 +392,10 @@
               <button
                 class="task-group-header__toggle"
                 type="button"
-                :title="store.settings.completedVisible ? '折叠已完成' : '展开已完成'"
+                :title="shouldShowCompletedTasks ? '折叠已完成' : '展开已完成'"
                 @click="toggleCompleted"
               >
-                <ChevronDown :size="16" :class="{ rotated: !store.settings.completedVisible }" />
+                <ChevronDown :size="16" :class="{ rotated: !shouldShowCompletedTasks }" />
               </button>
               <span class="task-group-header__emoji">🎉</span>
               <span class="task-group-header__name">已完成</span>
@@ -371,7 +403,7 @@
             </div>
           </div>
           <TaskItem
-            v-if="store.settings.completedVisible"
+            v-if="shouldShowCompletedTasks"
             v-for="task in store.completedTasks"
             :key="task.id"
             :task="task"
@@ -535,6 +567,7 @@ import {
   ArrowUpDown,
   AlertCircle,
   CalendarClock,
+  Funnel,
   FolderInput,
   Pencil,
   Check,
@@ -576,6 +609,7 @@ const quickInput = ref(null)
 const searchInput = ref(null)
 const searchViewMode = ref('list')
 const sortMenuOpen = ref(false)
+const filterMenuOpen = ref(false)
 const headerMoreOpen = ref(false)
 const listSwitcherOpen = ref(false)
 const listSummaryOpen = ref(false)
@@ -900,6 +934,42 @@ function closeListSwitcher() {
 const sortLabel = computed(() => {
   return sortOptions.find(option => option.value === store.sortBy)?.label || '智能排序'
 })
+const listFilterSections = [
+  {
+    key: 'status',
+    label: '完成状态',
+    compactLabel: '状态',
+    options: [
+      { value: 'all', label: '全部状态', compactLabel: '全部' },
+      { value: 'open', label: '未完成', description: '只显示待处理任务' },
+      { value: 'done', label: '已完成', description: '只显示完成记录' }
+    ]
+  },
+  {
+    key: 'date',
+    label: '日期',
+    compactLabel: '日期',
+    options: [
+      { value: 'all', label: '全部日期', compactLabel: '全部' },
+      { value: 'overdue', label: '已逾期', compactLabel: '逾期' },
+      { value: 'today', label: '今天到期', compactLabel: '今天' },
+      { value: 'future', label: '未来到期', compactLabel: '未来' },
+      { value: 'none', label: '未设日期', compactLabel: '无日期' }
+    ]
+  },
+  {
+    key: 'priority',
+    label: '优先级',
+    compactLabel: '优先级',
+    options: [
+      { value: 'all', label: '全部优先级', compactLabel: '全部' },
+      { value: '3', label: '高优先级', compactLabel: '高' },
+      { value: '2', label: '中优先级', compactLabel: '中' },
+      { value: '1', label: '低优先级', compactLabel: '低' }
+    ]
+  }
+]
+const listFilterLabel = computed(() => store.isListTaskFilterActive ? '已筛选' : '全部任务')
 
 const showTaskActions = computed(() => true)
 const isSearchView = computed(() => store.currentView === 'search')
@@ -962,7 +1032,14 @@ const viewMode = computed({
   }
 })
 const isGroupCompletedInGroups = computed(() => {
-  return !isSearchView.value && viewMode.value === 'group' && store.settings.groupCompletedDisplayMode === 'in-group'
+  return !isSearchView.value && viewMode.value === 'group' &&
+    (store.settings.groupCompletedDisplayMode === 'in-group' || forceCompletedFilterVisibility.value)
+})
+const forceCompletedFilterVisibility = computed(() => {
+  return Boolean(store.currentList && store.listTaskFilters.status === 'done')
+})
+const shouldShowCompletedTasks = computed(() => {
+  return store.settings.completedVisible || forceCompletedFilterVisibility.value
 })
 const searchResultGroups = computed(() => {
   const listOrder = new Map(store.lists.map((list, index) => [list.id, index]))
@@ -1004,6 +1081,7 @@ function getGroupCompletedVisibilityKey(groupId) {
 }
 
 function isGroupCompletedVisible(groupId) {
+  if (forceCompletedFilterVisibility.value) return true
   const key = getGroupCompletedVisibilityKey(groupId)
   return groupCompletedVisibility[key] ?? store.settings.groupCompletedVisibleByDefault
 }
@@ -1050,6 +1128,8 @@ function toggleAllGroups() {
 }
 
 const emptyTitle = computed(() => {
+  if (store.currentList && store.listTaskFilters.date === 'overdue') return '没有逾期任务'
+  if (store.currentList && store.isListTaskFilterActive) return '没有符合筛选条件的任务'
   const map = {
     today: '今天很清爽',
     inbox: '收集箱为空',
@@ -1063,6 +1143,8 @@ const emptyTitle = computed(() => {
 })
 
 const emptyText = computed(() => {
+  if (store.currentList && store.listTaskFilters.date === 'overdue') return '当前清单中没有已过截止日期且未完成的任务。'
+  if (store.currentList && store.isListTaskFilterActive) return '调整筛选条件，或添加一条任务。'
   const map = {
     today: '添加一个今日任务，或从建议中挑选今天要推进的事项。',
     inbox: '把临时想法先放在这里，之后再安排日期或清单。',
@@ -1296,8 +1378,17 @@ function selectSort(value) {
   sortMenuOpen.value = false
 }
 
+function selectListFilter(key, value) {
+  store.setListTaskFilters({ [key]: value })
+}
+
+function resetListFilters() {
+  store.setListTaskFilters({ status: 'all', date: 'all', priority: 'all' })
+}
+
 function closeHeaderTransientMenus() {
   sortMenuOpen.value = false
+  filterMenuOpen.value = false
   headerMoreOpen.value = false
   window.dispatchEvent(new Event('task-list:close-transient-menus'))
 }
@@ -1308,6 +1399,15 @@ function toggleSortMenu() {
   if (willOpen) {
     closeGroupMenu()
     sortMenuOpen.value = true
+  }
+}
+
+function toggleFilterMenu() {
+  const willOpen = !filterMenuOpen.value
+  closeHeaderTransientMenus()
+  if (willOpen) {
+    closeGroupMenu()
+    filterMenuOpen.value = true
   }
 }
 
@@ -1334,6 +1434,10 @@ function closeSortMenu() {
   sortMenuOpen.value = false
 }
 
+function closeFilterMenu() {
+  filterMenuOpen.value = false
+}
+
 function closeHeaderMoreMenu() {
   headerMoreOpen.value = false
 }
@@ -1342,7 +1446,7 @@ function handleSortKeydown(event) {
   if (event.key !== 'Escape') return
   if (listSwitcherOpen.value) {
     closeListSwitcher()
-  } else if (sortMenuOpen.value || headerMoreOpen.value) {
+  } else if (sortMenuOpen.value || filterMenuOpen.value || headerMoreOpen.value) {
     closeHeaderTransientMenus()
   } else if (groupMenu.visible) {
     closeGroupMenu()
@@ -1356,6 +1460,7 @@ function focusSearchInput() {
 onMounted(() => {
   window.addEventListener('click', closeListSwitcher)
   window.addEventListener('click', closeSortMenu)
+  window.addEventListener('click', closeFilterMenu)
   window.addEventListener('click', closeHeaderMoreMenu)
   window.addEventListener('click', closeCustomColorPicker)
   window.addEventListener('keydown', handleSortKeydown)
@@ -1367,6 +1472,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('click', closeListSwitcher)
   window.removeEventListener('click', closeSortMenu)
+  window.removeEventListener('click', closeFilterMenu)
   window.removeEventListener('click', closeHeaderMoreMenu)
   window.removeEventListener('click', closeCustomColorPicker)
   window.removeEventListener('keydown', handleSortKeydown)

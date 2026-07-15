@@ -87,26 +87,6 @@
             </div>
 
             <div class="rail-flyout__body">
-              <!-- 置顶快捷区 -->
-              <div v-if="pinnedLists.length > 0 && !flyoutSearch" class="rail-flyout__section">
-                <div class="rail-flyout__section-label">
-                  <Pin :size="10" />
-                  <span>已置顶</span>
-                </div>
-                <button
-                  v-for="list in pinnedLists"
-                  :key="list.id"
-                  class="rail-flyout__item"
-                  :class="{ active: store.currentView === list.id }"
-                  type="button"
-                  @click="selectList(list.id)"
-                >
-                  <span class="rail-flyout__dot" :style="{ backgroundColor: list.color }"></span>
-                  <span class="rail-flyout__name">{{ list.name }}</span>
-                  <span v-if="store.listTaskCounts[list.id]" class="rail-flyout__count">{{ store.listTaskCounts[list.id] }}</span>
-                </button>
-              </div>
-
               <!-- 分组清单 -->
               <template v-for="group in filteredGroups" :key="group.id">
                 <div v-if="group.lists.length > 0" class="rail-flyout__section">
@@ -261,7 +241,7 @@
               }"
             >
               <span
-                v-if="group.id !== 'ungrouped' && group.id !== 'pinned'"
+                v-if="group.id !== 'ungrouped'"
                 class="sidebar-drag-handle"
                 role="button"
                 tabindex="-1"
@@ -276,7 +256,6 @@
               </button>
               <div class="group-actions">
                 <button
-                  v-if="group.id !== 'pinned'"
                   class="mini-btn"
                   type="button"
                   title="添加清单"
@@ -286,7 +265,7 @@
                   <Plus :size="14" />
                 </button>
                 <button
-                  v-if="group.id !== 'ungrouped' && group.id !== 'pinned'"
+                  v-if="group.id !== 'ungrouped'"
                   class="mini-btn"
                   type="button"
                   title="分组操作"
@@ -298,7 +277,15 @@
               </div>
             </div>
 
-            <div v-if="!group.collapsed" class="list-stack">
+            <div
+              v-if="!group.collapsed"
+              class="list-stack"
+              :class="{
+                'list-stack--empty': group.lists.length === 0 && addingListGroupId !== group.id,
+                'list-stack--drop-target': listDrag.dragOverId.value === `__group__${group.id}`
+              }"
+              :data-list-group-id="group.id"
+            >
               <div
                 v-for="list in group.lists"
                 :key="list.id"
@@ -325,7 +312,6 @@
                 <button class="list-link" type="button" @click="store.setView(list.id)">
                   <span class="color-dot" :style="{ backgroundColor: list.color }"></span>
                   <span class="nav-label">{{ list.name }}</span>
-                  <Pin v-if="list.pinned" :size="11" class="inline-icon" />
                   <span v-if="store.listTaskCounts[list.id]" class="nav-badge">{{ store.listTaskCounts[list.id] }}</span>
                 </button>
                 <button class="row-more" type="button" aria-label="清单操作" @click.stop="openListMenu($event, list)">
@@ -390,14 +376,11 @@
       @keydown.esc="closeMenu"
     >
       <template v-if="menu.type === 'list'">
-        <button class="context-item" role="menuitem" type="button" @click="toggleSelectedListPin">
-          <Pin :size="15" /> {{ menu.target?.pinned ? '取消置顶' : '置顶清单' }}
-        </button>
         <button class="context-item" role="menuitem" type="button" @click="renameSelectedList">
           <Pencil :size="15" /> 重命名清单
         </button>
         <button class="context-item" role="menuitem" type="button" @click="moveSelectedList">
-          <FolderInput :size="15" /> 移动分组
+          <FolderInput :size="15" /> 移动至分组…
         </button>
         <button class="context-item context-item--danger" role="menuitem" type="button" @click="deleteSelectedList">
           <Trash2 :size="15" /> 删除清单
@@ -411,6 +394,33 @@
           <Trash2 :size="15" /> 删除分组
         </button>
       </template>
+    </div>
+
+    <div v-if="listGroupMoveOpen" class="context-menu group-move-submenu" :style="listGroupMoveSubmenuStyle" @click.stop>
+      <div class="group-move-submenu__head"><strong>移动至分组</strong><span>{{ filteredListMoveGroups.length }} 项</span></div>
+      <label class="group-move-submenu__search">
+        <Search :size="14" />
+        <input ref="listGroupMoveSearchInput" v-model="listGroupMoveQuery" type="search" placeholder="搜索分组" />
+      </label>
+      <div class="group-move-submenu__options">
+        <button class="context-item" :class="{ active: !menu.target?.groupId }" type="button" :disabled="!menu.target?.groupId" @click="moveSelectedListToGroup(null)">
+          <FolderInput :size="15" /> 未分组
+          <small v-if="!menu.target?.groupId">当前</small>
+        </button>
+        <button
+          v-for="group in filteredListMoveGroups"
+          :key="group.id"
+          class="context-item"
+          :class="{ active: menu.target?.groupId === group.id }"
+          type="button"
+          :disabled="menu.target?.groupId === group.id"
+          @click="moveSelectedListToGroup(group.id)"
+        >
+          <Folder :size="15" /> {{ group.name }}
+          <small v-if="menu.target?.groupId === group.id">当前</small>
+        </button>
+        <p v-if="!filteredListMoveGroups.length" class="group-move-submenu__empty">未找到匹配分组</p>
+      </div>
     </div>
 
     <ConfirmDialog
@@ -456,7 +466,6 @@ import {
   MoreHorizontal,
   Pencil,
   PanelLeft,
-  Pin,
   Plus,
   Search,
   Settings as SettingsIcon,
@@ -539,8 +548,6 @@ const totalLists = computed(() => store.groupedLists.reduce((sum, g) => sum + g.
 // --- 飞出面板 ---
 const flyoutSearch = ref('')
 
-const pinnedLists = computed(() => store.lists.filter(l => l.pinned && !l.deleted))
-
 const filteredGroups = computed(() => {
   const q = flyoutSearch.value.trim().toLowerCase()
   if (!q) return store.groupedLists
@@ -572,6 +579,18 @@ const listInputGrouped = ref(null)
 const listInputUngrouped = ref(null)
 const menuEl = ref(null)
 const menu = ref({ show: false, type: '', x: 0, y: 0, target: null })
+const listGroupMoveOpen = ref(false)
+const listGroupMoveQuery = ref('')
+const listGroupMoveSearchInput = ref(null)
+const listGroupMoveSubmenuPos = ref({ x: 0, y: 0 })
+const filteredListMoveGroups = computed(() => {
+  const query = listGroupMoveQuery.value.trim().toLowerCase()
+  return query ? store.groups.filter(group => group.name.toLowerCase().includes(query)) : store.groups
+})
+const listGroupMoveSubmenuStyle = computed(() => ({
+  left: `${listGroupMoveSubmenuPos.value.x}px`,
+  top: `${listGroupMoveSubmenuPos.value.y}px`
+}))
 const confirmDialog = reactive({
   visible: false,
   title: '',
@@ -611,7 +630,12 @@ const listDrag = useDragSort({
   onDragStart: () => store.playDragStartSound(),
   onDragOver: () => store.playDragOverSound(),
   onDragEnd: () => store.playDragEndSound(),
-  onDrop(sourceId, targetId, position) {
+  onDrop(sourceId, targetId, position, targetGroupId) {
+    if (targetId.startsWith('__group__')) {
+      store.moveListToGroup(sourceId, targetGroupId)
+      return
+    }
+
     // Find which group the target list belongs to
     for (const group of store.groupedLists) {
       const targetList = group.lists.find(l => l.id === targetId)
@@ -649,6 +673,12 @@ const listDrag = useDragSort({
         const rect = listItem.getBoundingClientRect()
         const midY = rect.top + rect.height / 2
         return { id: listId, position: y < midY ? 'before' : 'after' }
+      }
+
+      const listStack = el.closest?.('.list-stack[data-list-group-id]')
+      const groupId = listStack?.dataset.listGroupId
+      if (groupId) {
+        return { id: `__group__${groupId}`, position: 'after', groupId }
       }
     }
     return null
@@ -757,6 +787,8 @@ function openGroupMenu(event, group) {
 
 function closeMenu() {
   menu.value = { show: false, type: '', x: 0, y: 0, target: null }
+  listGroupMoveOpen.value = false
+  listGroupMoveQuery.value = ''
 }
 
 function renameSelectedList() {
@@ -776,30 +808,28 @@ function renameSelectedList() {
   closeMenu()
 }
 
-function toggleSelectedListPin() {
-  const list = menu.value.target
-  if (!list) return
-  store.toggleListPin(list.id)
-  closeMenu()
-}
-
 function moveSelectedList() {
   const list = menu.value.target
   if (!list) return
-  const groupNames = store.groups.map(group => group.name).join('、')
-  inputDialog.title = '移动清单'
-  inputDialog.message = `输入目标分组名称，留空为未分组。可选分组：${groupNames}`
-  inputDialog.placeholder = '分组名称（留空为未分组）'
-  inputDialog.defaultValue = ''
-  inputDialog.confirmText = '移动'
-  inputDialog.type = 'move'
-  inputDialog.onConfirm = (groupName) => {
-    const group = store.groups.find(item => item.name === groupName)
-    store.moveList(list.id, group?.id || null)
-    store.showNotice('清单已移动', 'success')
-    inputDialog.visible = false
-  }
-  inputDialog.visible = true
+  listGroupMoveQuery.value = ''
+  listGroupMoveOpen.value = true
+  nextTick(() => {
+    const rect = menuEl.value?.getBoundingClientRect()
+    if (!rect) return
+    const width = 280
+    const height = Math.min(390, window.innerHeight - 20)
+    const x = rect.right + width + 8 <= window.innerWidth ? rect.right + 8 : Math.max(10, rect.left - width - 8)
+    const y = Math.max(10, Math.min(rect.top, window.innerHeight - height - 10))
+    listGroupMoveSubmenuPos.value = { x, y }
+    listGroupMoveSearchInput.value?.focus()
+  })
+}
+
+function moveSelectedListToGroup(groupId) {
+  const list = menu.value.target
+  if (!list) return
+  store.moveListToGroup(list.id, groupId)
+  store.showNotice(groupId ? '清单已移动到分组' : '清单已移至未分组', 'success')
   closeMenu()
 }
 

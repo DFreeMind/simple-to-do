@@ -44,6 +44,24 @@ export function formatFullDate(dateStr) {
   return `${year}年${month}月${day}日 ${hours}:${minutes}`
 }
 
+export function formatDuration(startDateStr, endDateStr) {
+  const start = new Date(startDateStr).getTime()
+  const end = new Date(endDateStr).getTime()
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return ''
+
+  const totalMinutes = Math.floor((end - start) / 60000)
+  if (totalMinutes < 1) return '<1分'
+  if (totalMinutes < 60) return `${totalMinutes}分`
+
+  const totalHours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  if (totalHours < 24) return `${totalHours}时${minutes ? `${minutes}分` : ''}`
+
+  const days = Math.floor(totalHours / 24)
+  const hours = totalHours % 24
+  return `${days}天${hours ? `${hours}时` : ''}`
+}
+
 export function isToday(dateStr) {
   if (!dateStr) return false
   const d = new Date(dateStr)

@@ -87,9 +87,9 @@
           <Clock :size="12" />
           {{ formatCreatedAt(task.createdAt) }}
         </span>
-        <span v-if="task.completed && task.completedAt" class="meta-chip meta-chip--muted" :title="`完成于 ${formatFullDate(task.completedAt)}`">
+        <span v-if="task.completed && task.completedAt" class="meta-chip meta-chip--muted" :title="completionTitle">
           <CheckCheck :size="13" />
-          {{ formatCreatedAt(task.completedAt) }}
+          {{ formatCreatedAt(task.completedAt) }}<template v-if="completionDuration"> · {{ completionDuration }}</template>
         </span>
         <span
           v-if="tagSummary.first"
@@ -226,7 +226,7 @@ import {
   Trash2
 } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
-import { formatDate as fmtDate, formatCreatedAt, formatFullDate } from '@/utils/date'
+import { formatDate as fmtDate, formatCreatedAt, formatDuration, formatFullDate } from '@/utils/date'
 import { getTaskSearchMatchKinds, normalizeSearchQuery } from '@/utils/search'
 import MoveToListModal from './MoveToListModal.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
@@ -291,6 +291,16 @@ const filteredMoveGroups = computed(() => {
 })
 const groupMoveSubmenuStyle = computed(() => ({ left: `${groupMoveSubmenuPos.value.x}px`, top: `${groupMoveSubmenuPos.value.y}px` }))
 const completedSubtasks = computed(() => props.task.subtasks?.filter(item => item.completed).length || 0)
+const completionDuration = computed(() => store.settings.showCompletionDuration && props.task.completed && props.task.completedAt
+  ? formatDuration(props.task.createdAt, props.task.completedAt)
+  : '')
+const completionTitle = computed(() => {
+  if (!props.task.completedAt) return ''
+  const lines = [`完成于 ${formatFullDate(props.task.completedAt)}`]
+  if (props.task.createdAt) lines.push(`创建于 ${formatFullDate(props.task.createdAt)}`)
+  if (completionDuration.value) lines.push(`用时 ${completionDuration.value}`)
+  return lines.join('\n')
+})
 const normalizedSearchQuery = computed(() => normalizeSearchQuery(props.searchQuery))
 const searchMatchKinds = computed(() => getTaskSearchMatchKinds(props.task, normalizedSearchQuery.value))
 const priorityInfo = computed(() => {
