@@ -1356,12 +1356,17 @@ body.is-resizing {
 }
 
 .filter-menu {
-  min-width: 316px;
-  gap: 11px;
+  // 不使用自动宽度，避免 WebKit 按所有筛选按钮的内在宽度把弹层撑开。
+  width: 352px;
+  min-width: 0;
+  max-width: calc(100vw - 32px);
+  gap: 10px;
   padding: 12px;
+  border-color: var(--border);
   border-color: color-mix(in srgb, var(--accent) 16%, var(--border));
-  border-radius: 16px;
-  background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 5%, var(--surface)) 0%, var(--surface) 54%);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-popover);
 }
 
 .filter-menu__header {
@@ -1390,49 +1395,57 @@ body.is-resizing {
 .filter-menu__row {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr);
-  align-items: center;
+  align-items: start;
   gap: 10px;
 }
 
 .filter-menu__label {
   display: inline-flex;
   align-items: center;
-  min-height: 30px;
+  min-height: 34px;
   color: var(--text-muted);
   font-size: 12px;
   font-weight: 700;
 }
 
 .filter-menu__options {
-  display: flex;
-  gap: 5px;
-  padding: 3px;
-  border: 1px solid color-mix(in srgb, var(--accent) 8%, var(--border));
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--accent) 5%, var(--surface-subtle));
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.filter-menu__options--priority {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.filter-menu__options--date {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .filter-menu__option {
-  flex: 1 1 0;
   min-width: 0;
-  min-height: 28px;
-  padding: 0 7px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
+  min-height: 34px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
   color: var(--text-muted);
   font-size: 12px;
   font-weight: 650;
+  line-height: 1.25;
+  white-space: nowrap;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
 
   &:hover {
+    border-color: var(--accent);
     background: var(--accent-soft);
     color: var(--accent-strong);
   }
 
   &.active {
-    border-color: color-mix(in srgb, var(--accent) 25%, transparent);
-    background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 82%, #fff));
-    box-shadow: 0 3px 8px color-mix(in srgb, var(--accent) 24%, transparent);
+    border-color: var(--accent);
+    background: var(--accent);
+    box-shadow: 0 2px 6px var(--accent-24-fallback);
     color: #fff;
   }
 }

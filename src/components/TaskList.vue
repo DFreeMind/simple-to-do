@@ -63,7 +63,7 @@
             </div>
             <div v-for="section in listFilterSections" :key="section.key" class="filter-menu__row">
               <span class="filter-menu__label">{{ section.compactLabel }}</span>
-              <div class="filter-menu__options">
+              <div class="filter-menu__options" :class="`filter-menu__options--${section.key}`">
                 <button
                   v-for="option in section.options"
                   :key="option.value"
@@ -71,6 +71,7 @@
                   :class="{ active: store.listTaskFilters[section.key] === option.value }"
                   type="button"
                   :title="option.label"
+                  :aria-pressed="store.listTaskFilters[section.key] === option.value"
                   @click="selectListFilter(section.key, option.value)"
                 >{{ option.compactLabel || option.label }}</button>
               </div>

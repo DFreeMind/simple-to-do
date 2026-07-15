@@ -17,6 +17,13 @@ use tauri::{
     tray::{TrayIconBuilder, TrayIconEvent, MouseButton, MouseButtonState},
 };
 
+fn show_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
 fn app_data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let dir = app
         .path()
@@ -1766,6 +1773,13 @@ fn main() {
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
+
+                // Windows 上完全隐藏窗口会让任务栏失去可恢复入口；改为最小化，
+                // 用户可直接点击任务栏回到应用。macOS 继续隐藏，由 Dock Reopen 恢复。
+                #[cfg(target_os = "windows")]
+                let _ = window.minimize();
+
+                #[cfg(not(target_os = "windows"))]
                 let _ = window.hide();
             }
         })
@@ -1789,10 +1803,7 @@ fn main() {
                 .tooltip("易简清单")
                 .on_menu_event(|app, event| match event.id().as_ref() {
                     "show" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
+                        show_main_window(app);
                     }
                     "quit" => {
                         app.exit(0);
@@ -1807,10 +1818,7 @@ fn main() {
                     } = event
                     {
                         let app = tray.app_handle();
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
+                        show_main_window(&app);
                     }
                 })
                 .build(app)?;
@@ -1836,6 +1844,18 @@ fn main() {
             restore_quarantined_attachments,
             purge_quarantined_attachments
         ])
-        .run(tauri::generate_context!())
-        .expect("运行 Tauri 应用失败");
+        .build(tauri::generate_context!())
+        .expect("初始化 Tauri 应用失败")
+        .run(|app, event| {
+            // macOS 从 Dock 重新激活一个已隐藏窗口时会发出 Reopen；此前没有
+            // 处理这个事件，导致只能通过菜单栏恢复主窗口。
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen {
+                has_visible_windows: false,
+                ..
+            } = event
+            {
+                show_main_window(app);
+            }
+        });
 }
