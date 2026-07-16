@@ -5140,17 +5140,13 @@ body.is-resizing {
 .profile-avatar-picker header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .profile-avatar-picker header strong { font-size: 13px; }
 .profile-avatar-options { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
-.profile-avatar-options button { position: relative; aspect-ratio: 1; overflow: visible; padding: 2px; border: 2px solid transparent; border-radius: 11px; background: var(--surface-muted); }
+.profile-avatar-options button { position: relative; aspect-ratio: 1; overflow: hidden; padding: 2px; border: 2px solid transparent; border-radius: 11px; background: var(--surface-muted); }
 .profile-avatar-options button.active { border-color: var(--accent); box-shadow: var(--focus-ring); }
 .profile-avatar-options button:hover:not(:disabled), .profile-avatar-options button:focus-visible { border-color: var(--accent-38-fallback); transform: translateY(-1px); }
 .profile-avatar-options img { width: 100%; height: 100%; border-radius: 7px; object-fit: cover; }
-.profile-avatar-preview { position: absolute; top: calc(100% + 10px); left: 50%; z-index: 4; display: grid; width: 132px; padding: 6px; border: 1px solid var(--accent-20-border-fallback); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-popover); opacity: 0; pointer-events: none; transform: translate(-50%, -4px) scale(.96); transition: opacity .14s ease, transform .14s ease; visibility: hidden; }
-.profile-avatar-options button:hover .profile-avatar-preview, .profile-avatar-options button:focus-visible .profile-avatar-preview { opacity: 1; transform: translate(-50%, 0) scale(1); visibility: visible; }
-.profile-avatar-preview img { display: block; width: 100%; height: auto; aspect-ratio: 1; border-radius: 8px; object-fit: cover; }
-.profile-avatar-preview span { display: block; padding: 6px 2px 1px; color: var(--text); font-size: 12px; font-weight: 650; text-align: center; }
-// 靠近选择器底部的头像向上弹出，避免超出选择器覆盖后续内容。
-.profile-avatar-options button:nth-child(n + 11) .profile-avatar-preview { top: auto; bottom: calc(100% + 10px); transform: translate(-50%, 4px) scale(.96); }
-.profile-avatar-options button:nth-child(n + 11):hover .profile-avatar-preview, .profile-avatar-options button:nth-child(n + 11):focus-visible .profile-avatar-preview { transform: translate(-50%, 0) scale(1); }
+.profile-avatar-preview { position: fixed; z-index: 1200; display: grid; width: 148px; padding: 7px; border: 1px solid var(--accent-20-border-fallback); border-radius: 13px; background: var(--surface); box-shadow: var(--shadow-popover); pointer-events: none; }
+.profile-avatar-preview img { display: block; width: 100%; height: auto; aspect-ratio: 1; border-radius: 9px; object-fit: cover; }
+.profile-avatar-preview span { display: block; padding: 7px 2px 1px; color: var(--text); font-size: 12px; font-weight: 650; text-align: center; }
 .profile-overview-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-muted); }
 .profile-overview-grid article { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 12px; }.profile-overview-grid article + article { border-left: 1px solid var(--divider-soft); }
 .profile-overview-grid__icon { display: grid; width: 29px; height: 29px; flex: 0 0 auto; place-items: center; border-radius: 9px; background: var(--surface); color: var(--accent-strong); }.profile-overview-grid article > span:last-child { display: grid; min-width: 0; gap: 2px; }

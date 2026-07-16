@@ -16,7 +16,7 @@
         <div class="profile-panel__body">
         <section v-if="activeSection === 'profile'" class="profile-section profile-section--first">
           <section class="profile-person-card">
-            <div class="profile-person-card__visual"><div ref="avatarPickerAnchor" class="profile-avatar-picker-anchor"><button class="profile-avatar-button" type="button" :disabled="uploading" title="更换头像" aria-label="更换头像" @click="avatarPickerOpen = !avatarPickerOpen"><img v-if="avatarSrc" class="profile-avatar profile-avatar--hero" :src="avatarSrc" alt="当前头像" /><span v-else class="profile-avatar profile-avatar--hero">{{ avatarLetter }}</span><span class="profile-avatar-button__mask">{{ uploading ? '保存中' : '更换' }}</span></button><div v-if="avatarPickerOpen" class="profile-avatar-picker"><header><strong>选择头像</strong><button class="text-btn" type="button" :disabled="uploading" @click="chooseAvatar">上传本地头像</button></header><div class="profile-avatar-options"><button v-for="avatar in builtInAvatars" :key="avatar.id" type="button" :disabled="uploading" :class="{ active: selectedBuiltInId === avatar.id }" :title="`${avatar.label}（悬停预览）`" @click="selectBuiltIn(avatar.id)"><img :src="avatar.src" :alt="avatar.label" /><span class="profile-avatar-preview"><img :src="avatar.src" :alt="`${avatar.label}预览`" /><span>{{ avatar.label }}</span></span></button></div></div></div><span class="profile-person-card__device"><HardDrive :size="12" />本机</span></div>
+            <div class="profile-person-card__visual"><div ref="avatarPickerAnchor" class="profile-avatar-picker-anchor"><button class="profile-avatar-button" type="button" :disabled="uploading" title="更换头像" aria-label="更换头像" @click="avatarPickerOpen = !avatarPickerOpen"><img v-if="avatarSrc" class="profile-avatar profile-avatar--hero" :src="avatarSrc" alt="当前头像" /><span v-else class="profile-avatar profile-avatar--hero">{{ avatarLetter }}</span><span class="profile-avatar-button__mask">{{ uploading ? '保存中' : '更换' }}</span></button><div v-if="avatarPickerOpen" class="profile-avatar-picker"><header><strong>选择头像</strong><button class="text-btn" type="button" :disabled="uploading" @click="chooseAvatar">上传本地头像</button></header><div class="profile-avatar-options"><button v-for="avatar in builtInAvatars" :key="avatar.id" type="button" :disabled="uploading" :class="{ active: selectedBuiltInId === avatar.id }" :title="`${avatar.label}（悬停预览）`" @mouseenter="showAvatarPreview(avatar, $event)" @mouseleave="hideAvatarPreview" @focus="showAvatarPreview(avatar, $event)" @blur="hideAvatarPreview" @click="selectBuiltIn(avatar.id)"><img :src="avatar.src" :alt="avatar.label" /></button></div></div></div><span class="profile-person-card__device"><HardDrive :size="12" />本机</span></div>
             <div class="profile-person-card__copy"><p>你的个人空间</p><label class="profile-name-input"><span class="sr-only">昵称</span><input v-model="nickname" maxlength="24" aria-label="昵称" @blur="saveNickname" @keydown.enter.prevent="saveNickname" /></label><div class="profile-person-card__badges"><span><i></i>本地资料</span><span>仅此设备</span></div></div>
             <div class="profile-person-card__art" aria-hidden="true"><i></i><span><HardDrive :size="20" /></span><b></b><em></em></div>
           </section>
@@ -76,6 +76,12 @@
       @confirm="deleteBackup"
       @cancel="pendingDelete = null"
     />
+    <Teleport to="body">
+      <div v-if="avatarPreview" class="profile-avatar-preview" :style="{ left: `${avatarPreview.left}px`, top: `${avatarPreview.top}px` }" role="tooltip">
+        <img :src="avatarPreview.avatar.src" :alt="`${avatarPreview.avatar.label}预览`" />
+        <span>{{ avatarPreview.avatar.label }}</span>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -111,6 +117,7 @@ const nickname = ref(store.profile.nickname)
 const avatarUrl = ref('')
 const avatarPickerOpen = ref(false)
 const avatarPickerAnchor = ref(null)
+const avatarPreview = ref(null)
 const builtInAvatars = [{ id: 'shiba', label: '柴犬', src: shiba }, { id: 'cat', label: '黑白猫', src: cat }, { id: 'crane', label: '纸鹤', src: crane }, { id: 'red-panda', label: '小熊猫', src: redPanda }, { id: 'otter', label: '水獭', src: otter }, { id: 'astronaut', label: '太空人', src: astronaut }, { id: 'robot', label: '小机器人', src: robot }, { id: 'turtle', label: '海龟', src: turtle }, { id: 'cloud', label: '云朵', src: cloud }, { id: 'frog', label: '青蛙', src: frog }, { id: 'koi', label: '锦鲤', src: koi }, { id: 'space-blob', label: '太空团子', src: spaceBlob }, { id: 'chameleon', label: '变色龙', src: chameleon }, { id: 'cassette', label: '随身听', src: cassette }, { id: 'axolotl', label: '六角恐龙', src: axolotl }, { id: 'mushroom', label: '蘑菇屋', src: mushroom }, { id: 'jellyfish', label: '水母', src: jellyfish }, { id: 'fox', label: '小狐狸', src: fox }]
 const selectedBuiltInId = computed(() => store.profile.avatarRelativePath?.startsWith('builtin:') ? store.profile.avatarRelativePath.slice(8) : '')
 const avatarSrc = computed(() => avatarUrl.value || builtInAvatars.find(item => item.id === selectedBuiltInId.value)?.src || '')
@@ -152,7 +159,28 @@ async function loadAvatar() {
 }
 
 function closeAvatarPickerOnOutside(event) {
-  if (avatarPickerOpen.value && !avatarPickerAnchor.value?.contains(event.target)) avatarPickerOpen.value = false
+  if (avatarPickerOpen.value && !avatarPickerAnchor.value?.contains(event.target)) {
+    avatarPickerOpen.value = false
+    hideAvatarPreview()
+  }
+}
+
+function showAvatarPreview(avatar, event) {
+  const rect = event.currentTarget?.getBoundingClientRect()
+  if (!rect) return
+  const width = 164
+  const height = 196
+  const margin = 12
+  const left = Math.max(margin, Math.min(rect.left + rect.width / 2 - width / 2, window.innerWidth - width - margin))
+  const preferredTop = rect.bottom + 10
+  const top = preferredTop + height <= window.innerHeight - margin
+    ? preferredTop
+    : Math.max(margin, rect.top - height - 10)
+  avatarPreview.value = { avatar, left, top }
+}
+
+function hideAvatarPreview() {
+  avatarPreview.value = null
 }
 
 function formatBytes(value = 0) {
@@ -282,6 +310,7 @@ async function selectBuiltIn(id) {
     await persistAvatar(`builtin:${id}`, null)
     avatarUrl.value = ''
     avatarPickerOpen.value = false
+    hideAvatarPreview()
     store.showNotice('已切换内置头像', 'success')
   } catch (error) { errorMessage.value = error?.message || '保存头像失败' } finally { uploading.value = false }
 }
