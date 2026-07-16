@@ -57,11 +57,6 @@
             <small>当前数据将先保存为新的“恢复前安全点”，然后重新加载此恢复点。</small>
             <span><button class="text-btn" type="button" :disabled="backupWorking" @click="pendingRestore = null">取消</button><button class="small-btn" type="button" :disabled="backupWorking" @click="restoreBackup">确认恢复</button></span>
           </div>
-          <div v-if="pendingDelete" class="data-backup-confirm data-backup-confirm--danger">
-            <strong>删除此恢复点？</strong>
-            <small>将永久删除 {{ formatBackupDate(pendingDelete.createdAt) }} 的恢复点，无法撤销；不会影响当前正在使用的数据。</small>
-            <span><button class="text-btn" type="button" :disabled="backupWorking" @click="pendingDelete = null">取消</button><button class="small-btn danger-btn" type="button" :disabled="backupWorking" @click="deleteBackup">确认删除</button></span>
-          </div>
           <div class="profile-capability-list">
             <article class="profile-capability"><span class="profile-capability__icon">安</span><div><strong>当前设备</strong><small>数据仅保存在本机；不会上传到服务器</small></div><span class="profile-capability__status is-safe">仅此设备</span></article>
           </div>
@@ -69,6 +64,18 @@
         </div>
       </div>
     </aside>
+    <ConfirmDialog
+      :visible="Boolean(pendingDelete)"
+      title="删除此恢复点？"
+      :message="pendingDelete ? `将永久删除 ${formatBackupDate(pendingDelete.createdAt)} 的恢复点，无法撤销；不会影响当前正在使用的数据。` : ''"
+      :tag="pendingDelete ? backupLabel(pendingDelete) : ''"
+      :details="deleteBackupDetails"
+      confirm-text="确认删除"
+      cancel-text="取消"
+      type="danger"
+      @confirm="deleteBackup"
+      @cancel="pendingDelete = null"
+    />
   </div>
 </template>
 
@@ -78,6 +85,7 @@ import { CheckCircle2, Folder, HardDrive, ListTodo, RefreshCw, ShieldCheck, User
 import { useTaskStore } from '@/stores/task'
 import { createDataBackup, deleteDataBackup, getDataBackupLocation, importProfileAvatar, listDataBackups, openDataBackup, openDataBackupLocation, readProfileAvatar, restoreDataBackup, selectImage } from '@/services/platform'
 import SpaceManagement from './SpaceManagement.vue'
+import ConfirmDialog from './ConfirmDialog.vue'
 import shiba from '@/assets/avatars/shiba.png'
 import cat from '@/assets/avatars/cat.png'
 import crane from '@/assets/avatars/crane.png'
@@ -124,6 +132,10 @@ const backupError = ref('')
 const pendingRestore = ref(null)
 const pendingDelete = ref(null)
 const backupLocation = ref('')
+const deleteBackupDetails = computed(() => pendingDelete.value ? [
+  { label: '恢复点大小', value: formatBytes(pendingDelete.value.sizeBytes), type: 'danger' },
+  { label: '包含内容', value: '任务、附件和头像', type: 'info' }
+] : [])
 let nicknameTimer = null
 
 onMounted(() => { loadAvatar(); loadBackups(); loadBackupLocation(); document.addEventListener('pointerdown', closeAvatarPickerOnOutside) })
@@ -236,12 +248,13 @@ async function restoreBackup() {
 
 async function deleteBackup() {
   if (!pendingDelete.value) return
+  const backup = pendingDelete.value
+  pendingDelete.value = null
   backupWorking.value = true
   backupError.value = ''
   try {
-    await deleteDataBackup(pendingDelete.value.id)
-    backups.value = backups.value.filter(backup => backup.id !== pendingDelete.value.id)
-    pendingDelete.value = null
+    await deleteDataBackup(backup.id)
+    backups.value = backups.value.filter(item => item.id !== backup.id)
     store.showNotice('已删除本机恢复点', 'success')
   } catch (error) {
     backupError.value = error?.message || '删除本机恢复点失败'
