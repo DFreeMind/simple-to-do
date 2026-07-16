@@ -38,7 +38,7 @@ fn db_file(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(app_data_dir(app)?.join("simpletodo.db"))
 }
 
-const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
+const DATABASE_SCHEMA_VERSION: i64 = 1;
 
 fn backup_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let dir = app_data_dir(app)?.join("backups");
@@ -51,28 +51,75 @@ fn open_database(app: &tauri::AppHandle) -> Result<Connection, String> {
     if !database.exists() {
         import_legacy_database(app, &database)?;
     }
-    if database.exists() {
-        create_versioned_database_backup(app, &database)?;
-    }
-    let conn = Connection::open(&database).map_err(|err| format!("打开数据库失败: {err}"))?;
-    init_database(&conn)?;
+
+    let current_version = if database.exists() {
+        let version = inspect_database_schema_version(&database)?;
+        if version > DATABASE_SCHEMA_VERSION {
+            return Err(format!(
+                "本机数据库结构版本 v{version} 高于当前应用支持的 v{DATABASE_SCHEMA_VERSION}，请升级应用后再打开"
+            ));
+        }
+        if version < DATABASE_SCHEMA_VERSION {
+            create_migration_backup(app, &database, version)?;
+        }
+        version
+    } else {
+        0
+    };
+
+    let mut conn = Connection::open(&database).map_err(|err| format!("打开数据库失败: {err}"))?;
+    init_database(&mut conn, current_version)?;
     Ok(conn)
 }
 
-/// 在每个应用版本首次读取已有数据库前创建一致性备份。
-/// 备份失败时拒绝继续打开数据库，避免升级过程在未留下可恢复副本的情况下修改用户数据。
-fn create_versioned_database_backup(app: &tauri::AppHandle, database: &Path) -> Result<(), String> {
-    let backups = backup_dir(app)?;
-    let marker = backups.join(format!(".startup-backup-v{APP_VERSION}.done"));
-    if marker.exists() {
-        return Ok(());
+/// 对已有数据库做只读健康检查，并读取独立于前端业务 schemaVersion 的数据库结构版本。
+fn inspect_database_schema_version(database: &Path) -> Result<i64, String> {
+    let conn = Connection::open_with_flags(database, OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .map_err(|err| format!("打开本机数据库失败: {err}"))?;
+    let quick_check: String = conn
+        .query_row("PRAGMA quick_check", [], |row| row.get(0))
+        .map_err(|err| format!("检查本机数据库失败: {err}"))?;
+    if quick_check != "ok" {
+        return Err(format!("本机数据库完整性检查失败: {quick_check}"));
     }
 
+    let meta_exists: bool = conn
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'meta')",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|err| format!("读取数据库结构版本失败: {err}"))?;
+    if !meta_exists {
+        return Ok(0);
+    }
+
+    let version = conn
+        .query_row(
+            "SELECT value FROM meta WHERE key = 'databaseSchemaVersion'",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .map_err(|err| format!("读取数据库结构版本失败: {err}"))?;
+    match version {
+        Some(value) => value
+            .parse::<i64>()
+            .map_err(|_| "本机数据库结构版本无效，已阻止继续写入".to_string()),
+        // 没有独立版本标记的历史 SQLite 数据库只迁移一次，用于建立迁移基线。
+        None => Ok(0),
+    }
+}
+
+/// 仅在有实际数据库结构迁移时创建一致性备份。
+/// 备份失败时拒绝继续打开数据库，避免升级过程在未留下可恢复副本的情况下修改用户数据。
+fn create_migration_backup(app: &tauri::AppHandle, database: &Path, from_version: i64) -> Result<(), String> {
+    let backups = backup_dir(app)?;
     let timestamp = Local::now().format("%Y%m%d-%H%M%S");
-    let backup = backups.join(format!("simpletodo-v{APP_VERSION}-{timestamp}.db"));
+    let backup = backups.join(format!(
+        "simpletodo-schema-v{from_version}-to-v{DATABASE_SCHEMA_VERSION}-{timestamp}.db"
+    ));
     copy_sqlite_database(database, &backup)?;
-    fs::write(&marker, backup.file_name().unwrap_or_default().to_string_lossy().as_bytes())
-        .map_err(|err| format!("记录数据库备份状态失败: {err}"))?;
     Ok(())
 }
 
@@ -166,7 +213,11 @@ fn profile_avatar_file_path(app: &tauri::AppHandle, relative_path: &str) -> Resu
 
 #[tauri::command]
 fn load_data(app: tauri::AppHandle) -> Result<Option<serde_json::Value>, String> {
-    if !db_file(&app)?.exists() {
+    let database = db_file(&app)?;
+    if !database.exists() {
+        import_legacy_database(&app, &database)?;
+    }
+    if !database.exists() {
         return Ok(None);
     }
 
@@ -193,8 +244,23 @@ fn save_migration_backup(app: tauri::AppHandle, data: serde_json::Value) -> Resu
     Ok(path.to_string_lossy().to_string())
 }
 
-fn init_database(conn: &Connection) -> Result<(), String> {
-    conn.execute_batch(
+fn init_database(conn: &mut Connection, from_version: i64) -> Result<(), String> {
+    // foreign_keys 是连接级设置，即使没有结构迁移也必须在每次打开数据库时启用。
+    conn.execute_batch("PRAGMA foreign_keys = ON;")
+        .map_err(|err| format!("启用数据库外键约束失败: {err}"))?;
+    if from_version == DATABASE_SCHEMA_VERSION {
+        return Ok(());
+    }
+    if from_version > DATABASE_SCHEMA_VERSION {
+        return Err(format!(
+            "不支持从数据库结构版本 v{from_version} 降级到 v{DATABASE_SCHEMA_VERSION}"
+        ));
+    }
+
+    let tx = conn
+        .transaction()
+        .map_err(|err| format!("开启数据库结构迁移事务失败: {err}"))?;
+    tx.execute_batch(
         r#"
         PRAGMA foreign_keys = ON;
         CREATE TABLE IF NOT EXISTS meta (
@@ -328,7 +394,15 @@ fn init_database(conn: &Connection) -> Result<(), String> {
         "#,
     )
     .map_err(|err| format!("初始化数据库失败: {err}"))?;
-    run_database_migrations(conn)?;
+    run_database_migrations(&tx)?;
+    tx.execute(
+        "INSERT INTO meta(key, value) VALUES('databaseSchemaVersion', ?1)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        params![DATABASE_SCHEMA_VERSION.to_string()],
+    )
+    .map_err(|err| format!("记录数据库结构版本失败: {err}"))?;
+    tx.commit()
+        .map_err(|err| format!("提交数据库结构迁移失败: {err}"))?;
     Ok(())
 }
 
@@ -493,7 +567,7 @@ fn save_state_to_db(conn: &mut Connection, data: &serde_json::Value) -> Result<(
         DELETE FROM tasks;
         DELETE FROM lists;
         DELETE FROM groups;
-        DELETE FROM meta;
+        DELETE FROM meta WHERE key != 'databaseSchemaVersion';
         "#,
     )
     .map_err(|err| format!("清空数据库失败: {err}"))?;
@@ -1859,13 +1933,18 @@ fn extension_for_mime(mime: &str) -> Option<&'static str> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn sqlite_backup_preserves_wal_data() {
+    fn test_root(name: &str) -> PathBuf {
         let root = std::env::temp_dir().join(format!(
-            "simple-to-do-backup-test-{}",
+            "simple-to-do-{name}-{}",
             Local::now().timestamp_nanos_opt().unwrap_or_default()
         ));
         fs::create_dir_all(&root).unwrap();
+        root
+    }
+
+    #[test]
+    fn sqlite_backup_preserves_wal_data() {
+        let root = test_root("backup-test");
         let source_path = root.join("source.db");
         let backup_path = root.join("backup.db");
 
@@ -1880,6 +1959,38 @@ mod tests {
 
         drop(backup);
         drop(source);
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn schema_version_is_persisted_and_up_to_date_database_is_not_migrated_again() {
+        let root = test_root("schema-version-test");
+        let database = root.join("simpletodo.db");
+        let mut conn = Connection::open(&database).unwrap();
+
+        init_database(&mut conn, 0).unwrap();
+        let version: String = conn
+            .query_row(
+                "SELECT value FROM meta WHERE key = 'databaseSchemaVersion'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(version, DATABASE_SCHEMA_VERSION.to_string());
+
+        conn.execute(
+            "INSERT INTO groups(id, name, collapsed, sort_order) VALUES('preserved', '保留的数据', 0, 0)",
+            [],
+        )
+        .unwrap();
+        init_database(&mut conn, DATABASE_SCHEMA_VERSION).unwrap();
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM groups WHERE id = 'preserved'", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
+
+        drop(conn);
+        assert_eq!(inspect_database_schema_version(&database).unwrap(), DATABASE_SCHEMA_VERSION);
         fs::remove_dir_all(&root).unwrap();
     }
 }
