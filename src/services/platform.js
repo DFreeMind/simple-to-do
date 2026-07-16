@@ -138,6 +138,15 @@ export async function importProfileAvatar(filePath) {
   return null
 }
 
+export async function cleanupProfileAvatars(currentRelativePath = null) {
+  if (!isTauri()) return 0
+  try {
+    return await invoke('cleanup_profile_avatars', { currentRelativePath })
+  } catch (error) {
+    throw new Error(formatPlatformError(error, '清理旧头像失败'))
+  }
+}
+
 export async function importImageData(dataUrl) {
   if (isTauri()) {
     // 解析 data:image/png;base64,xxxxx

@@ -1622,6 +1622,31 @@ fn import_profile_avatar(
 }
 
 #[tauri::command]
+fn cleanup_profile_avatars(
+    app: tauri::AppHandle,
+    current_relative_path: Option<String>,
+) -> Result<u32, String> {
+    let current = current_relative_path
+        .as_deref()
+        .filter(|path| path.starts_with("profile/avatars/"))
+        .map(|path| profile_avatar_file_path(&app, path))
+        .transpose()?;
+    let avatar_dir = app_data_dir(&app)?.join("profile").join("avatars");
+    if !avatar_dir.is_dir() {
+        return Ok(0);
+    }
+    let mut removed = 0;
+    for entry in fs::read_dir(&avatar_dir).map_err(|err| format!("读取头像目录失败: {err}"))? {
+        let path = entry.map_err(|err| format!("读取头像目录失败: {err}"))?.path();
+        if path.is_file() && current.as_ref().map_or(true, |active| active != &path) {
+            fs::remove_file(&path).map_err(|err| format!("清理旧头像失败: {err}"))?;
+            removed += 1;
+        }
+    }
+    Ok(removed)
+}
+
+#[tauri::command]
 fn import_image_data(
     app: tauri::AppHandle,
     data: String,
@@ -2464,6 +2489,7 @@ fn main() {
             read_image,
             import_image,
             import_profile_avatar,
+            cleanup_profile_avatars,
             import_image_data,
             read_attachment,
             read_profile_avatar,

@@ -5142,7 +5142,11 @@ body.is-resizing {
 .profile-avatar-options { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
 .profile-avatar-options button { aspect-ratio: 1; overflow: hidden; padding: 2px; border: 2px solid transparent; border-radius: 11px; background: var(--surface-muted); }
 .profile-avatar-options button.active { border-color: var(--accent); box-shadow: var(--focus-ring); }
+.profile-avatar-options button:hover:not(:disabled), .profile-avatar-options button:focus-visible { border-color: var(--accent-38-fallback); transform: translateY(-1px); }
 .profile-avatar-options img { width: 100%; height: 100%; border-radius: 7px; object-fit: cover; }
+.profile-avatar-preview { position: absolute; top: 0; left: calc(100% + 12px); z-index: 2; width: 154px; padding: 7px; border: 1px solid var(--accent-20-border-fallback); border-radius: 13px; background: var(--surface); box-shadow: var(--shadow-popover); }
+.profile-avatar-preview img { display: block; width: 100%; aspect-ratio: 1; border-radius: 9px; object-fit: cover; }
+.profile-avatar-preview span { display: block; padding: 7px 3px 1px; color: var(--text); font-size: 12px; font-weight: 650; text-align: center; }
 .profile-overview-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-muted); }
 .profile-overview-grid article { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 12px; }.profile-overview-grid article + article { border-left: 1px solid var(--divider-soft); }
 .profile-overview-grid__icon { display: grid; width: 29px; height: 29px; flex: 0 0 auto; place-items: center; border-radius: 9px; background: var(--surface); color: var(--accent-strong); }.profile-overview-grid article > span:last-child { display: grid; min-width: 0; gap: 2px; }
