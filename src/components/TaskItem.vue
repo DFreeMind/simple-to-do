@@ -160,6 +160,19 @@
       <button class="context-item" role="menuitem" type="button" @click="openMoveModal">
         <FolderInput :size="15" /> 移动到清单
       </button>
+      <template v-if="isOverdue">
+        <div class="context-separator"></div>
+        <p class="context-menu__hint">此任务已逾期，重新安排一下吧</p>
+        <button class="context-item" role="menuitem" type="button" @click="rescheduleOverdue(0)">
+          <Sun :size="15" /> 安排到今天
+        </button>
+        <button class="context-item" role="menuitem" type="button" @click="rescheduleOverdue(1)">
+          <CalendarClock :size="15" /> 改到明天
+        </button>
+        <button class="context-item" role="menuitem" type="button" @click="clearDueDate">
+          <Clock :size="15" /> 暂不安排日期
+        </button>
+      </template>
       <template v-if="canMoveToGroup">
         <div class="context-separator"></div>
         <button class="context-item" role="menuitem" type="button" @click="openGroupMoveModal">
@@ -314,7 +327,7 @@ const priorityInfo = computed(() => {
 })
 const isOverdue = computed(() => props.task.dueDate && !props.task.completed && new Date(props.task.dueDate) < new Date())
 const repeatLabel = computed(() => {
-  const map = { daily: '每天', weekly: '每周', monthly: '每月', yearly: '每年' }
+  const map = { daily: '每天', weekdays: '工作日', weekly: '每周', monthly: '每月', yearly: '每年' }
   return map[props.task.repeatRule] || props.task.repeatRule
 })
 
@@ -401,6 +414,20 @@ async function copyLink() {
 function moveToList(listId) {
   store.updateTask(props.task.id, { listId, taskGroupId: null })
   store.showNotice('任务已移动', 'success')
+  closeMenu()
+}
+
+function rescheduleOverdue(days) {
+  const date = new Date()
+  date.setDate(date.getDate() + days)
+  store.moveTaskToDate(props.task.id, date)
+  store.showNotice(days ? '已改到明天' : '已安排到今天', 'success')
+  closeMenu()
+}
+
+function clearDueDate() {
+  store.updateTask(props.task.id, { dueDate: null, reminderAt: null })
+  store.showNotice('已移为暂不安排', 'success')
   closeMenu()
 }
 

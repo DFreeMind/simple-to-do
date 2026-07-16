@@ -1,6 +1,6 @@
 [package]
 name = "simple-to-do"
-version = "0.2.5"
+version = "0.3.1"
 description = "滴答清单 MVP 复刻版"
 authors = ["simple-to-do"]
 edition = "2021"
@@ -19,3 +19,6 @@ serde_json = "1"
 sha2 = "0.10"
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-notification = "2.3.3"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2"

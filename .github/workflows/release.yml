@@ -1,0 +1,52 @@
+name: 发布桌面应用
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '本次发布的应用版本，必须与 package.json 和 tauri.conf.json 完全一致'
+        required: true
+        type: string
+      release_notes:
+        description: '中文 Release Notes（包含主要更新、修复和已知限制）'
+        required: true
+        type: string
+
+jobs:
+  release-windows:
+    name: 构建并发布 Windows
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 安装 Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: 安装前端依赖
+        run: npm ci
+
+      - name: 发布前校验
+        run: npm run release:check -- ${{ inputs.version }}
+
+      - name: 构建并上传 Release 资源
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        with:
+          tagName: v__VERSION__
+          releaseName: __VERSION__
+          releaseBody: ${{ inputs.release_notes }}
+          releaseDraft: true
+          prerelease: false
+          args: --bundles nsis
+          updaterJsonPreferNsis: true
+          releaseAssetNamePattern: simple-to-do_[version]_[arch][setup].[ext]

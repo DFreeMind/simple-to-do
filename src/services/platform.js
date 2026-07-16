@@ -49,6 +49,69 @@ export async function saveMigrationBackup(data) {
   }
 }
 
+export async function createDataBackup() {
+  if (!isTauri()) throw new Error('当前环境不支持创建本机恢复点')
+  try {
+    return await invoke('create_data_backup')
+  } catch (error) {
+    throw new Error(formatPlatformError(error, '创建本机恢复点失败'))
+  }
+}
+
+export async function listDataBackups() {
+  if (!isTauri()) return []
+  try {
+    return await invoke('list_data_backups')
+  } catch (error) {
+    throw new Error(formatPlatformError(error, '读取恢复点失败'))
+  }
+}
+
+export async function getDataBackupLocation() {
+  if (!isTauri()) return ''
+  try {
+    return await invoke('data_backup_location')
+  } catch (error) {
+    throw new Error(formatPlatformError(error, '读取恢复点目录失败'))
+  }
+}
+
+export async function openDataBackupLocation() {
+  if (!isTauri()) throw new Error('当前环境不支持打开本机恢复点目录')
+  try {
+    return await invoke('open_data_backup_location')
+  } catch (error) {
+    throw new Error(formatPlatformError(error, '打开恢复点目录失败'))
+  }
+}
+
+export async function openDataBackup(backupId) {
+  if (!isTauri()) throw new Error('当前环境不支持打开本机恢复点')
+  try {
+    return await invoke('open_data_backup', { backupId })
+  } catch (error) {
+    throw new Error(formatPlatformError(error, '打开本机恢复点失败'))
+  }
+}
+
+export async function deleteDataBackup(backupId) {
+  if (!isTauri()) throw new Error('当前环境不支持删除本机恢复点')
+  try {
+    return await invoke('delete_data_backup', { backupId })
+  } catch (error) {
+    throw new Error(formatPlatformError(error, '删除本机恢复点失败'))
+  }
+}
+
+export async function restoreDataBackup(backupId) {
+  if (!isTauri()) throw new Error('当前环境不支持恢复本机数据')
+  try {
+    return await invoke('restore_data_backup', { backupId })
+  } catch (error) {
+    throw new Error(formatPlatformError(error, '恢复本机数据失败'))
+  }
+}
+
 export async function selectImage() {
   if (isTauri()) {
     return invoke('select_image')
@@ -73,6 +136,15 @@ export async function importImage(filePath) {
 export async function importProfileAvatar(filePath) {
   if (isTauri()) return invoke('import_profile_avatar', { filePath })
   return null
+}
+
+export async function cleanupProfileAvatars(currentRelativePath = null) {
+  if (!isTauri()) return 0
+  try {
+    return await invoke('cleanup_profile_avatars', { currentRelativePath })
+  } catch (error) {
+    throw new Error(formatPlatformError(error, '清理旧头像失败'))
+  }
 }
 
 export async function importImageData(dataUrl) {

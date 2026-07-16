@@ -440,6 +440,7 @@ const dateSummaryText = computed(() => {
 })
 const repeatLabels = {
   daily: '每天',
+  weekdays: '工作日',
   weekly: '每周',
   monthly: '每月',
   yearly: '每年'

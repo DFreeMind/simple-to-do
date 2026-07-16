@@ -234,6 +234,41 @@
 
             <div class="settings-block">
               <div class="settings-block__title">
+                <h4>每日提示</h4>
+                <span>{{ dailyGuidanceSummary }}</span>
+              </div>
+              <label class="switch-row">
+                <span>
+                  <strong>显示每日提示</strong>
+                  <small>按日期和任务状态给出本地提示；同一天保持一致，不会读取或上传数据</small>
+                </span>
+                <input
+                  type="checkbox"
+                  :checked="store.settings.dailyGuidanceEnabled"
+                  @change="store.updateSettings({ dailyGuidanceEnabled: $event.target.checked })"
+                />
+                <span class="switch-control" aria-hidden="true"></span>
+              </label>
+              <label class="setting-select-card" :class="{ disabled: !store.settings.dailyGuidanceEnabled }">
+                <span class="setting-select-card__icon"><Info :size="17" /></span>
+                <span class="setting-select-card__copy">
+                  <strong>提示风格</strong>
+                  <small>轻松、务实或鼓励；每天自动轮换不同表达</small>
+                </span>
+                <select
+                  :value="store.settings.dailyGuidanceStyle"
+                  :disabled="!store.settings.dailyGuidanceEnabled"
+                  @change="store.updateSettings({ dailyGuidanceStyle: $event.target.value })"
+                >
+                  <option value="calm">轻松</option>
+                  <option value="practical">务实</option>
+                  <option value="encouraging">鼓励</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="settings-block">
+              <div class="settings-block__title">
                 <h4>提醒</h4>
                 <span>{{ reminderSummary }}</span>
               </div>
@@ -306,6 +341,16 @@
                   <span class="switch-control" aria-hidden="true"></span>
                 </label>
 
+                <div class="sound-preview-row">
+                  <span><strong>试听与语义</strong><small>只为需要确认的操作发声；删除和错误保持安静</small></span>
+                  <div class="sound-preview-grid">
+                    <button class="small-btn" type="button" :disabled="!store.settings.soundEnabled || !store.settings.soundTaskEnabled" @click="store.previewSound('complete')"><Check :size="14" />完成铃音</button>
+                    <button class="small-btn" type="button" :disabled="!store.settings.soundEnabled || !store.settings.soundTaskEnabled" @click="store.previewSound('restore')"><Folder :size="14" />新增与恢复</button>
+                    <button class="small-btn" type="button" :disabled="!store.settings.soundEnabled || !store.settings.soundTaskEnabled" @click="store.previewSound('chime')"><Tag :size="14" />标记与日期</button>
+                    <button class="small-btn" type="button" :disabled="!store.settings.soundEnabled || !store.settings.soundDragEnabled" @click="store.previewSound('drag')"><SlidersHorizontal :size="14" />排序指示线</button>
+                  </div>
+                </div>
+
                 <p v-if="!store.settings.soundEnabled" class="setting-summary">音效已关闭；重新开启后会保留各类操作的开关状态。</p>
                 <div v-else class="sound-categories">
                   <label class="sound-item">
@@ -331,7 +376,7 @@
                     </span>
                     <span class="sound-item-content">
                       <strong>清单操作</strong>
-                      <small>清单增删</small>
+                      <small>新增、恢复、重命名</small>
                     </span>
                     <input
                       type="checkbox"
@@ -348,13 +393,30 @@
                     </span>
                     <span class="sound-item-content">
                       <strong>分组操作</strong>
-                      <small>分组增删</small>
+                      <small>新增与重命名</small>
                     </span>
                     <input
                       type="checkbox"
                       :checked="store.settings.soundGroupEnabled"
                       :disabled="!store.settings.soundEnabled"
                       @change="store.updateSettings({ soundGroupEnabled: $event.target.checked })"
+                    />
+                    <span class="switch-control" aria-hidden="true"></span>
+                  </label>
+
+                  <label class="sound-item">
+                    <span class="sound-item-icon">
+                      <SlidersHorizontal :size="16" />
+                    </span>
+                    <span class="sound-item-content">
+                      <strong>拖动排序</strong>
+                      <small>排序指示线位置变化时反馈</small>
+                    </span>
+                    <input
+                      type="checkbox"
+                      :checked="store.settings.soundDragEnabled"
+                      :disabled="!store.settings.soundEnabled"
+                      @change="store.updateSettings({ soundDragEnabled: $event.target.checked })"
                     />
                     <span class="switch-control" aria-hidden="true"></span>
                   </label>
@@ -484,7 +546,7 @@
               </div>
             </div>
 
-              <div class="about-card">
+            <div class="about-card">
               <img :src="appIcon" alt="" />
               <div>
                 <strong>易简清单</strong>
@@ -494,6 +556,53 @@
                 <Compass :size="17" />
                 <span><strong>打开使用指南</strong><small>快速开始、功能说明、常见问题与更新内容</small></span>
               </button>
+            </div>
+
+            <div class="settings-block">
+              <div class="settings-block__title">
+                <h4>应用更新</h4>
+                <span>{{ updateStatusText }}</span>
+              </div>
+              <article class="update-card" :class="`update-card--${updateState}`">
+                <div class="update-card__head">
+                  <span class="update-card__icon">
+                    <Download v-if="['available', 'downloading', 'installing'].includes(updateState)" :size="18" />
+                    <Check v-else-if="updateState === 'upToDate'" :size="18" />
+                    <Info v-else :size="18" />
+                  </span>
+                  <span class="update-card__copy">
+                    <strong>{{ updateTitle }}</strong>
+                    <small>{{ updateDescription }}</small>
+                  </span>
+                </div>
+                <div v-if="updateState === 'available'" class="update-card__release">
+                  <strong>v{{ availableUpdate?.version }}</strong>
+                  <p>{{ updateNotes }}</p>
+                </div>
+                <div v-if="updateState === 'downloading'" class="update-card__progress" aria-label="更新下载进度">
+                  <span :style="{ width: `${updateProgressPercent}%` }"></span>
+                </div>
+                <div class="update-card__actions">
+                  <button
+                    v-if="updateState === 'available'"
+                    class="small-btn update-card__action"
+                    type="button"
+                    :disabled="updateState === 'downloading' || updateState === 'installing'"
+                    @click="installUpdate"
+                  >
+                    下载并安装
+                  </button>
+                  <button
+                    v-else
+                    class="small-btn update-card__action"
+                    type="button"
+                    :disabled="updateActionDisabled"
+                    @click="checkForUpdates"
+                  >
+                    {{ updateActionText }}
+                  </button>
+                </div>
+              </article>
             </div>
           </section>
         </div>
@@ -533,6 +642,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { Bell, Check, Compass, Database, Info, PanelTop, Palette, ShieldCheck, SlidersHorizontal, Trash2, X, Volume2, CheckSquare, Folder, Tag } from 'lucide-vue-next'
+import { check } from '@tauri-apps/plugin-updater'
 import { useTaskStore } from '@/stores/task'
 import { purgeQuarantinedAttachments, quarantineOrphanAttachments, readAttachment, readQuarantinedAttachment, restoreQuarantinedAttachments, scanStorageHealth } from '@/services/platform'
 import ImageLightbox from './ImageLightbox.vue'
@@ -557,6 +667,11 @@ const storageBrowserPage = ref(0)
 const storageFilter = ref('all')
 const inlineLimit = 3
 const browserPageSize = 40
+const isDevelopment = import.meta.env.DEV
+const updateState = ref(isDevelopment ? 'development' : 'idle')
+const availableUpdate = ref(null)
+const updateError = ref('')
+const updateProgress = ref({ downloaded: 0, total: 0 })
 
 const sections = [
   { id: 'appearance', label: '外观', summary: '主题与布局', icon: Palette },
@@ -590,11 +705,65 @@ const completedDisplaySummary = computed(() => {
 const enabledSoundCount = computed(() => [
   store.settings.soundTaskEnabled,
   store.settings.soundListEnabled,
-  store.settings.soundGroupEnabled
+  store.settings.soundGroupEnabled,
+  store.settings.soundDragEnabled
 ].filter(Boolean).length)
-const soundSummary = computed(() => store.settings.soundEnabled ? `${enabledSoundCount.value}/3 已启用` : '已关闭')
+const soundSummary = computed(() => store.settings.soundEnabled ? `${enabledSoundCount.value}/4 已启用` : '已关闭')
 const reminderSummary = computed(() => store.settings.reminderNotificationsEnabled ? (store.settings.reminderSoundEnabled ? '通知和声音' : '仅通知') : '已关闭')
+const dailyGuidanceSummary = computed(() => {
+  if (!store.settings.dailyGuidanceEnabled) return '已关闭'
+  return ({ calm: '轻松', practical: '务实', encouraging: '鼓励' }[store.settings.dailyGuidanceStyle] || '务实')
+})
 const storageSummary = computed(() => storageReport.value ? `${storageReport.value.orphanAttachments.length} 项可清理` : '按需扫描')
+const updateStatusText = computed(() => ({
+  development: '开发环境',
+  idle: '手动检查',
+  checking: '正在检查',
+  upToDate: '已是最新',
+  available: `可更新至 ${availableUpdate.value?.version || ''}`,
+  downloading: '正在下载',
+  installing: '正在安装',
+  error: '服务暂不可用'
+}[updateState.value] || '手动检查'))
+const updateTitle = computed(() => ({
+  development: '开发环境不检查在线更新',
+  idle: '检查稳定版本',
+  checking: '正在检查更新',
+  upToDate: `已是最新版本 · v${version}`,
+  available: '发现可用更新',
+  downloading: '正在下载更新',
+  installing: '安装程序即将启动',
+  error: '暂时无法连接更新服务'
+}[updateState.value] || '检查稳定版本'))
+const updateDescription = computed(() => {
+  if (updateState.value === 'development') return 'npm run dev 不会请求 GitHub Release；请使用正式签名安装包验证更新。'
+  if (updateState.value === 'available') return '更新包已通过签名验证，下载完成后将启动安装程序。'
+  if (updateState.value === 'downloading') return updateProgressText.value
+  if (updateState.value === 'installing') return '下载已完成，请按照安装程序提示完成更新。'
+  if (updateState.value === 'error') return updateError.value
+  if (updateState.value === 'upToDate') return '当前已安装最新的稳定版本。'
+  return '从 GitHub Release 检查经过签名验证的稳定版本。'
+})
+const updateActionText = computed(() => ({
+  development: '开发模式不检查',
+  checking: '正在检查…',
+  downloading: updateProgressText.value,
+  installing: '正在启动安装程序…',
+  upToDate: '重新检查',
+  error: '重试检查',
+  idle: '检查更新'
+}[updateState.value] || '检查更新'))
+const updateActionDisabled = computed(() => isDevelopment || ['checking', 'downloading', 'installing'].includes(updateState.value))
+const updateProgressText = computed(() => {
+  const { downloaded, total } = updateProgress.value
+  if (!total) return '正在下载…'
+  return `正在下载 ${Math.min(100, Math.round(downloaded / total * 100))}%`
+})
+const updateProgressPercent = computed(() => {
+  const { downloaded, total } = updateProgress.value
+  return total ? Math.min(100, Math.round(downloaded / total * 100)) : 0
+})
+const updateNotes = computed(() => availableUpdate.value?.body?.trim() || '本次更新已准备就绪。')
 const orphanGroups = computed(() => {
   const items = storageReport.value?.orphanAttachments || []
   const images = items.filter(item => item.isImage)
@@ -633,6 +802,52 @@ function formatBytes(value = 0) {
 function formatDate(value) {
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? '未知时间' : date.toLocaleDateString('zh-CN')
+}
+
+async function checkForUpdates() {
+  if (isDevelopment) {
+    updateState.value = 'development'
+    return
+  }
+  updateState.value = 'checking'
+  updateError.value = ''
+  availableUpdate.value = null
+  try {
+    const update = await check({ timeout: 10000 })
+    if (!update) {
+      updateState.value = 'upToDate'
+      return
+    }
+    availableUpdate.value = update
+    updateState.value = 'available'
+  } catch (error) {
+    updateState.value = 'error'
+    const message = String(error?.message || '')
+    updateError.value = message.includes('404') || message.includes('latest.json')
+      ? '更新服务尚未就绪，请稍后重试。'
+      : '更新服务暂时不可用，不影响本机任务数据；请稍后重试。'
+  }
+}
+
+async function installUpdate() {
+  if (!availableUpdate.value) return
+  updateState.value = 'downloading'
+  updateError.value = ''
+  updateProgress.value = { downloaded: 0, total: 0 }
+  try {
+    await availableUpdate.value.downloadAndInstall((event) => {
+      if (event.event === 'Started') {
+        updateProgress.value = { downloaded: 0, total: event.data.contentLength || 0 }
+      } else if (event.event === 'Progress') {
+        updateProgress.value = { ...updateProgress.value, downloaded: updateProgress.value.downloaded + event.data.chunkLength }
+      } else if (event.event === 'Finished') {
+        updateState.value = 'installing'
+      }
+    })
+  } catch (error) {
+    updateState.value = 'error'
+    updateError.value = '更新下载或安装失败，不影响本机任务数据；请稍后重试。'
+  }
 }
 
 async function scanStorage() {

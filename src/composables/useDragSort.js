@@ -28,7 +28,7 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
   let lastMoveTime = 0
   let scrollRaf = null
   let suppressNextClick = false
-  let lastDragOverId = ''
+  let lastDropIndicatorKey = ''
 
   const DRAG_THRESHOLD = 5 // px before a press becomes a drag
   const EDGE_THRESHOLD = 60 // px from edge to trigger auto-scroll
@@ -58,6 +58,7 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
     suppressNextClick = true
     document.addEventListener('click', suppressClick, true)
     draggingId.value = pendingItemId
+    lastDropIndicatorKey = ''
 
     // Calculate offset from item top-left to mouse position
     const rect = pendingItem.el.getBoundingClientRect()
@@ -128,16 +129,17 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
       dragOverId.value = result.id
       dropPosition.value = result.position || 'after'
       targetGroupId = result.groupId
-      // 播放拖动经过目标音效（仅在目标变化时）
-      if (onDragOver && result.id !== lastDragOverId) {
-        onDragOver()
-        lastDragOverId = result.id
+      // 只在排序指示线实际换位时播放：同一任务的“上方/下方”是两条不同指示线。
+      const indicatorKey = `${result.id}:${dropPosition.value}:${result.groupId || ''}`
+      if (onDragOver && indicatorKey !== lastDropIndicatorKey) {
+        onDragOver({ id: result.id, position: dropPosition.value, groupId: result.groupId })
+        lastDropIndicatorKey = indicatorKey
       }
     } else {
       dragOverId.value = ''
       dropPosition.value = ''
       targetGroupId = undefined
-      lastDragOverId = ''
+      lastDropIndicatorKey = ''
     }
   }
 
@@ -201,7 +203,7 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
     dragOverId.value = ''
     dropPosition.value = ''
     targetGroupId = undefined
-    lastDragOverId = ''
+    lastDropIndicatorKey = ''
   }
 
   function suppressClick(event) {
@@ -231,7 +233,7 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
     dragOverId.value = ''
     dropPosition.value = ''
     targetGroupId = undefined
-    lastDragOverId = ''
+    lastDropIndicatorKey = ''
   }
 
   onUnmounted(cleanup)

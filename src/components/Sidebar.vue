@@ -517,9 +517,28 @@ function openSearch() {
 
 function handleSearchShortcut(event) {
   const isSearchShortcut = (event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'k'
-  if (!isSearchShortcut || event.defaultPrevented || event.isComposing || store.settingsOpen) return
-  event.preventDefault()
-  openSearch()
+  if (event.defaultPrevented || event.isComposing || store.settingsOpen) return
+  if (isSearchShortcut) {
+    event.preventDefault()
+    openSearch()
+    return
+  }
+  const target = event.target
+  const isEditing = target instanceof HTMLElement && (target.matches('input, textarea, select') || target.isContentEditable)
+  if (isEditing || event.ctrlKey || event.metaKey || event.altKey) return
+  if (event.key.toLowerCase() === 'n' && store.canQuickAddTask) {
+    event.preventDefault()
+    window.dispatchEvent(new Event('task-list:focus-quick-add'))
+    return
+  }
+  if (event.key.toLowerCase() === 'd' && store.selectedTaskId) {
+    const task = store.tasks.find(item => item.id === store.selectedTaskId)
+    if (task && !task.completed && !store.isInMyDay(task)) {
+      event.preventDefault()
+      store.toggleMyDay(task.id)
+      store.showNotice('已加入今日', 'success')
+    }
+  }
 }
 
 const listsFlyout = ref(false)

@@ -34,11 +34,13 @@ import {
   playRenameSound,
   playGroupAddSound,
   playGroupDeleteSound,
+  playSoundPreview,
   setSoundEnabled,
   setSoundCategories
 } from '@/utils/sound'
 import { migrateData, validateData, createBackup, getCurrentVersion } from '@/utils/migrator'
 import { matchesTaskSearch, normalizeSearchQuery } from '@/utils/search'
+import { getCompletionMessage } from '@/utils/dailyMessages'
 
 const SYSTEM_VIEW_IDS = ['today', 'inbox', 'planned', 'important', 'completed', 'trash', 'search']
 const READONLY_VIEWS = ['planned', 'completed', 'trash']
@@ -75,8 +77,11 @@ const DEFAULT_SETTINGS = {
   soundTaskEnabled: true,
   soundListEnabled: true,
   soundGroupEnabled: true,
+  soundDragEnabled: true,
   reminderNotificationsEnabled: true,
-  reminderSoundEnabled: true
+  reminderSoundEnabled: true,
+  dailyGuidanceEnabled: true,
+  dailyGuidanceStyle: 'practical'
 }
 
 const DEFAULT_PROFILE = {
@@ -130,6 +135,19 @@ function getPlanBucket(task) {
   return 'later'
 }
 
+function nextRepeatDueDate(dueDate, repeatRule) {
+  const next = new Date(dueDate)
+  if (Number.isNaN(next.getTime())) return null
+  if (repeatRule === 'daily') next.setDate(next.getDate() + 1)
+  else if (repeatRule === 'weekdays') {
+    do { next.setDate(next.getDate() + 1) } while (next.getDay() === 0 || next.getDay() === 6)
+  } else if (repeatRule === 'weekly') next.setDate(next.getDate() + 7)
+  else if (repeatRule === 'monthly') next.setMonth(next.getMonth() + 1)
+  else if (repeatRule === 'yearly') next.setFullYear(next.getFullYear() + 1)
+  else return null
+  return next
+}
+
 function parseQuickTitle(input) {
   let title = input.trim()
   const updates = {}
@@ -163,7 +181,10 @@ function parseQuickTitle(input) {
     title = title.replace(timeMatch[0], ' ')
   }
 
-  if (/每天|每日/.test(title)) {
+  if (/工作日|每个工作日/.test(title)) {
+    updates.repeatRule = 'weekdays'
+    title = title.replace(/工作日|每个工作日/, '')
+  } else if (/每天|每日/.test(title)) {
     updates.repeatRule = 'daily'
     title = title.replace(/每天|每日/, '')
   } else if (/每周|每星期/.test(title)) {
@@ -172,6 +193,9 @@ function parseQuickTitle(input) {
   } else if (/每月/.test(title)) {
     updates.repeatRule = 'monthly'
     title = title.replace(/每月/, '')
+  } else if (/每年/.test(title)) {
+    updates.repeatRule = 'yearly'
+    title = title.replace(/每年/, '')
   }
 
   if (/重要|高优先级/.test(title)) {
@@ -544,11 +568,12 @@ export const useTaskStore = defineStore('task', () => {
       setSoundEnabled(updates.soundEnabled)
     }
     // 更新音效分类开关
-    if ('soundTaskEnabled' in updates || 'soundListEnabled' in updates || 'soundGroupEnabled' in updates) {
+    if ('soundTaskEnabled' in updates || 'soundListEnabled' in updates || 'soundGroupEnabled' in updates || 'soundDragEnabled' in updates) {
       setSoundCategories({
         task: updates.soundTaskEnabled ?? settings.value.soundTaskEnabled,
         list: updates.soundListEnabled ?? settings.value.soundListEnabled,
-        group: updates.soundGroupEnabled ?? settings.value.soundGroupEnabled
+        group: updates.soundGroupEnabled ?? settings.value.soundGroupEnabled,
+        drag: updates.soundDragEnabled ?? settings.value.soundDragEnabled
       })
     }
     if ('reminderNotificationsEnabled' in updates || 'reminderSoundEnabled' in updates) {
@@ -556,6 +581,10 @@ export const useTaskStore = defineStore('task', () => {
       if (updates.reminderNotificationsEnabled === false) showNotice('任务提醒通知已关闭', 'info')
     }
     purgeExpiredTrash()
+  }
+
+  function previewSound(name) {
+    playSoundPreview(name)
   }
 
   async function testReminderNotification() {
@@ -998,6 +1027,7 @@ export const useTaskStore = defineStore('task', () => {
   function completeTask(id) {
     const task = tasks.value.find(item => item.id === id)
     if (!task) return
+    const isTodayTask = isInMyDay(task) || isToday(task.dueDate)
     task.completed = !task.completed
     const completedAt = task.completed ? nowIso() : null
     task.completedAt = completedAt
@@ -1008,11 +1038,39 @@ export const useTaskStore = defineStore('task', () => {
         subtask.completed = true
         subtask.completedAt = completedAt
       })
+      const nextDueDate = task.repeatRule && task.dueDate ? nextRepeatDueDate(task.dueDate, task.repeatRule) : null
+      if (nextDueDate) {
+        const reminderOffset = task.reminderAt ? new Date(task.reminderAt).getTime() - new Date(task.dueDate).getTime() : null
+        const nextCreatedAt = nowIso()
+        const nextTask = normalizeTask({
+          ...task,
+          id: genId(),
+          completed: false,
+          completedAt: null,
+          deleted: false,
+          deletedAt: null,
+          myDayDate: null,
+          dueDate: nextDueDate.toISOString(),
+          reminderAt: Number.isFinite(reminderOffset) ? new Date(nextDueDate.getTime() + reminderOffset).toISOString() : null,
+          reminderNotifiedAt: null,
+          subtasks: task.subtasks.map(subtask => ({ ...subtask, id: genId(), completed: false, completedAt: null })),
+          createdAt: nextCreatedAt,
+          updatedAt: nextCreatedAt
+        })
+        tasks.value.unshift(nextTask)
+        prependTaskToOrder(nextTask.id, getPlanBucket(nextTask) === 'none' ? 'inbox' : 'planned')
+        rescheduleReminder(nextTask)
+        showNotice('已生成下一次重复任务', 'success')
+      }
     }
     task.updatedAt = completedAt || nowIso()
     rescheduleReminder(task)
     if (task.completed) {
       playCompleteSound()
+      const remainingTodayTasks = activeTasks.value.filter(item => item.id !== task.id && !item.completed && (isInMyDay(item) || isToday(item.dueDate))).length
+      if (isTodayTask && remainingTodayTasks === 0 && settings.value.dailyGuidanceEnabled) {
+        showNotice(getCompletionMessage({ style: settings.value.dailyGuidanceStyle }), 'success')
+      }
     } else {
       playTaskUndoSound()
     }
@@ -1344,7 +1402,8 @@ export const useTaskStore = defineStore('task', () => {
         setSoundCategories({
           task: settings.value.soundTaskEnabled,
           list: settings.value.soundListEnabled,
-          group: settings.value.soundGroupEnabled
+          group: settings.value.soundGroupEnabled,
+          drag: settings.value.soundDragEnabled
         })
         purgeExpiredTrash()
         syncReminderNotifications({ requestPermission: false })
@@ -1641,8 +1700,13 @@ export const useTaskStore = defineStore('task', () => {
     const soundTaskEnabled = rawSettings.soundTaskEnabled !== false
     const soundListEnabled = rawSettings.soundListEnabled !== false
     const soundGroupEnabled = rawSettings.soundGroupEnabled !== false
+    const soundDragEnabled = rawSettings.soundDragEnabled !== false
     const reminderNotificationsEnabled = rawSettings.reminderNotificationsEnabled !== false
     const reminderSoundEnabled = rawSettings.reminderSoundEnabled !== false
+    const dailyGuidanceEnabled = rawSettings.dailyGuidanceEnabled !== false
+    const dailyGuidanceStyle = ['calm', 'practical', 'encouraging'].includes(rawSettings.dailyGuidanceStyle)
+      ? rawSettings.dailyGuidanceStyle
+      : DEFAULT_SETTINGS.dailyGuidanceStyle
     return {
       ...DEFAULT_SETTINGS,
       ...rawSettings,
@@ -1664,8 +1728,11 @@ export const useTaskStore = defineStore('task', () => {
       soundTaskEnabled,
       soundListEnabled,
       soundGroupEnabled,
+      soundDragEnabled,
       reminderNotificationsEnabled,
-      reminderSoundEnabled
+      reminderSoundEnabled,
+      dailyGuidanceEnabled,
+      dailyGuidanceStyle
     }
   }
 
@@ -1926,6 +1993,7 @@ export const useTaskStore = defineStore('task', () => {
     openHelpCenter,
     closeHelpCenter,
     updateSettings,
+    previewSound,
     updateProfile,
     testReminderNotification,
     loadData,
