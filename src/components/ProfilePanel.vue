@@ -20,13 +20,12 @@
             <div class="profile-person-card__copy"><p>你的个人空间</p><label class="profile-name-input"><span class="sr-only">昵称</span><input v-model="nickname" maxlength="24" aria-label="昵称" @blur="saveNickname" @keydown.enter.prevent="saveNickname" /></label><div class="profile-person-card__badges"><span><i></i>本地资料</span><span>仅此设备</span></div></div>
             <div class="profile-person-card__art" aria-hidden="true"><i></i><span><HardDrive :size="20" /></span><b></b><em></em></div>
           </section>
-          <div class="profile-section__head profile-overview-head"><h3>空间概览</h3><p>本地空间</p></div>
+          <div class="profile-section__head profile-overview-head"><h3>使用概览</h3><p>你的节奏</p></div>
           <div class="profile-overview-grid">
             <article><span class="profile-overview-grid__icon"><ListTodo :size="16" /></span><span><small>未完成</small><strong>{{ activeTaskCount }}</strong></span></article>
-            <article><span class="profile-overview-grid__icon"><Folder :size="16" /></span><span><small>任务清单</small><strong>{{ store.lists.length }}</strong></span></article>
-            <article><span class="profile-overview-grid__icon"><Trash2 :size="16" /></span><span><small>垃圾桶保留</small><strong>{{ store.settings.trashRetentionDays }}<em>天</em></strong></span></article>
+            <article><span class="profile-overview-grid__icon"><Folder :size="16" /></span><span><small>我的清单</small><strong>{{ store.lists.length }}</strong></span></article>
+            <article><span class="profile-overview-grid__icon"><CheckCircle2 :size="16" /></span><span><small>已完成</small><strong>{{ completedTaskCount }}</strong></span></article>
           </div>
-          <button class="profile-overview-action" type="button" @click="activeSection = 'space'"><span class="profile-overview-action__icon"><HardDrive :size="17" /></span><span><strong>管理本机数据</strong><small>附件维护、清理站和保留策略</small></span><ChevronRight :size="18" /></button>
         </section>
         <p v-if="activeSection === 'profile' && errorMessage" class="profile-editor__error">{{ errorMessage }}</p>
         <SpaceManagement v-else-if="activeSection === 'space'" />
@@ -75,7 +74,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { ChevronRight, Folder, HardDrive, ListTodo, RefreshCw, ShieldCheck, Trash2, UserRound, X } from 'lucide-vue-next'
+import { CheckCircle2, Folder, HardDrive, ListTodo, RefreshCw, ShieldCheck, UserRound, X } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import { createDataBackup, deleteDataBackup, getDataBackupLocation, importProfileAvatar, listDataBackups, openDataBackup, openDataBackupLocation, readProfileAvatar, restoreDataBackup, selectImage } from '@/services/platform'
 import SpaceManagement from './SpaceManagement.vue'
@@ -118,6 +117,7 @@ const sections = [
 ]
 const avatarLetter = computed(() => Array.from(store.profile.nickname?.trim() || '易')[0] || '易')
 const activeTaskCount = computed(() => store.tasks.filter(task => !task.completed && !task.deleted).length)
+const completedTaskCount = computed(() => store.tasks.filter(task => task.completed && !task.deleted).length)
 const backups = ref([])
 const backupWorking = ref(false)
 const backupError = ref('')

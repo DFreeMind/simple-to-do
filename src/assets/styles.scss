@@ -5106,10 +5106,6 @@ body.is-resizing {
 .profile-overview-grid strong, .profile-overview-grid small { display: block; }
 .profile-overview-grid strong { color: var(--text-strong); font-size: 18px; line-height: 1; }.profile-overview-grid strong em { margin-left: 2px; color: var(--text-muted); font-size: 11px; font-style: normal; font-weight: 600; }
 .profile-overview-grid small { color: var(--text-muted); font-size: 11px; }
-.profile-overview-action { display: flex; width: 100%; align-items: center; gap: 10px; margin-top: 12px; padding: 11px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); text-align: left; }.profile-overview-action:hover { border-color: var(--accent-20-border-fallback); background: var(--accent-tint); color: var(--accent-strong); }
-.profile-overview-action__icon { display: grid; width: 32px; height: 32px; flex: 0 0 auto; place-items: center; border-radius: 10px; background: var(--accent-soft); color: var(--accent-strong); }.profile-overview-action > span:nth-child(2) { min-width: 0; flex: 1; }
-.profile-overview-action strong, .profile-overview-action small { display: block; }
-.profile-overview-action strong { font-size: 13px; }.profile-overview-action small { margin-top: 2px; color: var(--text-muted); font-size: 11px; }.profile-overview-action > svg { color: var(--text-subtle); }
 .profile-section { margin-top: 30px; }
 .profile-section--first { margin-top: 0; }
 .profile-section__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
