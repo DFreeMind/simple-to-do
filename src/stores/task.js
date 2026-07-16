@@ -135,6 +135,19 @@ function getPlanBucket(task) {
   return 'later'
 }
 
+function nextRepeatDueDate(dueDate, repeatRule) {
+  const next = new Date(dueDate)
+  if (Number.isNaN(next.getTime())) return null
+  if (repeatRule === 'daily') next.setDate(next.getDate() + 1)
+  else if (repeatRule === 'weekdays') {
+    do { next.setDate(next.getDate() + 1) } while (next.getDay() === 0 || next.getDay() === 6)
+  } else if (repeatRule === 'weekly') next.setDate(next.getDate() + 7)
+  else if (repeatRule === 'monthly') next.setMonth(next.getMonth() + 1)
+  else if (repeatRule === 'yearly') next.setFullYear(next.getFullYear() + 1)
+  else return null
+  return next
+}
+
 function parseQuickTitle(input) {
   let title = input.trim()
   const updates = {}
@@ -168,7 +181,10 @@ function parseQuickTitle(input) {
     title = title.replace(timeMatch[0], ' ')
   }
 
-  if (/每天|每日/.test(title)) {
+  if (/工作日|每个工作日/.test(title)) {
+    updates.repeatRule = 'weekdays'
+    title = title.replace(/工作日|每个工作日/, '')
+  } else if (/每天|每日/.test(title)) {
     updates.repeatRule = 'daily'
     title = title.replace(/每天|每日/, '')
   } else if (/每周|每星期/.test(title)) {
@@ -177,6 +193,9 @@ function parseQuickTitle(input) {
   } else if (/每月/.test(title)) {
     updates.repeatRule = 'monthly'
     title = title.replace(/每月/, '')
+  } else if (/每年/.test(title)) {
+    updates.repeatRule = 'yearly'
+    title = title.replace(/每年/, '')
   }
 
   if (/重要|高优先级/.test(title)) {
@@ -1019,6 +1038,30 @@ export const useTaskStore = defineStore('task', () => {
         subtask.completed = true
         subtask.completedAt = completedAt
       })
+      const nextDueDate = task.repeatRule && task.dueDate ? nextRepeatDueDate(task.dueDate, task.repeatRule) : null
+      if (nextDueDate) {
+        const reminderOffset = task.reminderAt ? new Date(task.reminderAt).getTime() - new Date(task.dueDate).getTime() : null
+        const nextCreatedAt = nowIso()
+        const nextTask = normalizeTask({
+          ...task,
+          id: genId(),
+          completed: false,
+          completedAt: null,
+          deleted: false,
+          deletedAt: null,
+          myDayDate: null,
+          dueDate: nextDueDate.toISOString(),
+          reminderAt: Number.isFinite(reminderOffset) ? new Date(nextDueDate.getTime() + reminderOffset).toISOString() : null,
+          reminderNotifiedAt: null,
+          subtasks: task.subtasks.map(subtask => ({ ...subtask, id: genId(), completed: false, completedAt: null })),
+          createdAt: nextCreatedAt,
+          updatedAt: nextCreatedAt
+        })
+        tasks.value.unshift(nextTask)
+        prependTaskToOrder(nextTask.id, getPlanBucket(nextTask) === 'none' ? 'inbox' : 'planned')
+        rescheduleReminder(nextTask)
+        showNotice('已生成下一次重复任务', 'success')
+      }
     }
     task.updatedAt = completedAt || nowIso()
     rescheduleReminder(task)

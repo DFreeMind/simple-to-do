@@ -5157,6 +5157,8 @@ body.is-resizing {
   .data-backup-confirm > span { margin-left: 0; }
 }
 
+.context-menu__hint { margin: 5px 9px 4px; color: var(--text-muted); font-size: 11px; line-height: 1.35; }
+
 .sidebar--collapsed .rail-profile {
   width: 44px;
   height: 44px;

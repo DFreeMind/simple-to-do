@@ -154,6 +154,7 @@ function toggleExtra(name) {
 const repeatOptions = [
   { value: '', label: '不重复' },
   { value: 'daily', label: '每天' },
+  { value: 'weekdays', label: '工作日' },
   { value: 'weekly', label: '每周' },
   { value: 'monthly', label: '每月' },
   { value: 'yearly', label: '每年' }

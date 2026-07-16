@@ -3,6 +3,10 @@ name: 发布桌面应用
 on:
   workflow_dispatch:
     inputs:
+      version:
+        description: '本次发布的应用版本，必须与 package.json 和 tauri.conf.json 完全一致'
+        required: true
+        type: string
       release_notes:
         description: '中文 Release Notes（包含主要更新、修复和已知限制）'
         required: true
@@ -28,6 +32,9 @@ jobs:
 
       - name: 安装前端依赖
         run: npm ci
+
+      - name: 发布前校验
+        run: npm run release:check -- ${{ inputs.version }}
 
       - name: 构建并上传 Release 资源
         uses: tauri-apps/tauri-action@v1

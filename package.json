@@ -9,7 +9,8 @@
     "frontend:build": "vite build",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "release:check": "node scripts/release-preflight.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",

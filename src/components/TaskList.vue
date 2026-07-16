@@ -1474,6 +1474,10 @@ function focusSearchInput() {
   nextTick(() => searchInput.value?.focus())
 }
 
+function focusQuickAdd() {
+  nextTick(() => quickInput.value?.focus())
+}
+
 onMounted(() => {
   window.addEventListener('click', closeListSwitcher)
   window.addEventListener('click', closeSortMenu)
@@ -1483,6 +1487,7 @@ onMounted(() => {
   window.addEventListener('keydown', handleSortKeydown)
   window.addEventListener('keydown', handleGroupDialogKeydown)
   window.addEventListener('task-list:focus-search', focusSearchInput)
+  window.addEventListener('task-list:focus-quick-add', focusQuickAdd)
   nextTick(() => updateScrollIndicator())
 })
 
@@ -1495,6 +1500,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleSortKeydown)
   window.removeEventListener('keydown', handleGroupDialogKeydown)
   window.removeEventListener('task-list:focus-search', focusSearchInput)
+  window.removeEventListener('task-list:focus-quick-add', focusQuickAdd)
   if (scrollTimer) clearTimeout(scrollTimer)
 })
 
