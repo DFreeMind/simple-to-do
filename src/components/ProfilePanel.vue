@@ -79,6 +79,7 @@
     <Teleport to="body">
       <div v-if="avatarPreview" class="profile-avatar-preview" :style="{ left: `${avatarPreview.left}px`, top: `${avatarPreview.top}px` }" role="tooltip">
         <img :src="avatarPreview.avatar.src" :alt="`${avatarPreview.avatar.label}预览`" />
+        <span class="profile-avatar-preview__label">{{ avatarPreview.avatar.label }}</span>
       </div>
     </Teleport>
   </div>
@@ -167,8 +168,8 @@ function closeAvatarPickerOnOutside(event) {
 function showAvatarPreview(avatar, event) {
   const rect = event.currentTarget?.getBoundingClientRect()
   if (!rect) return
-  const width = 164
-  const height = 164
+  const width = 148
+  const height = 148
   const margin = 12
   const left = Math.max(margin, Math.min(rect.left + rect.width / 2 - width / 2, window.innerWidth - width - margin))
   const preferredTop = rect.bottom + 10
