@@ -39,9 +39,26 @@
         </section>
         <section v-else class="profile-section profile-section--first profile-section--capabilities">
           <div class="profile-section__head"><h3>数据与安全</h3><p>本地优先</p></div>
+          <div class="data-backup-toolbar">
+            <span><strong>本机恢复点</strong><small>包含任务、附件和头像；恢复前会自动创建安全点</small></span>
+            <button class="small-btn" type="button" :disabled="backupWorking" @click="createBackup">{{ backupWorking ? '处理中…' : '创建恢复点' }}</button>
+          </div>
+          <p v-if="backupError" class="profile-editor__error">{{ backupError }}</p>
+          <div v-if="backups.length" class="data-backup-list">
+            <article v-for="backup in backups" :key="backup.id" class="data-backup-item">
+              <span class="profile-capability__icon">备</span>
+              <span><strong>{{ backup.reason === 'manual' ? '手动恢复点' : '恢复前安全点' }}</strong><small>{{ formatBackupDate(backup.createdAt) }} · {{ formatBytes(backup.sizeBytes) }}</small></span>
+              <button class="text-btn" type="button" :disabled="backupWorking" @click="requestRestore(backup)">恢复</button>
+            </article>
+          </div>
+          <p v-else class="profile-capability__empty">还没有恢复点。建议在大批量整理或安装更新前创建一个。</p>
+          <div v-if="pendingRestore" class="data-backup-confirm">
+            <strong>恢复到 {{ formatBackupDate(pendingRestore.createdAt) }}？</strong>
+            <small>当前数据将先保存为新的“恢复前安全点”，然后重新加载此恢复点。</small>
+            <span><button class="text-btn" type="button" :disabled="backupWorking" @click="pendingRestore = null">取消</button><button class="small-btn" type="button" :disabled="backupWorking" @click="restoreBackup">确认恢复</button></span>
+          </div>
           <div class="profile-capability-list">
-            <article class="profile-capability"><span class="profile-capability__icon">备</span><div><strong>备份与恢复</strong><small>备份策略、恢复点和数据迁移将统一在这里管理</small></div><span class="profile-capability__status">未配置</span></article>
-            <article class="profile-capability"><span class="profile-capability__icon">安</span><div><strong>设备与安全</strong><small>账号接入后，可查看已登录设备并管理本地数据保护</small></div><span class="profile-capability__status is-safe">仅此设备</span></article>
+            <article class="profile-capability"><span class="profile-capability__icon">安</span><div><strong>当前设备</strong><small>数据仅保存在本机；不会上传到服务器</small></div><span class="profile-capability__status is-safe">仅此设备</span></article>
           </div>
         </section>
         </div>
@@ -54,7 +71,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ChevronRight, Folder, HardDrive, ListTodo, RefreshCw, ShieldCheck, Trash2, UserRound, X } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
-import { importProfileAvatar, readProfileAvatar, selectImage } from '@/services/platform'
+import { createDataBackup, importProfileAvatar, listDataBackups, readProfileAvatar, restoreDataBackup, selectImage } from '@/services/platform'
 import SpaceManagement from './SpaceManagement.vue'
 import shiba from '@/assets/avatars/shiba.png'
 import cat from '@/assets/avatars/cat.png'
@@ -95,9 +112,13 @@ const sections = [
 ]
 const avatarLetter = computed(() => Array.from(store.profile.nickname?.trim() || '易')[0] || '易')
 const activeTaskCount = computed(() => store.tasks.filter(task => !task.completed && !task.deleted).length)
+const backups = ref([])
+const backupWorking = ref(false)
+const backupError = ref('')
+const pendingRestore = ref(null)
 let nicknameTimer = null
 
-onMounted(() => { loadAvatar(); document.addEventListener('pointerdown', closeAvatarPickerOnOutside) })
+onMounted(() => { loadAvatar(); loadBackups(); document.addEventListener('pointerdown', closeAvatarPickerOnOutside) })
 onBeforeUnmount(() => { if (nicknameTimer) window.clearTimeout(nicknameTimer); document.removeEventListener('pointerdown', closeAvatarPickerOnOutside) })
 watch(nickname, () => {
   if (nicknameTimer) window.clearTimeout(nicknameTimer)
@@ -112,6 +133,57 @@ async function loadAvatar() {
 
 function closeAvatarPickerOnOutside(event) {
   if (avatarPickerOpen.value && !avatarPickerAnchor.value?.contains(event.target)) avatarPickerOpen.value = false
+}
+
+function formatBytes(value = 0) {
+  if (value < 1024) return `${value} B`
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function formatBackupDate(value) {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '未知时间' : date.toLocaleString('zh-CN', { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+async function loadBackups() {
+  try {
+    backups.value = await listDataBackups()
+  } catch (error) {
+    backupError.value = error?.message || '读取恢复点失败'
+  }
+}
+
+async function createBackup() {
+  backupWorking.value = true
+  backupError.value = ''
+  try {
+    const backup = await createDataBackup()
+    backups.value = [backup, ...backups.value]
+    store.showNotice('已创建本机恢复点', 'success')
+  } catch (error) {
+    backupError.value = error?.message || '创建恢复点失败'
+  } finally { backupWorking.value = false }
+}
+
+function requestRestore(backup) {
+  pendingRestore.value = backup
+  backupError.value = ''
+}
+
+async function restoreBackup() {
+  if (!pendingRestore.value) return
+  backupWorking.value = true
+  backupError.value = ''
+  try {
+    await restoreDataBackup(pendingRestore.value.id)
+    await store.loadData()
+    pendingRestore.value = null
+    await loadBackups()
+    store.showNotice('已恢复本机数据，并创建了恢复前安全点', 'success')
+  } catch (error) {
+    backupError.value = error?.message || '恢复本机数据失败'
+  } finally { backupWorking.value = false }
 }
 
 function selectBuiltIn(id) {

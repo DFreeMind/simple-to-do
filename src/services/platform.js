@@ -49,6 +49,33 @@ export async function saveMigrationBackup(data) {
   }
 }
 
+export async function createDataBackup() {
+  if (!isTauri()) throw new Error('当前环境不支持创建本机恢复点')
+  try {
+    return await invoke('create_data_backup')
+  } catch (error) {
+    throw new Error(formatPlatformError(error, '创建本机恢复点失败'))
+  }
+}
+
+export async function listDataBackups() {
+  if (!isTauri()) return []
+  try {
+    return await invoke('list_data_backups')
+  } catch (error) {
+    throw new Error(formatPlatformError(error, '读取恢复点失败'))
+  }
+}
+
+export async function restoreDataBackup(backupId) {
+  if (!isTauri()) throw new Error('当前环境不支持恢复本机数据')
+  try {
+    return await invoke('restore_data_backup', { backupId })
+  } catch (error) {
+    throw new Error(formatPlatformError(error, '恢复本机数据失败'))
+  }
+}
+
 export async function selectImage() {
   if (isTauri()) {
     return invoke('select_image')

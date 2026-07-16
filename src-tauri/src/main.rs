@@ -184,6 +184,189 @@ fn copy_directory_if_present(source: &Path, destination: &Path) -> Result<(), St
     Ok(())
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DataBackupRecord {
+    id: String,
+    created_at: String,
+    size_bytes: u64,
+    reason: String,
+}
+
+fn copy_directory_tree(source: &Path, destination: &Path) -> Result<(), String> {
+    fs::create_dir_all(destination).map_err(|err| format!("创建备份目录失败: {err}"))?;
+    if !source.is_dir() {
+        return Ok(());
+    }
+    for entry in fs::read_dir(source).map_err(|err| format!("读取备份目录失败: {err}"))? {
+        let entry = entry.map_err(|err| format!("读取备份目录失败: {err}"))?;
+        let source_path = entry.path();
+        let target_path = destination.join(entry.file_name());
+        if source_path.is_dir() {
+            copy_directory_tree(&source_path, &target_path)?;
+        } else {
+            fs::copy(&source_path, &target_path).map_err(|err| format!("复制备份文件失败: {err}"))?;
+        }
+    }
+    Ok(())
+}
+
+fn directory_size(path: &Path) -> Result<u64, String> {
+    if path.is_file() {
+        return fs::metadata(path)
+            .map(|metadata| metadata.len())
+            .map_err(|err| format!("读取备份大小失败: {err}"));
+    }
+    if !path.is_dir() {
+        return Ok(0);
+    }
+    let mut total = 0;
+    for entry in fs::read_dir(path).map_err(|err| format!("读取备份目录失败: {err}"))? {
+        total += directory_size(&entry.map_err(|err| format!("读取备份目录失败: {err}"))?.path())?;
+    }
+    Ok(total)
+}
+
+fn backup_id_is_safe(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 96
+        && id.chars().all(|character| character.is_ascii_alphanumeric() || character == '-' || character == '_')
+}
+
+fn create_data_snapshot(app: &tauri::AppHandle, reason: &str) -> Result<DataBackupRecord, String> {
+    let database = db_file(app)?;
+    if !database.is_file() {
+        return Err("当前没有可备份的本机数据".to_string());
+    }
+    // 先打开并关闭连接，确保结构校验通过；实际复制使用 Online Backup API 保留 WAL 中的数据。
+    drop(open_database(app)?);
+    let now = Local::now();
+    let id = format!("snapshot-{}-{}", now.format("%Y%m%d-%H%M%S"), reason);
+    let target = backup_dir(app)?.join(&id);
+    fs::create_dir_all(&target).map_err(|err| format!("创建恢复点失败: {err}"))?;
+    copy_sqlite_database(&database, &target.join("simpletodo.db"))?;
+    let data_dir = app_data_dir(app)?;
+    copy_directory_tree(&data_dir.join("attachments"), &target.join("attachments"))?;
+    copy_directory_tree(&data_dir.join("profile"), &target.join("profile"))?;
+    let record = DataBackupRecord {
+        id,
+        created_at: now.to_rfc3339(),
+        size_bytes: directory_size(&target)?,
+        reason: reason.to_string(),
+    };
+    let metadata = serde_json::to_vec_pretty(&record).map_err(|err| format!("写入恢复点信息失败: {err}"))?;
+    fs::write(target.join("backup.json"), metadata).map_err(|err| format!("写入恢复点信息失败: {err}"))?;
+    Ok(record)
+}
+
+fn read_data_backup_record(path: &Path) -> Result<Option<DataBackupRecord>, String> {
+    let metadata = path.join("backup.json");
+    if !metadata.is_file() || !path.join("simpletodo.db").is_file() {
+        return Ok(None);
+    }
+    let value: serde_json::Value = serde_json::from_slice(
+        &fs::read(&metadata).map_err(|err| format!("读取恢复点信息失败: {err}"))?,
+    )
+    .map_err(|err| format!("解析恢复点信息失败: {err}"))?;
+    let id = value.get("id").and_then(|item| item.as_str()).unwrap_or_default().to_string();
+    if !backup_id_is_safe(&id) || id != path.file_name().and_then(|item| item.to_str()).unwrap_or_default() {
+        return Ok(None);
+    }
+    Ok(Some(DataBackupRecord {
+        id,
+        created_at: value.get("createdAt").and_then(|item| item.as_str()).unwrap_or_default().to_string(),
+        size_bytes: directory_size(path)?,
+        reason: value.get("reason").and_then(|item| item.as_str()).unwrap_or("manual").to_string(),
+    }))
+}
+
+#[tauri::command]
+fn create_data_backup(app: tauri::AppHandle) -> Result<DataBackupRecord, String> {
+    create_data_snapshot(&app, "manual")
+}
+
+#[tauri::command]
+fn list_data_backups(app: tauri::AppHandle) -> Result<Vec<DataBackupRecord>, String> {
+    let mut backups = Vec::new();
+    for entry in fs::read_dir(backup_dir(&app)?).map_err(|err| format!("读取恢复点失败: {err}"))? {
+        let entry = entry.map_err(|err| format!("读取恢复点失败: {err}"))?;
+        if let Some(record) = read_data_backup_record(&entry.path())? {
+            backups.push(record);
+        }
+    }
+    backups.sort_by(|left, right| right.created_at.cmp(&left.created_at));
+    Ok(backups)
+}
+
+fn remove_path(path: &Path) -> Result<(), String> {
+    if path.is_dir() {
+        fs::remove_dir_all(path).map_err(|err| format!("清理临时恢复文件失败: {err}"))?;
+    } else if path.exists() {
+        fs::remove_file(path).map_err(|err| format!("清理临时恢复文件失败: {err}"))?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn restore_data_backup(app: tauri::AppHandle, backup_id: String) -> Result<bool, String> {
+    if !backup_id_is_safe(&backup_id) {
+        return Err("恢复点标识无效".to_string());
+    }
+    let snapshot = backup_dir(&app)?.join(&backup_id);
+    if read_data_backup_record(&snapshot)?.is_none() {
+        return Err("恢复点不存在或已损坏".to_string());
+    }
+    let safety_backup = create_data_snapshot(&app, "before-restore")?;
+    let data_dir = app_data_dir(&app)?;
+    let stage = data_dir.join(format!(".restore-stage-{}", Local::now().format("%Y%m%d-%H%M%S%3f")));
+    fs::create_dir_all(&stage).map_err(|err| format!("创建恢复暂存区失败: {err}"))?;
+    copy_sqlite_database(&snapshot.join("simpletodo.db"), &stage.join("simpletodo.db"))?;
+    copy_directory_tree(&snapshot.join("attachments"), &stage.join("attachments"))?;
+    copy_directory_tree(&snapshot.join("profile"), &stage.join("profile"))?;
+
+    let rollback = data_dir.join(format!(".restore-rollback-{}", Local::now().format("%Y%m%d-%H%M%S%3f")));
+    fs::create_dir_all(&rollback).map_err(|err| format!("创建恢复回滚区失败: {err}"))?;
+    let components = ["simpletodo.db", "attachments", "profile"];
+    let mut switched = Vec::new();
+    for component in components {
+        let current = data_dir.join(component);
+        let staged = stage.join(component);
+        let previous = rollback.join(component);
+        let result = (|| -> Result<(), String> {
+            if current.exists() {
+                fs::rename(&current, &previous).map_err(|err| format!("准备恢复当前数据失败: {err}"))?;
+            }
+            fs::rename(&staged, &current).map_err(|err| format!("应用恢复点失败: {err}"))?;
+            Ok(())
+        })();
+        if let Err(error) = result {
+            // 当前组件可能已移入回滚区、但暂存文件尚未来得及替换；先把它复原，
+            // 再处理此前已切换的组件，避免一次中断造成数据库或附件缺失。
+            let current = data_dir.join(component);
+            let previous = rollback.join(component);
+            let _ = remove_path(&current);
+            if previous.exists() {
+                let _ = fs::rename(&previous, &current);
+            }
+            for restored in switched.iter().rev() {
+                let current = data_dir.join(restored);
+                let previous = rollback.join(restored);
+                let _ = remove_path(&current);
+                if previous.exists() {
+                    let _ = fs::rename(previous, current);
+                }
+            }
+            let _ = remove_path(&stage);
+            let _ = remove_path(&rollback);
+            return Err(format!("恢复失败，已尝试回滚；恢复前安全点为 {}。{error}", safety_backup.id));
+        }
+        switched.push(component);
+    }
+    remove_path(&stage)?;
+    remove_path(&rollback)?;
+    Ok(true)
+}
+
 fn attachment_root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let dir = app
         .path()
@@ -2204,6 +2387,9 @@ fn main() {
             load_data,
             save_data,
             save_migration_backup,
+            create_data_backup,
+            list_data_backups,
+            restore_data_backup,
             select_image,
             read_image,
             import_image,
