@@ -34,6 +34,7 @@ import {
   playRenameSound,
   playGroupAddSound,
   playGroupDeleteSound,
+  playSoundPreview,
   setSoundEnabled,
   setSoundCategories
 } from '@/utils/sound'
@@ -559,6 +560,10 @@ export const useTaskStore = defineStore('task', () => {
       if (updates.reminderNotificationsEnabled === false) showNotice('任务提醒通知已关闭', 'info')
     }
     purgeExpiredTrash()
+  }
+
+  function previewSound() {
+    playSoundPreview()
   }
 
   async function testReminderNotification() {
@@ -1940,6 +1945,7 @@ export const useTaskStore = defineStore('task', () => {
     openHelpCenter,
     closeHelpCenter,
     updateSettings,
+    previewSound,
     updateProfile,
     testReminderNotification,
     loadData,

@@ -341,6 +341,13 @@
                   <span class="switch-control" aria-hidden="true"></span>
                 </label>
 
+                <div class="sound-preview-row">
+                  <span><strong>试听完成提示</strong><small>使用与任务完成相同的音效</small></span>
+                  <button class="small-btn" type="button" :disabled="!store.settings.soundEnabled || !store.settings.soundTaskEnabled" @click="store.previewSound">
+                    <Volume2 :size="14" />试听
+                  </button>
+                </div>
+
                 <p v-if="!store.settings.soundEnabled" class="setting-summary">音效已关闭；重新开启后会保留各类操作的开关状态。</p>
                 <div v-else class="sound-categories">
                   <label class="sound-item">
