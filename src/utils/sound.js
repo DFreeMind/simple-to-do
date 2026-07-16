@@ -1,95 +1,97 @@
-import backSound from '@/assets/sounds/back.ogg'
-import clickSound from '@/assets/sounds/click.ogg'
-import closeSound from '@/assets/sounds/close.ogg'
-import confirmSound from '@/assets/sounds/confirm.ogg'
-import dropSound from '@/assets/sounds/drop.ogg'
-import errorSound from '@/assets/sounds/error.ogg'
-import openSound from '@/assets/sounds/open.ogg'
-import selectSound from '@/assets/sounds/select.ogg'
-import tickSound from '@/assets/sounds/tick.ogg'
-import toggleSound from '@/assets/sounds/toggle.ogg'
+import chimeSound from '@/assets/sounds/chime.ogg'
+import completeSound from '@/assets/sounds/complete.ogg'
+import dragTickSound from '@/assets/sounds/drag-tick.ogg'
+import restoreSound from '@/assets/sounds/restore.ogg'
+import softClickSound from '@/assets/sounds/soft-click.ogg'
+import tapSound from '@/assets/sounds/tap.ogg'
 
-// Kenney Interface Sounds (CC0 1.0): https://opengameart.org/content/interface-sounds
-// 每个音效都使用独立 Audio 实例，避免高频操作中上一次播放被截断。
+// Robin Lamb UI Sound Effects (CC0 1.0): https://opengameart.org/content/ui-sound-effects-button-clicks-user-feedback-notifications
+// 素材使用延迟预加载的模板和 clone 播放：短音效可以叠加，拖动经过目标时不会因重新下载而失声。
 const SOUNDS = {
-  confirm: { src: confirmSound, volume: 0.42 },
-  back: { src: backSound, volume: 0.3 },
-  click: { src: clickSound, volume: 0.24 },
-  close: { src: closeSound, volume: 0.3 },
-  open: { src: openSound, volume: 0.34 },
-  drop: { src: dropSound, volume: 0.24 },
-  toggle: { src: toggleSound, volume: 0.22 },
-  select: { src: selectSound, volume: 0.25 },
-  error: { src: errorSound, volume: 0.28 },
-  tick: { src: tickSound, volume: 0.14 }
+  complete: { src: completeSound, volume: 0.31 },
+  restore: { src: restoreSound, volume: 0.22 },
+  chime: { src: chimeSound, volume: 0.17 },
+  tap: { src: tapSound, volume: 0.16 },
+  soft: { src: softClickSound, volume: 0.14 },
+  drag: { src: dragTickSound, volume: 0.12 }
 }
 
 let soundEnabled = true
-let soundCategories = {
-  task: true,
-  list: true,
-  group: true
-}
+let soundCategories = { task: true, list: true, group: true }
 let lastDragSoundTime = 0
-const DRAG_THROTTLE_MS = 180
+const DRAG_THROTTLE_MS = 90
+const audioTemplates = new Map()
 
 function isCategoryEnabled(category) {
   return soundEnabled && soundCategories[category]
 }
 
-function play(name, category) {
-  if (!isCategoryEnabled(category) || typeof Audio === 'undefined') return
-  const definition = SOUNDS[name]
-  if (!definition) return
-  try {
-    const audio = new Audio(definition.src)
+function getTemplate(name) {
+  if (typeof Audio === 'undefined') return null
+  if (!audioTemplates.has(name)) {
+    const audio = new Audio(SOUNDS[name].src)
     audio.preload = 'auto'
-    audio.volume = definition.volume
+    audioTemplates.set(name, audio)
+  }
+  return audioTemplates.get(name)
+}
+
+function warmAudioCache() {
+  Object.keys(SOUNDS).forEach(getTemplate)
+}
+
+function play(name, category) {
+  if (!isCategoryEnabled(category) || !SOUNDS[name]) return
+  try {
+    const template = getTemplate(name)
+    if (!template) return
+    const audio = template.cloneNode()
+    audio.volume = SOUNDS[name].volume
     audio.play().catch(() => {})
   } catch {
-    // 音频设备不可用或浏览器禁止播放时，不影响业务操作。
+    // 音频设备不可用或当前系统禁止播放时，不影响业务操作。
   }
 }
 
-// 任务：确认、回退、轻点击、收纳和放置形成一致的反馈语言。
-export function playCompleteSound() { play('confirm', 'task') }
-export function playTaskUndoSound() { play('back', 'task') }
-export function playSubtaskCompleteSound() { play('select', 'task') }
-export function playSubtaskUndoSound() { play('back', 'task') }
-export function playDeleteSound() { play('close', 'task') }
-export function playAddSound() { play('click', 'task') }
-export function playRestoreSound() { play('open', 'task') }
-export function playMoveSound() { play('drop', 'task') }
-export function playToggleSound() { play('toggle', 'task') }
-export function playMarkSound() { play('select', 'task') }
-export function playScheduleSound() { play('select', 'task') }
-export function playAttachSound() { play('click', 'task') }
-export function playClearSound() { play('close', 'task') }
-export function playSaveSound() { play('tick', 'task') }
-export function playErrorSound() { play('error', 'task') }
+// 任务：清亮完成提示 + 低干扰点击，避免使用夸张的游戏式“开关门”音色。
+export function playCompleteSound() { play('complete', 'task') }
+export function playTaskUndoSound() { play('soft', 'task') }
+export function playSubtaskCompleteSound() { play('tap', 'task') }
+export function playSubtaskUndoSound() { play('soft', 'task') }
+export function playDeleteSound() { play('soft', 'task') }
+export function playAddSound() { play('tap', 'task') }
+export function playRestoreSound() { play('restore', 'task') }
+export function playMoveSound() { play('tap', 'task') }
+export function playToggleSound() { play('soft', 'task') }
+export function playMarkSound() { play('chime', 'task') }
+export function playScheduleSound() { play('chime', 'task') }
+export function playAttachSound() { play('tap', 'task') }
+export function playClearSound() { play('soft', 'task') }
+export function playSaveSound() { play('soft', 'task') }
+export function playErrorSound() { play('soft', 'task') }
 
-export function playDragStartSound() { play('click', 'task') }
+export function playDragStartSound() { play('tap', 'task') }
 export function playDragOverSound() {
   if (!isCategoryEnabled('task')) return
   const now = Date.now()
   if (now - lastDragSoundTime < DRAG_THROTTLE_MS) return
   lastDragSoundTime = now
-  play('tick', 'task')
+  play('drag', 'task')
 }
-export function playDragEndSound() { play('drop', 'task') }
+export function playDragEndSound() { play('soft', 'task') }
 
-// 清单和分组沿用同一套音色，但以开合、确认区分语义，避免音效过多。
-export function playListAddSound() { play('open', 'list') }
-export function playListDeleteSound() { play('close', 'list') }
-export function playListRestoreSound() { play('open', 'list') }
-export function playRenameSound() { play('select', 'list') }
-export function playGroupAddSound() { play('open', 'group') }
-export function playGroupDeleteSound() { play('close', 'group') }
+export function playListAddSound() { play('restore', 'list') }
+export function playListDeleteSound() { play('soft', 'list') }
+export function playListRestoreSound() { play('restore', 'list') }
+export function playRenameSound() { play('tap', 'list') }
+export function playGroupAddSound() { play('restore', 'group') }
+export function playGroupDeleteSound() { play('soft', 'group') }
 
-export function playSoundPreview() { play('confirm', 'task') }
+export function playSoundPreview() { play('complete', 'task') }
 
 export function setSoundEnabled(enabled) {
   soundEnabled = enabled
+  if (enabled) warmAudioCache()
 }
 
 export function isSoundEnabled() {
@@ -98,6 +100,7 @@ export function isSoundEnabled() {
 
 export function setSoundCategories(categories) {
   soundCategories = { ...soundCategories, ...categories }
+  if (soundEnabled) warmAudioCache()
 }
 
 export function getSoundCategories() {

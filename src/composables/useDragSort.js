@@ -28,7 +28,8 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
   let lastMoveTime = 0
   let scrollRaf = null
   let suppressNextClick = false
-  let lastDragOverId = ''
+  let lastDragOverSoundTime = 0
+  const DRAG_OVER_SOUND_INTERVAL_MS = 110
 
   const DRAG_THRESHOLD = 5 // px before a press becomes a drag
   const EDGE_THRESHOLD = 60 // px from edge to trigger auto-scroll
@@ -58,6 +59,7 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
     suppressNextClick = true
     document.addEventListener('click', suppressClick, true)
     draggingId.value = pendingItemId
+    lastDragOverSoundTime = 0
 
     // Calculate offset from item top-left to mouse position
     const rect = pendingItem.el.getBoundingClientRect()
@@ -128,16 +130,15 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
       dragOverId.value = result.id
       dropPosition.value = result.position || 'after'
       targetGroupId = result.groupId
-      // 播放拖动经过目标音效（仅在目标变化时）
-      if (onDragOver && result.id !== lastDragOverId) {
+      // 拖动过程中给出低音量、稳定节奏的经过反馈；不局限于首次进入目标。
+      if (onDragOver && now - lastDragOverSoundTime >= DRAG_OVER_SOUND_INTERVAL_MS) {
         onDragOver()
-        lastDragOverId = result.id
+        lastDragOverSoundTime = now
       }
     } else {
       dragOverId.value = ''
       dropPosition.value = ''
       targetGroupId = undefined
-      lastDragOverId = ''
     }
   }
 
@@ -201,7 +202,7 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
     dragOverId.value = ''
     dropPosition.value = ''
     targetGroupId = undefined
-    lastDragOverId = ''
+    lastDragOverSoundTime = 0
   }
 
   function suppressClick(event) {
@@ -231,7 +232,7 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
     dragOverId.value = ''
     dropPosition.value = ''
     targetGroupId = undefined
-    lastDragOverId = ''
+    lastDragOverSoundTime = 0
   }
 
   onUnmounted(cleanup)
