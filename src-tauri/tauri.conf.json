@@ -25,6 +25,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": [
       "nsis",
       "dmg"
@@ -47,6 +48,17 @@
           "SimpChinese"
         ],
         "displayLanguageSelector": false
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY5NTVFOUY1MDYzRUQ2RjgKUldUNDFqNEc5ZWxWYWQzV3pQbXVnMWFtVEIxZFR6TU5SWXhLZ0FvTnhlak9oL08yVms4WFBieGMK",
+      "endpoints": [
+        "https://github.com/DFreeMind/simple-to-do/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
       }
     }
   }

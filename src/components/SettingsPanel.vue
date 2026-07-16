@@ -484,7 +484,7 @@
               </div>
             </div>
 
-              <div class="about-card">
+            <div class="about-card">
               <img :src="appIcon" alt="" />
               <div>
                 <strong>易简清单</strong>
@@ -493,6 +493,26 @@
               <button class="settings-help-link" type="button" @click="store.openHelpCenter">
                 <Compass :size="17" />
                 <span><strong>打开使用指南</strong><small>快速开始、功能说明、常见问题与更新内容</small></span>
+              </button>
+            </div>
+
+            <div class="settings-block">
+              <div class="settings-block__title">
+                <h4>应用更新</h4>
+                <span>{{ updateStatusText }}</span>
+              </div>
+              <p class="setting-summary">检查 GitHub Release 中经过签名验证的稳定版本。下载完成后会启动安装程序更新应用。</p>
+              <div v-if="updateState === 'available'" class="storage-result">
+                <div class="storage-result__head">
+                  <span><strong>发现新版本 {{ availableUpdate?.version }}</strong><small>{{ updateNotes }}</small></span>
+                  <button class="small-btn" type="button" :disabled="updateState === 'downloading' || updateState === 'installing'" @click="installUpdate">
+                    {{ updateState === 'downloading' ? updateProgressText : '下载并安装' }}
+                  </button>
+                </div>
+              </div>
+              <p v-else-if="updateState === 'error'" class="storage-warning">{{ updateError }}</p>
+              <button class="small-btn" type="button" :disabled="updateState === 'checking' || updateState === 'downloading' || updateState === 'installing'" @click="checkForUpdates">
+                {{ updateState === 'checking' ? '检查中…' : '检查更新' }}
               </button>
             </div>
           </section>
@@ -533,6 +553,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { Bell, Check, Compass, Database, Info, PanelTop, Palette, ShieldCheck, SlidersHorizontal, Trash2, X, Volume2, CheckSquare, Folder, Tag } from 'lucide-vue-next'
+import { check } from '@tauri-apps/plugin-updater'
 import { useTaskStore } from '@/stores/task'
 import { purgeQuarantinedAttachments, quarantineOrphanAttachments, readAttachment, readQuarantinedAttachment, restoreQuarantinedAttachments, scanStorageHealth } from '@/services/platform'
 import ImageLightbox from './ImageLightbox.vue'
@@ -557,6 +578,10 @@ const storageBrowserPage = ref(0)
 const storageFilter = ref('all')
 const inlineLimit = 3
 const browserPageSize = 40
+const updateState = ref('idle')
+const availableUpdate = ref(null)
+const updateError = ref('')
+const updateProgress = ref({ downloaded: 0, total: 0 })
 
 const sections = [
   { id: 'appearance', label: '外观', summary: '主题与布局', icon: Palette },
@@ -595,6 +620,21 @@ const enabledSoundCount = computed(() => [
 const soundSummary = computed(() => store.settings.soundEnabled ? `${enabledSoundCount.value}/3 已启用` : '已关闭')
 const reminderSummary = computed(() => store.settings.reminderNotificationsEnabled ? (store.settings.reminderSoundEnabled ? '通知和声音' : '仅通知') : '已关闭')
 const storageSummary = computed(() => storageReport.value ? `${storageReport.value.orphanAttachments.length} 项可清理` : '按需扫描')
+const updateStatusText = computed(() => ({
+  idle: '手动检查',
+  checking: '正在检查',
+  upToDate: '已是最新',
+  available: `可更新至 ${availableUpdate.value?.version || ''}`,
+  downloading: '正在下载',
+  installing: '正在安装',
+  error: '检查失败'
+}[updateState.value] || '手动检查'))
+const updateProgressText = computed(() => {
+  const { downloaded, total } = updateProgress.value
+  if (!total) return '正在下载…'
+  return `正在下载 ${Math.min(100, Math.round(downloaded / total * 100))}%`
+})
+const updateNotes = computed(() => availableUpdate.value?.body?.trim() || '本次更新已准备就绪。')
 const orphanGroups = computed(() => {
   const items = storageReport.value?.orphanAttachments || []
   const images = items.filter(item => item.isImage)
@@ -633,6 +673,45 @@ function formatBytes(value = 0) {
 function formatDate(value) {
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? '未知时间' : date.toLocaleDateString('zh-CN')
+}
+
+async function checkForUpdates() {
+  updateState.value = 'checking'
+  updateError.value = ''
+  availableUpdate.value = null
+  try {
+    const update = await check({ timeout: 10000 })
+    if (!update) {
+      updateState.value = 'upToDate'
+      return
+    }
+    availableUpdate.value = update
+    updateState.value = 'available'
+  } catch (error) {
+    updateState.value = 'error'
+    updateError.value = error?.message || '暂时无法检查更新，请检查网络后重试。'
+  }
+}
+
+async function installUpdate() {
+  if (!availableUpdate.value) return
+  updateState.value = 'downloading'
+  updateError.value = ''
+  updateProgress.value = { downloaded: 0, total: 0 }
+  try {
+    await availableUpdate.value.downloadAndInstall((event) => {
+      if (event.event === 'Started') {
+        updateProgress.value = { downloaded: 0, total: event.data.contentLength || 0 }
+      } else if (event.event === 'Progress') {
+        updateProgress.value = { ...updateProgress.value, downloaded: updateProgress.value.downloaded + event.data.chunkLength }
+      } else if (event.event === 'Finished') {
+        updateState.value = 'installing'
+      }
+    })
+  } catch (error) {
+    updateState.value = 'error'
+    updateError.value = error?.message || '更新下载或安装失败，请稍后重试。'
+  }
 }
 
 async function scanStorage() {

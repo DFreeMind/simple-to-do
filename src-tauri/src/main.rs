@@ -12,9 +12,9 @@ use std::{
 };
 use tauri::Manager;
 use tauri::{
-    WindowEvent,
     menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem},
-    tray::{TrayIconBuilder, TrayIconEvent, MouseButton, MouseButtonState},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    WindowEvent,
 };
 
 fn show_main_window(app: &tauri::AppHandle) {
@@ -63,11 +63,16 @@ fn attachment_file_path(app: &tauri::AppHandle, relative_path: &str) -> Result<P
     let relative_path = normalize_attachment_relative_path(relative_path)?;
     let path = relative_path
         .split('/')
-        .fold(attachment_root(app)?, |path, component| path.join(component));
+        .fold(attachment_root(app)?, |path, component| {
+            path.join(component)
+        });
     Ok(path)
 }
 
-fn profile_avatar_file_path(app: &tauri::AppHandle, relative_path: &str) -> Result<PathBuf, String> {
+fn profile_avatar_file_path(
+    app: &tauri::AppHandle,
+    relative_path: &str,
+) -> Result<PathBuf, String> {
     if !relative_path.starts_with("profile/avatars/") || relative_path.contains("..") {
         return Err("无效的头像路径".to_string());
     }
@@ -98,9 +103,13 @@ fn save_data(app: tauri::AppHandle, data: serde_json::Value) -> Result<bool, Str
 
 #[tauri::command]
 fn save_migration_backup(app: tauri::AppHandle, data: serde_json::Value) -> Result<String, String> {
-    let filename = format!("migration-{}.json", Local::now().format("%Y%m%d-%H%M%S%.3f"));
+    let filename = format!(
+        "migration-{}.json",
+        Local::now().format("%Y%m%d-%H%M%S%.3f")
+    );
     let path = backup_dir(&app)?.join(filename);
-    let content = serde_json::to_vec_pretty(&data).map_err(|err| format!("序列化迁移备份失败: {err}"))?;
+    let content =
+        serde_json::to_vec_pretty(&data).map_err(|err| format!("序列化迁移备份失败: {err}"))?;
     fs::write(&path, content).map_err(|err| format!("写入迁移备份失败: {err}"))?;
     Ok(path.to_string_lossy().to_string())
 }
@@ -1152,7 +1161,10 @@ fn import_image(app: tauri::AppHandle, file_path: String) -> Result<ImportedAtta
 }
 
 #[tauri::command]
-fn import_profile_avatar(app: tauri::AppHandle, file_path: String) -> Result<ImportedAttachment, String> {
+fn import_profile_avatar(
+    app: tauri::AppHandle,
+    file_path: String,
+) -> Result<ImportedAttachment, String> {
     let source = PathBuf::from(file_path);
     let data = fs::read(&source).map_err(|err| format!("读取头像失败: {err}"))?;
     let mime = mime_from_path(&source);
@@ -1164,7 +1176,11 @@ fn import_profile_avatar(app: tauri::AppHandle, file_path: String) -> Result<Imp
         .or_else(|| source.extension().and_then(|value| value.to_str()))
         .unwrap_or("bin")
         .to_ascii_lowercase();
-    let relative_path = format!("profile/avatars/{}.{}", &sha256[..16.min(sha256.len())], ext);
+    let relative_path = format!(
+        "profile/avatars/{}.{}",
+        &sha256[..16.min(sha256.len())],
+        ext
+    );
     let destination = profile_avatar_file_path(&app, &relative_path)?;
     if let Some(parent) = destination.parent() {
         fs::create_dir_all(parent).map_err(|err| format!("创建头像目录失败: {err}"))?;
@@ -1177,15 +1193,29 @@ fn import_profile_avatar(app: tauri::AppHandle, file_path: String) -> Result<Imp
         .unwrap_or((None, None));
     let timestamp = Local::now().to_rfc3339();
     Ok(ImportedAttachment {
-        kind: "image".to_string(), mime,
-        original_name: source.file_name().and_then(|value| value.to_str()).unwrap_or("avatar").to_string(),
-        relative_path, sha256, size_bytes: data.len() as u64, width, height,
-        created_at: timestamp.clone(), last_referenced_at: timestamp,
+        kind: "image".to_string(),
+        mime,
+        original_name: source
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or("avatar")
+            .to_string(),
+        relative_path,
+        sha256,
+        size_bytes: data.len() as u64,
+        width,
+        height,
+        created_at: timestamp.clone(),
+        last_referenced_at: timestamp,
     })
 }
 
 #[tauri::command]
-fn import_image_data(app: tauri::AppHandle, data: String, mime: String) -> Result<ImportedAttachment, String> {
+fn import_image_data(
+    app: tauri::AppHandle,
+    data: String,
+    mime: String,
+) -> Result<ImportedAttachment, String> {
     let bytes = general_purpose::STANDARD
         .decode(&data)
         .map_err(|err| format!("解码图片数据失败: {err}"))?;
@@ -1195,7 +1225,9 @@ fn import_image_data(app: tauri::AppHandle, data: String, mime: String) -> Resul
     }
 
     let sha256 = hex_sha256(&bytes);
-    let ext = extension_for_mime(&mime).unwrap_or("bin").to_ascii_lowercase();
+    let ext = extension_for_mime(&mime)
+        .unwrap_or("bin")
+        .to_ascii_lowercase();
     let now = Local::now();
     let short_hash = &sha256[..16.min(sha256.len())];
     let relative_path = format!(
@@ -1255,7 +1287,9 @@ fn resolve_html_images(app: tauri::AppHandle, html: String) -> Result<String, St
         let Some(offset) = pos else { break };
         let abs_pos = search_start + offset;
         let value_start = abs_pos + 5; // skip 'src="'
-        let Some(value_end) = result[value_start..].find('"') else { break };
+        let Some(value_end) = result[value_start..].find('"') else {
+            break;
+        };
 
         let raw_path = &result[value_start..value_start + value_end];
         let relative_path = normalize_attachment_relative_path(raw_path)?;
@@ -1301,11 +1335,20 @@ fn read_attachment(app: tauri::AppHandle, relative_path: String) -> Result<Optio
 }
 
 #[tauri::command]
-fn read_profile_avatar(app: tauri::AppHandle, relative_path: String) -> Result<Option<String>, String> {
+fn read_profile_avatar(
+    app: tauri::AppHandle,
+    relative_path: String,
+) -> Result<Option<String>, String> {
     let path = profile_avatar_file_path(&app, &relative_path)?;
-    if !path.exists() { return Ok(None); }
+    if !path.exists() {
+        return Ok(None);
+    }
     let data = fs::read(&path).map_err(|err| format!("读取头像失败: {err}"))?;
-    Ok(Some(format!("data:{};base64,{}", mime_from_path(&path), general_purpose::STANDARD.encode(data))))
+    Ok(Some(format!(
+        "data:{};base64,{}",
+        mime_from_path(&path),
+        general_purpose::STANDARD.encode(data)
+    )))
 }
 
 #[tauri::command]
@@ -1364,16 +1407,21 @@ fn referenced_attachment_paths(app: &tauri::AppHandle) -> Result<HashSet<String>
     let mut attachment_stmt = conn.prepare(
         "SELECT a.relative_path FROM attachments a INNER JOIN task_attachments ta ON ta.attachment_id = a.id"
     ).map_err(|err| format!("读取附件引用失败: {err}"))?;
-    let paths = attachment_stmt.query_map([], |row| row.get::<_, String>(0))
+    let paths = attachment_stmt
+        .query_map([], |row| row.get::<_, String>(0))
         .map_err(|err| format!("读取附件引用失败: {err}"))?;
     for path in paths {
-        if let Ok(path) = normalize_attachment_relative_path(&path.map_err(|err| format!("读取附件引用失败: {err}"))?) {
+        if let Ok(path) = normalize_attachment_relative_path(
+            &path.map_err(|err| format!("读取附件引用失败: {err}"))?,
+        ) {
             referenced.insert(path);
         }
     }
-    let mut html_stmt = conn.prepare("SELECT description_html FROM tasks")
+    let mut html_stmt = conn
+        .prepare("SELECT description_html FROM tasks")
         .map_err(|err| format!("读取备注图片引用失败: {err}"))?;
-    let htmls = html_stmt.query_map([], |row| row.get::<_, String>(0))
+    let htmls = html_stmt
+        .query_map([], |row| row.get::<_, String>(0))
         .map_err(|err| format!("读取备注图片引用失败: {err}"))?;
     for html in htmls {
         let html = html.map_err(|err| format!("读取备注图片引用失败: {err}"))?;
@@ -1387,11 +1435,19 @@ fn referenced_attachment_paths(app: &tauri::AppHandle) -> Result<HashSet<String>
         let mut files = Vec::new();
         collect_files(&root, &mut files)?;
         for file in files {
-            let stem = file.file_stem().and_then(|value| value.to_str()).unwrap_or("");
-            if embedded_hashes.iter().any(|prefix| stem.starts_with(prefix)) {
-                let relative = file.strip_prefix(&root)
+            let stem = file
+                .file_stem()
+                .and_then(|value| value.to_str())
+                .unwrap_or("");
+            if embedded_hashes
+                .iter()
+                .any(|prefix| stem.starts_with(prefix))
+            {
+                let relative = file
+                    .strip_prefix(&root)
                     .map_err(|err| format!("计算附件相对路径失败: {err}"))?
-                    .to_string_lossy().replace('\\', "/");
+                    .to_string_lossy()
+                    .replace('\\', "/");
                 referenced.insert(relative);
             }
         }
@@ -1400,17 +1456,29 @@ fn referenced_attachment_paths(app: &tauri::AppHandle) -> Result<HashSet<String>
 }
 
 fn storage_item(root: &Path, path: &Path, id: String) -> Result<StorageItem, String> {
-    let relative_path = path.strip_prefix(root)
+    let relative_path = path
+        .strip_prefix(root)
         .map_err(|err| format!("计算附件相对路径失败: {err}"))?
-        .to_string_lossy().replace('\\', "/");
+        .to_string_lossy()
+        .replace('\\', "/");
     let metadata = fs::metadata(path).map_err(|err| format!("读取附件信息失败: {err}"))?;
-    let modified_at = metadata.modified().ok()
+    let modified_at = metadata
+        .modified()
+        .ok()
         .map(|time| chrono::DateTime::<Local>::from(time).to_rfc3339())
         .unwrap_or_default();
-    let extension = path.extension().and_then(|value| value.to_str()).unwrap_or("").to_ascii_lowercase();
+    let extension = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
     Ok(StorageItem {
         id,
-        name: path.file_name().and_then(|value| value.to_str()).unwrap_or("附件").to_string(),
+        name: path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or("附件")
+            .to_string(),
         relative_path,
         size_bytes: metadata.len(),
         modified_at,
@@ -1419,10 +1487,18 @@ fn storage_item(root: &Path, path: &Path, id: String) -> Result<StorageItem, Str
 }
 
 fn collect_files(dir: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {
-    if !dir.exists() { return Ok(()); }
+    if !dir.exists() {
+        return Ok(());
+    }
     for entry in fs::read_dir(dir).map_err(|err| format!("读取附件目录失败: {err}"))? {
-        let path = entry.map_err(|err| format!("读取附件目录失败: {err}"))?.path();
-        if path.is_dir() { collect_files(&path, files)?; } else { files.push(path); }
+        let path = entry
+            .map_err(|err| format!("读取附件目录失败: {err}"))?
+            .path();
+        if path.is_dir() {
+            collect_files(&path, files)?;
+        } else {
+            files.push(path);
+        }
     }
     Ok(())
 }
@@ -1431,7 +1507,10 @@ fn compact_empty_dirs(dir: &Path) {
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.is_dir() { compact_empty_dirs(&path); let _ = fs::remove_dir(&path); }
+            if path.is_dir() {
+                compact_empty_dirs(&path);
+                let _ = fs::remove_dir(&path);
+            }
         }
     }
 }
@@ -1449,9 +1528,17 @@ fn scan_storage_health(app: tauri::AppHandle) -> Result<StorageHealth, String> {
         let item = storage_item(&attachment_root, &path, String::new())?;
         attachment_bytes += item.size_bytes;
         present.insert(item.relative_path.clone());
-        if !referenced.contains(&item.relative_path) { orphan_attachments.push(StorageItem { id: item.relative_path.clone(), ..item }); }
+        if !referenced.contains(&item.relative_path) {
+            orphan_attachments.push(StorageItem {
+                id: item.relative_path.clone(),
+                ..item
+            });
+        }
     }
-    let missing_references = referenced.into_iter().filter(|path| !present.contains(path)).collect();
+    let missing_references = referenced
+        .into_iter()
+        .filter(|path| !present.contains(path))
+        .collect();
     let cleanup_root = cleanup_root(&app)?;
     let mut cleanup_files = Vec::new();
     collect_files(&cleanup_root, &mut cleanup_files)?;
@@ -1460,14 +1547,28 @@ fn scan_storage_health(app: tauri::AppHandle) -> Result<StorageHealth, String> {
     for path in cleanup_files {
         let item = storage_item(&cleanup_root, &path, String::new())?;
         quarantined_bytes += item.size_bytes;
-        quarantined_attachments.push(StorageItem { id: item.relative_path.clone(), ..item });
+        quarantined_attachments.push(StorageItem {
+            id: item.relative_path.clone(),
+            ..item
+        });
     }
     let orphan_bytes = orphan_attachments.iter().map(|item| item.size_bytes).sum();
-    Ok(StorageHealth { supported: true, attachment_bytes, orphan_bytes, orphan_attachments, missing_references, quarantined_attachments, quarantined_bytes })
+    Ok(StorageHealth {
+        supported: true,
+        attachment_bytes,
+        orphan_bytes,
+        orphan_attachments,
+        missing_references,
+        quarantined_attachments,
+        quarantined_bytes,
+    })
 }
 
 #[tauri::command]
-fn quarantine_orphan_attachments(app: tauri::AppHandle, relative_paths: Vec<String>) -> Result<StorageOperation, String> {
+fn quarantine_orphan_attachments(
+    app: tauri::AppHandle,
+    relative_paths: Vec<String>,
+) -> Result<StorageOperation, String> {
     let referenced = referenced_attachment_paths(&app)?;
     let root = attachment_root(&app)?;
     let batch = Local::now().format("%Y%m%d-%H%M%S").to_string();
@@ -1476,22 +1577,37 @@ fn quarantine_orphan_attachments(app: tauri::AppHandle, relative_paths: Vec<Stri
     let mut affected_bytes = 0;
     for relative in relative_paths {
         let relative = normalize_attachment_relative_path(&relative)?;
-        if referenced.contains(&relative) { continue; }
+        if referenced.contains(&relative) {
+            continue;
+        }
         let source = attachment_file_path(&app, &relative)?;
-        if !source.is_file() { continue; }
-        let target = relative.split('/').fold(cleanup.clone(), |path, part| path.join(part));
-        if let Some(parent) = target.parent() { fs::create_dir_all(parent).map_err(|err| format!("创建清理站目录失败: {err}"))?; }
-        affected_bytes += fs::metadata(&source).map_err(|err| format!("读取附件信息失败: {err}"))?.len();
+        if !source.is_file() {
+            continue;
+        }
+        let target = relative
+            .split('/')
+            .fold(cleanup.clone(), |path, part| path.join(part));
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent).map_err(|err| format!("创建清理站目录失败: {err}"))?;
+        }
+        affected_bytes += fs::metadata(&source)
+            .map_err(|err| format!("读取附件信息失败: {err}"))?
+            .len();
         fs::rename(&source, &target).map_err(|err| format!("移入清理站失败: {err}"))?;
         affected_count += 1;
     }
     compact_empty_dirs(&root);
-    Ok(StorageOperation { affected_count, affected_bytes })
+    Ok(StorageOperation {
+        affected_count,
+        affected_bytes,
+    })
 }
 
 fn cleanup_item_path(app: &tauri::AppHandle, id: &str) -> Result<PathBuf, String> {
     let relative = normalize_attachment_relative_path(id)?;
-    let path = relative.split('/').fold(cleanup_root(app)?, |path, part| path.join(part));
+    let path = relative
+        .split('/')
+        .fold(cleanup_root(app)?, |path, part| path.join(part));
     Ok(path)
 }
 
@@ -1511,33 +1627,64 @@ fn read_quarantined_attachment(
 }
 
 #[tauri::command]
-fn restore_quarantined_attachments(app: tauri::AppHandle, item_ids: Vec<String>) -> Result<StorageOperation, String> {
-    let mut affected_count = 0; let mut affected_bytes = 0;
+fn restore_quarantined_attachments(
+    app: tauri::AppHandle,
+    item_ids: Vec<String>,
+) -> Result<StorageOperation, String> {
+    let mut affected_count = 0;
+    let mut affected_bytes = 0;
     for id in item_ids {
         let source = cleanup_item_path(&app, &id)?;
-        if !source.is_file() { continue; }
-        let relative = id.split_once('/').map(|(_, path)| path).ok_or("清理站项目不合法")?;
+        if !source.is_file() {
+            continue;
+        }
+        let relative = id
+            .split_once('/')
+            .map(|(_, path)| path)
+            .ok_or("清理站项目不合法")?;
         let target = attachment_file_path(&app, relative)?;
-        if target.exists() { continue; }
-        if let Some(parent) = target.parent() { fs::create_dir_all(parent).map_err(|err| format!("恢复附件失败: {err}"))?; }
-        affected_bytes += fs::metadata(&source).map_err(|err| format!("读取附件信息失败: {err}"))?.len();
-        fs::rename(&source, &target).map_err(|err| format!("恢复附件失败: {err}"))?; affected_count += 1;
+        if target.exists() {
+            continue;
+        }
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent).map_err(|err| format!("恢复附件失败: {err}"))?;
+        }
+        affected_bytes += fs::metadata(&source)
+            .map_err(|err| format!("读取附件信息失败: {err}"))?
+            .len();
+        fs::rename(&source, &target).map_err(|err| format!("恢复附件失败: {err}"))?;
+        affected_count += 1;
     }
     compact_empty_dirs(&cleanup_root(&app)?);
-    Ok(StorageOperation { affected_count, affected_bytes })
+    Ok(StorageOperation {
+        affected_count,
+        affected_bytes,
+    })
 }
 
 #[tauri::command]
-fn purge_quarantined_attachments(app: tauri::AppHandle, item_ids: Vec<String>) -> Result<StorageOperation, String> {
-    let mut affected_count = 0; let mut affected_bytes = 0;
+fn purge_quarantined_attachments(
+    app: tauri::AppHandle,
+    item_ids: Vec<String>,
+) -> Result<StorageOperation, String> {
+    let mut affected_count = 0;
+    let mut affected_bytes = 0;
     for id in item_ids {
         let path = cleanup_item_path(&app, &id)?;
-        if !path.is_file() { continue; }
-        affected_bytes += fs::metadata(&path).map_err(|err| format!("读取附件信息失败: {err}"))?.len();
-        fs::remove_file(path).map_err(|err| format!("永久删除附件失败: {err}"))?; affected_count += 1;
+        if !path.is_file() {
+            continue;
+        }
+        affected_bytes += fs::metadata(&path)
+            .map_err(|err| format!("读取附件信息失败: {err}"))?
+            .len();
+        fs::remove_file(path).map_err(|err| format!("永久删除附件失败: {err}"))?;
+        affected_count += 1;
     }
     compact_empty_dirs(&cleanup_root(&app)?);
-    Ok(StorageOperation { affected_count, affected_bytes })
+    Ok(StorageOperation {
+        affected_count,
+        affected_bytes,
+    })
 }
 
 fn sanitize_save_data(mut data: serde_json::Value) -> serde_json::Value {
@@ -1636,7 +1783,9 @@ fn collect_html_attachment_paths(html: &str, paths: &mut std::collections::HashS
             let mut remaining = html;
             while let Some(offset) = remaining.find(&marker) {
                 let value_start = offset + marker.len();
-                let Some(value_end) = remaining[value_start..].find(quote) else { break };
+                let Some(value_end) = remaining[value_start..].find(quote) else {
+                    break;
+                };
                 let raw = &remaining[value_start..value_start + value_end];
                 if raw.starts_with("attachments/") || raw.starts_with("images/") {
                     if let Ok(path) = normalize_attachment_relative_path(raw) {
@@ -1660,7 +1809,8 @@ fn collect_embedded_image_hash_prefixes(html: &str) -> HashSet<String> {
         };
         let encoded_start = base64_offset + ";base64,".len();
         let encoded = &source[encoded_start..];
-        let end = encoded.find(|ch: char| matches!(ch, '\"' | '\'' | '<' | '>' | ' '))
+        let end = encoded
+            .find(|ch: char| matches!(ch, '\"' | '\'' | '<' | '>' | ' '))
             .unwrap_or(encoded.len());
         if let Ok(bytes) = general_purpose::STANDARD.decode(&encoded[..end]) {
             let hash = hex_sha256(&bytes);
@@ -1769,6 +1919,7 @@ fn extension_for_mime(mime: &str) -> Option<&'static str> {
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
@@ -1784,13 +1935,9 @@ fn main() {
             }
         })
         .setup(|app| {
-            let show_item = MenuItemBuilder::new("显示主窗口")
-                .id("show")
-                .build(app)?;
+            let show_item = MenuItemBuilder::new("显示主窗口").id("show").build(app)?;
             let separator = PredefinedMenuItem::separator(app)?;
-            let quit_item = MenuItemBuilder::new("退出")
-                .id("quit")
-                .build(app)?;
+            let quit_item = MenuItemBuilder::new("退出").id("quit").build(app)?;
             let menu = MenuBuilder::new(app)
                 .item(&show_item)
                 .item(&separator)
