@@ -1,6 +1,8 @@
+import addSound from '@/assets/sounds/add.ogg'
 import chimeSound from '@/assets/sounds/chime.ogg'
 import completeSound from '@/assets/sounds/complete.ogg'
 import dragTickSound from '@/assets/sounds/drag-tick.ogg'
+import negativeSound from '@/assets/sounds/negative.ogg'
 import restoreSound from '@/assets/sounds/restore.ogg'
 import softClickSound from '@/assets/sounds/soft-click.ogg'
 import tapSound from '@/assets/sounds/tap.ogg'
@@ -9,43 +11,53 @@ import tapSound from '@/assets/sounds/tap.ogg'
 // 素材使用延迟预加载的模板和 clone 播放：短音效可以叠加，拖动经过目标时不会因重新下载而失声。
 const SOUNDS = {
   complete: { src: completeSound, volume: 0.31 },
+  add: { src: addSound, volume: 0.18 },
   restore: { src: restoreSound, volume: 0.22 },
   chime: { src: chimeSound, volume: 0.17 },
   tap: { src: tapSound, volume: 0.16 },
   soft: { src: softClickSound, volume: 0.14 },
-  drag: { src: dragTickSound, volume: 0.12 }
+  drag: { src: dragTickSound, volume: 0.16 },
+  negative: { src: negativeSound, volume: 0.12 }
 }
 
 let soundEnabled = true
 let soundCategories = { task: true, list: true, group: true }
 let lastDragSoundTime = 0
 const DRAG_THROTTLE_MS = 90
-const audioTemplates = new Map()
+const audioPools = new Map()
+const AUDIO_POOL_SIZE = 4
 
 function isCategoryEnabled(category) {
   return soundEnabled && soundCategories[category]
 }
 
-function getTemplate(name) {
+function getAudioPool(name) {
   if (typeof Audio === 'undefined') return null
-  if (!audioTemplates.has(name)) {
-    const audio = new Audio(SOUNDS[name].src)
-    audio.preload = 'auto'
-    audioTemplates.set(name, audio)
+  if (!audioPools.has(name)) {
+    const voices = Array.from({ length: AUDIO_POOL_SIZE }, () => {
+      const audio = new Audio(SOUNDS[name].src)
+      audio.preload = 'auto'
+      audio.load()
+      return audio
+    })
+    audioPools.set(name, { voices, cursor: 0 })
   }
-  return audioTemplates.get(name)
+  return audioPools.get(name)
 }
 
 function warmAudioCache() {
-  Object.keys(SOUNDS).forEach(getTemplate)
+  Object.keys(SOUNDS).forEach(getAudioPool)
 }
 
 function play(name, category) {
   if (!isCategoryEnabled(category) || !SOUNDS[name]) return
   try {
-    const template = getTemplate(name)
-    if (!template) return
-    const audio = template.cloneNode()
+    const pool = getAudioPool(name)
+    if (!pool) return
+    const audio = pool.voices[pool.cursor]
+    pool.cursor = (pool.cursor + 1) % pool.voices.length
+    audio.pause()
+    audio.currentTime = 0
     audio.volume = SOUNDS[name].volume
     audio.play().catch(() => {})
   } catch {
@@ -58,19 +70,19 @@ export function playCompleteSound() { play('complete', 'task') }
 export function playTaskUndoSound() { play('soft', 'task') }
 export function playSubtaskCompleteSound() { play('tap', 'task') }
 export function playSubtaskUndoSound() { play('soft', 'task') }
-export function playDeleteSound() { play('soft', 'task') }
-export function playAddSound() { play('tap', 'task') }
+export function playDeleteSound() { play('negative', 'task') }
+export function playAddSound() { play('add', 'task') }
 export function playRestoreSound() { play('restore', 'task') }
-export function playMoveSound() { play('tap', 'task') }
+export function playMoveSound() { play('chime', 'task') }
 export function playToggleSound() { play('soft', 'task') }
 export function playMarkSound() { play('chime', 'task') }
 export function playScheduleSound() { play('chime', 'task') }
 export function playAttachSound() { play('tap', 'task') }
-export function playClearSound() { play('soft', 'task') }
+export function playClearSound() { play('negative', 'task') }
 export function playSaveSound() { play('soft', 'task') }
-export function playErrorSound() { play('soft', 'task') }
+export function playErrorSound() { play('negative', 'task') }
 
-export function playDragStartSound() { play('tap', 'task') }
+export function playDragStartSound() { play('add', 'task') }
 export function playDragOverSound() {
   if (!isCategoryEnabled('task')) return
   const now = Date.now()
@@ -80,14 +92,14 @@ export function playDragOverSound() {
 }
 export function playDragEndSound() { play('soft', 'task') }
 
-export function playListAddSound() { play('restore', 'list') }
-export function playListDeleteSound() { play('soft', 'list') }
+export function playListAddSound() { play('add', 'list') }
+export function playListDeleteSound() { play('negative', 'list') }
 export function playListRestoreSound() { play('restore', 'list') }
 export function playRenameSound() { play('tap', 'list') }
-export function playGroupAddSound() { play('restore', 'group') }
-export function playGroupDeleteSound() { play('soft', 'group') }
+export function playGroupAddSound() { play('add', 'group') }
+export function playGroupDeleteSound() { play('negative', 'group') }
 
-export function playSoundPreview() { play('complete', 'task') }
+export function playSoundPreview(name = 'complete') { play(name, 'task') }
 
 export function setSoundEnabled(enabled) {
   soundEnabled = enabled

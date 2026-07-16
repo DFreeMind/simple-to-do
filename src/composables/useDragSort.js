@@ -29,6 +29,7 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
   let scrollRaf = null
   let suppressNextClick = false
   let lastDragOverSoundTime = 0
+  let lastDragOverSoundTargetId = ''
   const DRAG_OVER_SOUND_INTERVAL_MS = 110
 
   const DRAG_THRESHOLD = 5 // px before a press becomes a drag
@@ -60,6 +61,7 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
     document.addEventListener('click', suppressClick, true)
     draggingId.value = pendingItemId
     lastDragOverSoundTime = 0
+    lastDragOverSoundTargetId = ''
 
     // Calculate offset from item top-left to mouse position
     const rect = pendingItem.el.getBoundingClientRect()
@@ -130,15 +132,18 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
       dragOverId.value = result.id
       dropPosition.value = result.position || 'after'
       targetGroupId = result.groupId
-      // 拖动过程中给出低音量、稳定节奏的经过反馈；不局限于首次进入目标。
-      if (onDragOver && now - lastDragOverSoundTime >= DRAG_OVER_SOUND_INTERVAL_MS) {
+      // 刚经过新目标时立即反馈；停留或掠过多个指示线时再以稳定节奏继续提示。
+      const enteredNewTarget = result.id !== lastDragOverSoundTargetId
+      if (onDragOver && (enteredNewTarget || now - lastDragOverSoundTime >= DRAG_OVER_SOUND_INTERVAL_MS)) {
         onDragOver()
         lastDragOverSoundTime = now
       }
+      lastDragOverSoundTargetId = result.id
     } else {
       dragOverId.value = ''
       dropPosition.value = ''
       targetGroupId = undefined
+      lastDragOverSoundTargetId = ''
     }
   }
 
@@ -203,6 +208,7 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
     dropPosition.value = ''
     targetGroupId = undefined
     lastDragOverSoundTime = 0
+    lastDragOverSoundTargetId = ''
   }
 
   function suppressClick(event) {
@@ -233,6 +239,7 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
     dropPosition.value = ''
     targetGroupId = undefined
     lastDragOverSoundTime = 0
+    lastDragOverSoundTargetId = ''
   }
 
   onUnmounted(cleanup)

@@ -5536,9 +5536,7 @@ body.is-resizing {
 }
 
 .sound-preview-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
   gap: 10px;
   padding: 8px 10px;
   border: 1px solid var(--border);
@@ -5549,7 +5547,17 @@ body.is-resizing {
   strong, small { display: block; }
   strong { color: var(--text); font-size: 12px; }
   small { margin-top: 2px; color: var(--text-muted); font-size: 11px; }
-  .small-btn { flex: 0 0 auto; }
+}
+
+.sound-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+
+  .small-btn {
+    min-width: 0;
+    padding: 0 7px;
+  }
 }
 
 .sound-master {

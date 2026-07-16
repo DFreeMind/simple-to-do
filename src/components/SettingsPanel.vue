@@ -342,10 +342,15 @@
                 </label>
 
                 <div class="sound-preview-row">
-                  <span><strong>试听完成提示</strong><small>使用与任务完成相同的音效</small></span>
-                  <button class="small-btn" type="button" :disabled="!store.settings.soundEnabled || !store.settings.soundTaskEnabled" @click="store.previewSound">
-                    <Volume2 :size="14" />试听
-                  </button>
+                  <span><strong>试听音效</strong><small>每一类对应不同的交互语义</small></span>
+                  <div class="sound-preview-grid">
+                    <button class="small-btn" type="button" :disabled="!store.settings.soundEnabled || !store.settings.soundTaskEnabled" @click="store.previewSound('complete')"><Check :size="14" />完成</button>
+                    <button class="small-btn" type="button" :disabled="!store.settings.soundEnabled || !store.settings.soundTaskEnabled" @click="store.previewSound('add')"><Plus :size="14" />新增</button>
+                    <button class="small-btn" type="button" :disabled="!store.settings.soundEnabled || !store.settings.soundTaskEnabled" @click="store.previewSound('chime')"><Tag :size="14" />标记</button>
+                    <button class="small-btn" type="button" :disabled="!store.settings.soundEnabled || !store.settings.soundTaskEnabled" @click="store.previewSound('drag')"><SlidersHorizontal :size="14" />拖动</button>
+                    <button class="small-btn" type="button" :disabled="!store.settings.soundEnabled || !store.settings.soundTaskEnabled" @click="store.previewSound('restore')"><Folder :size="14" />恢复</button>
+                    <button class="small-btn" type="button" :disabled="!store.settings.soundEnabled || !store.settings.soundTaskEnabled" @click="store.previewSound('negative')"><X :size="14" />移除</button>
+                  </div>
                 </div>
 
                 <p v-if="!store.settings.soundEnabled" class="setting-summary">音效已关闭；重新开启后会保留各类操作的开关状态。</p>

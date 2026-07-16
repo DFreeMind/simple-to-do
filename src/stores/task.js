@@ -562,8 +562,8 @@ export const useTaskStore = defineStore('task', () => {
     purgeExpiredTrash()
   }
 
-  function previewSound() {
-    playSoundPreview()
+  function previewSound(name) {
+    playSoundPreview(name)
   }
 
   async function testReminderNotification() {
