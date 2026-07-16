@@ -1,27 +1,23 @@
-import addSound from '@/assets/sounds/add.ogg'
 import chimeSound from '@/assets/sounds/chime.ogg'
 import completeSound from '@/assets/sounds/complete.ogg'
-import dragTickSound from '@/assets/sounds/drag-tick.ogg'
-import negativeSound from '@/assets/sounds/negative.ogg'
+import dragGlassSound from '@/assets/sounds/drag-glass.ogg'
 import restoreSound from '@/assets/sounds/restore.ogg'
 import softClickSound from '@/assets/sounds/soft-click.ogg'
 import tapSound from '@/assets/sounds/tap.ogg'
 
-// Robin Lamb UI Sound Effects (CC0 1.0): https://opengameart.org/content/ui-sound-effects-button-clicks-user-feedback-notifications
+// Robin Lamb / Kenney UI Sound Effects (CC0 1.0)，完整来源见 src/assets/sounds/LICENSE.md。
 // 素材使用延迟预加载的模板和 clone 播放：短音效可以叠加，拖动经过目标时不会因重新下载而失声。
 const SOUNDS = {
   complete: { src: completeSound, volume: 0.31 },
-  add: { src: addSound, volume: 0.18 },
   restore: { src: restoreSound, volume: 0.22 },
   chime: { src: chimeSound, volume: 0.17 },
   tap: { src: tapSound, volume: 0.16 },
   soft: { src: softClickSound, volume: 0.14 },
-  drag: { src: dragTickSound, volume: 0.16 },
-  negative: { src: negativeSound, volume: 0.12 }
+  drag: { src: dragGlassSound, volume: 0.15 }
 }
 
 let soundEnabled = true
-let soundCategories = { task: true, list: true, group: true }
+let soundCategories = { task: true, list: true, group: true, drag: true }
 const audioPools = new Map()
 const AUDIO_POOL_SIZE = 4
 
@@ -63,35 +59,35 @@ function play(name, category) {
   }
 }
 
-// 任务：清亮完成提示 + 低干扰点击，避免使用夸张的游戏式“开关门”音色。
+// 仅为正向、需要确认的操作提供声音；删除和错误保持安静，避免制造紧张感。
 export function playCompleteSound() { play('complete', 'task') }
 export function playTaskUndoSound() { play('soft', 'task') }
 export function playSubtaskCompleteSound() { play('tap', 'task') }
 export function playSubtaskUndoSound() { play('soft', 'task') }
-export function playDeleteSound() { play('negative', 'task') }
-export function playAddSound() { play('add', 'task') }
+export function playDeleteSound() {}
+export function playAddSound() { play('chime', 'task') }
 export function playRestoreSound() { play('restore', 'task') }
 export function playMoveSound() { play('chime', 'task') }
 export function playToggleSound() { play('soft', 'task') }
 export function playMarkSound() { play('chime', 'task') }
 export function playScheduleSound() { play('chime', 'task') }
 export function playAttachSound() { play('tap', 'task') }
-export function playClearSound() { play('negative', 'task') }
+export function playClearSound() {}
 export function playSaveSound() { play('soft', 'task') }
-export function playErrorSound() { play('negative', 'task') }
+export function playErrorSound() {}
 
-export function playDragStartSound() { play('add', 'task') }
-export function playDragOverSound() { play('drag', 'task') }
-export function playDragEndSound() { play('soft', 'task') }
+export function playDragStartSound() { play('soft', 'drag') }
+export function playDragOverSound() { play('drag', 'drag') }
+export function playDragEndSound() { play('soft', 'drag') }
 
-export function playListAddSound() { play('add', 'list') }
-export function playListDeleteSound() { play('negative', 'list') }
+export function playListAddSound() { play('chime', 'list') }
+export function playListDeleteSound() {}
 export function playListRestoreSound() { play('restore', 'list') }
 export function playRenameSound() { play('tap', 'list') }
-export function playGroupAddSound() { play('add', 'group') }
-export function playGroupDeleteSound() { play('negative', 'group') }
+export function playGroupAddSound() { play('chime', 'group') }
+export function playGroupDeleteSound() {}
 
-export function playSoundPreview(name = 'complete') { play(name, 'task') }
+export function playSoundPreview(name = 'complete') { play(name, name === 'drag' ? 'drag' : 'task') }
 
 export function setSoundEnabled(enabled) {
   soundEnabled = enabled

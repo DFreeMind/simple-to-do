@@ -342,14 +342,12 @@
                 </label>
 
                 <div class="sound-preview-row">
-                  <span><strong>试听音效</strong><small>每一类对应不同的交互语义</small></span>
+                  <span><strong>试听与语义</strong><small>只为需要确认的操作发声；删除和错误保持安静</small></span>
                   <div class="sound-preview-grid">
-                    <button class="small-btn" type="button" :disabled="!store.settings.soundEnabled || !store.settings.soundTaskEnabled" @click="store.previewSound('complete')"><Check :size="14" />完成</button>
-                    <button class="small-btn" type="button" :disabled="!store.settings.soundEnabled || !store.settings.soundTaskEnabled" @click="store.previewSound('add')"><Plus :size="14" />新增</button>
-                    <button class="small-btn" type="button" :disabled="!store.settings.soundEnabled || !store.settings.soundTaskEnabled" @click="store.previewSound('chime')"><Tag :size="14" />标记</button>
-                    <button class="small-btn" type="button" :disabled="!store.settings.soundEnabled || !store.settings.soundTaskEnabled" @click="store.previewSound('drag')"><SlidersHorizontal :size="14" />拖动</button>
-                    <button class="small-btn" type="button" :disabled="!store.settings.soundEnabled || !store.settings.soundTaskEnabled" @click="store.previewSound('restore')"><Folder :size="14" />恢复</button>
-                    <button class="small-btn" type="button" :disabled="!store.settings.soundEnabled || !store.settings.soundTaskEnabled" @click="store.previewSound('negative')"><X :size="14" />移除</button>
+                    <button class="small-btn" type="button" :disabled="!store.settings.soundEnabled || !store.settings.soundTaskEnabled" @click="store.previewSound('complete')"><Check :size="14" />完成铃音</button>
+                    <button class="small-btn" type="button" :disabled="!store.settings.soundEnabled || !store.settings.soundTaskEnabled" @click="store.previewSound('restore')"><Folder :size="14" />新增与恢复</button>
+                    <button class="small-btn" type="button" :disabled="!store.settings.soundEnabled || !store.settings.soundTaskEnabled" @click="store.previewSound('chime')"><Tag :size="14" />标记与日期</button>
+                    <button class="small-btn" type="button" :disabled="!store.settings.soundEnabled || !store.settings.soundDragEnabled" @click="store.previewSound('drag')"><SlidersHorizontal :size="14" />排序指示线</button>
                   </div>
                 </div>
 
@@ -378,7 +376,7 @@
                     </span>
                     <span class="sound-item-content">
                       <strong>清单操作</strong>
-                      <small>清单增删</small>
+                      <small>新增、恢复、重命名</small>
                     </span>
                     <input
                       type="checkbox"
@@ -395,13 +393,30 @@
                     </span>
                     <span class="sound-item-content">
                       <strong>分组操作</strong>
-                      <small>分组增删</small>
+                      <small>新增与重命名</small>
                     </span>
                     <input
                       type="checkbox"
                       :checked="store.settings.soundGroupEnabled"
                       :disabled="!store.settings.soundEnabled"
                       @change="store.updateSettings({ soundGroupEnabled: $event.target.checked })"
+                    />
+                    <span class="switch-control" aria-hidden="true"></span>
+                  </label>
+
+                  <label class="sound-item">
+                    <span class="sound-item-icon">
+                      <SlidersHorizontal :size="16" />
+                    </span>
+                    <span class="sound-item-content">
+                      <strong>拖动排序</strong>
+                      <small>排序指示线位置变化时反馈</small>
+                    </span>
+                    <input
+                      type="checkbox"
+                      :checked="store.settings.soundDragEnabled"
+                      :disabled="!store.settings.soundEnabled"
+                      @change="store.updateSettings({ soundDragEnabled: $event.target.checked })"
                     />
                     <span class="switch-control" aria-hidden="true"></span>
                   </label>
@@ -690,9 +705,10 @@ const completedDisplaySummary = computed(() => {
 const enabledSoundCount = computed(() => [
   store.settings.soundTaskEnabled,
   store.settings.soundListEnabled,
-  store.settings.soundGroupEnabled
+  store.settings.soundGroupEnabled,
+  store.settings.soundDragEnabled
 ].filter(Boolean).length)
-const soundSummary = computed(() => store.settings.soundEnabled ? `${enabledSoundCount.value}/3 已启用` : '已关闭')
+const soundSummary = computed(() => store.settings.soundEnabled ? `${enabledSoundCount.value}/4 已启用` : '已关闭')
 const reminderSummary = computed(() => store.settings.reminderNotificationsEnabled ? (store.settings.reminderSoundEnabled ? '通知和声音' : '仅通知') : '已关闭')
 const dailyGuidanceSummary = computed(() => {
   if (!store.settings.dailyGuidanceEnabled) return '已关闭'

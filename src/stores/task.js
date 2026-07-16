@@ -77,6 +77,7 @@ const DEFAULT_SETTINGS = {
   soundTaskEnabled: true,
   soundListEnabled: true,
   soundGroupEnabled: true,
+  soundDragEnabled: true,
   reminderNotificationsEnabled: true,
   reminderSoundEnabled: true,
   dailyGuidanceEnabled: true,
@@ -548,11 +549,12 @@ export const useTaskStore = defineStore('task', () => {
       setSoundEnabled(updates.soundEnabled)
     }
     // 更新音效分类开关
-    if ('soundTaskEnabled' in updates || 'soundListEnabled' in updates || 'soundGroupEnabled' in updates) {
+    if ('soundTaskEnabled' in updates || 'soundListEnabled' in updates || 'soundGroupEnabled' in updates || 'soundDragEnabled' in updates) {
       setSoundCategories({
         task: updates.soundTaskEnabled ?? settings.value.soundTaskEnabled,
         list: updates.soundListEnabled ?? settings.value.soundListEnabled,
-        group: updates.soundGroupEnabled ?? settings.value.soundGroupEnabled
+        group: updates.soundGroupEnabled ?? settings.value.soundGroupEnabled,
+        drag: updates.soundDragEnabled ?? settings.value.soundDragEnabled
       })
     }
     if ('reminderNotificationsEnabled' in updates || 'reminderSoundEnabled' in updates) {
@@ -1357,7 +1359,8 @@ export const useTaskStore = defineStore('task', () => {
         setSoundCategories({
           task: settings.value.soundTaskEnabled,
           list: settings.value.soundListEnabled,
-          group: settings.value.soundGroupEnabled
+          group: settings.value.soundGroupEnabled,
+          drag: settings.value.soundDragEnabled
         })
         purgeExpiredTrash()
         syncReminderNotifications({ requestPermission: false })
@@ -1654,6 +1657,7 @@ export const useTaskStore = defineStore('task', () => {
     const soundTaskEnabled = rawSettings.soundTaskEnabled !== false
     const soundListEnabled = rawSettings.soundListEnabled !== false
     const soundGroupEnabled = rawSettings.soundGroupEnabled !== false
+    const soundDragEnabled = rawSettings.soundDragEnabled !== false
     const reminderNotificationsEnabled = rawSettings.reminderNotificationsEnabled !== false
     const reminderSoundEnabled = rawSettings.reminderSoundEnabled !== false
     const dailyGuidanceEnabled = rawSettings.dailyGuidanceEnabled !== false
@@ -1681,6 +1685,7 @@ export const useTaskStore = defineStore('task', () => {
       soundTaskEnabled,
       soundListEnabled,
       soundGroupEnabled,
+      soundDragEnabled,
       reminderNotificationsEnabled,
       reminderSoundEnabled,
       dailyGuidanceEnabled,
