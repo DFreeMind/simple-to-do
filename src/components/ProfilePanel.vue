@@ -79,7 +79,7 @@
     <Teleport to="body">
       <div v-if="avatarPreview" class="profile-avatar-preview" :style="{ left: `${avatarPreview.left}px`, top: `${avatarPreview.top}px` }" role="tooltip">
         <img :src="avatarPreview.avatar.src" :alt="`${avatarPreview.avatar.label}预览`" />
-        <span>{{ avatarPreview.avatar.label }}</span>
+        <span class="profile-avatar-preview__label">{{ avatarPreview.avatar.label }}</span>
       </div>
     </Teleport>
   </div>
