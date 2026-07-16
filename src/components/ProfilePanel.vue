@@ -48,8 +48,8 @@
           <div v-if="backups.length" class="data-backup-list">
             <article v-for="backup in backups" :key="backup.id" class="data-backup-item">
               <span class="profile-capability__icon">备</span>
-              <span><strong>{{ backup.reason === 'manual' ? '手动恢复点' : '恢复前安全点' }}</strong><small>{{ formatBackupDate(backup.createdAt) }} · {{ formatBytes(backup.sizeBytes) }}</small></span>
-              <span class="data-backup-item__actions"><button class="text-btn" type="button" :disabled="backupWorking" @click="requestRestore(backup)">恢复</button><button class="text-btn data-backup-item__delete" type="button" :disabled="backupWorking" @click="requestDelete(backup)">删除</button></span>
+              <span><strong>{{ backupLabel(backup) }}</strong><small>{{ formatBytes(backup.sizeBytes) }}</small></span>
+              <span class="data-backup-item__actions"><button class="text-btn" type="button" :disabled="backupWorking" @click="openBackup(backup)">打开</button><button class="text-btn" type="button" :disabled="backupWorking" @click="requestRestore(backup)">恢复</button><button class="text-btn data-backup-item__delete" type="button" :disabled="backupWorking" @click="requestDelete(backup)">删除</button></span>
             </article>
           </div>
           <p v-else class="profile-capability__empty">还没有恢复点。建议在大批量整理或安装更新前创建一个。</p>
@@ -77,7 +77,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ChevronRight, Folder, HardDrive, ListTodo, RefreshCw, ShieldCheck, Trash2, UserRound, X } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
-import { createDataBackup, deleteDataBackup, getDataBackupLocation, importProfileAvatar, listDataBackups, openDataBackupLocation, readProfileAvatar, restoreDataBackup, selectImage } from '@/services/platform'
+import { createDataBackup, deleteDataBackup, getDataBackupLocation, importProfileAvatar, listDataBackups, openDataBackup, openDataBackupLocation, readProfileAvatar, restoreDataBackup, selectImage } from '@/services/platform'
 import SpaceManagement from './SpaceManagement.vue'
 import shiba from '@/assets/avatars/shiba.png'
 import cat from '@/assets/avatars/cat.png'
@@ -154,6 +154,13 @@ function formatBackupDate(value) {
   return Number.isNaN(date.getTime()) ? '未知时间' : date.toLocaleString('zh-CN', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
+function backupLabel(backup) {
+  const kind = backup.reason === 'manual' ? '手动恢复点' : '恢复前安全点'
+  const date = new Date(backup.createdAt)
+  if (Number.isNaN(date.getTime())) return kind
+  return `${kind} · ${date.toLocaleString('zh-CN', { dateStyle: 'medium', timeStyle: 'medium' })}`
+}
+
 async function loadBackups() {
   try {
     backups.value = await listDataBackups()
@@ -176,6 +183,15 @@ async function openBackupLocation() {
     await openDataBackupLocation()
   } catch (error) {
     backupError.value = error?.message || '打开恢复点目录失败'
+  }
+}
+
+async function openBackup(backup) {
+  backupError.value = ''
+  try {
+    await openDataBackup(backup.id)
+  } catch (error) {
+    backupError.value = error?.message || '打开本机恢复点失败'
   }
 }
 

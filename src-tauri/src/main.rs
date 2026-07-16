@@ -242,7 +242,7 @@ fn create_data_snapshot(app: &tauri::AppHandle, reason: &str) -> Result<DataBack
     // 先打开并关闭连接，确保结构校验通过；实际复制使用 Online Backup API 保留 WAL 中的数据。
     drop(open_database(app)?);
     let now = Local::now();
-    let id = format!("snapshot-{}-{}", now.format("%Y%m%d-%H%M%S"), reason);
+    let id = format!("snapshot-{}-{}", now.format("%Y%m%d-%H%M%S%3f"), reason);
     let target = backup_dir(app)?.join(&id);
     fs::create_dir_all(&target).map_err(|err| format!("创建恢复点失败: {err}"))?;
     copy_sqlite_database(&database, &target.join("simpletodo.db"))?;
@@ -306,23 +306,48 @@ fn data_backup_location(app: tauri::AppHandle) -> Result<String, String> {
 
 #[tauri::command]
 fn open_data_backup_location(app: tauri::AppHandle) -> Result<bool, String> {
-    let location = backup_dir(&app)?;
+    open_path_in_file_manager(&backup_dir(&app)?, false)
+}
+
+fn open_path_in_file_manager(location: &Path, reveal: bool) -> Result<bool, String> {
     #[cfg(target_os = "windows")]
-    Command::new("explorer.exe")
-        .arg(&location)
+    {
+        let argument = if reveal {
+            format!("/select,{}", location.to_string_lossy())
+        } else {
+            location.to_string_lossy().to_string()
+        };
+        Command::new("explorer.exe")
+        .arg(argument)
         .spawn()
         .map_err(|err| format!("打开恢复点目录失败: {err}"))?;
+    }
     #[cfg(target_os = "macos")]
-    Command::new("open")
-        .arg(&location)
+    {
+        let mut command = Command::new("open");
+        if reveal { command.arg("-R"); }
+        command.arg(location)
         .spawn()
         .map_err(|err| format!("打开恢复点目录失败: {err}"))?;
+    }
     #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
     Command::new("xdg-open")
-        .arg(&location)
+        .arg(location)
         .spawn()
         .map_err(|err| format!("打开恢复点目录失败: {err}"))?;
     Ok(true)
+}
+
+#[tauri::command]
+fn open_data_backup(app: tauri::AppHandle, backup_id: String) -> Result<bool, String> {
+    if !backup_id_is_safe(&backup_id) {
+        return Err("恢复点标识无效".to_string());
+    }
+    let snapshot = backup_dir(&app)?.join(&backup_id);
+    if read_data_backup_record(&snapshot)?.is_none() {
+        return Err("恢复点不存在或已损坏".to_string());
+    }
+    open_path_in_file_manager(&snapshot, true)
 }
 
 fn remove_path(path: &Path) -> Result<(), String> {
@@ -2431,6 +2456,7 @@ fn main() {
             list_data_backups,
             data_backup_location,
             open_data_backup_location,
+            open_data_backup,
             delete_data_backup,
             restore_data_backup,
             select_image,

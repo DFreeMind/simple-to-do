@@ -85,6 +85,15 @@ export async function openDataBackupLocation() {
   }
 }
 
+export async function openDataBackup(backupId) {
+  if (!isTauri()) throw new Error('当前环境不支持打开本机恢复点')
+  try {
+    return await invoke('open_data_backup', { backupId })
+  } catch (error) {
+    throw new Error(formatPlatformError(error, '打开本机恢复点失败'))
+  }
+}
+
 export async function deleteDataBackup(backupId) {
   if (!isTauri()) throw new Error('当前环境不支持删除本机恢复点')
   try {
