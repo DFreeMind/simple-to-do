@@ -94,14 +94,14 @@ import SpaceManagement from './SpaceManagement.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
 import shiba from '@/assets/avatars/shiba.png'
 import cat from '@/assets/avatars/cat.png'
-import crane from '@/assets/avatars/crane.png'
-import redPanda from '@/assets/avatars/red-panda.png'
-import otter from '@/assets/avatars/otter.png'
-import astronaut from '@/assets/avatars/astronaut.png'
-import robot from '@/assets/avatars/robot.png'
+import robot from '@/assets/avatars/crane.png'
+import crane from '@/assets/avatars/red-panda.png'
+import frog from '@/assets/avatars/otter.png'
+import redPanda from '@/assets/avatars/astronaut.png'
+import astronaut from '@/assets/avatars/robot.png'
 import turtle from '@/assets/avatars/turtle.png'
 import cloud from '@/assets/avatars/cloud.png'
-import frog from '@/assets/avatars/frog.png'
+import moon from '@/assets/avatars/frog.png'
 import koi from '@/assets/avatars/koi.png'
 import spaceBlob from '@/assets/avatars/space-blob.png'
 import chameleon from '@/assets/avatars/chameleon.png'
@@ -118,7 +118,7 @@ const avatarUrl = ref('')
 const avatarPickerOpen = ref(false)
 const avatarPickerAnchor = ref(null)
 const avatarPreview = ref(null)
-const builtInAvatars = [{ id: 'shiba', label: '柴犬', src: shiba }, { id: 'cat', label: '黑白猫', src: cat }, { id: 'crane', label: '纸鹤', src: crane }, { id: 'red-panda', label: '小熊猫', src: redPanda }, { id: 'otter', label: '水獭', src: otter }, { id: 'astronaut', label: '太空人', src: astronaut }, { id: 'robot', label: '小机器人', src: robot }, { id: 'turtle', label: '海龟', src: turtle }, { id: 'cloud', label: '云朵', src: cloud }, { id: 'frog', label: '青蛙', src: frog }, { id: 'koi', label: '锦鲤', src: koi }, { id: 'space-blob', label: '太空团子', src: spaceBlob }, { id: 'chameleon', label: '变色龙', src: chameleon }, { id: 'cassette', label: '随身听', src: cassette }, { id: 'axolotl', label: '六角恐龙', src: axolotl }, { id: 'mushroom', label: '蘑菇屋', src: mushroom }, { id: 'jellyfish', label: '水母', src: jellyfish }, { id: 'fox', label: '小狐狸', src: fox }]
+const builtInAvatars = [{ id: 'shiba', label: '柴犬', src: shiba }, { id: 'cat', label: '黑白猫', src: cat }, { id: 'crane', label: '纸鹤', src: crane }, { id: 'red-panda', label: '小熊猫', src: redPanda }, { id: 'otter', label: '青蛙', src: frog }, { id: 'astronaut', label: '太空人', src: astronaut }, { id: 'robot', label: '小机器人', src: robot }, { id: 'turtle', label: '海龟', src: turtle }, { id: 'cloud', label: '云朵', src: cloud }, { id: 'frog', label: '月亮', src: moon }, { id: 'koi', label: '锦鲤', src: koi }, { id: 'space-blob', label: '太空团子', src: spaceBlob }, { id: 'chameleon', label: '变色龙', src: chameleon }, { id: 'cassette', label: '随身听', src: cassette }, { id: 'axolotl', label: '六角恐龙', src: axolotl }, { id: 'mushroom', label: '蘑菇屋', src: mushroom }, { id: 'jellyfish', label: '水母', src: jellyfish }, { id: 'fox', label: '小狐狸', src: fox }]
 const selectedBuiltInId = computed(() => store.profile.avatarRelativePath?.startsWith('builtin:') ? store.profile.avatarRelativePath.slice(8) : '')
 const avatarSrc = computed(() => avatarUrl.value || builtInAvatars.find(item => item.id === selectedBuiltInId.value)?.src || '')
 const uploading = ref(false)
