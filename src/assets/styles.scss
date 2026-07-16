@@ -5968,6 +5968,126 @@ body.is-resizing {
   }
 }
 
+.update-card {
+  display: grid;
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--accent-tint), var(--surface) 56%);
+
+  &--development {
+    background: var(--surface-muted);
+  }
+
+  &--error {
+    border-color: #f1c46e;
+    background: #fffaf0;
+  }
+
+  &--available {
+    border-color: var(--accent-34-fallback);
+  }
+}
+
+.update-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.update-card__icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.update-card--error .update-card__icon {
+  background: #fff1cf;
+  color: #9a6200;
+}
+
+.update-card__copy {
+  min-width: 0;
+
+  strong,
+  small {
+    display: block;
+  }
+
+  strong {
+    color: var(--text);
+    font-size: 13px;
+  }
+
+  small {
+    margin-top: 3px;
+    color: var(--text-muted);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+}
+
+.update-card__release {
+  padding: 9px 10px;
+  border: 1px solid var(--accent-20-border-fallback);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+
+  strong {
+    color: var(--accent-strong);
+    font-size: 12px;
+  }
+
+  p {
+    display: -webkit-box;
+    margin: 4px 0 0;
+    overflow: hidden;
+    color: var(--text-muted);
+    font-size: 12px;
+    line-height: 1.45;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+}
+
+.update-card__progress {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--border);
+
+  span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--accent);
+    transition: width var(--transition-fast);
+  }
+}
+
+.update-card__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.update-card__action {
+  min-width: 96px;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+
+  &:not(:disabled):hover {
+    border-color: var(--accent-strong);
+    background: var(--accent-strong);
+  }
+}
+
 .settings-help-link {
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr);

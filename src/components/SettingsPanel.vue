@@ -501,19 +501,46 @@
                 <h4>应用更新</h4>
                 <span>{{ updateStatusText }}</span>
               </div>
-              <p class="setting-summary">检查 GitHub Release 中经过签名验证的稳定版本。下载完成后会启动安装程序更新应用。</p>
-              <div v-if="updateState === 'available'" class="storage-result">
-                <div class="storage-result__head">
-                  <span><strong>发现新版本 {{ availableUpdate?.version }}</strong><small>{{ updateNotes }}</small></span>
-                  <button class="small-btn" type="button" :disabled="updateState === 'downloading' || updateState === 'installing'" @click="installUpdate">
-                    {{ updateState === 'downloading' ? updateProgressText : '下载并安装' }}
+              <article class="update-card" :class="`update-card--${updateState}`">
+                <div class="update-card__head">
+                  <span class="update-card__icon">
+                    <Download v-if="['available', 'downloading', 'installing'].includes(updateState)" :size="18" />
+                    <Check v-else-if="updateState === 'upToDate'" :size="18" />
+                    <Info v-else :size="18" />
+                  </span>
+                  <span class="update-card__copy">
+                    <strong>{{ updateTitle }}</strong>
+                    <small>{{ updateDescription }}</small>
+                  </span>
+                </div>
+                <div v-if="updateState === 'available'" class="update-card__release">
+                  <strong>v{{ availableUpdate?.version }}</strong>
+                  <p>{{ updateNotes }}</p>
+                </div>
+                <div v-if="updateState === 'downloading'" class="update-card__progress" aria-label="更新下载进度">
+                  <span :style="{ width: `${updateProgressPercent}%` }"></span>
+                </div>
+                <div class="update-card__actions">
+                  <button
+                    v-if="updateState === 'available'"
+                    class="small-btn update-card__action"
+                    type="button"
+                    :disabled="updateState === 'downloading' || updateState === 'installing'"
+                    @click="installUpdate"
+                  >
+                    下载并安装
+                  </button>
+                  <button
+                    v-else
+                    class="small-btn update-card__action"
+                    type="button"
+                    :disabled="updateActionDisabled"
+                    @click="checkForUpdates"
+                  >
+                    {{ updateActionText }}
                   </button>
                 </div>
-              </div>
-              <p v-else-if="updateState === 'error'" class="storage-warning">{{ updateError }}</p>
-              <button class="small-btn" type="button" :disabled="updateState === 'checking' || updateState === 'downloading' || updateState === 'installing'" @click="checkForUpdates">
-                {{ updateState === 'checking' ? '检查中…' : '检查更新' }}
-              </button>
+              </article>
             </div>
           </section>
         </div>
@@ -578,7 +605,8 @@ const storageBrowserPage = ref(0)
 const storageFilter = ref('all')
 const inlineLimit = 3
 const browserPageSize = 40
-const updateState = ref('idle')
+const isDevelopment = import.meta.env.DEV
+const updateState = ref(isDevelopment ? 'development' : 'idle')
 const availableUpdate = ref(null)
 const updateError = ref('')
 const updateProgress = ref({ downloaded: 0, total: 0 })
@@ -621,18 +649,52 @@ const soundSummary = computed(() => store.settings.soundEnabled ? `${enabledSoun
 const reminderSummary = computed(() => store.settings.reminderNotificationsEnabled ? (store.settings.reminderSoundEnabled ? '通知和声音' : '仅通知') : '已关闭')
 const storageSummary = computed(() => storageReport.value ? `${storageReport.value.orphanAttachments.length} 项可清理` : '按需扫描')
 const updateStatusText = computed(() => ({
+  development: '开发环境',
   idle: '手动检查',
   checking: '正在检查',
   upToDate: '已是最新',
   available: `可更新至 ${availableUpdate.value?.version || ''}`,
   downloading: '正在下载',
   installing: '正在安装',
-  error: '检查失败'
+  error: '服务暂不可用'
 }[updateState.value] || '手动检查'))
+const updateTitle = computed(() => ({
+  development: '开发环境不检查在线更新',
+  idle: '检查稳定版本',
+  checking: '正在检查更新',
+  upToDate: `已是最新版本 · v${version}`,
+  available: '发现可用更新',
+  downloading: '正在下载更新',
+  installing: '安装程序即将启动',
+  error: '暂时无法连接更新服务'
+}[updateState.value] || '检查稳定版本'))
+const updateDescription = computed(() => {
+  if (updateState.value === 'development') return 'npm run dev 不会请求 GitHub Release；请使用正式签名安装包验证更新。'
+  if (updateState.value === 'available') return '更新包已通过签名验证，下载完成后将启动安装程序。'
+  if (updateState.value === 'downloading') return updateProgressText.value
+  if (updateState.value === 'installing') return '下载已完成，请按照安装程序提示完成更新。'
+  if (updateState.value === 'error') return updateError.value
+  if (updateState.value === 'upToDate') return '当前已安装最新的稳定版本。'
+  return '从 GitHub Release 检查经过签名验证的稳定版本。'
+})
+const updateActionText = computed(() => ({
+  development: '开发模式不检查',
+  checking: '正在检查…',
+  downloading: updateProgressText.value,
+  installing: '正在启动安装程序…',
+  upToDate: '重新检查',
+  error: '重试检查',
+  idle: '检查更新'
+}[updateState.value] || '检查更新'))
+const updateActionDisabled = computed(() => isDevelopment || ['checking', 'downloading', 'installing'].includes(updateState.value))
 const updateProgressText = computed(() => {
   const { downloaded, total } = updateProgress.value
   if (!total) return '正在下载…'
   return `正在下载 ${Math.min(100, Math.round(downloaded / total * 100))}%`
+})
+const updateProgressPercent = computed(() => {
+  const { downloaded, total } = updateProgress.value
+  return total ? Math.min(100, Math.round(downloaded / total * 100)) : 0
 })
 const updateNotes = computed(() => availableUpdate.value?.body?.trim() || '本次更新已准备就绪。')
 const orphanGroups = computed(() => {
@@ -676,6 +738,10 @@ function formatDate(value) {
 }
 
 async function checkForUpdates() {
+  if (isDevelopment) {
+    updateState.value = 'development'
+    return
+  }
   updateState.value = 'checking'
   updateError.value = ''
   availableUpdate.value = null
@@ -689,7 +755,10 @@ async function checkForUpdates() {
     updateState.value = 'available'
   } catch (error) {
     updateState.value = 'error'
-    updateError.value = error?.message || '暂时无法检查更新，请检查网络后重试。'
+    const message = String(error?.message || '')
+    updateError.value = message.includes('404') || message.includes('latest.json')
+      ? '更新服务尚未就绪，请稍后重试。'
+      : '更新服务暂时不可用，不影响本机任务数据；请稍后重试。'
   }
 }
 
@@ -710,7 +779,7 @@ async function installUpdate() {
     })
   } catch (error) {
     updateState.value = 'error'
-    updateError.value = error?.message || '更新下载或安装失败，请稍后重试。'
+    updateError.value = '更新下载或安装失败，不影响本机任务数据；请稍后重试。'
   }
 }
 
