@@ -2074,16 +2074,16 @@ fn main() {
         ])
         .build(tauri::generate_context!())
         .expect("初始化 Tauri 应用失败")
-        .run(|app, event| {
+        .run(|_app, _event| {
             // macOS 从 Dock 重新激活一个已隐藏窗口时会发出 Reopen；此前没有
             // 处理这个事件，导致只能通过菜单栏恢复主窗口。
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Reopen {
                 has_visible_windows: false,
                 ..
-            } = event
+            } = _event
             {
-                show_main_window(app);
+                show_main_window(_app);
             }
         });
 }
