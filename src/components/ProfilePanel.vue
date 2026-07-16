@@ -170,7 +170,11 @@ function backupLabel(backup) {
   const kind = backup.reason === 'manual' ? '手动恢复点' : '恢复前安全点'
   const date = new Date(backup.createdAt)
   if (Number.isNaN(date.getTime())) return kind
-  return `${kind} · ${date.toLocaleString('zh-CN', { dateStyle: 'medium', timeStyle: 'medium' })}`
+  const now = new Date()
+  const isToday = date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate()
+  const day = isToday ? '今天' : `${date.getMonth() + 1}月${date.getDate()}日`
+  const time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  return `${kind} · ${day} ${time}`
 }
 
 async function loadBackups() {
