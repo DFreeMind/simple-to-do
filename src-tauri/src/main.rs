@@ -347,7 +347,8 @@ fn open_data_backup(app: tauri::AppHandle, backup_id: String) -> Result<bool, St
     if read_data_backup_record(&snapshot)?.is_none() {
         return Err("恢复点不存在或已损坏".to_string());
     }
-    open_path_in_file_manager(&snapshot, true)
+    // 单项“打开”应直接进入快照目录，方便查看其中的数据库、附件和元数据。
+    open_path_in_file_manager(&snapshot, false)
 }
 
 fn remove_path(path: &Path) -> Result<(), String> {
