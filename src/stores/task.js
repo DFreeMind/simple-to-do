@@ -39,6 +39,7 @@ import {
 } from '@/utils/sound'
 import { migrateData, validateData, createBackup, getCurrentVersion } from '@/utils/migrator'
 import { matchesTaskSearch, normalizeSearchQuery } from '@/utils/search'
+import { getCompletionMessage } from '@/utils/dailyMessages'
 
 const SYSTEM_VIEW_IDS = ['today', 'inbox', 'planned', 'important', 'completed', 'trash', 'search']
 const READONLY_VIEWS = ['planned', 'completed', 'trash']
@@ -76,7 +77,9 @@ const DEFAULT_SETTINGS = {
   soundListEnabled: true,
   soundGroupEnabled: true,
   reminderNotificationsEnabled: true,
-  reminderSoundEnabled: true
+  reminderSoundEnabled: true,
+  dailyGuidanceEnabled: true,
+  dailyGuidanceStyle: 'practical'
 }
 
 const DEFAULT_PROFILE = {
@@ -998,6 +1001,7 @@ export const useTaskStore = defineStore('task', () => {
   function completeTask(id) {
     const task = tasks.value.find(item => item.id === id)
     if (!task) return
+    const isTodayTask = isInMyDay(task) || isToday(task.dueDate)
     task.completed = !task.completed
     const completedAt = task.completed ? nowIso() : null
     task.completedAt = completedAt
@@ -1013,6 +1017,10 @@ export const useTaskStore = defineStore('task', () => {
     rescheduleReminder(task)
     if (task.completed) {
       playCompleteSound()
+      const remainingTodayTasks = activeTasks.value.filter(item => item.id !== task.id && !item.completed && (isInMyDay(item) || isToday(item.dueDate))).length
+      if (isTodayTask && remainingTodayTasks === 0 && settings.value.dailyGuidanceEnabled) {
+        showNotice(getCompletionMessage({ style: settings.value.dailyGuidanceStyle }), 'success')
+      }
     } else {
       playTaskUndoSound()
     }
@@ -1643,6 +1651,10 @@ export const useTaskStore = defineStore('task', () => {
     const soundGroupEnabled = rawSettings.soundGroupEnabled !== false
     const reminderNotificationsEnabled = rawSettings.reminderNotificationsEnabled !== false
     const reminderSoundEnabled = rawSettings.reminderSoundEnabled !== false
+    const dailyGuidanceEnabled = rawSettings.dailyGuidanceEnabled !== false
+    const dailyGuidanceStyle = ['calm', 'practical', 'encouraging'].includes(rawSettings.dailyGuidanceStyle)
+      ? rawSettings.dailyGuidanceStyle
+      : DEFAULT_SETTINGS.dailyGuidanceStyle
     return {
       ...DEFAULT_SETTINGS,
       ...rawSettings,
@@ -1665,7 +1677,9 @@ export const useTaskStore = defineStore('task', () => {
       soundListEnabled,
       soundGroupEnabled,
       reminderNotificationsEnabled,
-      reminderSoundEnabled
+      reminderSoundEnabled,
+      dailyGuidanceEnabled,
+      dailyGuidanceStyle
     }
   }
 

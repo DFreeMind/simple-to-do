@@ -5496,6 +5496,11 @@ body.is-resizing {
     background: var(--surface);
     outline: 0;
   }
+
+  &.disabled {
+    opacity: 0.55;
+    pointer-events: none;
+  }
 }
 
 .setting-select-card__icon {

@@ -596,6 +596,7 @@ import {
 } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import { useDragSort } from '@/composables/useDragSort'
+import { getTodayGuidance, getViewEmptyMessage } from '@/utils/dailyMessages'
 import TaskItem from './TaskItem.vue'
 import TaskGroupHeader from './TaskGroupHeader.vue'
 import EmojiPicker from './EmojiPicker.vue'
@@ -885,9 +886,21 @@ function onContentScroll(event) {
   }, 850)
 }
 
+const todayOpenTaskCount = computed(() => store.activeTasks.filter(task => !task.completed && (store.isInMyDay(task) || store.getPlanBucket(task) === 'today')).length)
+const overdueTaskCount = computed(() => store.activeTasks.filter(task => !task.completed && store.getPlanBucket(task) === 'overdue').length)
+const dailyGuidance = computed(() => getTodayGuidance({
+  style: store.settings.dailyGuidanceStyle,
+  openCount: todayOpenTaskCount.value,
+  overdueCount: overdueTaskCount.value
+}))
+const contextualEmptyMessage = computed(() => getViewEmptyMessage({
+  view: store.currentView,
+  style: store.settings.dailyGuidanceStyle
+}))
+
 const viewMeta = computed(() => {
   const system = {
-    today: { title: '今日', eyebrow: '聚焦今天真正要推进的事' },
+    today: { title: '今日', eyebrow: store.settings.dailyGuidanceEnabled ? dailyGuidance.value.eyebrow : '聚焦今天真正要推进的事' },
     inbox: { title: '收集箱', eyebrow: '先记录，再整理' },
     planned: { title: '计划', eyebrow: '按时间推进任务' },
     important: { title: '重要', eyebrow: '需要优先处理的任务' },
@@ -1131,6 +1144,7 @@ function toggleAllGroups() {
 const emptyTitle = computed(() => {
   if (store.currentList && store.listTaskFilters.date === 'overdue') return '没有逾期任务'
   if (store.currentList && store.isListTaskFilterActive) return '没有符合筛选条件的任务'
+  if (store.currentView === 'today' && store.settings.dailyGuidanceEnabled) return dailyGuidance.value.title
   const map = {
     today: '今天很清爽',
     inbox: '收集箱为空',
@@ -1146,6 +1160,8 @@ const emptyTitle = computed(() => {
 const emptyText = computed(() => {
   if (store.currentList && store.listTaskFilters.date === 'overdue') return '当前清单中没有已过截止日期且未完成的任务。'
   if (store.currentList && store.isListTaskFilterActive) return '调整筛选条件，或添加一条任务。'
+  if (store.currentView === 'today' && store.settings.dailyGuidanceEnabled) return dailyGuidance.value.text
+  if (store.settings.dailyGuidanceEnabled && contextualEmptyMessage.value?.text) return contextualEmptyMessage.value.text
   const map = {
     today: '添加一个今日任务，或从建议中挑选今天要推进的事项。',
     inbox: '把临时想法先放在这里，之后再安排日期或清单。',

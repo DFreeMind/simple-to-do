@@ -234,6 +234,41 @@
 
             <div class="settings-block">
               <div class="settings-block__title">
+                <h4>每日提示</h4>
+                <span>{{ dailyGuidanceSummary }}</span>
+              </div>
+              <label class="switch-row">
+                <span>
+                  <strong>显示每日提示</strong>
+                  <small>按日期和任务状态给出本地提示；同一天保持一致，不会读取或上传数据</small>
+                </span>
+                <input
+                  type="checkbox"
+                  :checked="store.settings.dailyGuidanceEnabled"
+                  @change="store.updateSettings({ dailyGuidanceEnabled: $event.target.checked })"
+                />
+                <span class="switch-control" aria-hidden="true"></span>
+              </label>
+              <label class="setting-select-card" :class="{ disabled: !store.settings.dailyGuidanceEnabled }">
+                <span class="setting-select-card__icon"><Info :size="17" /></span>
+                <span class="setting-select-card__copy">
+                  <strong>提示风格</strong>
+                  <small>轻松、务实或鼓励；每天自动轮换不同表达</small>
+                </span>
+                <select
+                  :value="store.settings.dailyGuidanceStyle"
+                  :disabled="!store.settings.dailyGuidanceEnabled"
+                  @change="store.updateSettings({ dailyGuidanceStyle: $event.target.value })"
+                >
+                  <option value="calm">轻松</option>
+                  <option value="practical">务实</option>
+                  <option value="encouraging">鼓励</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="settings-block">
+              <div class="settings-block__title">
                 <h4>提醒</h4>
                 <span>{{ reminderSummary }}</span>
               </div>
@@ -647,6 +682,10 @@ const enabledSoundCount = computed(() => [
 ].filter(Boolean).length)
 const soundSummary = computed(() => store.settings.soundEnabled ? `${enabledSoundCount.value}/3 已启用` : '已关闭')
 const reminderSummary = computed(() => store.settings.reminderNotificationsEnabled ? (store.settings.reminderSoundEnabled ? '通知和声音' : '仅通知') : '已关闭')
+const dailyGuidanceSummary = computed(() => {
+  if (!store.settings.dailyGuidanceEnabled) return '已关闭'
+  return ({ calm: '轻松', practical: '务实', encouraging: '鼓励' }[store.settings.dailyGuidanceStyle] || '务实')
+})
 const storageSummary = computed(() => storageReport.value ? `${storageReport.value.orphanAttachments.length} 项可清理` : '按需扫描')
 const updateStatusText = computed(() => ({
   development: '开发环境',
