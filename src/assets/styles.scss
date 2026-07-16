@@ -1293,27 +1293,32 @@ body.is-resizing {
 // 保留视图切换、筛选和详情开关，避免操作溢出到右侧详情面板。
 @container task-list (max-width: 720px) {
   .task-list__header {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 10px;
+    align-items: flex-start;
+    gap: 8px;
   }
 
   .list-switcher,
-  .list-switcher__trigger {
-    max-width: 100%;
+  .task-list__title {
+    min-width: 0;
+    flex: 1 1 auto;
   }
 
   .list-switcher__trigger {
+    width: 100%;
+    max-width: 100%;
     text-align: left;
   }
 
   .list-switcher__trigger > span {
     min-width: 0;
-    overflow-wrap: anywhere;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .header-actions {
-    width: 100%;
+    width: auto;
+    flex: 0 0 auto;
     justify-content: flex-start;
   }
 
