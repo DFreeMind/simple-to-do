@@ -1289,6 +1289,37 @@ body.is-resizing {
   justify-content: flex-start;
 }
 
+// 中栏被详情栏挤窄时，工具栏改为独立一行并按需换行。
+// 不让操作按钮溢出到右侧详情面板，也不把常用操作无提示地隐藏起来。
+@container task-list (max-width: 720px) {
+  .task-list__header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .list-switcher,
+  .list-switcher__trigger {
+    max-width: 100%;
+  }
+
+  .list-switcher__trigger {
+    text-align: left;
+  }
+
+  .list-switcher__trigger > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    row-gap: 6px;
+  }
+}
+
 @container task-list (max-width: 640px) {
   .header-actions {
     gap: 6px;
