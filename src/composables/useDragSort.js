@@ -28,9 +28,7 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
   let lastMoveTime = 0
   let scrollRaf = null
   let suppressNextClick = false
-  let lastDragOverSoundTime = 0
-  let lastDragOverSoundTargetId = ''
-  const DRAG_OVER_SOUND_INTERVAL_MS = 110
+  let lastDropIndicatorKey = ''
 
   const DRAG_THRESHOLD = 5 // px before a press becomes a drag
   const EDGE_THRESHOLD = 60 // px from edge to trigger auto-scroll
@@ -60,8 +58,7 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
     suppressNextClick = true
     document.addEventListener('click', suppressClick, true)
     draggingId.value = pendingItemId
-    lastDragOverSoundTime = 0
-    lastDragOverSoundTargetId = ''
+    lastDropIndicatorKey = ''
 
     // Calculate offset from item top-left to mouse position
     const rect = pendingItem.el.getBoundingClientRect()
@@ -132,18 +129,17 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
       dragOverId.value = result.id
       dropPosition.value = result.position || 'after'
       targetGroupId = result.groupId
-      // 刚经过新目标时立即反馈；停留或掠过多个指示线时再以稳定节奏继续提示。
-      const enteredNewTarget = result.id !== lastDragOverSoundTargetId
-      if (onDragOver && (enteredNewTarget || now - lastDragOverSoundTime >= DRAG_OVER_SOUND_INTERVAL_MS)) {
-        onDragOver()
-        lastDragOverSoundTime = now
+      // 只在排序指示线实际换位时播放：同一任务的“上方/下方”是两条不同指示线。
+      const indicatorKey = `${result.id}:${dropPosition.value}:${result.groupId || ''}`
+      if (onDragOver && indicatorKey !== lastDropIndicatorKey) {
+        onDragOver({ id: result.id, position: dropPosition.value, groupId: result.groupId })
+        lastDropIndicatorKey = indicatorKey
       }
-      lastDragOverSoundTargetId = result.id
     } else {
       dragOverId.value = ''
       dropPosition.value = ''
       targetGroupId = undefined
-      lastDragOverSoundTargetId = ''
+      lastDropIndicatorKey = ''
     }
   }
 
@@ -207,8 +203,7 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
     dragOverId.value = ''
     dropPosition.value = ''
     targetGroupId = undefined
-    lastDragOverSoundTime = 0
-    lastDragOverSoundTargetId = ''
+    lastDropIndicatorKey = ''
   }
 
   function suppressClick(event) {
@@ -238,8 +233,7 @@ export function useDragSort({ onDrop, getItemEl, findItemAtPoint, scrollContaine
     dragOverId.value = ''
     dropPosition.value = ''
     targetGroupId = undefined
-    lastDragOverSoundTime = 0
-    lastDragOverSoundTargetId = ''
+    lastDropIndicatorKey = ''
   }
 
   onUnmounted(cleanup)

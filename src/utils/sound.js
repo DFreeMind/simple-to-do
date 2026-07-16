@@ -22,8 +22,6 @@ const SOUNDS = {
 
 let soundEnabled = true
 let soundCategories = { task: true, list: true, group: true }
-let lastDragSoundTime = 0
-const DRAG_THROTTLE_MS = 90
 const audioPools = new Map()
 const AUDIO_POOL_SIZE = 4
 
@@ -83,13 +81,7 @@ export function playSaveSound() { play('soft', 'task') }
 export function playErrorSound() { play('negative', 'task') }
 
 export function playDragStartSound() { play('add', 'task') }
-export function playDragOverSound() {
-  if (!isCategoryEnabled('task')) return
-  const now = Date.now()
-  if (now - lastDragSoundTime < DRAG_THROTTLE_MS) return
-  lastDragSoundTime = now
-  play('drag', 'task')
-}
+export function playDragOverSound() { play('drag', 'task') }
 export function playDragEndSound() { play('soft', 'task') }
 
 export function playListAddSound() { play('add', 'list') }
