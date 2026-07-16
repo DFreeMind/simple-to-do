@@ -67,6 +67,33 @@ export async function listDataBackups() {
   }
 }
 
+export async function getDataBackupLocation() {
+  if (!isTauri()) return ''
+  try {
+    return await invoke('data_backup_location')
+  } catch (error) {
+    throw new Error(formatPlatformError(error, '读取恢复点目录失败'))
+  }
+}
+
+export async function openDataBackupLocation() {
+  if (!isTauri()) throw new Error('当前环境不支持打开本机恢复点目录')
+  try {
+    return await invoke('open_data_backup_location')
+  } catch (error) {
+    throw new Error(formatPlatformError(error, '打开恢复点目录失败'))
+  }
+}
+
+export async function deleteDataBackup(backupId) {
+  if (!isTauri()) throw new Error('当前环境不支持删除本机恢复点')
+  try {
+    return await invoke('delete_data_backup', { backupId })
+  } catch (error) {
+    throw new Error(formatPlatformError(error, '删除本机恢复点失败'))
+  }
+}
+
 export async function restoreDataBackup(backupId) {
   if (!isTauri()) throw new Error('当前环境不支持恢复本机数据')
   try {

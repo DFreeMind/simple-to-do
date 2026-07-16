@@ -9,6 +9,7 @@ use std::{
     collections::HashSet,
     fs,
     path::{Path, PathBuf},
+    process::Command,
     time::Duration,
 };
 use tauri::Manager;
@@ -298,6 +299,32 @@ fn list_data_backups(app: tauri::AppHandle) -> Result<Vec<DataBackupRecord>, Str
     Ok(backups)
 }
 
+#[tauri::command]
+fn data_backup_location(app: tauri::AppHandle) -> Result<String, String> {
+    Ok(backup_dir(&app)?.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn open_data_backup_location(app: tauri::AppHandle) -> Result<bool, String> {
+    let location = backup_dir(&app)?;
+    #[cfg(target_os = "windows")]
+    Command::new("explorer.exe")
+        .arg(&location)
+        .spawn()
+        .map_err(|err| format!("打开恢复点目录失败: {err}"))?;
+    #[cfg(target_os = "macos")]
+    Command::new("open")
+        .arg(&location)
+        .spawn()
+        .map_err(|err| format!("打开恢复点目录失败: {err}"))?;
+    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+    Command::new("xdg-open")
+        .arg(&location)
+        .spawn()
+        .map_err(|err| format!("打开恢复点目录失败: {err}"))?;
+    Ok(true)
+}
+
 fn remove_path(path: &Path) -> Result<(), String> {
     if path.is_dir() {
         fs::remove_dir_all(path).map_err(|err| format!("清理临时恢复文件失败: {err}"))?;
@@ -305,6 +332,19 @@ fn remove_path(path: &Path) -> Result<(), String> {
         fs::remove_file(path).map_err(|err| format!("清理临时恢复文件失败: {err}"))?;
     }
     Ok(())
+}
+
+#[tauri::command]
+fn delete_data_backup(app: tauri::AppHandle, backup_id: String) -> Result<bool, String> {
+    if !backup_id_is_safe(&backup_id) {
+        return Err("恢复点标识无效".to_string());
+    }
+    let snapshot = backup_dir(&app)?.join(&backup_id);
+    if read_data_backup_record(&snapshot)?.is_none() {
+        return Err("恢复点不存在或已损坏".to_string());
+    }
+    remove_path(&snapshot)?;
+    Ok(true)
 }
 
 #[tauri::command]
@@ -2389,6 +2429,9 @@ fn main() {
             save_migration_backup,
             create_data_backup,
             list_data_backups,
+            data_backup_location,
+            open_data_backup_location,
+            delete_data_backup,
             restore_data_backup,
             select_image,
             read_image,
