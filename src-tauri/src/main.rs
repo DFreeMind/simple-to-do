@@ -2,13 +2,14 @@
 
 use base64::{engine::general_purpose, Engine as _};
 use chrono::{Datelike, Local};
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{backup::Backup, params, Connection, OpenFlags, OptionalExtension};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::{
     collections::HashSet,
     fs,
     path::{Path, PathBuf},
+    time::Duration,
 };
 use tauri::Manager;
 use tauri::{
@@ -37,6 +38,8 @@ fn db_file(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(app_data_dir(app)?.join("simpletodo.db"))
 }
 
+const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 fn backup_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let dir = app_data_dir(app)?.join("backups");
     fs::create_dir_all(&dir).map_err(|err| format!("创建备份目录失败: {err}"))?;
@@ -44,9 +47,94 @@ fn backup_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 }
 
 fn open_database(app: &tauri::AppHandle) -> Result<Connection, String> {
-    let conn = Connection::open(db_file(app)?).map_err(|err| format!("打开数据库失败: {err}"))?;
+    let database = db_file(app)?;
+    if !database.exists() {
+        import_legacy_database(app, &database)?;
+    }
+    if database.exists() {
+        create_versioned_database_backup(app, &database)?;
+    }
+    let conn = Connection::open(&database).map_err(|err| format!("打开数据库失败: {err}"))?;
     init_database(&conn)?;
     Ok(conn)
+}
+
+/// 在每个应用版本首次读取已有数据库前创建一致性备份。
+/// 备份失败时拒绝继续打开数据库，避免升级过程在未留下可恢复副本的情况下修改用户数据。
+fn create_versioned_database_backup(app: &tauri::AppHandle, database: &Path) -> Result<(), String> {
+    let backups = backup_dir(app)?;
+    let marker = backups.join(format!(".startup-backup-v{APP_VERSION}.done"));
+    if marker.exists() {
+        return Ok(());
+    }
+
+    let timestamp = Local::now().format("%Y%m%d-%H%M%S");
+    let backup = backups.join(format!("simpletodo-v{APP_VERSION}-{timestamp}.db"));
+    copy_sqlite_database(database, &backup)?;
+    fs::write(&marker, backup.file_name().unwrap_or_default().to_string_lossy().as_bytes())
+        .map_err(|err| format!("记录数据库备份状态失败: {err}"))?;
+    Ok(())
+}
+
+/// 使用 SQLite Online Backup API 复制数据库，包含 WAL 中尚未 checkpoint 的提交。
+fn copy_sqlite_database(source: &Path, destination: &Path) -> Result<(), String> {
+    let source = Connection::open_with_flags(source, OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .map_err(|err| format!("打开待备份数据库失败: {err}"))?;
+    let mut destination = Connection::open(destination)
+        .map_err(|err| format!("创建数据库备份失败: {err}"))?;
+    let backup = Backup::new(&source, &mut destination)
+        .map_err(|err| format!("初始化数据库备份失败: {err}"))?;
+    backup
+        .run_to_completion(128, Duration::from_millis(10), None)
+        .map_err(|err| format!("写入数据库备份失败: {err}"))?;
+    Ok(())
+}
+
+/// 仅在当前数据目录不存在数据库时，从已知的历史 Tauri 标识目录导入 SQLite 数据。
+/// 源数据库保留在原位置，导入使用 SQLite 备份 API，避免直接复制 WAL 文件造成不一致。
+fn import_legacy_database(app: &tauri::AppHandle, destination: &Path) -> Result<(), String> {
+    let current_data_dir = app_data_dir(app)?;
+    let Some(parent) = current_data_dir.parent() else {
+        return Ok(());
+    };
+
+    for identifier in ["com.simpletodo.desktop", "com.simpletodo.app"] {
+        let legacy_dir = parent.join(identifier);
+        let legacy_database = legacy_dir.join("simpletodo.db");
+        if !legacy_database.is_file() {
+            continue;
+        }
+
+        let staging_database = destination.with_extension("legacy-import.tmp");
+        if staging_database.exists() {
+            fs::remove_file(&staging_database).map_err(|err| format!("清理上次迁移暂存文件失败: {err}"))?;
+        }
+        copy_sqlite_database(&legacy_database, &staging_database)?;
+        for directory in ["attachments", "profile"] {
+            copy_directory_if_present(&legacy_dir.join(directory), &current_data_dir.join(directory))?;
+        }
+        fs::rename(&staging_database, destination).map_err(|err| format!("完成历史数据库导入失败: {err}"))?;
+        return Ok(());
+    }
+    Ok(())
+}
+
+fn copy_directory_if_present(source: &Path, destination: &Path) -> Result<(), String> {
+    if !source.is_dir() {
+        return Ok(());
+    }
+    fs::create_dir_all(destination).map_err(|err| format!("创建迁移目录失败: {err}"))?;
+    for entry in fs::read_dir(source).map_err(|err| format!("读取迁移目录失败: {err}"))? {
+        let entry = entry.map_err(|err| format!("读取迁移目录失败: {err}"))?;
+        let source_path = entry.path();
+        let target_path = destination.join(entry.file_name());
+        if source_path.is_dir() {
+            copy_directory_if_present(&source_path, &target_path)?;
+        } else if !target_path.exists() {
+            fs::copy(&source_path, &target_path).map_err(|err| format!("复制迁移附件失败: {err}"))?;
+        }
+    }
+    Ok(())
 }
 
 fn attachment_root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -1764,6 +1852,35 @@ fn extension_for_mime(mime: &str) -> Option<&'static str> {
         "application/vnd.ms-powerpoint" => Some("ppt"),
         "application/vnd.openxmlformats-officedocument.presentationml.presentation" => Some("pptx"),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sqlite_backup_preserves_wal_data() {
+        let root = std::env::temp_dir().join(format!(
+            "simple-to-do-backup-test-{}",
+            Local::now().timestamp_nanos_opt().unwrap_or_default()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let source_path = root.join("source.db");
+        let backup_path = root.join("backup.db");
+
+        let source = Connection::open(&source_path).unwrap();
+        source.execute_batch("PRAGMA journal_mode = WAL; CREATE TABLE tasks (id INTEGER PRIMARY KEY, title TEXT NOT NULL);").unwrap();
+        source.execute("INSERT INTO tasks (title) VALUES (?1)", params!["升级前任务"]).unwrap();
+
+        copy_sqlite_database(&source_path, &backup_path).unwrap();
+        let backup = Connection::open(&backup_path).unwrap();
+        let count: i64 = backup.query_row("SELECT COUNT(*) FROM tasks", [], |row| row.get(0)).unwrap();
+        assert_eq!(count, 1);
+
+        drop(backup);
+        drop(source);
+        fs::remove_dir_all(&root).unwrap();
     }
 }
 
