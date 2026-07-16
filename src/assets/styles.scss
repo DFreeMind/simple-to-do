@@ -1289,8 +1289,8 @@ body.is-resizing {
   justify-content: flex-start;
 }
 
-// 中栏被详情栏挤窄时，工具栏改为独立一行并按需换行。
-// 不让操作按钮溢出到右侧详情面板，也不把常用操作无提示地隐藏起来。
+// 中栏被详情栏挤窄时，工具栏改为独立一行；低频操作收进更多菜单。
+// 保留视图切换、筛选和详情开关，避免操作溢出到右侧详情面板。
 @container task-list (max-width: 720px) {
   .task-list__header {
     align-items: stretch;
@@ -1314,9 +1314,16 @@ body.is-resizing {
 
   .header-actions {
     width: 100%;
-    flex-wrap: wrap;
     justify-content: flex-start;
-    row-gap: 6px;
+  }
+
+  .header-actions__secondary,
+  .header-actions__compact-secondary {
+    display: none;
+  }
+
+  .header-actions__more {
+    display: block;
   }
 }
 

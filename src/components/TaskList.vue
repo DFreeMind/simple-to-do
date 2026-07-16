@@ -11,7 +11,7 @@
         <ViewModeToggle v-if="showTaskActions && !['planned', 'completed', 'trash'].includes(store.currentView)" v-model="viewMode" />
         <button
           v-if="showTaskActions && !isSearchView && isGroupCompletedInGroups && store.completedTasks.length"
-          class="icon-btn"
+          class="icon-btn header-actions__compact-secondary"
           type="button"
           :title="allGroupCompletedVisible ? '已显示所有完成任务，点击全部隐藏' : '已隐藏部分或全部完成任务，点击全部显示'"
           :aria-label="allGroupCompletedVisible ? '全部隐藏完成任务' : '全部显示完成任务'"
@@ -36,13 +36,25 @@
             <ChevronsUp v-else :size="18" />
           </button>
         </div>
-        <div v-if="showTaskActions && !isSearchView && viewMode === 'group' && !['planned', 'completed', 'trash'].includes(store.currentView)" class="header-actions__more">
-          <button class="icon-btn" type="button" title="更多分组操作" aria-label="更多分组操作" @click.stop="toggleHeaderMoreMenu">
+        <div v-if="showTaskActions && !isSearchView" class="header-actions__more">
+          <button class="icon-btn" type="button" title="更多操作" aria-label="更多操作" @click.stop="toggleHeaderMoreMenu">
             <MoreHorizontal :size="18" />
           </button>
           <div v-if="headerMoreOpen" class="sort-menu header-actions__more-menu" @click.stop>
-            <button class="sort-menu__item" type="button" @click="addGroupFromHeaderMenu"><Plus :size="15" /><span>新建分组</span></button>
-            <button v-if="store.currentListGroups.length" class="sort-menu__item" type="button" @click="toggleAllGroupsFromHeaderMenu"><ChevronsDown v-if="!allGroupsExpanded" :size="15" /><ChevronsUp v-else :size="15" /><span>{{ allGroupsExpanded ? '折叠全部分组' : '展开全部分组' }}</span></button>
+            <button v-if="isGroupCompletedInGroups && store.completedTasks.length" class="sort-menu__item" type="button" @click="toggleAllGroupCompletedFromHeaderMenu"><Eye v-if="allGroupCompletedVisible" :size="15" /><EyeOff v-else :size="15" /><span>{{ allGroupCompletedVisible ? '隐藏所有完成任务' : '显示所有完成任务' }}</span></button>
+            <div v-if="isGroupCompletedInGroups && store.completedTasks.length" class="sort-menu__separator"></div>
+            <div class="sort-menu__title">排序方式</div>
+            <template v-for="option in sortOptions" :key="`compact-${option.value}`">
+              <div v-if="option.secondary" class="sort-menu__separator"></div>
+              <button class="sort-menu__item" :class="{ active: store.sortBy === option.value }" type="button" @click="selectSortFromHeaderMenu(option.value)">
+                <span class="sort-menu__copy"><strong>{{ option.label }}</strong><small v-if="option.description">{{ option.description }}</small></span><Check v-if="store.sortBy === option.value" :size="15" />
+              </button>
+            </template>
+            <template v-if="viewMode === 'group' && !['planned', 'completed', 'trash'].includes(store.currentView)">
+              <div class="sort-menu__separator"></div>
+              <button class="sort-menu__item" type="button" @click="addGroupFromHeaderMenu"><Plus :size="15" /><span>新建分组</span></button>
+              <button v-if="store.currentListGroups.length" class="sort-menu__item" type="button" @click="toggleAllGroupsFromHeaderMenu"><ChevronsDown v-if="!allGroupsExpanded" :size="15" /><ChevronsUp v-else :size="15" /><span>{{ allGroupsExpanded ? '折叠全部分组' : '展开全部分组' }}</span></button>
+            </template>
           </div>
         </div>
         <div v-if="store.currentList" class="sort-select">
@@ -78,7 +90,7 @@
             </div>
           </div>
         </div>
-        <div v-if="showTaskActions" class="sort-select">
+        <div v-if="showTaskActions" class="sort-select header-actions__compact-secondary">
           <button
             class="icon-btn"
             :class="{ active: store.sortBy !== 'default' || sortMenuOpen }"
@@ -1395,6 +1407,11 @@ function selectSort(value) {
   sortMenuOpen.value = false
 }
 
+function selectSortFromHeaderMenu(value) {
+  selectSort(value)
+  headerMoreOpen.value = false
+}
+
 function selectListFilter(key, value) {
   store.setListTaskFilters({ [key]: value })
 }
@@ -1440,6 +1457,11 @@ function toggleHeaderMoreMenu() {
 function addGroupFromHeaderMenu() {
   headerMoreOpen.value = false
   addGroup()
+}
+
+function toggleAllGroupCompletedFromHeaderMenu() {
+  headerMoreOpen.value = false
+  toggleAllGroupCompletedVisibility()
 }
 
 function toggleAllGroupsFromHeaderMenu() {
