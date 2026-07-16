@@ -36,7 +36,7 @@
             <article class="profile-capability"><span class="profile-capability__icon">协</span><div><strong>协作空间</strong><small>局域网或云端协作时，在这里切换空间、成员和权限</small></div><span>未加入</span></article>
           </div>
         </section>
-        <section v-else class="profile-section profile-section--first profile-section--capabilities">
+        <section v-else-if="activeSection === 'security'" class="profile-section profile-section--first profile-section--capabilities">
           <div class="profile-section__head"><h3>数据与安全</h3><p>本地优先</p></div>
           <div class="data-backup-toolbar">
             <span><strong>本机恢复点</strong><small>包含任务、附件和头像；恢复前会自动创建安全点</small></span>
