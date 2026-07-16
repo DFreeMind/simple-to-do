@@ -110,6 +110,16 @@ import axolotl from '@/assets/avatars/axolotl.png'
 import mushroom from '@/assets/avatars/mushroom.png'
 import jellyfish from '@/assets/avatars/jellyfish.png'
 import fox from '@/assets/avatars/fox.png'
+import foxPilot from '@/assets/avatars/fox-pilot.png'
+import teaDragon from '@/assets/avatars/tea-dragon.png'
+import starRaccoon from '@/assets/avatars/star-raccoon.png'
+import cloudPup from '@/assets/avatars/cloud-pup.png'
+import capybara from '@/assets/avatars/capybara.png'
+import octopusDj from '@/assets/avatars/octopus-dj.png'
+import penguinPost from '@/assets/avatars/penguin-post.png'
+import alienGardener from '@/assets/avatars/alien-gardener.png'
+import snailLibrarian from '@/assets/avatars/snail-librarian.png'
+import lemonRobot from '@/assets/avatars/lemon-robot.png'
 
 defineEmits(['close'])
 const store = useTaskStore()
@@ -118,7 +128,10 @@ const avatarUrl = ref('')
 const avatarPickerOpen = ref(false)
 const avatarPickerAnchor = ref(null)
 const avatarPreview = ref(null)
-const builtInAvatars = [{ id: 'shiba', label: '柴犬', src: shiba }, { id: 'cat', label: '黑白猫', src: cat }, { id: 'crane', label: '纸鹤', src: crane }, { id: 'red-panda', label: '小熊猫', src: redPanda }, { id: 'otter', label: '青蛙', src: frog }, { id: 'astronaut', label: '太空人', src: astronaut }, { id: 'robot', label: '小机器人', src: robot }, { id: 'turtle', label: '海龟', src: turtle }, { id: 'cloud', label: '云朵', src: cloud }, { id: 'frog', label: '月亮', src: moon }, { id: 'koi', label: '锦鲤', src: koi }, { id: 'space-blob', label: '太空团子', src: spaceBlob }, { id: 'chameleon', label: '变色龙', src: chameleon }, { id: 'cassette', label: '随身听', src: cassette }, { id: 'axolotl', label: '六角恐龙', src: axolotl }, { id: 'mushroom', label: '蘑菇屋', src: mushroom }, { id: 'jellyfish', label: '水母', src: jellyfish }, { id: 'fox', label: '小狐狸', src: fox }]
+const builtInAvatars = [
+  { id: 'shiba', label: '柴犬', src: shiba }, { id: 'cat', label: '黑白猫', src: cat }, { id: 'crane', label: '纸鹤', src: crane }, { id: 'red-panda', label: '小熊猫', src: redPanda }, { id: 'otter', label: '青蛙', src: frog }, { id: 'astronaut', label: '太空人', src: astronaut }, { id: 'robot', label: '小机器人', src: robot }, { id: 'turtle', label: '海龟', src: turtle }, { id: 'cloud', label: '云朵', src: cloud }, { id: 'frog', label: '月亮', src: moon }, { id: 'koi', label: '锦鲤', src: koi }, { id: 'space-blob', label: '太空团子', src: spaceBlob }, { id: 'chameleon', label: '变色龙', src: chameleon }, { id: 'cassette', label: '随身听', src: cassette }, { id: 'axolotl', label: '六角恐龙', src: axolotl }, { id: 'mushroom', label: '蘑菇屋', src: mushroom }, { id: 'jellyfish', label: '水母', src: jellyfish }, { id: 'fox', label: '小狐狸', src: fox },
+  { id: 'fox-pilot', label: '飞行小狐狸', src: foxPilot }, { id: 'tea-dragon', label: '茶杯小龙', src: teaDragon }, { id: 'star-raccoon', label: '星空浣熊', src: starRaccoon }, { id: 'cloud-pup', label: '云朵小狗', src: cloudPup }, { id: 'capybara', label: '水豚咖啡师', src: capybara }, { id: 'octopus-dj', label: '章鱼 DJ', src: octopusDj }, { id: 'penguin-post', label: '企鹅邮差', src: penguinPost }, { id: 'alien-gardener', label: '外星园丁', src: alienGardener }, { id: 'snail-librarian', label: '蜗牛图书管理员', src: snailLibrarian }, { id: 'lemon-robot', label: '柠檬滑轮机器人', src: lemonRobot }
+]
 const selectedBuiltInId = computed(() => store.profile.avatarRelativePath?.startsWith('builtin:') ? store.profile.avatarRelativePath.slice(8) : '')
 const avatarSrc = computed(() => avatarUrl.value || builtInAvatars.find(item => item.id === selectedBuiltInId.value)?.src || '')
 const uploading = ref(false)
