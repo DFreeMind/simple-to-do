@@ -6878,3 +6878,32 @@ body.is-resizing {
   background: var(--surface);
   opacity: 1;
 }
+
+.data-safety-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: var(--app-bg, #f5f8f7);
+}
+
+.data-safety-card {
+  width: min(520px, 100%);
+  padding: 32px;
+  border: 1px solid var(--border, #dce8e5);
+  border-radius: var(--radius-lg, 16px);
+  background: var(--surface, #fff);
+  box-shadow: 0 18px 48px rgba(26, 78, 70, 0.12);
+
+  h1 {
+    margin: 6px 0 12px;
+    color: var(--text, #173b35);
+    font-size: 22px;
+  }
+
+  p:not(.eyebrow) {
+    margin: 0 0 20px;
+    color: var(--text-secondary, #648078);
+    line-height: 1.7;
+  }
+}

@@ -2,13 +2,14 @@
 
 use base64::{engine::general_purpose, Engine as _};
 use chrono::{Datelike, Local};
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{backup::Backup, params, Connection, OpenFlags, OptionalExtension};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::{
     collections::HashSet,
     fs,
     path::{Path, PathBuf},
+    time::Duration,
 };
 use tauri::Manager;
 use tauri::{
@@ -37,6 +38,8 @@ fn db_file(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(app_data_dir(app)?.join("simpletodo.db"))
 }
 
+const DATABASE_SCHEMA_VERSION: i64 = 1;
+
 fn backup_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let dir = app_data_dir(app)?.join("backups");
     fs::create_dir_all(&dir).map_err(|err| format!("创建备份目录失败: {err}"))?;
@@ -44,9 +47,141 @@ fn backup_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 }
 
 fn open_database(app: &tauri::AppHandle) -> Result<Connection, String> {
-    let conn = Connection::open(db_file(app)?).map_err(|err| format!("打开数据库失败: {err}"))?;
-    init_database(&conn)?;
+    let database = db_file(app)?;
+    if !database.exists() {
+        import_legacy_database(app, &database)?;
+    }
+
+    let current_version = if database.exists() {
+        let version = inspect_database_schema_version(&database)?;
+        if version > DATABASE_SCHEMA_VERSION {
+            return Err(format!(
+                "本机数据库结构版本 v{version} 高于当前应用支持的 v{DATABASE_SCHEMA_VERSION}，请升级应用后再打开"
+            ));
+        }
+        if version < DATABASE_SCHEMA_VERSION {
+            create_migration_backup(app, &database, version)?;
+        }
+        version
+    } else {
+        0
+    };
+
+    let mut conn = Connection::open(&database).map_err(|err| format!("打开数据库失败: {err}"))?;
+    init_database(&mut conn, current_version)?;
     Ok(conn)
+}
+
+/// 对已有数据库做只读健康检查，并读取独立于前端业务 schemaVersion 的数据库结构版本。
+fn inspect_database_schema_version(database: &Path) -> Result<i64, String> {
+    let conn = Connection::open_with_flags(database, OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .map_err(|err| format!("打开本机数据库失败: {err}"))?;
+    let quick_check: String = conn
+        .query_row("PRAGMA quick_check", [], |row| row.get(0))
+        .map_err(|err| format!("检查本机数据库失败: {err}"))?;
+    if quick_check != "ok" {
+        return Err(format!("本机数据库完整性检查失败: {quick_check}"));
+    }
+
+    let meta_exists: bool = conn
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'meta')",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|err| format!("读取数据库结构版本失败: {err}"))?;
+    if !meta_exists {
+        return Ok(0);
+    }
+
+    let version = conn
+        .query_row(
+            "SELECT value FROM meta WHERE key = 'databaseSchemaVersion'",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .map_err(|err| format!("读取数据库结构版本失败: {err}"))?;
+    match version {
+        Some(value) => value
+            .parse::<i64>()
+            .map_err(|_| "本机数据库结构版本无效，已阻止继续写入".to_string()),
+        // 没有独立版本标记的历史 SQLite 数据库只迁移一次，用于建立迁移基线。
+        None => Ok(0),
+    }
+}
+
+/// 仅在有实际数据库结构迁移时创建一致性备份。
+/// 备份失败时拒绝继续打开数据库，避免升级过程在未留下可恢复副本的情况下修改用户数据。
+fn create_migration_backup(app: &tauri::AppHandle, database: &Path, from_version: i64) -> Result<(), String> {
+    let backups = backup_dir(app)?;
+    let timestamp = Local::now().format("%Y%m%d-%H%M%S");
+    let backup = backups.join(format!(
+        "simpletodo-schema-v{from_version}-to-v{DATABASE_SCHEMA_VERSION}-{timestamp}.db"
+    ));
+    copy_sqlite_database(database, &backup)?;
+    Ok(())
+}
+
+/// 使用 SQLite Online Backup API 复制数据库，包含 WAL 中尚未 checkpoint 的提交。
+fn copy_sqlite_database(source: &Path, destination: &Path) -> Result<(), String> {
+    let source = Connection::open_with_flags(source, OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .map_err(|err| format!("打开待备份数据库失败: {err}"))?;
+    let mut destination = Connection::open(destination)
+        .map_err(|err| format!("创建数据库备份失败: {err}"))?;
+    let backup = Backup::new(&source, &mut destination)
+        .map_err(|err| format!("初始化数据库备份失败: {err}"))?;
+    backup
+        .run_to_completion(128, Duration::from_millis(10), None)
+        .map_err(|err| format!("写入数据库备份失败: {err}"))?;
+    Ok(())
+}
+
+/// 仅在当前数据目录不存在数据库时，从已知的历史 Tauri 标识目录导入 SQLite 数据。
+/// 源数据库保留在原位置，导入使用 SQLite 备份 API，避免直接复制 WAL 文件造成不一致。
+fn import_legacy_database(app: &tauri::AppHandle, destination: &Path) -> Result<(), String> {
+    let current_data_dir = app_data_dir(app)?;
+    let Some(parent) = current_data_dir.parent() else {
+        return Ok(());
+    };
+
+    for identifier in ["com.simpletodo.desktop", "com.simpletodo.app"] {
+        let legacy_dir = parent.join(identifier);
+        let legacy_database = legacy_dir.join("simpletodo.db");
+        if !legacy_database.is_file() {
+            continue;
+        }
+
+        let staging_database = destination.with_extension("legacy-import.tmp");
+        if staging_database.exists() {
+            fs::remove_file(&staging_database).map_err(|err| format!("清理上次迁移暂存文件失败: {err}"))?;
+        }
+        copy_sqlite_database(&legacy_database, &staging_database)?;
+        for directory in ["attachments", "profile"] {
+            copy_directory_if_present(&legacy_dir.join(directory), &current_data_dir.join(directory))?;
+        }
+        fs::rename(&staging_database, destination).map_err(|err| format!("完成历史数据库导入失败: {err}"))?;
+        return Ok(());
+    }
+    Ok(())
+}
+
+fn copy_directory_if_present(source: &Path, destination: &Path) -> Result<(), String> {
+    if !source.is_dir() {
+        return Ok(());
+    }
+    fs::create_dir_all(destination).map_err(|err| format!("创建迁移目录失败: {err}"))?;
+    for entry in fs::read_dir(source).map_err(|err| format!("读取迁移目录失败: {err}"))? {
+        let entry = entry.map_err(|err| format!("读取迁移目录失败: {err}"))?;
+        let source_path = entry.path();
+        let target_path = destination.join(entry.file_name());
+        if source_path.is_dir() {
+            copy_directory_if_present(&source_path, &target_path)?;
+        } else if !target_path.exists() {
+            fs::copy(&source_path, &target_path).map_err(|err| format!("复制迁移附件失败: {err}"))?;
+        }
+    }
+    Ok(())
 }
 
 fn attachment_root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -83,7 +218,11 @@ fn profile_avatar_file_path(
 
 #[tauri::command]
 fn load_data(app: tauri::AppHandle) -> Result<Option<serde_json::Value>, String> {
-    if !db_file(&app)?.exists() {
+    let database = db_file(&app)?;
+    if !database.exists() {
+        import_legacy_database(&app, &database)?;
+    }
+    if !database.exists() {
         return Ok(None);
     }
 
@@ -114,8 +253,23 @@ fn save_migration_backup(app: tauri::AppHandle, data: serde_json::Value) -> Resu
     Ok(path.to_string_lossy().to_string())
 }
 
-fn init_database(conn: &Connection) -> Result<(), String> {
-    conn.execute_batch(
+fn init_database(conn: &mut Connection, from_version: i64) -> Result<(), String> {
+    // foreign_keys 是连接级设置，即使没有结构迁移也必须在每次打开数据库时启用。
+    conn.execute_batch("PRAGMA foreign_keys = ON;")
+        .map_err(|err| format!("启用数据库外键约束失败: {err}"))?;
+    if from_version == DATABASE_SCHEMA_VERSION {
+        return Ok(());
+    }
+    if from_version > DATABASE_SCHEMA_VERSION {
+        return Err(format!(
+            "不支持从数据库结构版本 v{from_version} 降级到 v{DATABASE_SCHEMA_VERSION}"
+        ));
+    }
+
+    let tx = conn
+        .transaction()
+        .map_err(|err| format!("开启数据库结构迁移事务失败: {err}"))?;
+    tx.execute_batch(
         r#"
         PRAGMA foreign_keys = ON;
         CREATE TABLE IF NOT EXISTS meta (
@@ -249,7 +403,15 @@ fn init_database(conn: &Connection) -> Result<(), String> {
         "#,
     )
     .map_err(|err| format!("初始化数据库失败: {err}"))?;
-    run_database_migrations(conn)?;
+    run_database_migrations(&tx)?;
+    tx.execute(
+        "INSERT INTO meta(key, value) VALUES('databaseSchemaVersion', ?1)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        params![DATABASE_SCHEMA_VERSION.to_string()],
+    )
+    .map_err(|err| format!("记录数据库结构版本失败: {err}"))?;
+    tx.commit()
+        .map_err(|err| format!("提交数据库结构迁移失败: {err}"))?;
     Ok(())
 }
 
@@ -414,7 +576,7 @@ fn save_state_to_db(conn: &mut Connection, data: &serde_json::Value) -> Result<(
         DELETE FROM tasks;
         DELETE FROM lists;
         DELETE FROM groups;
-        DELETE FROM meta;
+        DELETE FROM meta WHERE key != 'databaseSchemaVersion';
         "#,
     )
     .map_err(|err| format!("清空数据库失败: {err}"))?;
@@ -1917,6 +2079,72 @@ fn extension_for_mime(mime: &str) -> Option<&'static str> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_root(name: &str) -> PathBuf {
+        let root = std::env::temp_dir().join(format!(
+            "simple-to-do-{name}-{}",
+            Local::now().timestamp_nanos_opt().unwrap_or_default()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        root
+    }
+
+    #[test]
+    fn sqlite_backup_preserves_wal_data() {
+        let root = test_root("backup-test");
+        let source_path = root.join("source.db");
+        let backup_path = root.join("backup.db");
+
+        let source = Connection::open(&source_path).unwrap();
+        source.execute_batch("PRAGMA journal_mode = WAL; CREATE TABLE tasks (id INTEGER PRIMARY KEY, title TEXT NOT NULL);").unwrap();
+        source.execute("INSERT INTO tasks (title) VALUES (?1)", params!["升级前任务"]).unwrap();
+
+        copy_sqlite_database(&source_path, &backup_path).unwrap();
+        let backup = Connection::open(&backup_path).unwrap();
+        let count: i64 = backup.query_row("SELECT COUNT(*) FROM tasks", [], |row| row.get(0)).unwrap();
+        assert_eq!(count, 1);
+
+        drop(backup);
+        drop(source);
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn schema_version_is_persisted_and_up_to_date_database_is_not_migrated_again() {
+        let root = test_root("schema-version-test");
+        let database = root.join("simpletodo.db");
+        let mut conn = Connection::open(&database).unwrap();
+
+        init_database(&mut conn, 0).unwrap();
+        let version: String = conn
+            .query_row(
+                "SELECT value FROM meta WHERE key = 'databaseSchemaVersion'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(version, DATABASE_SCHEMA_VERSION.to_string());
+
+        conn.execute(
+            "INSERT INTO groups(id, name, collapsed, sort_order) VALUES('preserved', '保留的数据', 0, 0)",
+            [],
+        )
+        .unwrap();
+        init_database(&mut conn, DATABASE_SCHEMA_VERSION).unwrap();
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM groups WHERE id = 'preserved'", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
+
+        drop(conn);
+        assert_eq!(inspect_database_schema_version(&database).unwrap(), DATABASE_SCHEMA_VERSION);
+        fs::remove_dir_all(&root).unwrap();
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -1993,16 +2221,16 @@ fn main() {
         ])
         .build(tauri::generate_context!())
         .expect("初始化 Tauri 应用失败")
-        .run(|app, event| {
+        .run(|_app, _event| {
             // macOS 从 Dock 重新激活一个已隐藏窗口时会发出 Reopen；此前没有
             // 处理这个事件，导致只能通过菜单栏恢复主窗口。
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Reopen {
                 has_visible_windows: false,
                 ..
-            } = event
+            } = _event
             {
-                show_main_window(app);
+                show_main_window(_app);
             }
         });
 }

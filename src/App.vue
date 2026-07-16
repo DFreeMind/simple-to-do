@@ -5,6 +5,22 @@
     :data-theme="store.settings.theme"
     :data-density="store.settings.density"
   >
+    <main v-if="store.dataLoadState !== 'ready'" class="data-safety-screen" aria-live="polite">
+      <section class="data-safety-card">
+        <template v-if="store.dataLoadState === 'loading'">
+          <p class="eyebrow">正在保护本地数据</p>
+          <h1>正在加载清单</h1>
+          <p>请稍候，应用正在验证本机数据库。</p>
+        </template>
+        <template v-else>
+          <p class="eyebrow">本地数据未打开</p>
+          <h1>为保护数据，应用没有加载空白清单</h1>
+          <p>{{ store.dataLoadError || '本机数据库暂时无法读取。请重试；若仍失败，请保留应用数据目录并联系支持。' }}</p>
+          <button class="small-btn" type="button" @click="store.loadData">重新尝试读取</button>
+        </template>
+      </section>
+    </main>
+    <template v-else>
     <div
       class="app-shell"
       :class="{
@@ -35,6 +51,7 @@
     >
       {{ store.notice.message }}
     </div>
+    </template>
   </div>
 </template>
 

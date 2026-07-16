@@ -201,6 +201,8 @@ export const useTaskStore = defineStore('task', () => {
   const searchQuery = ref('')
   const saveError = ref('')
   const migrationBlocked = ref(false)
+  const dataLoadState = ref('loading')
+  const dataLoadError = ref('')
   const isSaving = ref(false)
   const notice = ref(null)
   const settings = ref({ ...DEFAULT_SETTINGS })
@@ -1301,6 +1303,8 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   async function loadData() {
+    dataLoadState.value = 'loading'
+    dataLoadError.value = ''
     try {
       console.log('[Store] 开始加载数据...')
       const rawData = await loadPlatformData()
@@ -1349,11 +1353,13 @@ export const useTaskStore = defineStore('task', () => {
       currentView.value = settings.value.startView || 'today'
       migrationBlocked.value = false
       saveError.value = ''
+      dataLoadState.value = 'ready'
     } catch (error) {
       console.error('[Store] 数据加载失败:', error)
       migrationBlocked.value = true
       saveError.value = error?.message || '读取本地数据失败'
-      showNotice(saveError.value, 'error')
+      dataLoadError.value = saveError.value
+      dataLoadState.value = 'failed'
     }
   }
 
@@ -1826,6 +1832,8 @@ export const useTaskStore = defineStore('task', () => {
     searchQuery,
     saveError,
     migrationBlocked,
+    dataLoadState,
+    dataLoadError,
     isSaving,
     notice,
     settings,
