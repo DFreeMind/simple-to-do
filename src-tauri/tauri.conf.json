@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "易简清单",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "identifier": "cn.duqimeng.simpletodo",
   "build": {
     "beforeDevCommand": "npm run frontend:dev",
@@ -53,7 +53,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY5NTVFOUY1MDYzRUQ2RjgKUldUNDFqNEc5ZWxWYWQzV3pQbXVnMWFtVEIxZFR6TU5SWXhLZ0FvTnhlak9oL08yVms4WFBieGMK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENDNkQ1MDk3QjkxMTM1NDAKUldSQU5SRzVsMUJ0ekhWdjhCcktsR0FXSnAzMGljMndvV3hiYjE3Q3N5VDJGRzd3TWs0OTJiRE8K",
       "endpoints": [
         "https://github.com/DFreeMind/simple-to-do/releases/latest/download/latest.json"
       ],

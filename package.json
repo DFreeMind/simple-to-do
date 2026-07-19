@@ -1,6 +1,6 @@
 {
   "name": "simple-to-do",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "易简清单，本地优先的桌面待办应用",
   "scripts": {
     "dev": "tauri dev",
@@ -10,7 +10,8 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
-    "release:check": "node scripts/release-preflight.mjs"
+    "release:check": "node scripts/release-preflight.mjs",
+    "build:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows.ps1"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",
@@ -34,6 +35,7 @@
   "devDependencies": {
     "@tauri-apps/cli": "^2.11.4",
     "@vitejs/plugin-vue": "^6.0.7",
+    "playwright": "^1.61.1",
     "sass": "^1.101.0",
     "vite": "^8.1.2"
   },
