@@ -1,196 +1,150 @@
-# 易简清单
+# 易简清单 · Simple To Do
 
-一个基于 `Tauri 2 + Vue 3 + Pinia + Vite + SCSS` 的跨平台桌面待办应用。产品方向参考滴答清单的核心任务体验，当前阶段聚焦本地个人任务管理，把本地清单做到稳定可日用。
+> 本地优先的跨平台桌面待办应用。把复杂事情拆清楚，在变化中持续推进，直到做成。
+
+[![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white)](https://v2.tauri.app/)
+[![Vue](https://img.shields.io/badge/Vue-3-42B883?logo=vuedotjs&logoColor=white)](https://vuejs.org/)
+[![SQLite](https://img.shields.io/badge/SQLite-Local%20first-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
+
+**易简清单**（Simple To Do）是一款面向 Windows 与 macOS 的个人任务管理软件。它不是把任务越堆越多的“功能集合”，而是帮助你把一件复杂事项拆成明确的下一步：收集、安排、完成、复盘，再继续推进。
+
+[下载最新版本](https://github.com/DFreeMind/simple-to-do/releases/latest) · [查看功能](#核心功能) · [开发文档](#开发)
+
+![易简清单今日视图：清单、任务、计划与搜索](public/screenshots/rich-editor.webp)
+
+## 为什么是易简清单
+
+- **本地优先**：任务、设置和附件默认只保存在本机 SQLite 数据库，不要求账号，也不依赖云端。
+- **复杂事项可拆可追**：子任务、任务分组、日期、提醒、优先级、标签和富文本备注围绕“下一步是什么”组织。
+- **真正的桌面体验**：基于 Tauri 2，提供 Windows 与 macOS 原生窗口、通知、托盘 / Dock 恢复和本地文件选择。
+- **克制但完整**：不加入账号、同步、协作、番茄钟、习惯或完整日历等当前不服务于个人任务闭环的功能。
+
+## 核心功能
+
+| 让事情落地 | 让进度可见 | 让信息留在本机 |
+| --- | --- | --- |
+| 收集箱、今日、计划、重要、已完成、垃圾桶与全局搜索 | 子任务进度、任务分组、拖拽排序、重复任务、提醒与逾期重排 | SQLite 持久化、分层附件存储、恢复点、清理站与本地头像 |
+
+- **快速记录与安排**：快速添加能识别日期、时间、重复规则、优先级和 `#标签`；任务可加入今日或计划到具体时间。
+- **按场景查看任务**：今日、收集箱、计划、重要、已完成、垃圾桶、清单和搜索视图；支持智能排序和自定义顺序。
+- **把大事拆开推进**：任务可配置子任务、进度、任务分组、优先级、标签、截止日期、提醒和重复规则。
+- **写清楚而不只记标题**：富文本备注支持标题、列表、待办块、引用、链接与图片附件；图片可直接预览。
+- **安心整理**：删除先进入垃圾桶；附件有清理站；大批量操作前可创建本机恢复点。
+- **跨平台细节**：Windows 系统通知与托盘恢复、macOS 通知中心与 Dock / 菜单栏恢复；操作音效基于 Web Audio 合成，不依赖外部音频文件。
+
+## 从收集到完成，一屏看清
+
+### 把复杂任务拆成能开始的下一步
+
+<p align="center">
+  <img src="public/screenshots/subtasks.webp" alt="任务详情：子任务进度、日期、优先级、清单、标签与富文本备注" width="960" />
+</p>
+
+任务详情将子任务进度、日期与提醒、优先级、任务清单、标签和富文本备注放在同一处；完成一个子任务，整体进度会随之更新。
+
+### 用计划视图重新安排时间
+
+<p align="center">
+  <img src="public/screenshots/planned-view.webp" alt="计划视图：按已逾期、今天与明天分组查看任务，并展示重复、提醒、标签和子任务进度" width="960" />
+</p>
+
+计划会按已逾期、今天和后续日期整理任务。重复任务、提醒、标签和子任务进度无需打开详情即可确认，让你能先处理最需要推进的事。
+
+### 通知有提醒，数据也留有退路
+
+<p align="center">
+  <img src="public/screenshots/settings-notifications.webp" alt="通知设置：系统通知、提醒时间与操作音效选项" width="49%" />
+  <img src="public/screenshots/profile-security.webp" alt="数据与隐私：本机恢复点、默认清单和本地数据说明" width="49%" />
+</p>
+
+可以分别控制系统通知、提醒时机和操作音效；数据默认仅保存在本机，并能创建恢复点，在误操作后恢复到可信状态。
+
+## 快捷键
+
+| 操作 | Windows | macOS |
+| --- | --- | --- |
+| 打开搜索 | `Ctrl + K` | `⌘ + K` |
+| 快速添加任务 | `N` | `N` |
+| 将选中任务加入今日 | `D` | `D` |
+| 关闭当前弹窗或面板 | `Esc` | `Esc` |
+| 富文本加粗 / 斜体 | `Ctrl + B` / `Ctrl + I` | `⌘ + B` / `⌘ + I` |
+
+快捷键仅在应用窗口处于前台时生效；输入框、富文本编辑器和弹窗会优先接收自己的按键，避免误操作。
+
+## 下载与安装
+
+请前往 [GitHub Releases](https://github.com/DFreeMind/simple-to-do/releases/latest) 下载对应系统的安装包：
+
+- Windows：`simple-to-do_<version>_x64-setup.exe`
+- macOS Intel：`simple-to-do_<version>_x64.dmg`
+
+当前 Release 已提供 Windows x64 与 macOS Intel 版本；其他架构的可用情况请以 Release 页面资产列表为准。
+
+应用是本地优先软件：安装、更新或卸载前如需保留数据，建议先在“个人空间 → 数据与安全”创建恢复点。
 
 ## 技术栈
 
-- 桌面运行时：Tauri 2
-- 原生能力：Rust command
-- 前端：Vue 3、Pinia、Vite、SCSS
-- 富文本：Tiptap
-- 本地存储：应用数据目录下的 SQLite 数据库 `simpletodo.db`
+- **桌面运行时**：[Tauri 2](https://v2.tauri.app/) + Rust
+- **前端**：Vue 3、Pinia、Vite、SCSS
+- **富文本**：[Tiptap](https://tiptap.dev/)
+- **本地数据**：SQLite；图片附件按内容 hash 分层保存
 
-## 环境要求
+## 开发
+
+### 环境要求
 
 - Node.js 20+
 - npm 10+
-- Rust stable MSVC toolchain
-- Windows 需要 WebView2 和 Visual Studio Build Tools/MSVC
+- Rust stable toolchain
+- Windows 构建需要 WebView2 与 Visual Studio Build Tools / MSVC
+- macOS 构建需要 Xcode Command Line Tools
 
-本机已安装并验证：
+### 本地运行
 
-```powershell
-rustc 1.96.1
-cargo 1.96.1
-rustup 1.29.0
-```
-
-如果新终端无法识别 `rustc` 或 `cargo`，重新打开终端，或确认用户 PATH 包含：
-
-```text
-C:\Users\qiulu\.cargo\bin
-```
-
-## 安装依赖
-
-```powershell
+```bash
 npm install
-```
-
-项目已在 `.cargo/config.toml` 配置 Cargo 使用镜像源下载 Rust crates。如果网络环境能稳定访问 crates.io，也可以删除该文件恢复默认源。
-
-## 开发运行
-
-启动 Tauri 桌面应用：
-
-```powershell
 npm run dev
 ```
 
-`npm run dev` 会自动启动内部 Vite 服务，并打开桌面窗口。项目不再把浏览器页面作为产品运行入口；`frontend:dev` 只供 Tauri 开发流程内部使用。
+`npm run dev` 会启动 Vite 并打开 Tauri 桌面窗口；浏览器页面不是产品运行入口。
 
-## 构建
+### 构建与验证
 
-构建 Tauri 桌面应用和安装包：
-
-```powershell
-npm run build
-```
-
-### 安装器文案定制
-
-Tauri 2 每次构建会自动生成 NSIS 语言文件（`SimpChinese.nsh`），部分默认中文翻译不够准确。可通过以下步骤应用文案补丁：
-
-```powershell
-npm run build
-powershell -File scripts/patch-nsis-lang.ps1
-```
-
-补丁文件为 `src-tauri/nsis/override_strings.nsh`，修改后重新运行补丁脚本即可。详见脚本内注释。
-
-### 构建产物说明
-
-构建完成后，`src-tauri/target/release/` 下会生成大量文件，**只有安装包需要分发**：
-
-| 路径 | 说明 | 是否分发 |
-|------|------|---------|
-| `bundle/nsis/易简清单_0.1.1_x64-setup.exe` | NSIS 安装包（用户运行此文件） | ✅ 是 |
-| `simple-to-do.exe` | 主程序（已打包进安装包） | ❌ 否 |
-| `build/*/build_script_build-*.exe` | Rust 编译中间产物 | ❌ 否 |
-| `deps/simple_to_do.exe` | 编译依赖产物 | ❌ 否 |
-
-整个 `target/` 目录已被 `.gitignore` 排除，不会进入版本控制。
-
-### Windows 安装注意事项
-
-安装器在写入 `exe` 文件时，如果应用正在运行，Windows 会锁定该文件导致安装失败（报 "Error opening file for writing"）。
-
-- **全新安装**：用户电脑上没有此应用，不会遇到此问题
-- **升级安装**：安装器会自动检测并提示关闭正在运行的应用
-- **开发者测试**：运行安装包前需先关闭 dev 模式（`Ctrl+C` 停止 `npm run dev`）
-
-### 自定义安装器 UI
-
-安装器支持自定义头部和侧边栏图片，规格要求：
-
-- 头部图片：`src-tauri/nsis/header.bmp`，493×312 像素，24 位 BMP
-- 侧边栏图片：`src-tauri/nsis/sidebar.bmp`，164×314 像素，24 位 BMP
-
-在 `tauri.conf.json` 的 `bundle.windows.nsis` 中配置：
-
-```json
-{
-  "headerImage": "nsis/header.bmp",
-  "sidebarImage": "nsis/sidebar.bmp"
-}
-```
-
-## 验证命令
-
-完整桌面构建：
-
-```powershell
-npm run build
-```
-
-检查 Tauri 环境：
-
-```powershell
-npm run tauri -- info
-```
-
-检查 Rust 工具链：
-
-```powershell
-rustc --version
-cargo --version
-rustup show
-```
-
-检查 Rust 代码编译：
-
-```powershell
-cd src-tauri
-cargo check
-```
-
-仅检查内嵌前端构建：
-
-```powershell
+```bash
+# 仅构建前端
 npm run frontend:build
+
+# 构建当前平台的桌面安装包
+npm run build
+
+# Windows：构建带更新签名的安装包
+npm run build:windows
 ```
 
-## 当前功能
+构建后的分发文件位于 `src-tauri/target/release/bundle/`。只分发 Release 安装包，不分发 `target/` 下的中间编译产物。
 
-- 清单管理：新增、重命名、删除；清单分组拖拽排序；清单颜色。
-- 任务管理：新增、编辑、完成、置顶、复制、移动到其他清单、标记重要/今日、删除、恢复、永久删除、批量清理已完成。
-- 快捷视图：今日、计划（按日期分组）、重要、收集箱、已完成、垃圾桶、搜索。
-- 任务属性：截止日期（含时间）、提醒、重复规则（每日/每周/每月/每年）、优先级（无/低/中/高）、标签、子任务（含拖拽排序和进度环）、图片附件（含灯箱预览）。
-- 富文本备注：使用 Tiptap，支持标题、列表、待办块、引用、分割线、粘贴/拖入图片。
-- 快速添加解析：输入时实时识别日期、时间、重复规则、优先级和 `#标签`，以芯片形式预览。
-- 排序：智能排序、按日期/优先级/创建时间/名称排序，支持自定义拖拽顺序。
-- 拖拽排序：基于鼠标事件的自定义实现，适用于 Tauri/WebView，支持任务、清单、分组、子任务拖拽。
-- 三栏布局：左侧导航、中央任务列表、右侧详情面板；左栏可折叠为 56px 图标栏（Rail），右栏可折叠/展开并支持拖拽调整宽度。
-- 操作音效：基于 Web Audio API 合成，每类操作有独特音色（sine 明亮 / triangle 柔和），覆盖任务完成/添加/删除/恢复、清单重命名、分组操作、拖拽、数据保存等，无外部音频文件。
-- 系统托盘：关闭窗口最小化到托盘，托盘左键点击恢复窗口，右键菜单可显示或退出。
-- 本地持久化：SQLite 主存储，图片附件按 `attachments/images/YYYY/MM/{sha256}.{ext}` 分层存储，附件自动清理。
-- 任务分组：清单支持分组视图（`viewMode="group"`），可创建任务分组（TaskGroup），分组支持图标、颜色、折叠；任务可归属分组，列表模式与分组模式可切换。
+## 产品边界
 
-## 当前取舍
+易简清单当前聚焦**本地个人任务管理与复杂事项推进**。以下能力暂不纳入：账号登录、云同步、多人协作、共享清单、外部日历同步、习惯、番茄钟和四象限。
 
-- 当前以本地个人任务管理为核心；提供本机昵称和头像资料，不把未实现的账号、云同步或协作伪装为可用入口。
-- 未实现能力不会作为可点击入口出现，避免误导用户。
-- 当前开发阶段主存储为 SQLite，不迁移旧 JSON 数据；前端 normalize 仍会为缺失字段补默认值。
+## 文档
 
-## 项目文档
-
-- [AI 开发规范](AGENTS.md)
-- [产品调研](docs/产品调研.md)
+- [文档中心](docs/README.md)
+- [安装与使用](docs/安装与使用.md)
 - [产品需求文档](docs/产品需求文档.md)
+- [产品调研](docs/产品调研.md)
 - [功能路线图](docs/功能路线图.md)
 - [界面设计规范](docs/界面设计规范.md)
 - [技术架构](docs/技术架构.md)
 - [数据模型](docs/数据模型.md)
-- [Electron 迁移 Tauri 方案](docs/Electron迁移Tauri方案.md)
+- [开发规范](AGENTS.md)
 
-## 开发约定
+## 许可证与品牌
 
-- 不继续扩展 Electron，原生能力统一走 Tauri/Rust。
-- 不维护独立 Web 版本；GUI 是唯一产品形态，Vite 仅作为 Tauri 内嵌前端工具链。
-- 前端不要直接访问 Tauri 全局对象，统一通过 `src/services/platform.js` 调用。
-- 每完成一个稳定功能并验证通过后提交一次，commit 使用中文。
-- 新增数据字段必须同步更新 SQLite 表设计、读写逻辑和前端 normalize 默认值。
+本项目代码采用 [MIT License](LICENSE)。你可以在保留版权与许可证声明的前提下使用、修改和分发代码。
 
-## 常见问题
+MIT 许可只授予软件著作权许可；“易简清单 / Simple To Do”名称、应用图标及其他品牌标识不因此获得商标或品牌使用许可。
 
-### `cargo` 或 `rustc` 找不到
+## 反馈
 
-确认 Rust 已安装，并确认用户 PATH 包含 `.cargo\bin`。如果刚安装完，关闭并重新打开终端。
-
-### `npm uninstall` 因 Electron 文件占用失败
-
-这是历史 `node_modules` 残留导致的本地文件锁问题。源码和 lockfile 已经移除 Electron 依赖；如需彻底清理本地依赖目录，可关闭相关进程后删除 `node_modules/` 并重新运行 `npm install`。
-
-### Vite 提示 chunk 大于 500KB
-
-当前主要来自 Tiptap 富文本依赖，`RichTextEditor` 已通过 `defineAsyncComponent` 懒加载，不影响首屏加载速度。
+欢迎通过 [Issues](https://github.com/DFreeMind/simple-to-do/issues) 提交问题、使用场景或改进建议。请尽量说明系统版本、应用版本和复现步骤；涉及本地数据时请先移除个人隐私信息。

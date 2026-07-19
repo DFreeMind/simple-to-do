@@ -1,24 +1,7 @@
-# Electron 迁移 Tauri 方案
+# Electron 迁移 Tauri 方案（历史记录）
 
-## 当前 Electron 能力
-- `electron/main.js` 创建窗口。
-- `electron/preload.js` 暴露 `window.electronAPI`。
-- IPC 能力包括窗口控制、加载数据、保存数据、选择图片、读取图片。
+> 状态：**已完成**。本文件用于说明历史决策，不是当前开发入口。
 
-## Tauri 替换方案
-- 窗口创建由 `src-tauri/tauri.conf.json` 配置。
-- 数据读写由 Rust command `load_data`、`save_data` 提供，运行时主存储为 SQLite `simpletodo.db`。
-- 图片选择由 Tauri dialog 插件或 Rust command 提供。
-- 图片导入、读取和清理由 Rust command 提供，附件文件写入分层 `attachments/` 目录。
-- 前端通过 `src/services/platform.js` 调用平台 API。
+项目已从 Electron 迁移至 Tauri 2：窗口由 `src-tauri/tauri.conf.json` 配置，原生能力由 Rust command 和 Tauri 插件提供，数据保存为应用数据目录下的 SQLite，前端仅通过 `src/services/platform.js` 访问平台能力。
 
-## 迁移步骤
-- 新增 `src-tauri/` 和 Rust 入口。
-- 替换 npm 脚本：`tauri dev`、`tauri build`。
-- 新增前端平台封装。
-- 修改 store 和详情组件，移除 `window.electronAPI` 直接调用。
-- 确认 SQLite 数据目录、附件目录和 Tauri 应用标识 `cn.duqimeng.simpletodo`。
-
-## 清理策略
-- Tauri 跑通后删除 Electron 依赖。
-- Electron 目录可在迁移提交中删除，避免后续误用。
+当前不再维护 Electron 运行时、`window.electronAPI` 或 Electron 打包链路。后续开发应阅读：[技术架构](技术架构.md)、[数据模型](数据模型.md)、[数据库设计](数据库设计.md) 和 [开发规范](../AGENTS.md)。
