@@ -1,70 +1,101 @@
-import chimeSound from '@/assets/sounds/chime.ogg'
-import completeSound from '@/assets/sounds/complete.ogg'
-import dragGlassSound from '@/assets/sounds/drag-glass.ogg'
-import restoreSound from '@/assets/sounds/restore.ogg'
-import softClickSound from '@/assets/sounds/soft-click.ogg'
-import tapSound from '@/assets/sounds/tap.ogg'
-
-// Robin Lamb / Kenney UI Sound Effects (CC0 1.0)，完整来源见 src/assets/sounds/LICENSE.md。
-// 素材使用延迟预加载的模板和 clone 播放：短音效可以叠加，拖动经过目标时不会因重新下载而失声。
+// 以 Web Audio 合成短提示音，避免 macOS WKWebView 无法播放 OGG/Vorbis 时整套音效失效。
+// 所有声音只在用户完成有结果的操作时触发；音高、节奏和音色都承担语义，删除音保持低调。
 const SOUNDS = {
-  complete: { src: completeSound, volume: 0.31 },
-  restore: { src: restoreSound, volume: 0.22 },
-  chime: { src: chimeSound, volume: 0.17 },
-  tap: { src: tapSound, volume: 0.16 },
-  soft: { src: softClickSound, volume: 0.14 },
-  drag: { src: dragGlassSound, volume: 0.15 }
+  // 完成：明亮上行的确认感。
+  complete: { wave: 'sine', filter: 4400, gain: 0.66, notes: [[659, 0, 0.17, 0.105], [784, 0.055, 0.19, 0.09], [1047, 0.11, 0.22, 0.075]] },
+  // 新增/恢复：温暖、从低到高的琶音，避免和完成铃混淆。
+  restore: { wave: 'triangle', filter: 2300, gain: 0.8, notes: [[523, 0, 0.17, 0.095], [659, 0.06, 0.17, 0.075], [784, 0.12, 0.2, 0.06]] },
+  // 标记/日期：清透的五度双音，像轻提示而不是确认铃。
+  chime: { wave: 'sine', filter: 3500, gain: 0.98, notes: [[880, 0, 0.16, 0.07], [1319, 0.045, 0.19, 0.05]] },
+  // 附件、重命名：短而柔和的轻触。
+  tap: { wave: 'sine', filter: 1800, glide: 0.82, gain: 1.2, notes: [[622, 0, 0.11, 0.055]] },
+  // 撤销、开关：低一点的上行回弹。
+  soft: { wave: 'triangle', filter: 1450, glide: 1.16, gain: 1.3, notes: [[330, 0, 0.12, 0.045]] },
+  // 主任务改回未完成：清楚但柔和的上行回弹，和完成音保持同等级的可感知度。
+  undo: { wave: 'triangle', filter: 1850, glide: 1.12, gain: 1.45, notes: [[392, 0, 0.13, 0.06], [494, 0.045, 0.15, 0.048]] },
+  // 拖动经过目标：非常轻的玻璃感，避免高频操作造成疲劳。
+  drag: { wave: 'sine', filter: 5200, glide: 0.94, gain: 1.55, notes: [[1175, 0, 0.09, 0.03]] },
+  // 移入垃圾桶：中频、圆润的下行两拍，在笔记本扬声器上仍清楚可闻。
+  delete: { wave: 'triangle', filter: 1800, glide: 0.86, gain: 1.1, notes: [[523, 0, 0.14, 0.065], [392, 0.06, 0.18, 0.052]] },
+  // 永久清除：比移入垃圾桶略低，但仍保持足够的可听度。
+  clear: { wave: 'triangle', filter: 1450, glide: 0.84, gain: 1.08, notes: [[440, 0, 0.15, 0.06], [330, 0.06, 0.18, 0.048]] },
+  listDelete: { wave: 'triangle', filter: 1650, glide: 0.86, gain: 1.08, notes: [[494, 0, 0.14, 0.062], [370, 0.06, 0.18, 0.05]] },
+  groupDelete: { wave: 'triangle', filter: 1700, glide: 0.86, gain: 1.08, notes: [[587, 0, 0.14, 0.06], [440, 0.06, 0.18, 0.048]] }
 }
 
 let soundEnabled = true
 let soundCategories = { task: true, list: true, group: true, drag: true }
-const audioPools = new Map()
-const AUDIO_POOL_SIZE = 4
+let audioContext = null
+let audioFailureReported = false
 
 function isCategoryEnabled(category) {
   return soundEnabled && soundCategories[category]
 }
 
-function getAudioPool(name) {
-  if (typeof Audio === 'undefined') return null
-  if (!audioPools.has(name)) {
-    const voices = Array.from({ length: AUDIO_POOL_SIZE }, () => {
-      const audio = new Audio(SOUNDS[name].src)
-      audio.preload = 'auto'
-      audio.load()
-      return audio
-    })
-    audioPools.set(name, { voices, cursor: 0 })
-  }
-  return audioPools.get(name)
+function getAudioContext() {
+  if (audioContext) return audioContext
+  const AudioContextConstructor = window.AudioContext || window.webkitAudioContext
+  if (!AudioContextConstructor) return null
+  audioContext = new AudioContextConstructor()
+  return audioContext
 }
 
-function warmAudioCache() {
-  Object.keys(SOUNDS).forEach(getAudioPool)
+function reportAudioFailure(error) {
+  if (audioFailureReported) return
+  audioFailureReported = true
+  console.warn('[Sound] 无法初始化操作音效。', error)
+}
+
+function playTone(context, frequency, delay, duration, volume, sound) {
+  const startedAt = context.currentTime + delay
+  const oscillator = context.createOscillator()
+  const filter = context.createBiquadFilter()
+  const gain = context.createGain()
+
+  oscillator.type = sound.wave || 'triangle'
+  oscillator.frequency.setValueAtTime(frequency, startedAt)
+  if (sound.glide && sound.glide !== 1) {
+    oscillator.frequency.exponentialRampToValueAtTime(Math.max(1, frequency * sound.glide), startedAt + duration)
+  }
+  filter.type = 'lowpass'
+  filter.frequency.setValueAtTime(sound.filter || 2800, startedAt)
+  filter.Q.setValueAtTime(0.7, startedAt)
+  gain.gain.setValueAtTime(0.0001, startedAt)
+  gain.gain.exponentialRampToValueAtTime(volume * (sound.gain || 1), startedAt + 0.012)
+  gain.gain.exponentialRampToValueAtTime(0.0001, startedAt + duration)
+
+  oscillator.connect(filter)
+  filter.connect(gain)
+  gain.connect(context.destination)
+  oscillator.start(startedAt)
+  oscillator.stop(startedAt + duration + 0.02)
 }
 
 function play(name, category) {
-  if (!isCategoryEnabled(category) || !SOUNDS[name]) return
+  if (!isCategoryEnabled(category) || !SOUNDS[name] || typeof window === 'undefined') return
   try {
-    const pool = getAudioPool(name)
-    if (!pool) return
-    const audio = pool.voices[pool.cursor]
-    pool.cursor = (pool.cursor + 1) % pool.voices.length
-    audio.pause()
-    audio.currentTime = 0
-    audio.volume = SOUNDS[name].volume
-    audio.play().catch(() => {})
-  } catch {
-    // 音频设备不可用或当前系统禁止播放时，不影响业务操作。
+    const context = getAudioContext()
+    if (!context) return
+    const sound = SOUNDS[name]
+    const start = () => sound.notes.forEach(([frequency, delay, duration, volume]) => {
+      playTone(context, frequency, delay, duration, volume, sound)
+    })
+
+    if (context.state === 'suspended') {
+      context.resume().then(start).catch(reportAudioFailure)
+    } else {
+      start()
+    }
+  } catch (error) {
+    reportAudioFailure(error)
   }
 }
 
-// 仅为正向、需要确认的操作提供声音；删除和错误保持安静，避免制造紧张感。
 export function playCompleteSound() { play('complete', 'task') }
-export function playTaskUndoSound() { play('soft', 'task') }
+export function playTaskUndoSound() { play('undo', 'task') }
 export function playSubtaskCompleteSound() { play('tap', 'task') }
 export function playSubtaskUndoSound() { play('soft', 'task') }
-export function playDeleteSound() {}
+export function playDeleteSound() { play('delete', 'task') }
 export function playAddSound() { play('chime', 'task') }
 export function playRestoreSound() { play('restore', 'task') }
 export function playMoveSound() { play('chime', 'task') }
@@ -72,7 +103,7 @@ export function playToggleSound() { play('soft', 'task') }
 export function playMarkSound() { play('chime', 'task') }
 export function playScheduleSound() { play('chime', 'task') }
 export function playAttachSound() { play('tap', 'task') }
-export function playClearSound() {}
+export function playClearSound() { play('clear', 'task') }
 export function playSaveSound() { play('soft', 'task') }
 export function playErrorSound() {}
 
@@ -81,17 +112,19 @@ export function playDragOverSound() { play('drag', 'drag') }
 export function playDragEndSound() { play('soft', 'drag') }
 
 export function playListAddSound() { play('chime', 'list') }
-export function playListDeleteSound() {}
+export function playListDeleteSound() { play('listDelete', 'list') }
 export function playListRestoreSound() { play('restore', 'list') }
 export function playRenameSound() { play('tap', 'list') }
 export function playGroupAddSound() { play('chime', 'group') }
-export function playGroupDeleteSound() {}
+export function playGroupDeleteSound() { play('groupDelete', 'group') }
 
-export function playSoundPreview(name = 'complete') { play(name, name === 'drag' ? 'drag' : 'task') }
+export function playSoundPreview(name = 'complete') {
+  const category = name === 'drag' ? 'drag' : name === 'listDelete' ? 'list' : name === 'groupDelete' ? 'group' : 'task'
+  play(name, category)
+}
 
 export function setSoundEnabled(enabled) {
   soundEnabled = enabled
-  if (enabled) warmAudioCache()
 }
 
 export function isSoundEnabled() {
@@ -100,7 +133,6 @@ export function isSoundEnabled() {
 
 export function setSoundCategories(categories) {
   soundCategories = { ...soundCategories, ...categories }
-  if (soundEnabled) warmAudioCache()
 }
 
 export function getSoundCategories() {
