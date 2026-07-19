@@ -63,7 +63,11 @@ const today = localDateKey()
 const yesterday = localDateKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1))
 
 // 任务分组（list 内部的分组，不同于清单分组）
-const taskGroups = []
+const taskGroups = [
+  { id: 'tg-alpha-review', name: '评审准备', emoji: '📌', color: 'violet', customColor: '#7C6EE6', listId: 'project-alpha', sortOrder: 1000, collapsed: false, createdAt: daysAgo(7, 9), updatedAt: daysAgo(1, 16) },
+  { id: 'tg-alpha-followup', name: '后续跟进', emoji: '🔁', color: 'blue', customColor: '#4F8DE8', listId: 'project-alpha', sortOrder: 2000, collapsed: false, createdAt: daysAgo(6, 9), updatedAt: daysAgo(2, 15) },
+  { id: 'tg-home-weekly', name: '每周家务', emoji: '🏠', color: 'green', customColor: '#5F9E72', listId: 'home', sortOrder: 1000, collapsed: false, createdAt: daysAgo(14, 9), updatedAt: daysAgo(3, 18) }
+]
 
 // 分组
 const groups = [
@@ -121,6 +125,7 @@ const tasks = [
   }),
   task('today-3', '下班后买咖啡豆和洗衣液', {
     listId: 'home',
+    taskGroupId: 'tg-home-weekly',
     myDayDate: today,
     dueDate: atOffset(0, 19),
     tags: ['采购', '生活'],
@@ -176,6 +181,7 @@ const tasks = [
   }),
   task('tomorrow-2', '准备周五项目评审材料', {
     listId: 'project-alpha',
+    taskGroupId: 'tg-alpha-review',
     dueDate: atOffset(1, 15),
     important: true,
     priority: 3,
@@ -312,6 +318,7 @@ const tasks = [
   // ===== 项目任务 =====
   task('project-1', 'Alpha 项目需求评审', {
     listId: 'project-alpha',
+    taskGroupId: 'tg-alpha-review',
     dueDate: atOffset(2, 14),
     priority: 3,
     important: true,
@@ -448,15 +455,35 @@ const data = {
   viewOrders: {},
   settings: {
     theme: 'mint',
+    themeBackgrounds: true,
     density: 'comfortable',
     detailOpen: true,
+    sidebarCollapsed: false,
+    detailWidth: 390,
     startView: 'today',
     completedVisible: true,
+    groupCompletedDisplayMode: 'in-group',
+    groupCompletedVisibleByDefault: true,
+    showCompletionDuration: true,
     trashRetentionDays: 30,
     soundEnabled: true,
+    soundTaskEnabled: true,
+    soundListEnabled: true,
+    soundGroupEnabled: true,
+    soundDragEnabled: true,
     reminderNotificationsEnabled: true,
-    groupCompletedDisplayMode: 'in-group',
-    groupCompletedVisibleByDefault: true
+    reminderSoundEnabled: true,
+    windowCloseBehavior: 'hide',
+    dailyGuidanceEnabled: true,
+    dailyGuidanceStyle: 'practical'
+  },
+  profile: {
+    id: 'demo-profile',
+    nickname: '演示用户',
+    avatarRelativePath: null,
+    avatarSha256: null,
+    createdAt: daysAgo(30, 9),
+    updatedAt: daysAgo(1, 9)
   }
 }
 
