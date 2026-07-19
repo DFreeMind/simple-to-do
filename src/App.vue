@@ -22,12 +22,13 @@
     </main>
     <template v-else>
     <div
+      ref="shellRef"
       class="app-shell"
       :class="{
         'app-shell--detail-closed': !store.settings.detailOpen,
         'app-shell--sidebar-closed': store.settings.sidebarCollapsed
       }"
-      :style="{ '--detail-w': detailWidth + 'px' }"
+      :style="{ '--detail-w': layoutDetailWidth + 'px' }"
     >
       <Sidebar />
       <TaskList />
@@ -56,7 +57,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
+import { listen } from '@tauri-apps/api/event'
 import Sidebar from './components/Sidebar.vue'
 import TaskList from './components/TaskList.vue'
 import TaskDetail from './components/TaskDetail.vue'
@@ -74,8 +76,26 @@ useTheme(themeRef)
 const DETAIL_WIDTH_MIN = 320
 const DETAIL_WIDTH_MAX = 800
 const TASK_LIST_WIDTH_MIN = 300
+const RESIZER_WIDTH = 12
 
 const detailWidth = ref(store.settings.detailWidth || 380)
+const shellRef = ref(null)
+const shellWidth = ref(0)
+let unlistenReminderAction
+let shellResizeObserver
+
+const layoutDetailWidth = computed(() => clampDetailWidth(detailWidth.value, getDetailMaxWidth()))
+
+function openReminderTask(event) {
+  const taskId = event.payload?.taskId
+  const task = store.tasks.find(item => item.id === taskId && !item.deleted)
+  if (!task) return
+
+  store.settingsOpen = false
+  store.helpCenterOpen = false
+  store.setView(task.listId)
+  store.selectTask(task.id)
+}
 
 watch(() => store.settings.detailWidth, (v) => {
   if (typeof v === 'number') detailWidth.value = clampDetailWidth(v)
@@ -83,10 +103,8 @@ watch(() => store.settings.detailWidth, (v) => {
 
 function onResizeStart(e) {
   const startX = e.clientX
-  const startWidth = detailWidth.value
-  const shellWidth = e.target.parentElement.offsetWidth
-  const sidebarW = store.settings.sidebarCollapsed ? 56 : 286
-  const maxDetail = Math.max(DETAIL_WIDTH_MIN, Math.min(DETAIL_WIDTH_MAX, shellWidth - sidebarW - TASK_LIST_WIDTH_MIN))
+  const startWidth = layoutDetailWidth.value
+  const maxDetail = getDetailMaxWidth()
   const target = e.currentTarget
 
   document.body.classList.add('is-resizing')
@@ -126,8 +144,35 @@ function clampDetailWidth(value, max = DETAIL_WIDTH_MAX) {
   return Math.max(DETAIL_WIDTH_MIN, Math.min(max, value))
 }
 
-onMounted(() => {
+function getDetailMaxWidth() {
+  const currentShellWidth = shellWidth.value || shellRef.value?.clientWidth || window.innerWidth
+  const sidebarWidth = store.settings.sidebarCollapsed ? 56 : 286
+  return Math.max(
+    DETAIL_WIDTH_MIN,
+    Math.min(DETAIL_WIDTH_MAX, currentShellWidth - sidebarWidth - TASK_LIST_WIDTH_MIN - RESIZER_WIDTH)
+  )
+}
+
+function syncShellWidth() {
+  shellWidth.value = shellRef.value?.clientWidth || window.innerWidth
+}
+
+onMounted(async () => {
+  await nextTick()
+  syncShellWidth()
+  shellResizeObserver = new ResizeObserver(syncShellWidth)
+  if (shellRef.value) shellResizeObserver.observe(shellRef.value)
+  if (window.__TAURI_INTERNALS__) {
+    listen('task-reminder:open', openReminderTask)
+      .then(unlisten => { unlistenReminderAction = unlisten })
+      .catch(error => console.warn('[App] 注册提醒点击事件失败:', error))
+  }
   store.loadData()
+})
+
+onBeforeUnmount(() => {
+  unlistenReminderAction?.()
+  shellResizeObserver?.disconnect()
 })
 
 watch(() => store.notice?.id, (id) => {

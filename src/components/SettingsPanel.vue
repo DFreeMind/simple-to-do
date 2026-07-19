@@ -1,5 +1,5 @@
 <template>
-  <div v-if="store.settingsOpen" class="settings-layer" role="dialog" aria-modal="true" aria-label="设置">
+  <div v-if="store.settingsOpen" class="settings-layer" role="dialog" aria-modal="true" aria-label="设置" @keydown.esc.stop="store.closeSettings">
     <button class="settings-scrim" type="button" aria-label="关闭设置" @click="store.closeSettings"></button>
     <aside class="settings-panel">
       <header class="settings-panel__header">
@@ -20,6 +20,7 @@
             class="settings-nav__item"
             :class="{ active: activeSection === section.id }"
             :aria-current="activeSection === section.id ? 'page' : undefined"
+            :title="section.summary"
             type="button"
             @click="activeSection = section.id"
           >
@@ -38,7 +39,7 @@
             <div class="settings-section__head settings-section__head--accent">
               <span class="settings-section__icon"><Palette :size="20" /></span>
               <div>
-                <h3>外观</h3>
+                <h3>外观与布局</h3>
                 <p>调整配色、信息密度和界面显示方式。</p>
               </div>
             </div>
@@ -140,8 +141,8 @@
             <div class="settings-section__head settings-section__head--accent">
               <span class="settings-section__icon"><CheckSquare :size="20" /></span>
               <div>
-                <h3>任务显示</h3>
-                <p>统一设置已完成任务在列表和分组中的展示方式。</p>
+                <h3>任务与清单</h3>
+                <p>统一设置任务、分组和已完成项的展示方式。</p>
               </div>
             </div>
 
@@ -203,15 +204,26 @@
             </div>
           </section>
 
-          <section v-else-if="activeSection === 'preferences'" class="settings-section">
+          <section v-else-if="activeSection === 'app-behavior'" class="settings-section">
             <div class="settings-section__head settings-section__head--accent">
               <span class="settings-section__icon"><SlidersHorizontal :size="20" /></span>
               <div>
-                <h3>偏好与提醒</h3>
-                <p>设置启动页、系统提醒和操作反馈。</p>
+                <h3>应用行为</h3>
+                <p>设置启动方式、日常引导和关闭窗口后的行为。</p>
               </div>
             </div>
 
+            <div class="preference-categories">
+              <section class="preference-category preference-category--experience" aria-labelledby="preference-startup-title">
+                <header class="preference-category__head">
+                  <span class="preference-category__icon"><PanelTop :size="18" /></span>
+                  <span>
+                    <small>应用行为 · 01</small>
+                    <h4 id="preference-startup-title">启动、提示与窗口</h4>
+                    <p>决定打开应用后的落点、日常提示和关闭窗口后的去向。</p>
+                  </span>
+                  <strong>{{ startViewLabel }} · {{ dailyGuidanceSummary }}</strong>
+                </header>
             <div class="settings-block">
               <div class="settings-block__title">
                 <h4>启动页</h4>
@@ -234,13 +246,13 @@
 
             <div class="settings-block">
               <div class="settings-block__title">
-                <h4>每日提示</h4>
+                <h4>启动提示</h4>
                 <span>{{ dailyGuidanceSummary }}</span>
               </div>
               <label class="switch-row">
                 <span>
-                  <strong>显示每日提示</strong>
-                  <small>按日期和任务状态给出本地提示；同一天保持一致，不会读取或上传数据</small>
+                  <strong>启动时显示提示</strong>
+                  <small>按任务状态给出本地提示；每次启动自动换一组表达，不会读取或上传数据</small>
                 </span>
                 <input
                   type="checkbox"
@@ -253,7 +265,7 @@
                 <span class="setting-select-card__icon"><Info :size="17" /></span>
                 <span class="setting-select-card__copy">
                   <strong>提示风格</strong>
-                  <small>轻松、务实或鼓励；每天自动轮换不同表达</small>
+                  <small>轻松、务实或鼓励；每次启动自动换一组表达</small>
                 </span>
                 <select
                   :value="store.settings.dailyGuidanceStyle"
@@ -267,6 +279,50 @@
               </label>
             </div>
 
+            <div class="settings-block">
+              <div class="settings-block__title">
+                <h4>关闭窗口</h4>
+                <span>{{ store.settings.windowCloseBehavior === 'hide' ? '保留在后台' : '直接退出' }}</span>
+              </div>
+              <label class="setting-select-card">
+                <span class="setting-select-card__icon"><PanelTop :size="17" /></span>
+                <span class="setting-select-card__copy">
+                  <strong>点击窗口关闭按钮时</strong>
+                  <small>保留在后台时，Windows 可从通知区域图标恢复；macOS 可从 Dock 或菜单栏恢复。</small>
+                </span>
+                <select
+                  :value="store.settings.windowCloseBehavior"
+                  @change="store.updateSettings({ windowCloseBehavior: $event.target.value })"
+                >
+                  <option value="hide">最小化到后台</option>
+                  <option value="quit">直接退出应用</option>
+                </select>
+              </label>
+            </div>
+              </section>
+            </div>
+          </section>
+
+          <section v-else-if="activeSection === 'notifications'" class="settings-section">
+            <div class="settings-section__head settings-section__head--accent">
+              <span class="settings-section__icon"><Bell :size="20" /></span>
+              <div>
+                <h3>通知与反馈</h3>
+                <p>设置到期提醒、系统权限和操作声音。</p>
+              </div>
+            </div>
+
+            <div class="preference-categories">
+              <section class="preference-category preference-category--reminder" aria-labelledby="preference-reminder-title">
+                <header class="preference-category__head">
+                  <span class="preference-category__icon"><Bell :size="18" /></span>
+                  <span>
+                    <small>到期提醒 · 01</small>
+                    <h4 id="preference-reminder-title">系统提醒</h4>
+                    <p>管理到期通知、提醒声音和系统权限测试。</p>
+                  </span>
+                  <strong>{{ reminderSummary }}</strong>
+                </header>
             <div class="settings-block">
               <div class="settings-block__title">
                 <h4>提醒</h4>
@@ -318,7 +374,18 @@
                 </div>
               </div>
             </div>
+              </section>
 
+              <section class="preference-category preference-category--feedback" aria-labelledby="preference-sound-title">
+                <header class="preference-category__head">
+                  <span class="preference-category__icon"><Volume2 :size="18" /></span>
+                  <span>
+                    <small>操作反馈 · 02</small>
+                    <h4 id="preference-sound-title">操作音效</h4>
+                    <p>配置操作反馈，并试听每一种提示声音。</p>
+                  </span>
+                  <strong>{{ soundSummary }}</strong>
+                </header>
             <div class="settings-block">
               <div class="settings-block__title">
                 <h4>音效</h4>
@@ -342,11 +409,12 @@
                 </label>
 
                 <div class="sound-preview-row">
-                  <span><strong>试听与语义</strong><small>只为需要确认的操作发声；删除和错误保持安静</small></span>
+                  <span><strong>试听与语义</strong><small>只为有结果的操作发声；删除使用低调的短提示</small></span>
                   <div class="sound-preview-grid">
                     <button class="small-btn" type="button" :disabled="!store.settings.soundEnabled || !store.settings.soundTaskEnabled" @click="store.previewSound('complete')"><Check :size="14" />完成铃音</button>
                     <button class="small-btn" type="button" :disabled="!store.settings.soundEnabled || !store.settings.soundTaskEnabled" @click="store.previewSound('restore')"><Folder :size="14" />新增与恢复</button>
                     <button class="small-btn" type="button" :disabled="!store.settings.soundEnabled || !store.settings.soundTaskEnabled" @click="store.previewSound('chime')"><Tag :size="14" />标记与日期</button>
+                    <button class="small-btn" type="button" :disabled="!store.settings.soundEnabled || !store.settings.soundTaskEnabled" @click="store.previewSound('delete')"><Trash2 :size="14" />删除与清空</button>
                     <button class="small-btn" type="button" :disabled="!store.settings.soundEnabled || !store.settings.soundDragEnabled" @click="store.previewSound('drag')"><SlidersHorizontal :size="14" />排序指示线</button>
                   </div>
                 </div>
@@ -422,6 +490,8 @@
                   </label>
                 </div>
               </div>
+            </div>
+              </section>
             </div>
           </section>
 
@@ -537,26 +607,45 @@
             <ImageLightbox :visible="previewOpen" :images="previewImages" :start-index="previewIndex" @close="previewOpen = false" />
           </section>
 
-          <section v-else class="settings-section">
-            <div class="settings-section__head settings-section__head--accent">
-              <span class="settings-section__icon"><Info :size="20" /></span>
-              <div>
-                <h3>关于</h3>
-                <p>易简清单是本地优先的个人任务管理工具。</p>
-              </div>
-            </div>
-
-            <div class="about-card">
+          <section v-else class="settings-section about-section">
+            <header class="about-hero">
               <img :src="appIcon" alt="" />
-              <div>
-                <strong>易简清单</strong>
-                <small>版本 {{ version }} · Tauri 本地应用</small>
+              <div class="about-card__identity">
+                <p class="eyebrow">本地优先 · 桌面任务管理</p>
+                <h3>易简清单</h3>
+                <p>记录、安排并完成每一个下一步。</p>
+                <div class="about-hero__meta"><span>v{{ version }}</span><span>Tauri 桌面应用</span></div>
               </div>
-              <button class="settings-help-link" type="button" @click="store.openHelpCenter">
+              <button class="about-hero__guide" type="button" @click="store.openHelpCenter">
                 <Compass :size="17" />
-                <span><strong>打开使用指南</strong><small>快速开始、功能说明、常见问题与更新内容</small></span>
+                <span>使用指南</span>
               </button>
-            </div>
+            </header>
+
+            <section class="release-notes" aria-labelledby="release-notes-title">
+              <div class="release-notes__head">
+                <div>
+                  <p class="eyebrow">本次更新</p>
+                  <h4 id="release-notes-title">v{{ version }} 带来了什么</h4>
+                </div>
+                <span>当前稳定版</span>
+              </div>
+              <ul class="release-notes__list">
+                <li v-for="item in currentReleaseHighlights" :key="item">
+                  <Check :size="15" aria-hidden="true" />
+                  <span>{{ item }}</span>
+                </li>
+              </ul>
+              <details class="release-history">
+                <summary>查看历史版本更新</summary>
+                <div class="release-history__list">
+                  <article v-for="release in releaseHistory" :key="release.version">
+                    <strong>v{{ release.version }}</strong>
+                    <p>{{ release.summary }}</p>
+                  </article>
+                </div>
+              </details>
+            </section>
 
             <div class="settings-block">
               <div class="settings-block__title">
@@ -582,7 +671,7 @@
                 <div v-if="updateState === 'downloading'" class="update-card__progress" aria-label="更新下载进度">
                   <span :style="{ width: `${updateProgressPercent}%` }"></span>
                 </div>
-                <div class="update-card__actions">
+                <div v-if="updateState !== 'development'" class="update-card__actions">
                   <button
                     v-if="updateState === 'available'"
                     class="small-btn update-card__action"
@@ -610,7 +699,7 @@
     </aside>
   </div>
   <Teleport to="body">
-    <div v-if="storageBrowserOpen" class="storage-browser-layer" role="dialog" aria-modal="true" aria-label="清理附件">
+    <div v-if="storageBrowserOpen" class="storage-browser-layer" role="dialog" aria-modal="true" aria-label="清理附件" @keydown.esc.stop="closeStorageBrowser">
       <button class="storage-browser-layer__scrim" type="button" aria-label="关闭" @click="closeStorageBrowser"></button>
       <section class="storage-browser">
         <header><div><h2>清理附件</h2><small>检查未引用附件，恢复或清理暂存文件。</small></div><button class="icon-btn" type="button" aria-label="关闭" @click="closeStorageBrowser"><X :size="18" /></button></header>
@@ -629,7 +718,7 @@
   <Teleport to="body">
     <div v-if="pendingPurgeIds.length" class="storage-delete-dialog-layer" role="presentation">
       <button class="storage-delete-dialog-layer__scrim" type="button" aria-label="取消永久删除" @click="pendingPurgeIds = []"></button>
-      <section class="storage-delete-dialog" role="alertdialog" aria-modal="true" aria-labelledby="storage-delete-title">
+      <section class="storage-delete-dialog" role="alertdialog" aria-modal="true" aria-labelledby="storage-delete-title" @keydown.esc.stop="pendingPurgeIds = []">
         <span class="storage-delete-dialog__icon"><Trash2 :size="22" /></span>
         <div><h2 id="storage-delete-title">永久删除 {{ pendingPurgeIds.length }} 项文件？</h2><p>文件将从本机彻底移除，且无法恢复。</p></div>
         <div class="storage-delete-dialog__targets"><strong>将删除</strong><ul><li v-for="item in purgeTargets" :key="item.id"><span>{{ item.name }}</span><small>{{ item.relativePath }}</small></li></ul><small v-if="pendingPurgeIds.length > purgeTargets.length">另有 {{ pendingPurgeIds.length - purgeTargets.length }} 项文件</small></div>
@@ -649,6 +738,19 @@ import ImageLightbox from './ImageLightbox.vue'
 import appIcon from '@/assets/app-icon.svg'
 
 const version = __APP_VERSION__
+
+const currentReleaseHighlights = [
+  '本机恢复点：创建、定位、恢复与删除恢复点，恢复前自动创建安全点。',
+  '重复任务、逾期处理、常用快捷键和发布前检查更完整。',
+  '优化每日引导、操作音效、任务拖动和窄列表的操作收纳。',
+  '个人空间新增数据与安全分区，头像选择和预览更顺畅。'
+]
+
+const releaseHistory = [
+  { version: '0.2.5', summary: '新增多条件筛选，完善任务与子任务完成逻辑、日期和分组操作。' },
+  { version: '0.2.4', summary: '重构个人空间与本地数据管理，并加入头像、主题背景和清单进度。' },
+  { version: '0.2.3', summary: '优化任务阅读与子任务布局，完善桌面端提醒投递。' }
+]
 
 const store = useTaskStore()
 const activeSection = ref('appearance')
@@ -674,10 +776,11 @@ const updateError = ref('')
 const updateProgress = ref({ downloaded: 0, total: 0 })
 
 const sections = [
-  { id: 'appearance', label: '外观', summary: '主题与布局', icon: Palette },
-  { id: 'task-display', label: '任务显示', summary: '完成任务', icon: CheckSquare },
-  { id: 'preferences', label: '偏好与提醒', summary: '启动与反馈', icon: SlidersHorizontal },
-  { id: 'about', label: '关于', summary: '版本信息', icon: Info }
+  { id: 'appearance', label: '外观与布局', summary: '主题、密度与面板', icon: Palette },
+  { id: 'task-display', label: '任务与清单', summary: '完成项与分组显示', icon: CheckSquare },
+  { id: 'app-behavior', label: '应用行为', summary: '启动、提示与窗口', icon: SlidersHorizontal },
+  { id: 'notifications', label: '通知与反馈', summary: '提醒、权限与声音', icon: Bell },
+  { id: 'about', label: '关于与更新', summary: '版本、指南与更新', icon: Info }
 ]
 
 const themes = [
@@ -723,7 +826,7 @@ const updateStatusText = computed(() => ({
   available: `可更新至 ${availableUpdate.value?.version || ''}`,
   downloading: '正在下载',
   installing: '正在安装',
-  error: '服务暂不可用'
+  error: '自动更新不可用'
 }[updateState.value] || '手动检查'))
 const updateTitle = computed(() => ({
   development: '开发环境不检查在线更新',
@@ -733,7 +836,7 @@ const updateTitle = computed(() => ({
   available: '发现可用更新',
   downloading: '正在下载更新',
   installing: '安装程序即将启动',
-  error: '暂时无法连接更新服务'
+  error: '自动更新暂不可用'
 }[updateState.value] || '检查稳定版本'))
 const updateDescription = computed(() => {
   if (updateState.value === 'development') return 'npm run dev 不会请求 GitHub Release；请使用正式签名安装包验证更新。'
@@ -824,7 +927,7 @@ async function checkForUpdates() {
     updateState.value = 'error'
     const message = String(error?.message || '')
     updateError.value = message.includes('404') || message.includes('latest.json')
-      ? '更新服务尚未就绪，请稍后重试。'
+      ? '当前发布未提供已签名的自动更新清单（latest.json），因此无法在线检查；请在发布页下载安装包更新。'
       : '更新服务暂时不可用，不影响本机任务数据；请稍后重试。'
   }
 }

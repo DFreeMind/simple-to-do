@@ -7,6 +7,7 @@ import {
   loadData as loadPlatformData,
   saveData as savePlatformData,
   saveMigrationBackup,
+  setWindowCloseBehavior,
   sendReminderTestNotification,
   sendTaskReminderNotification
 } from '@/services/platform'
@@ -80,6 +81,7 @@ const DEFAULT_SETTINGS = {
   soundDragEnabled: true,
   reminderNotificationsEnabled: true,
   reminderSoundEnabled: true,
+  windowCloseBehavior: 'hide',
   dailyGuidanceEnabled: true,
   dailyGuidanceStyle: 'practical'
 }
@@ -580,6 +582,10 @@ export const useTaskStore = defineStore('task', () => {
       syncReminderNotifications({ requestPermission: Boolean(updates.reminderNotificationsEnabled) })
       if (updates.reminderNotificationsEnabled === false) showNotice('任务提醒通知已关闭', 'info')
     }
+    if ('windowCloseBehavior' in updates) {
+      setWindowCloseBehavior(settings.value.windowCloseBehavior)
+        .catch(error => console.warn('[Store] 同步窗口关闭方式失败:', error))
+    }
     purgeExpiredTrash()
   }
 
@@ -680,6 +686,9 @@ export const useTaskStore = defineStore('task', () => {
     if (!list || list.isSystem || id === 'inbox') return false
     const updatedAt = nowIso()
     const listTasks = tasks.value.filter(task => task.listId === id)
+    const deletedTaskGroupIds = new Set(taskGroups.value
+      .filter(group => group.listId === id)
+      .map(group => group.id))
     listTrash.value = listTrash.value.filter(item => item.id !== id)
     listTrash.value.unshift({
       ...list,
@@ -699,6 +708,16 @@ export const useTaskStore = defineStore('task', () => {
         removeTaskFromOrders(task.id)
       }
     })
+    // 任务分组只能属于一个有效清单。清单进入回收站后不再保留其分组，
+    // 同时清空任务上的分组引用，避免写入无法通过完整性校验的数据。
+    if (deletedTaskGroupIds.size) {
+      taskGroups.value = taskGroups.value.filter(group => group.listId !== id)
+      const clearTaskGroupReference = (task) => {
+        if (deletedTaskGroupIds.has(task.taskGroupId)) task.taskGroupId = null
+      }
+      tasks.value.forEach(clearTaskGroupReference)
+      trash.value.forEach(clearTaskGroupReference)
+    }
     lists.value = lists.value.filter(item => item.id !== id)
     if (currentView.value === id) currentView.value = 'inbox'
     playListDeleteSound()
@@ -1407,6 +1426,8 @@ export const useTaskStore = defineStore('task', () => {
         })
         purgeExpiredTrash()
         syncReminderNotifications({ requestPermission: false })
+        setWindowCloseBehavior(settings.value.windowCloseBehavior)
+          .catch(error => console.warn('[Store] 初始化窗口关闭方式失败:', error))
         console.log(`[Store] 数据初始化完成: ${tasks.value.length} 任务, ${lists.value.length} 清单`)
       }
       currentView.value = settings.value.startView || 'today'
@@ -1554,7 +1575,7 @@ export const useTaskStore = defineStore('task', () => {
 
   function buildSavePayload() {
     const payload = JSON.parse(JSON.stringify({
-      schemaVersion: 8,
+      schemaVersion: getCurrentVersion(),
       groups: groups.value,
       lists: lists.value,
       tasks: tasks.value,
@@ -1703,6 +1724,9 @@ export const useTaskStore = defineStore('task', () => {
     const soundDragEnabled = rawSettings.soundDragEnabled !== false
     const reminderNotificationsEnabled = rawSettings.reminderNotificationsEnabled !== false
     const reminderSoundEnabled = rawSettings.reminderSoundEnabled !== false
+    const windowCloseBehavior = ['hide', 'quit'].includes(rawSettings.windowCloseBehavior)
+      ? rawSettings.windowCloseBehavior
+      : DEFAULT_SETTINGS.windowCloseBehavior
     const dailyGuidanceEnabled = rawSettings.dailyGuidanceEnabled !== false
     const dailyGuidanceStyle = ['calm', 'practical', 'encouraging'].includes(rawSettings.dailyGuidanceStyle)
       ? rawSettings.dailyGuidanceStyle
@@ -1731,6 +1755,7 @@ export const useTaskStore = defineStore('task', () => {
       soundDragEnabled,
       reminderNotificationsEnabled,
       reminderSoundEnabled,
+      windowCloseBehavior,
       dailyGuidanceEnabled,
       dailyGuidanceStyle
     }

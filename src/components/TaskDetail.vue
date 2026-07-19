@@ -4,8 +4,8 @@
       <div class="empty-state__icon">
         <PanelRightOpen :size="28" />
       </div>
-      <h2>选择任务查看详情</h2>
-      <p>任务属性、子任务和富文本备注会显示在这里。</p>
+      <h2>{{ detailEmptyMessage.title }}</h2>
+      <p>{{ detailEmptyMessage.text }}</p>
     </div>
 
     <template v-else>
@@ -176,7 +176,7 @@
             class="subtask-panel__progress"
             :aria-label="`子任务进度 ${completedSubtasks}/${task.subtasks.length}`"
           >
-            <div class="subtask-panel__progress-bar" :style="{ width: subtaskProgressPercent + '%' }"></div>
+            <div class="subtask-panel__progress-bar" :style="{ width: subtaskProgressPercent + '%', backgroundColor: 'var(--accent)' }"></div>
           </div>
 
           <div class="subtask-list" @mousedown="handleSubtaskMouseDown">
@@ -276,6 +276,7 @@
 
 <script setup>
 import { computed, ref, reactive, watch, defineAsyncComponent, h, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { getDetailEmptyMessage } from '@/utils/dailyMessages'
 import {
   Bell,
   CalendarClock,
@@ -311,6 +312,12 @@ const RichTextEditor = defineAsyncComponent({
 })
 
 const store = useTaskStore()
+const detailEmptyMessage = computed(() => {
+  if (!store.settings.dailyGuidanceEnabled) {
+    return { title: '选择任务查看详情', text: '任务属性、子任务和富文本备注会显示在这里。' }
+  }
+  return getDetailEmptyMessage({ style: store.settings.dailyGuidanceStyle })
+})
 const newSubtask = ref('')
 const editorContent = ref('')
 const richTextEditor = ref(null)

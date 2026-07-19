@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="visible" class="input-overlay" @click.self="cancel">
+    <div v-if="visible" class="input-overlay" role="dialog" aria-modal="true" :aria-label="title" @keydown.esc.stop="cancel" @click.self="cancel">
       <div class="input-dialog" @click.stop>
         <button class="input-close" type="button" @click="cancel">
           <X :size="18" />
@@ -28,7 +28,7 @@
               :placeholder="placeholder"
               class="input-field"
               @keydown.enter="confirm"
-              @keydown.esc="cancel"
+              @keydown.esc.stop="cancel"
             />
           </div>
         </div>

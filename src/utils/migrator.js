@@ -1,5 +1,5 @@
 /** 前端状态结构迁移。数据库表结构迁移由 Rust 侧负责。 */
-const CURRENT_VERSION = 8
+const CURRENT_VERSION = 9
 const TASK_GROUP_COLOR_IDS = ['auto', 'accent', 'blue', 'violet', 'amber', 'rose', 'green', 'cyan', 'coral', 'indigo', 'teal', 'brick', 'custom']
 
 export class MigrationError extends Error {
@@ -17,7 +17,8 @@ const migrations = {
   4: migrateV4ToV5,
   5: migrateV5ToV6,
   6: migrateV6ToV7,
-  7: migrateV7ToV8
+  7: migrateV7ToV8,
+  8: migrateV8ToV9
 }
 
 export function migrateData(data) {
@@ -141,6 +142,26 @@ function migrateV7ToV8(data) {
   }
 }
 
+// v0.3.1 之前删除清单时没有同步删除其任务分组，导致分组保留了已失效的
+// listId，启动校验会拒绝加载整个数据集。迁移时移除这些孤儿分组，并清空
+// 仍引用它们的任务字段；任务本身（包括回收站任务）会被完整保留。
+function migrateV8ToV9(data) {
+  const listIds = new Set((data.lists || []).map(list => list?.id).filter(Boolean))
+  const validTaskGroups = (data.taskGroups || []).filter(group => listIds.has(group?.listId))
+  const validTaskGroupIds = new Set(validTaskGroups.map(group => group.id))
+  const clearOrphanTaskGroup = (task) => ({
+    ...task,
+    taskGroupId: validTaskGroupIds.has(task?.taskGroupId) ? task.taskGroupId : null
+  })
+
+  return {
+    ...data,
+    taskGroups: validTaskGroups,
+    tasks: (data.tasks || []).map(clearOrphanTaskGroup),
+    trash: (data.trash || []).map(clearOrphanTaskGroup)
+  }
+}
+
 export function validateData(data) {
   const errors = []
   if (!data || typeof data !== 'object' || Array.isArray(data)) return { valid: false, errors: ['数据不是有效的对象'] }
@@ -180,4 +201,4 @@ export function createBackup(data) {
 }
 
 export function getCurrentVersion() { return CURRENT_VERSION }
-export function getSupportedVersions() { return [1, 2, 3, 4, 5, 6, 7] }
+export function getSupportedVersions() { return [1, 2, 3, 4, 5, 6, 7, 8] }

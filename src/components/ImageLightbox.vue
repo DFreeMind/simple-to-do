@@ -7,7 +7,7 @@
         role="dialog"
         aria-modal="true"
         @click.self="$emit('close')"
-        @keydown="onKeydown"
+        @keydown.stop="onKeydown"
         tabindex="0"
         ref="rootEl"
       >

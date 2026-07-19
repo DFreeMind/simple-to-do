@@ -465,7 +465,7 @@
 
     <!-- 分组创建/重命名弹窗 -->
     <Teleport to="body">
-      <div v-if="groupDialog.visible" class="input-overlay" @click.self="closeGroupDialog">
+      <div v-if="groupDialog.visible" class="input-overlay" role="dialog" aria-modal="true" :aria-label="groupDialog.title" @keydown.esc.stop="handleGroupDialogKeydown" @click.self="closeGroupDialog">
         <div class="input-dialog group-dialog" @click.stop>
           <div class="group-dialog__header">
             <h3 class="group-dialog__title">{{ groupDialog.title }}</h3>
@@ -906,7 +906,13 @@ const dailyGuidance = computed(() => getTodayGuidance({
   overdueCount: overdueTaskCount.value
 }))
 const contextualEmptyMessage = computed(() => getViewEmptyMessage({
-  view: store.currentView,
+  view: store.currentList && store.listTaskFilters.date === 'overdue'
+    ? 'overdue'
+    : store.currentList && store.isListTaskFilterActive
+      ? 'filtered'
+      : store.currentList
+        ? 'list'
+        : store.currentView,
   style: store.settings.dailyGuidanceStyle
 }))
 
@@ -1094,16 +1100,10 @@ const allGroupCompletedVisible = computed(() => {
   return groups.length > 0 && groups.every(group => isGroupCompletedVisible(group.id))
 })
 
-watch(
-  () => `${store.currentView}:${viewMode.value}`,
-  () => {
-    Object.keys(groupCompletedVisibility).forEach(key => delete groupCompletedVisibility[key])
-  },
-  { immediate: true }
-)
-
 function getGroupCompletedVisibilityKey(groupId) {
-  return groupId || '__ungrouped__'
+  // 切换清单时保留各清单自己的显示选择；未分组任务也必须按清单隔离。
+  const listId = store.currentList?.id || store.currentView
+  return `${listId}:${groupId || '__ungrouped__'}`
 }
 
 function isGroupCompletedVisible(groupId) {
@@ -1154,9 +1154,10 @@ function toggleAllGroups() {
 }
 
 const emptyTitle = computed(() => {
-  if (store.currentList && store.listTaskFilters.date === 'overdue') return '没有逾期任务'
-  if (store.currentList && store.isListTaskFilterActive) return '没有符合筛选条件的任务'
+  if (store.currentList && store.listTaskFilters.date === 'overdue') return store.settings.dailyGuidanceEnabled ? (contextualEmptyMessage.value?.title || '没有逾期任务') : '没有逾期任务'
+  if (store.currentList && store.isListTaskFilterActive) return store.settings.dailyGuidanceEnabled ? (contextualEmptyMessage.value?.title || '没有符合筛选条件的任务') : '没有符合筛选条件的任务'
   if (store.currentView === 'today' && store.settings.dailyGuidanceEnabled) return dailyGuidance.value.title
+  if (store.settings.dailyGuidanceEnabled && contextualEmptyMessage.value?.title) return contextualEmptyMessage.value.title
   const map = {
     today: '今天很清爽',
     inbox: '收集箱为空',
@@ -1170,8 +1171,8 @@ const emptyTitle = computed(() => {
 })
 
 const emptyText = computed(() => {
-  if (store.currentList && store.listTaskFilters.date === 'overdue') return '当前清单中没有已过截止日期且未完成的任务。'
-  if (store.currentList && store.isListTaskFilterActive) return '调整筛选条件，或添加一条任务。'
+  if (store.currentList && store.listTaskFilters.date === 'overdue') return store.settings.dailyGuidanceEnabled ? (contextualEmptyMessage.value?.text || '当前清单中没有已过截止日期且未完成的任务。') : '当前清单中没有已过截止日期且未完成的任务。'
+  if (store.currentList && store.isListTaskFilterActive) return store.settings.dailyGuidanceEnabled ? (contextualEmptyMessage.value?.text || '调整筛选条件，或添加一条任务。') : '调整筛选条件，或添加一条任务。'
   if (store.currentView === 'today' && store.settings.dailyGuidanceEnabled) return dailyGuidance.value.text
   if (store.settings.dailyGuidanceEnabled && contextualEmptyMessage.value?.text) return contextualEmptyMessage.value.text
   const map = {

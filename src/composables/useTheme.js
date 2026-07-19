@@ -1,4 +1,4 @@
-import { watch } from 'vue'
+import { onMounted, watch } from 'vue'
 
 /**
  * 主题色板定义
@@ -218,8 +218,8 @@ export function useTheme(themeRef) {
     applied = true
   }
 
-  // 首次立即应用 + 监听变化
-  apply(themeRef.value)
+  // .app 在 setup 阶段尚未挂载；在挂载后首次写入，避免初始变量缺失。
+  onMounted(() => apply(themeRef.value))
   watch(themeRef, apply)
 }
 

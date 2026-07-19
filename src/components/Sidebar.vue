@@ -516,29 +516,45 @@ function openSearch() {
 }
 
 function handleSearchShortcut(event) {
-  const isSearchShortcut = (event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'k'
-  if (event.defaultPrevented || event.isComposing || store.settingsOpen) return
+  if (event.defaultPrevented || event.isComposing || hasOpenModal()) return
+
+  const isSearchShortcut = (event.ctrlKey || event.metaKey) && !event.altKey && event.code === 'KeyK'
   if (isSearchShortcut) {
     event.preventDefault()
     openSearch()
     return
   }
+
   const target = event.target
-  const isEditing = target instanceof HTMLElement && (target.matches('input, textarea, select') || target.isContentEditable)
-  if (isEditing || event.ctrlKey || event.metaKey || event.altKey) return
-  if (event.key.toLowerCase() === 'n' && store.canQuickAddTask) {
+  const isEditing = target instanceof HTMLElement && Boolean(target.closest('input, textarea, select, [contenteditable="true"], [role="textbox"]'))
+  if (isEditing || event.ctrlKey || event.metaKey || event.altKey || event.repeat) return
+
+  if (event.code === 'KeyN') {
     event.preventDefault()
-    window.dispatchEvent(new Event('task-list:focus-quick-add'))
+    if (!store.canQuickAddTask) {
+      store.setView('inbox')
+      store.showNotice('已切换到收集箱，可快速添加任务', 'info')
+    }
+    nextTick(() => window.dispatchEvent(new Event('task-list:focus-quick-add')))
     return
   }
-  if (event.key.toLowerCase() === 'd' && store.selectedTaskId) {
+
+  if (event.code === 'KeyD' && store.selectedTaskId) {
     const task = store.tasks.find(item => item.id === store.selectedTaskId)
-    if (task && !task.completed && !store.isInMyDay(task)) {
+    if (task && !task.deleted && !task.completed) {
       event.preventDefault()
-      store.toggleMyDay(task.id)
-      store.showNotice('已加入今日', 'success')
+      if (store.isInMyDay(task)) {
+        store.showNotice('任务已在今日', 'info')
+      } else {
+        store.toggleMyDay(task.id)
+        store.showNotice('已加入今日', 'success')
+      }
     }
   }
+}
+
+function hasOpenModal() {
+  return Boolean(document.querySelector('[role="dialog"][aria-modal="true"]'))
 }
 
 const listsFlyout = ref(false)

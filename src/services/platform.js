@@ -38,6 +38,11 @@ export async function saveData(data) {
   }
 }
 
+export async function setWindowCloseBehavior(behavior) {
+  if (!isTauri()) return false
+  return invoke('set_window_close_behavior', { behavior })
+}
+
 export async function saveMigrationBackup(data) {
   try {
     if (isTauri()) return await invoke('save_migration_backup', { data })
@@ -242,10 +247,26 @@ export async function sendTaskReminderNotification(task, settings = {}, options 
   if (!granted) return { sent: false, reason: 'permission' }
 
   try {
+    const title = options.catchUp ? '任务提醒（补发）' : '任务提醒'
+    const body = options.catchUp ? `已到期：${task.title || '未命名任务'}` : (task.title || '未命名任务')
+
+    // Windows 的通知插件不会把点击正文的事件回传给前端。原生 command
+    // 成功发送时会在点击后恢复窗口，并通过 task-reminder:open 定位任务。
+    try {
+      const sentInteractively = await invoke('send_interactive_task_reminder', {
+        taskId: task.id,
+        title,
+        body
+      })
+      if (sentInteractively) return { sent: true }
+    } catch (error) {
+      console.warn('[Platform] 可交互提醒不可用，改用普通系统通知:', error)
+    }
+
     sendNotification({
       id: reminderNotificationId(task.id),
-      title: options.catchUp ? '任务提醒（补发）' : '任务提醒',
-      body: options.catchUp ? `已到期：${task.title || '未命名任务'}` : (task.title || '未命名任务'),
+      title,
+      body,
       group: REMINDER_GROUP,
       autoCancel: true,
       silent: settings.reminderSoundEnabled === false,

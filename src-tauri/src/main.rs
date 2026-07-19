@@ -10,20 +10,94 @@ use std::{
     fs,
     path::{Path, PathBuf},
     process::Command,
+    sync::atomic::{AtomicBool, Ordering},
     time::Duration,
 };
 use tauri::Manager;
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    WindowEvent,
 };
+
+#[cfg(target_os = "windows")]
+use notify_rust::{Notification, NotificationResponse};
+#[cfg(target_os = "windows")]
+use tauri::Emitter;
+
+struct WindowCloseBehavior(AtomicBool);
+
+impl Default for WindowCloseBehavior {
+    fn default() -> Self {
+        // 默认隐藏而不是退出，避免提醒调度器因误关窗口而停止。
+        Self(AtomicBool::new(true))
+    }
+}
 
 fn show_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
         let _ = window.set_focus();
     }
+}
+
+/// 在 Windows 使用带激活回调的原生 toast。notification 插件负责展示，
+/// 但不会把点击通知正文的事件回传到 WebView，因而无法定位到对应任务。
+#[tauri::command]
+fn send_interactive_task_reminder(
+    app: tauri::AppHandle,
+    task_id: String,
+    title: String,
+    body: String,
+) -> Result<bool, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let mut notification = Notification::new();
+        notification
+            .app_id("cn.duqimeng.simpletodo")
+            .summary(&title)
+            .body(&body);
+        let handle = notification
+            .show()
+            .map_err(|err| format!("发送 Windows 提醒失败: {err}"))?;
+
+        std::thread::spawn(move || {
+            let _ = handle.wait_for_response(move |response: &NotificationResponse| {
+                if matches!(
+                    response,
+                    NotificationResponse::Default | NotificationResponse::Action(_)
+                ) {
+                    show_main_window(&app);
+                    let _ = app.emit(
+                        "task-reminder:open",
+                        serde_json::json!({ "taskId": task_id }),
+                    );
+                }
+            });
+        });
+        return Ok(true);
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (app, task_id, title, body);
+        Ok(false)
+    }
+}
+
+#[tauri::command]
+fn set_window_close_behavior(
+    app: tauri::AppHandle,
+    behavior: String,
+) -> Result<bool, String> {
+    let hide_on_close = match behavior.as_str() {
+        "hide" => true,
+        "quit" => false,
+        _ => return Err("无效的关闭窗口方式".to_string()),
+    };
+    app.state::<WindowCloseBehavior>()
+        .0
+        .store(hide_on_close, Ordering::Relaxed);
+    Ok(true)
 }
 
 fn app_data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -114,7 +188,11 @@ fn inspect_database_schema_version(database: &Path) -> Result<i64, String> {
 
 /// 仅在有实际数据库结构迁移时创建一致性备份。
 /// 备份失败时拒绝继续打开数据库，避免升级过程在未留下可恢复副本的情况下修改用户数据。
-fn create_migration_backup(app: &tauri::AppHandle, database: &Path, from_version: i64) -> Result<(), String> {
+fn create_migration_backup(
+    app: &tauri::AppHandle,
+    database: &Path,
+    from_version: i64,
+) -> Result<(), String> {
     let backups = backup_dir(app)?;
     let timestamp = Local::now().format("%Y%m%d-%H%M%S");
     let backup = backups.join(format!(
@@ -128,8 +206,8 @@ fn create_migration_backup(app: &tauri::AppHandle, database: &Path, from_version
 fn copy_sqlite_database(source: &Path, destination: &Path) -> Result<(), String> {
     let source = Connection::open_with_flags(source, OpenFlags::SQLITE_OPEN_READ_ONLY)
         .map_err(|err| format!("打开待备份数据库失败: {err}"))?;
-    let mut destination = Connection::open(destination)
-        .map_err(|err| format!("创建数据库备份失败: {err}"))?;
+    let mut destination =
+        Connection::open(destination).map_err(|err| format!("创建数据库备份失败: {err}"))?;
     let backup = Backup::new(&source, &mut destination)
         .map_err(|err| format!("初始化数据库备份失败: {err}"))?;
     backup
@@ -155,13 +233,18 @@ fn import_legacy_database(app: &tauri::AppHandle, destination: &Path) -> Result<
 
         let staging_database = destination.with_extension("legacy-import.tmp");
         if staging_database.exists() {
-            fs::remove_file(&staging_database).map_err(|err| format!("清理上次迁移暂存文件失败: {err}"))?;
+            fs::remove_file(&staging_database)
+                .map_err(|err| format!("清理上次迁移暂存文件失败: {err}"))?;
         }
         copy_sqlite_database(&legacy_database, &staging_database)?;
         for directory in ["attachments", "profile"] {
-            copy_directory_if_present(&legacy_dir.join(directory), &current_data_dir.join(directory))?;
+            copy_directory_if_present(
+                &legacy_dir.join(directory),
+                &current_data_dir.join(directory),
+            )?;
         }
-        fs::rename(&staging_database, destination).map_err(|err| format!("完成历史数据库导入失败: {err}"))?;
+        fs::rename(&staging_database, destination)
+            .map_err(|err| format!("完成历史数据库导入失败: {err}"))?;
         return Ok(());
     }
     Ok(())
@@ -179,7 +262,8 @@ fn copy_directory_if_present(source: &Path, destination: &Path) -> Result<(), St
         if source_path.is_dir() {
             copy_directory_if_present(&source_path, &target_path)?;
         } else if !target_path.exists() {
-            fs::copy(&source_path, &target_path).map_err(|err| format!("复制迁移附件失败: {err}"))?;
+            fs::copy(&source_path, &target_path)
+                .map_err(|err| format!("复制迁移附件失败: {err}"))?;
         }
     }
     Ok(())
@@ -206,7 +290,8 @@ fn copy_directory_tree(source: &Path, destination: &Path) -> Result<(), String> 
         if source_path.is_dir() {
             copy_directory_tree(&source_path, &target_path)?;
         } else {
-            fs::copy(&source_path, &target_path).map_err(|err| format!("复制备份文件失败: {err}"))?;
+            fs::copy(&source_path, &target_path)
+                .map_err(|err| format!("复制备份文件失败: {err}"))?;
         }
     }
     Ok(())
@@ -223,7 +308,11 @@ fn directory_size(path: &Path) -> Result<u64, String> {
     }
     let mut total = 0;
     for entry in fs::read_dir(path).map_err(|err| format!("读取备份目录失败: {err}"))? {
-        total += directory_size(&entry.map_err(|err| format!("读取备份目录失败: {err}"))?.path())?;
+        total += directory_size(
+            &entry
+                .map_err(|err| format!("读取备份目录失败: {err}"))?
+                .path(),
+        )?;
     }
     Ok(total)
 }
@@ -231,7 +320,9 @@ fn directory_size(path: &Path) -> Result<u64, String> {
 fn backup_id_is_safe(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 96
-        && id.chars().all(|character| character.is_ascii_alphanumeric() || character == '-' || character == '_')
+        && id.chars().all(|character| {
+            character.is_ascii_alphanumeric() || character == '-' || character == '_'
+        })
 }
 
 fn create_data_snapshot(app: &tauri::AppHandle, reason: &str) -> Result<DataBackupRecord, String> {
@@ -255,8 +346,10 @@ fn create_data_snapshot(app: &tauri::AppHandle, reason: &str) -> Result<DataBack
         size_bytes: directory_size(&target)?,
         reason: reason.to_string(),
     };
-    let metadata = serde_json::to_vec_pretty(&record).map_err(|err| format!("写入恢复点信息失败: {err}"))?;
-    fs::write(target.join("backup.json"), metadata).map_err(|err| format!("写入恢复点信息失败: {err}"))?;
+    let metadata =
+        serde_json::to_vec_pretty(&record).map_err(|err| format!("写入恢复点信息失败: {err}"))?;
+    fs::write(target.join("backup.json"), metadata)
+        .map_err(|err| format!("写入恢复点信息失败: {err}"))?;
     Ok(record)
 }
 
@@ -269,15 +362,33 @@ fn read_data_backup_record(path: &Path) -> Result<Option<DataBackupRecord>, Stri
         &fs::read(&metadata).map_err(|err| format!("读取恢复点信息失败: {err}"))?,
     )
     .map_err(|err| format!("解析恢复点信息失败: {err}"))?;
-    let id = value.get("id").and_then(|item| item.as_str()).unwrap_or_default().to_string();
-    if !backup_id_is_safe(&id) || id != path.file_name().and_then(|item| item.to_str()).unwrap_or_default() {
+    let id = value
+        .get("id")
+        .and_then(|item| item.as_str())
+        .unwrap_or_default()
+        .to_string();
+    if !backup_id_is_safe(&id)
+        || id
+            != path
+                .file_name()
+                .and_then(|item| item.to_str())
+                .unwrap_or_default()
+    {
         return Ok(None);
     }
     Ok(Some(DataBackupRecord {
         id,
-        created_at: value.get("createdAt").and_then(|item| item.as_str()).unwrap_or_default().to_string(),
+        created_at: value
+            .get("createdAt")
+            .and_then(|item| item.as_str())
+            .unwrap_or_default()
+            .to_string(),
         size_bytes: directory_size(path)?,
-        reason: value.get("reason").and_then(|item| item.as_str()).unwrap_or("manual").to_string(),
+        reason: value
+            .get("reason")
+            .and_then(|item| item.as_str())
+            .unwrap_or("manual")
+            .to_string(),
     }))
 }
 
@@ -289,7 +400,8 @@ fn create_data_backup(app: tauri::AppHandle) -> Result<DataBackupRecord, String>
 #[tauri::command]
 fn list_data_backups(app: tauri::AppHandle) -> Result<Vec<DataBackupRecord>, String> {
     let mut backups = Vec::new();
-    for entry in fs::read_dir(backup_dir(&app)?).map_err(|err| format!("读取恢复点失败: {err}"))? {
+    for entry in fs::read_dir(backup_dir(&app)?).map_err(|err| format!("读取恢复点失败: {err}"))?
+    {
         let entry = entry.map_err(|err| format!("读取恢复点失败: {err}"))?;
         if let Some(record) = read_data_backup_record(&entry.path())? {
             backups.push(record);
@@ -318,17 +430,20 @@ fn open_path_in_file_manager(location: &Path, reveal: bool) -> Result<bool, Stri
             location.to_string_lossy().to_string()
         };
         Command::new("explorer.exe")
-        .arg(argument)
-        .spawn()
-        .map_err(|err| format!("打开恢复点目录失败: {err}"))?;
+            .arg(argument)
+            .spawn()
+            .map_err(|err| format!("打开恢复点目录失败: {err}"))?;
     }
     #[cfg(target_os = "macos")]
     {
         let mut command = Command::new("open");
-        if reveal { command.arg("-R"); }
-        command.arg(location)
-        .spawn()
-        .map_err(|err| format!("打开恢复点目录失败: {err}"))?;
+        if reveal {
+            command.arg("-R");
+        }
+        command
+            .arg(location)
+            .spawn()
+            .map_err(|err| format!("打开恢复点目录失败: {err}"))?;
     }
     #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
     Command::new("xdg-open")
@@ -384,13 +499,22 @@ fn restore_data_backup(app: tauri::AppHandle, backup_id: String) -> Result<bool,
     }
     let safety_backup = create_data_snapshot(&app, "before-restore")?;
     let data_dir = app_data_dir(&app)?;
-    let stage = data_dir.join(format!(".restore-stage-{}", Local::now().format("%Y%m%d-%H%M%S%3f")));
+    let stage = data_dir.join(format!(
+        ".restore-stage-{}",
+        Local::now().format("%Y%m%d-%H%M%S%3f")
+    ));
     fs::create_dir_all(&stage).map_err(|err| format!("创建恢复暂存区失败: {err}"))?;
-    copy_sqlite_database(&snapshot.join("simpletodo.db"), &stage.join("simpletodo.db"))?;
+    copy_sqlite_database(
+        &snapshot.join("simpletodo.db"),
+        &stage.join("simpletodo.db"),
+    )?;
     copy_directory_tree(&snapshot.join("attachments"), &stage.join("attachments"))?;
     copy_directory_tree(&snapshot.join("profile"), &stage.join("profile"))?;
 
-    let rollback = data_dir.join(format!(".restore-rollback-{}", Local::now().format("%Y%m%d-%H%M%S%3f")));
+    let rollback = data_dir.join(format!(
+        ".restore-rollback-{}",
+        Local::now().format("%Y%m%d-%H%M%S%3f")
+    ));
     fs::create_dir_all(&rollback).map_err(|err| format!("创建恢复回滚区失败: {err}"))?;
     let components = ["simpletodo.db", "attachments", "profile"];
     let mut switched = Vec::new();
@@ -400,7 +524,8 @@ fn restore_data_backup(app: tauri::AppHandle, backup_id: String) -> Result<bool,
         let previous = rollback.join(component);
         let result = (|| -> Result<(), String> {
             if current.exists() {
-                fs::rename(&current, &previous).map_err(|err| format!("准备恢复当前数据失败: {err}"))?;
+                fs::rename(&current, &previous)
+                    .map_err(|err| format!("准备恢复当前数据失败: {err}"))?;
             }
             fs::rename(&staged, &current).map_err(|err| format!("应用恢复点失败: {err}"))?;
             Ok(())
@@ -424,7 +549,10 @@ fn restore_data_backup(app: tauri::AppHandle, backup_id: String) -> Result<bool,
             }
             let _ = remove_path(&stage);
             let _ = remove_path(&rollback);
-            return Err(format!("恢复失败，已尝试回滚；恢复前安全点为 {}。{error}", safety_backup.id));
+            return Err(format!(
+                "恢复失败，已尝试回滚；恢复前安全点为 {}。{error}",
+                safety_backup.id
+            ));
         }
         switched.push(component);
     }
@@ -1636,8 +1764,11 @@ fn cleanup_profile_avatars(
         return Ok(0);
     }
     let mut removed = 0;
-    for entry in fs::read_dir(&avatar_dir).map_err(|err| format!("读取头像目录失败: {err}"))? {
-        let path = entry.map_err(|err| format!("读取头像目录失败: {err}"))?.path();
+    for entry in fs::read_dir(&avatar_dir).map_err(|err| format!("读取头像目录失败: {err}"))?
+    {
+        let path = entry
+            .map_err(|err| format!("读取头像目录失败: {err}"))?
+            .path();
         if path.is_file() && current.as_ref().map_or(true, |active| active != &path) {
             fs::remove_file(&path).map_err(|err| format!("清理旧头像失败: {err}"))?;
             removed += 1;
@@ -2374,11 +2505,18 @@ mod tests {
 
         let source = Connection::open(&source_path).unwrap();
         source.execute_batch("PRAGMA journal_mode = WAL; CREATE TABLE tasks (id INTEGER PRIMARY KEY, title TEXT NOT NULL);").unwrap();
-        source.execute("INSERT INTO tasks (title) VALUES (?1)", params!["升级前任务"]).unwrap();
+        source
+            .execute(
+                "INSERT INTO tasks (title) VALUES (?1)",
+                params!["升级前任务"],
+            )
+            .unwrap();
 
         copy_sqlite_database(&source_path, &backup_path).unwrap();
         let backup = Connection::open(&backup_path).unwrap();
-        let count: i64 = backup.query_row("SELECT COUNT(*) FROM tasks", [], |row| row.get(0)).unwrap();
+        let count: i64 = backup
+            .query_row("SELECT COUNT(*) FROM tasks", [], |row| row.get(0))
+            .unwrap();
         assert_eq!(count, 1);
 
         drop(backup);
@@ -2409,33 +2547,28 @@ mod tests {
         .unwrap();
         init_database(&mut conn, DATABASE_SCHEMA_VERSION).unwrap();
         let count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM groups WHERE id = 'preserved'", [], |row| row.get(0))
+            .query_row(
+                "SELECT COUNT(*) FROM groups WHERE id = 'preserved'",
+                [],
+                |row| row.get(0),
+            )
             .unwrap();
         assert_eq!(count, 1);
 
         drop(conn);
-        assert_eq!(inspect_database_schema_version(&database).unwrap(), DATABASE_SCHEMA_VERSION);
+        assert_eq!(
+            inspect_database_schema_version(&database).unwrap(),
+            DATABASE_SCHEMA_VERSION
+        );
         fs::remove_dir_all(&root).unwrap();
     }
 }
 
 fn main() {
     tauri::Builder::default()
+        .manage(WindowCloseBehavior::default())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
-        .on_window_event(|window, event| {
-            if let WindowEvent::CloseRequested { api, .. } = event {
-                api.prevent_close();
-
-                // Windows 上完全隐藏窗口会让任务栏失去可恢复入口；改为最小化，
-                // 用户可直接点击任务栏回到应用。macOS 继续隐藏，由 Dock Reopen 恢复。
-                #[cfg(target_os = "windows")]
-                let _ = window.minimize();
-
-                #[cfg(not(target_os = "windows"))]
-                let _ = window.hide();
-            }
-        })
         .setup(|app| {
             let show_item = MenuItemBuilder::new("显示主窗口").id("show").build(app)?;
             let separator = PredefinedMenuItem::separator(app)?;
@@ -2499,18 +2632,52 @@ fn main() {
             quarantine_orphan_attachments,
             read_quarantined_attachment,
             restore_quarantined_attachments,
-            purge_quarantined_attachments
+            purge_quarantined_attachments,
+            send_interactive_task_reminder,
+            set_window_close_behavior
         ])
         .build(tauri::generate_context!())
         .expect("初始化 Tauri 应用失败")
         .run(|_app, _event| {
+            if let tauri::RunEvent::WindowEvent {
+                label,
+                event: tauri::WindowEvent::CloseRequested { api, .. },
+                ..
+            } = &_event
+            {
+                if label == "main"
+                    && _app
+                        .state::<WindowCloseBehavior>()
+                        .0
+                        .load(Ordering::Relaxed)
+                {
+                    api.prevent_close();
+                    if let Some(window) = _app.get_webview_window("main") {
+                        let _ = window.hide();
+                    }
+                }
+
+                // macOS 的原生习惯是关闭窗口但保留应用。用户选择“直接退出”
+                // 时才显式结束进程，保持两个选项在两端语义一致。
+                #[cfg(target_os = "macos")]
+                if label == "main"
+                    && !_app
+                        .state::<WindowCloseBehavior>()
+                        .0
+                        .load(Ordering::Relaxed)
+                {
+                    api.prevent_close();
+                    _app.exit(0);
+                }
+            }
+
             // macOS 从 Dock 重新激活一个已隐藏窗口时会发出 Reopen；此前没有
             // 处理这个事件，导致只能通过菜单栏恢复主窗口。
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Reopen {
                 has_visible_windows: false,
                 ..
-            } = _event
+            } = &_event
             {
                 show_main_window(_app);
             }

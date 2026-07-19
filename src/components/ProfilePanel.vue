@@ -1,5 +1,5 @@
 <template>
-  <div class="profile-layer" role="dialog" aria-modal="true" aria-label="个人资料">
+  <div class="profile-layer" role="dialog" aria-modal="true" aria-label="个人资料" @keydown.esc.stop="$emit('close')">
     <button class="profile-layer__scrim" type="button" aria-label="关闭个人资料" @click="$emit('close')" />
     <aside class="profile-panel">
       <header class="profile-panel__header">

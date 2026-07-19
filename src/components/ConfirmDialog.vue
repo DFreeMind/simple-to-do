@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="visible" class="confirm-overlay" @click.self="cancel">
+    <div v-if="visible" class="confirm-overlay" role="dialog" aria-modal="true" :aria-label="title" @keydown.esc.stop="cancel" @click.self="cancel">
       <div class="confirm-dialog" @click.stop>
         <button class="confirm-close" type="button" @click="cancel">
           <X :size="18" />
