@@ -104,9 +104,19 @@ const DEFAULT_FOCUS_PROFILES = [
   { id: 'free-focus', name: '自由计时', durationSeconds: null, description: '不设结束时间，记录真实投入。', sortOrder: 3000 }
 ]
 
+const DEFAULT_FOCUS_SETTINGS = {
+  shortBreakSeconds: 5 * 60,
+  longBreakSeconds: 15 * 60,
+  focusesBeforeLongBreak: 4,
+  autoStartBreaks: false
+}
+
 const DEFAULT_CLOCK = {
   profiles: DEFAULT_FOCUS_PROFILES,
+  focusSettings: DEFAULT_FOCUS_SETTINGS,
   activeSession: null,
+  pendingBreak: null,
+  cycleFocusCount: 0,
   history: []
 }
 
@@ -268,13 +278,14 @@ export const useTaskStore = defineStore('task', () => {
   const todayKey = computed(() => localDateKey())
   const focusProfiles = computed(() => clock.value.profiles)
   const activeFocusSession = computed(() => clock.value.activeSession)
+  const focusPendingBreak = computed(() => clock.value.pendingBreak)
   const currentFocusProfile = computed(() => {
     const session = activeFocusSession.value
     return focusProfiles.value.find(profile => profile.id === session?.profileId) || focusProfiles.value[0] || null
   })
   const focusElapsedSeconds = computed(() => getFocusElapsedSeconds(activeFocusSession.value, focusClockNow.value))
   const focusRemainingSeconds = computed(() => {
-    const duration = currentFocusProfile.value?.durationSeconds
+    const duration = getFocusSessionDuration(activeFocusSession.value)
     return duration === null || duration === undefined ? null : Math.max(0, duration - focusElapsedSeconds.value)
   })
 
@@ -1642,11 +1653,33 @@ export const useTaskStore = defineStore('task', () => {
     const profiles = rawProfiles
       .map((profile, index) => normalizeFocusProfile(profile, index))
       .filter((profile, index, items) => items.findIndex(item => item.id === profile.id) === index)
+    const focusSettings = normalizeFocusSettings(rawClock?.focusSettings)
     const activeSession = normalizeFocusSession(rawClock?.activeSession, profiles)
+    const pendingBreak = normalizePendingBreak(rawClock?.pendingBreak, profiles, focusSettings)
     const history = Array.isArray(rawClock?.history)
       ? rawClock.history.map(item => normalizeFocusHistory(item, profiles)).filter(Boolean).slice(0, 500)
       : []
-    return { profiles, activeSession, history }
+    return {
+      profiles,
+      focusSettings,
+      activeSession,
+      pendingBreak,
+      cycleFocusCount: Math.max(0, Math.min(focusSettings.focusesBeforeLongBreak - 1, Math.floor(Number(rawClock?.cycleFocusCount) || 0))),
+      history
+    }
+  }
+
+  function normalizeFocusSettings(rawSettings = {}) {
+    return {
+      shortBreakSeconds: normalizeDuration(rawSettings?.shortBreakSeconds, DEFAULT_FOCUS_SETTINGS.shortBreakSeconds),
+      longBreakSeconds: normalizeDuration(rawSettings?.longBreakSeconds, DEFAULT_FOCUS_SETTINGS.longBreakSeconds),
+      focusesBeforeLongBreak: Math.max(2, Math.min(12, Math.round(Number(rawSettings?.focusesBeforeLongBreak) || DEFAULT_FOCUS_SETTINGS.focusesBeforeLongBreak))),
+      autoStartBreaks: rawSettings?.autoStartBreaks === true
+    }
+  }
+
+  function normalizeDuration(value, fallback) {
+    return Math.max(60, Math.min(8 * 60 * 60, Math.round(Number(value) || fallback)))
   }
 
   function normalizeFocusProfile(rawProfile, index = 0) {
@@ -1654,7 +1687,7 @@ export const useTaskStore = defineStore('task', () => {
     const duration = rawProfile?.durationSeconds
     const durationSeconds = duration === null || duration === undefined
       ? (known?.durationSeconds ?? null)
-      : Math.max(60, Math.min(8 * 60 * 60, Math.round(Number(duration) || 0)))
+      : normalizeDuration(duration, known?.durationSeconds || DEFAULT_FOCUS_SETTINGS.shortBreakSeconds)
     return {
       id: String(rawProfile?.id || known?.id || genId()),
       name: String(rawProfile?.name || known?.name || '自定义专注').trim().slice(0, 32) || '自定义专注',
@@ -1671,6 +1704,11 @@ export const useTaskStore = defineStore('task', () => {
     const status = rawSession.status === 'paused' ? 'paused' : 'running'
     const startedAt = status === 'running' && isValidIsoDate(rawSession.startedAt) ? rawSession.startedAt : null
     const taskId = tasks.value.some(task => !task.deleted && task.id === rawSession.taskId) ? rawSession.taskId : null
+    const phase = ['focus', 'short-break', 'long-break'].includes(rawSession.phase) ? rawSession.phase : 'focus'
+    const profile = profiles.find(item => item.id === profileId)
+    const durationSeconds = rawSession.durationSeconds === null || rawSession.durationSeconds === undefined
+      ? (phase === 'focus' ? profile?.durationSeconds ?? null : null)
+      : normalizeDuration(rawSession.durationSeconds, profile?.durationSeconds || DEFAULT_FOCUS_SETTINGS.shortBreakSeconds)
     return {
       id: String(rawSession.id || genId()),
       profileId,
@@ -1678,7 +1716,22 @@ export const useTaskStore = defineStore('task', () => {
       status: startedAt ? status : 'paused',
       createdAt: isValidIsoDate(rawSession.createdAt) ? rawSession.createdAt : nowIso(),
       startedAt,
-      elapsedSeconds: Math.max(0, Math.min(8 * 60 * 60, Math.round(Number(rawSession.elapsedSeconds) || 0)))
+      elapsedSeconds: Math.max(0, Math.min(8 * 60 * 60, Math.round(Number(rawSession.elapsedSeconds) || 0))),
+      phase,
+      durationSeconds
+    }
+  }
+
+  function normalizePendingBreak(rawBreak, profiles, focusSettings) {
+    if (!rawBreak || typeof rawBreak !== 'object' || Array.isArray(rawBreak)) return null
+    const phase = rawBreak.phase === 'long-break' ? 'long-break' : rawBreak.phase === 'short-break' ? 'short-break' : null
+    const profileId = profiles.find(item => item.id === rawBreak.profileId)?.id || profiles[0]?.id
+    if (!phase || !profileId) return null
+    return {
+      phase,
+      profileId,
+      durationSeconds: normalizeDuration(rawBreak.durationSeconds, phase === 'long-break' ? focusSettings.longBreakSeconds : focusSettings.shortBreakSeconds),
+      createdAt: isValidIsoDate(rawBreak.createdAt) ? rawBreak.createdAt : nowIso()
     }
   }
 
@@ -1693,6 +1746,7 @@ export const useTaskStore = defineStore('task', () => {
       startedAt: isValidIsoDate(rawHistory.startedAt) ? rawHistory.startedAt : rawHistory.finishedAt,
       finishedAt: rawHistory.finishedAt,
       elapsedSeconds: Math.max(0, Math.min(8 * 60 * 60, Math.round(Number(rawHistory.elapsedSeconds) || 0))),
+      phase: ['focus', 'short-break', 'long-break'].includes(rawHistory.phase) ? rawHistory.phase : 'focus',
       result: ['completed', 'abandoned', 'interrupted'].includes(rawHistory.result) ? rawHistory.result : 'completed',
       note: String(rawHistory.note || '').trim().slice(0, 240)
     }
@@ -1710,6 +1764,12 @@ export const useTaskStore = defineStore('task', () => {
     return base + Math.max(0, live)
   }
 
+  function getFocusSessionDuration(session) {
+    if (!session) return currentFocusProfile.value?.durationSeconds ?? null
+    if (session.durationSeconds === null || session.durationSeconds === undefined) return null
+    return Number(session.durationSeconds)
+  }
+
   function syncFocusTimer() {
     if (focusTickTimer) window.clearInterval(focusTickTimer)
     focusTickTimer = null
@@ -1718,8 +1778,8 @@ export const useTaskStore = defineStore('task', () => {
     focusTickTimer = window.setInterval(() => {
       focusClockNow.value = Date.now()
       const session = clock.value.activeSession
-      const profile = currentFocusProfile.value
-      if (session && profile?.durationSeconds && getFocusElapsedSeconds(session, focusClockNow.value) >= profile.durationSeconds) {
+      const duration = getFocusSessionDuration(session)
+      if (session && duration && getFocusElapsedSeconds(session, focusClockNow.value) >= duration) {
         finishFocus('completed')
       }
     }, 1000)
@@ -1737,7 +1797,9 @@ export const useTaskStore = defineStore('task', () => {
       status: 'running',
       createdAt: nowIso(),
       startedAt: nowIso(),
-      elapsedSeconds: 0
+      elapsedSeconds: 0,
+      phase: 'focus',
+      durationSeconds: profile.durationSeconds
     }
     focusClockNow.value = Date.now()
     syncFocusTimer()
@@ -1773,6 +1835,52 @@ export const useTaskStore = defineStore('task', () => {
     return true
   }
 
+  function updateFocusSettings(updates = {}) {
+    clock.value.focusSettings = normalizeFocusSettings({ ...clock.value.focusSettings, ...updates })
+    clock.value.cycleFocusCount = Math.min(clock.value.cycleFocusCount, clock.value.focusSettings.focusesBeforeLongBreak - 1)
+  }
+
+  function updateFocusProfile(profileId, updates = {}) {
+    const profile = clock.value.profiles.find(item => item.id === profileId)
+    if (!profile) return false
+    const next = normalizeFocusProfile({ ...profile, ...updates }, profile.sortOrder / 1000 - 1)
+    profile.name = next.name
+    profile.description = next.description
+    profile.durationSeconds = next.durationSeconds
+    if (clock.value.activeSession?.profileId === profile.id && clock.value.activeSession.phase === 'focus') {
+      clock.value.activeSession.durationSeconds = next.durationSeconds
+    }
+    return true
+  }
+
+  function startPendingBreak() {
+    const pending = clock.value.pendingBreak
+    if (!pending || clock.value.activeSession) return false
+    clock.value.activeSession = {
+      id: genId(),
+      profileId: pending.profileId,
+      taskId: null,
+      status: 'running',
+      createdAt: nowIso(),
+      startedAt: nowIso(),
+      elapsedSeconds: 0,
+      phase: pending.phase,
+      durationSeconds: pending.durationSeconds
+    }
+    clock.value.pendingBreak = null
+    focusClockNow.value = Date.now()
+    syncFocusTimer()
+    showNotice(pending.phase === 'long-break' ? '已开始长休息' : '已开始短休息', 'success')
+    return true
+  }
+
+  function skipPendingBreak() {
+    if (!clock.value.pendingBreak) return false
+    clock.value.pendingBreak = null
+    showNotice('已跳过本次休息', 'info')
+    return true
+  }
+
   function finishFocus(result = 'completed', note = '') {
     const session = clock.value.activeSession
     if (!session) return false
@@ -1784,14 +1892,32 @@ export const useTaskStore = defineStore('task', () => {
       startedAt: session.createdAt,
       finishedAt: nowIso(),
       elapsedSeconds,
+      phase: session.phase || 'focus',
       result: ['completed', 'abandoned', 'interrupted'].includes(result) ? result : 'completed',
       note: String(note || '').trim().slice(0, 240)
     })
     clock.value.history = clock.value.history.slice(0, 500)
     clock.value.activeSession = null
+    if (session.phase === 'focus' && result === 'completed') {
+      const nextFocusCount = clock.value.cycleFocusCount + 1
+      const isLongBreak = nextFocusCount >= clock.value.focusSettings.focusesBeforeLongBreak
+      clock.value.cycleFocusCount = isLongBreak ? 0 : nextFocusCount
+      clock.value.pendingBreak = {
+        phase: isLongBreak ? 'long-break' : 'short-break',
+        profileId: session.profileId,
+        durationSeconds: isLongBreak ? clock.value.focusSettings.longBreakSeconds : clock.value.focusSettings.shortBreakSeconds,
+        createdAt: nowIso()
+      }
+      if (clock.value.focusSettings.autoStartBreaks) startPendingBreak()
+    }
     focusClockNow.value = Date.now()
     syncFocusTimer()
-    showNotice(result === 'completed' ? '本次专注已完成' : '本次专注已记录', 'success')
+    const message = session.phase === 'focus' && result === 'completed'
+      ? (clock.value.pendingBreak ? '专注完成，可以开始休息' : '专注完成，已开始休息')
+      : session.phase !== 'focus' && result === 'completed'
+        ? '休息完成，准备继续投入'
+        : '本次专注已记录'
+    showNotice(message, 'success')
     return true
   }
 
@@ -2156,6 +2282,7 @@ export const useTaskStore = defineStore('task', () => {
     statsTrend7Days,
     focusProfiles,
     activeFocusSession,
+    focusPendingBreak,
     currentFocusProfile,
     focusElapsedSeconds,
     focusRemainingSeconds,
@@ -2230,6 +2357,10 @@ export const useTaskStore = defineStore('task', () => {
     pauseFocus,
     resumeFocus,
     updateFocusTask,
+    updateFocusSettings,
+    updateFocusProfile,
+    startPendingBreak,
+    skipPendingBreak,
     finishFocus,
     testReminderNotification,
     loadData,

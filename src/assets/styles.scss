@@ -1176,8 +1176,9 @@ body.is-resizing {
 .focus-profile span { color: var(--text-muted); font-size: 12px; }
 
 .focus-field { display: grid; gap: 7px; margin-bottom: 16px; color: var(--text-muted); font-size: 12px; font-weight: 600; }
-.focus-field select { width: 100%; min-width: 0; min-height: 40px; padding: 0 10px; border: 1px solid var(--divider-soft); border-radius: var(--radius-sm); outline: none; background: var(--surface); color: var(--text); font: inherit; font-weight: 400; }
-.focus-field select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.focus-field select, .focus-field input { width: 100%; min-width: 0; min-height: 40px; padding: 0 10px; border: 1px solid var(--divider-soft); border-radius: var(--radius-sm); outline: none; background: var(--surface); color: var(--text); font: inherit; font-weight: 400; }
+.focus-field select:focus, .focus-field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.focus-field--note { margin: 14px 0 0; }
 
 .focus-primary-action, .focus-secondary-action { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; border-radius: var(--radius-sm); font-weight: 650; }
 .focus-primary-action { width: 100%; background: var(--accent); color: #fff; }
@@ -1185,6 +1186,25 @@ body.is-resizing {
 .focus-secondary-action { flex: 1; border: 1px solid var(--divider-soft); background: var(--surface); color: var(--text); }
 .focus-secondary-action:hover { background: var(--surface-muted); }
 .focus-actions { display: flex; gap: 10px; }
+
+.focus-break-ready { display: grid; gap: 8px; margin-top: -3px; text-align: center; }
+.focus-break-ready strong { color: var(--text); font-size: 17px; }
+.focus-break-ready > span { color: var(--text-muted); font-size: 13px; }
+.focus-break-ready .focus-actions { margin-top: 9px; }
+.focus-break-ready .focus-primary-action { flex: 1.4; }
+
+.focus-settings { margin-top: 20px; border-top: 1px solid var(--divider-soft); color: var(--text-muted); font-size: 13px; }
+.focus-settings summary { padding: 16px 0 2px; cursor: pointer; font-weight: 650; color: var(--text-muted); }
+.focus-settings[open] summary { color: var(--text); }
+.focus-settings__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+.focus-settings__grid .focus-field { margin: 0; }
+.focus-checkbox { display: flex; align-items: center; gap: 8px; margin-top: 3px; color: var(--text); font-size: 13px; }
+.focus-checkbox input { accent-color: var(--accent); }
+.focus-settings__profiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+.focus-profile-edit { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; padding: 9px; border: 1px solid var(--divider-soft); border-radius: var(--radius-sm); }
+.focus-profile-edit > span { overflow: hidden; color: var(--text); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.focus-profile-edit input { width: 48px; min-height: 30px; padding: 0 6px; border: 1px solid var(--divider-soft); border-radius: 6px; background: var(--surface); color: var(--text); text-align: center; }
+.focus-profile-edit small { grid-column: 1 / -1; color: var(--text-muted); font-size: 11px; }
 
 .focus-summary { display: grid; width: min(100%, 580px); grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--divider-soft); border-radius: var(--radius-md); background: var(--divider-soft); }
 .focus-summary > div { display: grid; gap: 4px; padding: 16px 18px; background: var(--surface); }
