@@ -26,7 +26,6 @@
       <div class="app-rail__divider app-rail__divider--quick"></div>
 
       <nav v-if="store.settings.activeModule === 'tasks'" class="app-rail__quick" aria-label="清单快捷操作">
-        <button class="app-rail__button" type="button" title="展开清单栏" aria-label="展开清单栏" @click="store.updateSettings({ sidebarCollapsed: false })"><PanelLeft :size="20" /></button>
         <button class="app-rail__button" :class="{ active: store.currentView === 'search' }" type="button" title="搜索（Ctrl/Cmd + K）" aria-label="搜索" @click="openSearch"><Search :size="20" /></button>
         <button v-for="item in taskQuickViews" :key="item.id" class="app-rail__button app-rail__button--badge" :class="{ active: store.currentView === item.id }" type="button" :title="item.label" :aria-label="item.label" @click="store.setView(item.id)"><component :is="item.icon" :size="20" /><span v-if="store.listTaskCounts[item.id]" class="app-rail__badge">{{ store.listTaskCounts[item.id] }}</span></button>
 
@@ -44,14 +43,12 @@
         <button class="app-rail__button app-rail__button--badge" :class="{ active: store.currentView === 'trash' }" type="button" title="垃圾桶" aria-label="垃圾桶" @click="store.setView('trash')"><Trash2 :size="20" /><span v-if="store.listTaskCounts.trash" class="app-rail__badge">{{ store.listTaskCounts.trash }}</span></button>
       </nav>
 
-      <nav v-else class="app-rail__quick" aria-label="时钟快捷操作">
-        <button class="app-rail__button" type="button" title="展开时钟栏" aria-label="展开时钟栏" @click="store.updateSettings({ sidebarCollapsed: false })"><PanelLeft :size="20" /></button>
-      </nav>
     </template>
 
     <div class="app-rail__spacer"></div>
 
     <div class="app-rail__footer">
+      <button v-if="store.settings.sidebarCollapsed" class="app-rail__button" type="button" :title="store.settings.activeModule === 'tasks' ? '展开清单栏' : '展开时钟栏'" :aria-label="store.settings.activeModule === 'tasks' ? '展开清单栏' : '展开时钟栏'" @click="store.updateSettings({ sidebarCollapsed: false })"><PanelLeft :size="20" /></button>
       <button class="app-rail__button" type="button" title="使用指南" aria-label="使用指南" @click="store.openHelpCenter"><Compass :size="20" /></button>
       <button class="app-rail__button" type="button" title="设置" aria-label="设置" @click="store.openSettings"><Settings :size="20" /></button>
     </div>

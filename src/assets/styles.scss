@@ -415,12 +415,14 @@ select:focus-visible,
 .app-rail__badge {
   position: absolute;
   top: -5px;
-  right: -6px;
+  right: -5px;
   display: grid;
+  box-sizing: border-box;
+  width: 16px;
   min-width: 16px;
   height: 16px;
   place-items: center;
-  padding: 0 3px;
+  padding: 0 1px;
   border: 1px solid var(--surface);
   border-radius: 999px;
   background: var(--accent);
@@ -429,6 +431,7 @@ select:focus-visible,
   font-weight: 700;
   line-height: 1;
 }
+.app-rail__button--badge > svg { transform: translateX(-3px); }
 
 .app-rail__list-anchor { position: relative; }
 .app-rail__list-flyout {
