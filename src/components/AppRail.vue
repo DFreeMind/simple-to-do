@@ -1,15 +1,21 @@
 <template>
   <aside class="app-rail" aria-label="应用模块">
-    <button
-      class="app-rail__profile"
-      type="button"
-      :title="`${store.profile.nickname} · 个人资料`"
-      :aria-label="`${store.profile.nickname}，打开个人资料`"
-      @click="profilePanelOpen = true"
-    >
-      <img v-if="profileAvatarSrc" :src="profileAvatarSrc" alt="" />
-      <span v-else>{{ profileInitial }}</span>
-    </button>
+    <div class="app-rail__profile-wrap">
+      <button
+        class="app-rail__profile"
+        type="button"
+        :aria-label="`${store.profile.nickname}，打开个人资料`"
+        @click="profilePanelOpen = true"
+      >
+        <img v-if="profileAvatarSrc" :src="profileAvatarSrc" alt="" />
+        <span v-else>{{ profileInitial }}</span>
+      </button>
+      <div class="app-rail__profile-tip" role="tooltip">
+        <strong>{{ store.profile.nickname }}</strong>
+        <span>本地个人空间</span>
+        <small>{{ store.lists.length }} 个清单 · 数据仅保存在此设备</small>
+      </div>
+    </div>
 
     <div class="app-rail__divider"></div>
 
@@ -43,7 +49,7 @@
       <button class="app-rail__button" type="button" title="设置" aria-label="设置" @click="store.openSettings"><Settings :size="20" /></button>
     </div>
 
-    <Teleport to="body">
+    <Teleport to=".app">
       <div v-if="listsFlyout" class="app-rail__list-flyout" :style="listsFlyoutStyle" @click.stop>
         <template v-for="group in store.groupedLists" :key="group.id">
           <p v-if="group.id !== 'ungrouped'" class="app-rail__list-group">{{ group.name }}</p>

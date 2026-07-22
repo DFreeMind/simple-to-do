@@ -396,6 +396,35 @@ select:focus-visible,
   img { width: 100%; height: 100%; object-fit: cover; }
 }
 
+.app-rail__profile-wrap { position: relative; }
+.app-rail__profile-tip {
+  position: absolute;
+  top: -5px;
+  left: 42px;
+  z-index: 1300;
+  display: grid;
+  width: max-content;
+  min-width: 176px;
+  max-width: 220px;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: var(--shadow-popover);
+  color: var(--text-muted);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-4px) scale(0.98);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+
+  strong { color: var(--text); font-size: 13px; }
+  span { color: var(--accent-strong); font-size: 11px; font-weight: 650; }
+  small { margin-top: 3px; color: var(--text-subtle); font-size: 10px; }
+}
+.app-rail__profile-wrap:hover .app-rail__profile-tip,
+.app-rail__profile-wrap:focus-within .app-rail__profile-tip { opacity: 1; transform: translateX(0) scale(1); }
+
 .app-rail__divider { width: 24px; height: 1px; margin: 12px 0; background: var(--accent-34-text-muted-fallback); }
 .app-rail__modules { display: flex; flex-direction: column; gap: 8px; }
 .app-rail__divider--quick { margin: 14px 0 8px; }
@@ -421,7 +450,6 @@ select:focus-visible,
   font-weight: 700;
   line-height: 1;
 }
-.app-rail__button--badge > svg { transform: translateX(-5px); }
 
 .app-rail__list-anchor { position: relative; }
 .app-rail__list-flyout {
@@ -447,8 +475,10 @@ select:focus-visible,
     background: transparent;
     color: var(--text-muted);
     text-align: left;
+    transition: background var(--transition-fast), color var(--transition-fast);
 
-    &:hover, &.active { background: var(--accent-soft); color: var(--accent-strong); }
+    &:hover { background: var(--accent-soft); color: var(--accent-strong); }
+    &.active { background: var(--accent-soft); color: var(--accent-strong); box-shadow: inset 3px 0 0 var(--accent); }
   }
 
   i { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; }
