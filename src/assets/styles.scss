@@ -1247,6 +1247,25 @@ body.is-resizing {
 .rhythm-add { width: 100%; min-height: 40px; margin-top: 14px; border: 1px dashed var(--accent-38-fallback); border-radius: var(--radius-sm); color: var(--accent-strong); }
 .rhythm-add:hover { background: var(--accent-soft); }
 
+.history-workspace { align-content: start; padding: 32px; }
+.history-panel { width: min(100%, 760px); padding: 28px; border: 1px solid var(--divider-soft); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow-popover); }
+.history-panel__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.history-panel__header .eyebrow { margin: 0 0 5px; }
+.history-panel__header h1 { margin: 0; color: var(--text); font-size: 23px; letter-spacing: -0.025em; }
+.history-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; margin: 22px 0; overflow: hidden; border: 1px solid var(--divider-soft); border-radius: var(--radius-md); background: var(--divider-soft); }
+.history-summary > div { display: grid; gap: 4px; padding: 15px; background: var(--surface-muted); }
+.history-summary span { color: var(--text-muted); font-size: 12px; }
+.history-summary strong { color: var(--text); font-size: 18px; font-variant-numeric: tabular-nums; }
+.history-section h2 { margin: 0 0 10px; color: var(--text); font-size: 15px; }
+.history-empty { margin: 0; padding: 20px; border: 1px dashed var(--divider-soft); border-radius: var(--radius-sm); color: var(--text-muted); font-size: 13px; text-align: center; }
+.history-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.history-list li { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 12px; border: 1px solid var(--divider-soft); border-radius: var(--radius-sm); }
+.history-list li > div { display: grid; min-width: 0; gap: 3px; }
+.history-list strong { color: var(--text); font-size: 13px; }
+.history-list span, .history-list small { overflow: hidden; color: var(--text-muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.history-list button { flex: 0 0 auto; color: var(--text-muted); font-size: 12px; }
+.history-list button:hover { color: var(--danger, #c64f4f); }
+
 .clock-workspace__empty {
   max-width: 390px;
   padding: 36px;

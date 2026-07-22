@@ -117,7 +117,8 @@
       <p>节律提醒和完整回顾将在后续任务中加入；当前专注记录已安全保存在本机。</p>
     </section>
   </main>
-  <RhythmWorkspace v-else />
+  <RhythmWorkspace v-else-if="store.settings.clockView === 'rhythm'" />
+  <FocusHistoryWorkspace v-else />
 </template>
 
 <script setup>
@@ -125,6 +126,7 @@ import { computed, ref } from 'vue'
 import { Check, Pause, Play, Square } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import RhythmWorkspace from './RhythmWorkspace.vue'
+import FocusHistoryWorkspace from './FocusHistoryWorkspace.vue'
 
 const store = useTaskStore()
 const selectedProfileId = ref('pomodoro')

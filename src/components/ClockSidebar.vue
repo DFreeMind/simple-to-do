@@ -10,6 +10,7 @@
     <nav class="clock-sidebar__nav" aria-label="时钟功能">
       <button class="clock-sidebar__nav-item" :class="{ active: store.settings.clockView === 'focus' }" type="button" @click="store.setClockView('focus')"><Timer :size="19" /><span>专注工作台</span></button>
       <button class="clock-sidebar__nav-item" :class="{ active: store.settings.clockView === 'rhythm' }" type="button" @click="store.setClockView('rhythm')"><Bell :size="19" /><span>节律提醒</span></button>
+      <button class="clock-sidebar__nav-item" :class="{ active: store.settings.clockView === 'history' }" type="button" @click="store.setClockView('history')"><ChartNoAxesColumnIncreasing :size="19" /><span>专注回顾</span></button>
     </nav>
 
     <p class="clock-sidebar__hint">把专注和日常提醒放进同一个节奏里，提醒可以按你的工作时间调整。</p>
@@ -20,7 +21,7 @@
 </template>
 
 <script setup>
-import { Bell, CircleHelp, PanelLeft, Timer } from 'lucide-vue-next'
+import { Bell, ChartNoAxesColumnIncreasing, CircleHelp, PanelLeft, Timer } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 
 const store = useTaskStore()

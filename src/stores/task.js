@@ -658,7 +658,7 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   function setClockView(view) {
-    if (!['focus', 'rhythm'].includes(view)) return
+    if (!['focus', 'rhythm', 'history'].includes(view)) return
     updateSettings({ clockView: view, activeModule: 'clock' })
   }
 
@@ -2003,6 +2003,31 @@ export const useTaskStore = defineStore('task', () => {
     return true
   }
 
+  function deleteFocusHistory(historyId) {
+    const index = clock.value.history.findIndex(item => item.id === historyId)
+    if (index < 0) return false
+    clock.value.history.splice(index, 1)
+    showNotice('专注记录已删除', 'info')
+    return true
+  }
+
+  function clearFocusHistoryBefore(endDate) {
+    const end = new Date(endDate).getTime()
+    if (!Number.isFinite(end)) return false
+    const originalLength = clock.value.history.length
+    clock.value.history = clock.value.history.filter(item => new Date(item.finishedAt).getTime() > end)
+    if (clock.value.history.length !== originalLength) showNotice('已清理选定时间范围内的专注记录', 'info')
+    return true
+  }
+
+  function clearFocusHistoryForDay(dateValue = new Date()) {
+    const day = localDateKey(dateValue)
+    const originalLength = clock.value.history.length
+    clock.value.history = clock.value.history.filter(item => localDateKey(item.finishedAt) !== day)
+    if (clock.value.history.length !== originalLength) showNotice('已清理当天专注记录', 'info')
+    return true
+  }
+
   function syncRhythmTimer() {
     if (rhythmTimer) window.clearInterval(rhythmTimer)
     rhythmTimer = null
@@ -2326,7 +2351,7 @@ export const useTaskStore = defineStore('task', () => {
       ...rawSettings,
       theme,
       activeModule,
-      clockView: ['focus', 'rhythm'].includes(rawSettings.clockView) ? rawSettings.clockView : DEFAULT_SETTINGS.clockView,
+      clockView: ['focus', 'rhythm', 'history'].includes(rawSettings.clockView) ? rawSettings.clockView : DEFAULT_SETTINGS.clockView,
       themeBackgrounds: rawSettings.themeBackgrounds === true,
       density,
       startView,
@@ -2556,6 +2581,7 @@ export const useTaskStore = defineStore('task', () => {
     currentFocusProfile,
     focusElapsedSeconds,
     focusRemainingSeconds,
+    focusHistory: computed(() => clock.value.history),
     listDistribution,
     currentViewMode,
     currentListGroups,
@@ -2642,6 +2668,9 @@ export const useTaskStore = defineStore('task', () => {
     pauseRhythmReminders,
     resumeRhythmReminders,
     finishFocus,
+    deleteFocusHistory,
+    clearFocusHistoryBefore,
+    clearFocusHistoryForDay,
     testReminderNotification,
     loadData,
     saveData,
