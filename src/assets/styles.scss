@@ -414,8 +414,8 @@ select:focus-visible,
 .app-rail__button--badge { position: relative; }
 .app-rail__badge {
   position: absolute;
-  top: -2px;
-  right: -2px;
+  top: 1px;
+  right: -1px;
   display: grid;
   box-sizing: border-box;
   width: 14px;
@@ -431,7 +431,7 @@ select:focus-visible,
   font-weight: 700;
   line-height: 1;
 }
-.app-rail__button--badge > svg { transform: translateX(-4px); }
+.app-rail__button--badge > svg { transform: translateX(-5px); }
 
 .app-rail__list-anchor { position: relative; }
 .app-rail__list-flyout {
@@ -454,6 +454,7 @@ select:focus-visible,
     min-height: 30px;
     padding: 0 8px;
     border-radius: var(--radius-xs);
+    background: transparent;
     color: var(--text-muted);
     text-align: left;
 
