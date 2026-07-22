@@ -10,7 +10,8 @@ import {
   setWindowCloseBehavior,
   getSystemIdleSeconds,
   sendReminderTestNotification,
-  sendTaskReminderNotification
+  sendTaskReminderNotification,
+  sendRhythmReminderNotification
 } from '@/services/platform'
 import {
   playCompleteSound,
@@ -2046,6 +2047,7 @@ export const useTaskStore = defineStore('task', () => {
     const dueReminder = rhythmReminders.value.find(isRhythmReminderDue)
     if (!dueReminder) return
     dueReminder.lastNotifiedAt = nowIso()
+    void sendRhythmReminderNotification(dueReminder, settings.value)
     showNotice(`${dueReminder.title}：${dueReminder.message || '该给自己一点时间了。'}`, 'info')
   }
 

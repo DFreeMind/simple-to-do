@@ -290,6 +290,28 @@ export async function sendTaskReminderNotification(task, settings = {}, options 
   }
 }
 
+export async function sendRhythmReminderNotification(reminder, settings = {}) {
+  if (!isTauri() || !reminder?.id || settings.reminderNotificationsEnabled === false) {
+    return { sent: false, reason: 'unsupported' }
+  }
+  const granted = await ensureReminderNotificationPermission()
+  if (!granted) return { sent: false, reason: 'permission' }
+  try {
+    sendNotification({
+      id: reminderNotificationId(`rhythm-${reminder.id}`),
+      title: reminder.title || '易简节律提醒',
+      body: reminder.message || '该给自己一点短暂的调整时间了。',
+      group: REMINDER_GROUP,
+      autoCancel: true,
+      silent: settings.reminderSoundEnabled === false
+    })
+    return { sent: true }
+  } catch (error) {
+    console.error('[Platform] 发送节律提醒失败:', error)
+    return { sent: false, reason: 'send-failed', error }
+  }
+}
+
 export async function sendReminderTestNotification(settings = {}) {
   if (!isTauri()) return { sent: false, reason: 'unsupported' }
   const granted = await ensureReminderNotificationPermission({ request: true })
