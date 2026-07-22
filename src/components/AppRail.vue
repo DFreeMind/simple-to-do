@@ -76,9 +76,6 @@ async function loadProfileAvatar() {
 
 function selectModule(module) {
   store.setActiveModule(module)
-  if (module === 'tasks' && store.settings.sidebarCollapsed) {
-    store.updateSettings({ sidebarCollapsed: false })
-  }
 }
 
 watch(() => store.profile.avatarRelativePath, loadProfileAvatar, { immediate: true })
