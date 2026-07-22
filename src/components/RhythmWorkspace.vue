@@ -13,7 +13,7 @@
       <p class="rhythm-panel__intro">护眼、补水和活动提醒默认只在工作日 09:00–18:00 运行。你可以修改每一条的频率、时间和文案。</p>
 
       <div class="rhythm-list">
-        <article v-for="reminder in store.rhythmReminders" :key="reminder.id" class="rhythm-card" :class="{ 'rhythm-card--disabled': !reminder.enabled }">
+        <article v-for="reminder in visibleReminders" :key="reminder.id" class="rhythm-card" :class="{ 'rhythm-card--disabled': !reminder.enabled }">
           <div class="rhythm-card__heading">
             <div>
               <strong>{{ reminder.title }}</strong>
@@ -53,9 +53,11 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useTaskStore } from '@/stores/task'
 
 const store = useTaskStore()
+const visibleReminders = computed(() => store.rhythmReminders.filter(item => item.triggerType !== 'active-duration' || store.activityMonitoringAvailable))
 
 function triggerSummary(reminder) {
   if (reminder.triggerType === 'fixed-time') return `每天 ${reminder.time}`
