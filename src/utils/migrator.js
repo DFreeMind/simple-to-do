@@ -1,5 +1,5 @@
 /** 前端状态结构迁移。数据库表结构迁移由 Rust 侧负责。 */
-const CURRENT_VERSION = 9
+const CURRENT_VERSION = 10
 const TASK_GROUP_COLOR_IDS = ['auto', 'accent', 'blue', 'violet', 'amber', 'rose', 'green', 'cyan', 'coral', 'indigo', 'teal', 'brick', 'custom']
 
 export class MigrationError extends Error {
@@ -18,7 +18,8 @@ const migrations = {
   5: migrateV5ToV6,
   6: migrateV6ToV7,
   7: migrateV7ToV8,
-  8: migrateV8ToV9
+  8: migrateV8ToV9,
+  9: migrateV9ToV10
 }
 
 export function migrateData(data) {
@@ -162,6 +163,15 @@ function migrateV8ToV9(data) {
   }
 }
 
+function migrateV9ToV10(data) {
+  return {
+    ...data,
+    clock: data.clock && typeof data.clock === 'object' && !Array.isArray(data.clock)
+      ? data.clock
+      : { profiles: [], activeSession: null, history: [] }
+  }
+}
+
 export function validateData(data) {
   const errors = []
   if (!data || typeof data !== 'object' || Array.isArray(data)) return { valid: false, errors: ['数据不是有效的对象'] }
@@ -172,6 +182,7 @@ export function validateData(data) {
   if (!data.settings || typeof data.settings !== 'object' || Array.isArray(data.settings)) errors.push('缺少有效的 settings 字段')
   if (!data.profile || typeof data.profile !== 'object' || Array.isArray(data.profile)) errors.push('缺少有效的 profile 字段')
   if (!data.viewOrders || typeof data.viewOrders !== 'object' || Array.isArray(data.viewOrders)) errors.push('缺少有效的 viewOrders 字段')
+  if (!data.clock || typeof data.clock !== 'object' || Array.isArray(data.clock)) errors.push('缺少有效的 clock 字段')
   if (errors.length) return { valid: false, errors }
 
   const listIds = new Set()
@@ -201,4 +212,4 @@ export function createBackup(data) {
 }
 
 export function getCurrentVersion() { return CURRENT_VERSION }
-export function getSupportedVersions() { return [1, 2, 3, 4, 5, 6, 7, 8] }
+export function getSupportedVersions() { return [1, 2, 3, 4, 5, 6, 7, 8, 9] }

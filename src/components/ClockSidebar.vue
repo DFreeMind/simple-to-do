@@ -8,12 +8,10 @@
     </header>
 
     <nav class="clock-sidebar__nav" aria-label="时钟功能">
-      <button class="clock-sidebar__nav-item active" type="button"><Timer :size="19" /><span>番茄计时</span></button>
-      <button class="clock-sidebar__nav-item" type="button" disabled><Bell :size="19" /><span>定时提醒</span></button>
-      <button class="clock-sidebar__nav-item" type="button" disabled><ChartNoAxesColumnIncreasing :size="19" /><span>今日记录</span></button>
+      <div class="clock-sidebar__nav-item active"><Timer :size="19" /><span>专注工作台</span></div>
     </nav>
 
-    <p class="clock-sidebar__hint">更多时钟功能将在后续版本开放。</p>
+    <p class="clock-sidebar__hint">从一个清晰的专注周期开始。节律提醒与回顾会在后续产品任务中逐步完成。</p>
 
     <div class="clock-sidebar__spacer"></div>
     <button class="clock-sidebar__help" type="button" @click="store.openHelpCenter"><CircleHelp :size="18" />使用指南</button>
@@ -21,7 +19,7 @@
 </template>
 
 <script setup>
-import { Bell, ChartNoAxesColumnIncreasing, CircleHelp, PanelLeft, Timer } from 'lucide-vue-next'
+import { CircleHelp, PanelLeft, Timer } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 
 const store = useTaskStore()

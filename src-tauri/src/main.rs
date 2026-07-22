@@ -113,7 +113,7 @@ fn db_file(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(app_data_dir(app)?.join("simpletodo.db"))
 }
 
-const DATABASE_SCHEMA_VERSION: i64 = 1;
+const DATABASE_SCHEMA_VERSION: i64 = 2;
 
 fn backup_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let dir = app_data_dir(app)?.join("backups");
@@ -755,6 +755,10 @@ fn init_database(conn: &mut Connection, from_version: i64) -> Result<(), String>
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS clock_state (
+            id INTEGER PRIMARY KEY CHECK(id = 1),
+            value TEXT NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS profile (
             id TEXT PRIMARY KEY,
             nickname TEXT NOT NULL,
@@ -947,6 +951,7 @@ fn save_state_to_db(conn: &mut Connection, data: &serde_json::Value) -> Result<(
         DELETE FROM subtasks;
         DELETE FROM view_orders;
         DELETE FROM settings;
+        DELETE FROM clock_state;
         DELETE FROM profile;
         DELETE FROM task_groups;
         DELETE FROM trash_lists;
@@ -1075,6 +1080,14 @@ fn save_state_to_db(conn: &mut Connection, data: &serde_json::Value) -> Result<(
             )
             .map_err(|err| format!("保存设置失败: {err}"))?;
         }
+    }
+
+    if let Some(clock) = data.get("clock") {
+        tx.execute(
+            "INSERT INTO clock_state(id, value) VALUES(1, ?1)",
+            params![clock.to_string()],
+        )
+        .map_err(|err| format!("保存时钟数据失败: {err}"))?;
     }
 
     if let Some(profile) = data.get("profile").and_then(|value| value.as_object()) {
@@ -1257,6 +1270,7 @@ fn load_state_from_db(
     let list_trash = query_list_trash(conn)?;
     let view_orders = query_view_orders(conn)?;
     let settings = query_settings(conn)?;
+    let clock = query_clock_state(conn)?;
     let task_groups = query_task_groups(conn)?;
     let profile = query_profile(conn)?;
 
@@ -1271,6 +1285,7 @@ fn load_state_from_db(
         "taskGroups": task_groups,
         "profile": profile,
         "settings": settings,
+        "clock": clock,
     }))
 }
 
@@ -1544,6 +1559,17 @@ fn query_settings(conn: &Connection) -> Result<serde_json::Value, String> {
         map.insert(key, value);
     }
     Ok(serde_json::Value::Object(map))
+}
+
+fn query_clock_state(conn: &Connection) -> Result<serde_json::Value, String> {
+    let raw = conn
+        .query_row("SELECT value FROM clock_state WHERE id = 1", [], |row| row.get::<_, String>(0))
+        .optional()
+        .map_err(|err| format!("读取时钟数据失败: {err}"))?;
+    match raw {
+        Some(value) => serde_json::from_str(&value).map_err(|err| format!("时钟数据格式无效: {err}")),
+        None => Ok(serde_json::json!({})),
+    }
 }
 
 fn collect_rows<T>(

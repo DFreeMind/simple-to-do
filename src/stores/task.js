@@ -98,6 +98,18 @@ const DEFAULT_PROFILE = {
   updatedAt: ''
 }
 
+const DEFAULT_FOCUS_PROFILES = [
+  { id: 'pomodoro', name: '番茄专注', durationSeconds: 25 * 60, description: '25 分钟专注，适合从下一步开始。', sortOrder: 1000 },
+  { id: 'deep-work', name: '深度专注', durationSeconds: 50 * 60, description: '50 分钟连续投入，适合需要沉浸的事项。', sortOrder: 2000 },
+  { id: 'free-focus', name: '自由计时', durationSeconds: null, description: '不设结束时间，记录真实投入。', sortOrder: 3000 }
+]
+
+const DEFAULT_CLOCK = {
+  profiles: DEFAULT_FOCUS_PROFILES,
+  activeSession: null,
+  history: []
+}
+
 function nowIso() {
   return new Date().toISOString()
 }
@@ -233,6 +245,7 @@ export const useTaskStore = defineStore('task', () => {
   const isSaving = ref(false)
   const notice = ref(null)
   const settings = ref({ ...DEFAULT_SETTINGS })
+  const clock = ref(normalizeClock(DEFAULT_CLOCK))
   const profile = ref({ ...DEFAULT_PROFILE })
   const settingsOpen = ref(false)
   const helpCenterOpen = ref(false)
@@ -246,11 +259,24 @@ export const useTaskStore = defineStore('task', () => {
   let reminderSyncing = false
   let reminderSyncPending = false
   let pendingPermissionRequest = false
+  let focusTickTimer = null
+  const focusClockNow = ref(Date.now())
 
   const trashedListIds = computed(() => new Set(listTrash.value.map(item => item.id)))
   const activeTasks = computed(() => tasks.value.filter(task => !task.deleted && !trashedListIds.value.has(task.listId)))
   const visibleTrashTasks = computed(() => trash.value.filter(task => !task.deletedByListId || !trashedListIds.value.has(task.deletedByListId)))
   const todayKey = computed(() => localDateKey())
+  const focusProfiles = computed(() => clock.value.profiles)
+  const activeFocusSession = computed(() => clock.value.activeSession)
+  const currentFocusProfile = computed(() => {
+    const session = activeFocusSession.value
+    return focusProfiles.value.find(profile => profile.id === session?.profileId) || focusProfiles.value[0] || null
+  })
+  const focusElapsedSeconds = computed(() => getFocusElapsedSeconds(activeFocusSession.value, focusClockNow.value))
+  const focusRemainingSeconds = computed(() => {
+    const duration = currentFocusProfile.value?.durationSeconds
+    return duration === null || duration === undefined ? null : Math.max(0, duration - focusElapsedSeconds.value)
+  })
 
   const currentList = computed(() => {
     if (SYSTEM_VIEW_IDS.includes(currentView.value)) return null
@@ -1422,6 +1448,7 @@ export const useTaskStore = defineStore('task', () => {
         profile.value = normalizeProfile(data.profile)
         viewOrders.value = normalizeViewOrders(data.viewOrders)
         taskGroups.value = (data.taskGroups || []).map(normalizeTaskGroup)
+        clock.value = normalizeClock(data.clock)
         // 根据用户设置更新音效开关
         setSoundEnabled(settings.value.soundEnabled)
         setSoundCategories({
@@ -1436,6 +1463,7 @@ export const useTaskStore = defineStore('task', () => {
           .catch(error => console.warn('[Store] 初始化窗口关闭方式失败:', error))
         console.log(`[Store] 数据初始化完成: ${tasks.value.length} 任务, ${lists.value.length} 清单`)
       }
+      syncFocusTimer()
       currentView.value = settings.value.startView || 'today'
       migrationBlocked.value = false
       saveError.value = ''
@@ -1477,7 +1505,7 @@ export const useTaskStore = defineStore('task', () => {
     }
   }
 
-  watch([groups, lists, tasks, trash, listTrash, settings, profile, viewOrders, taskGroups], () => {
+  watch([groups, lists, tasks, trash, listTrash, settings, profile, viewOrders, taskGroups, clock], () => {
     scheduleSave()
   }, { deep: true })
 
@@ -1590,7 +1618,8 @@ export const useTaskStore = defineStore('task', () => {
       viewOrders: viewOrders.value,
       taskGroups: taskGroups.value,
       profile: profile.value,
-      settings: settings.value
+      settings: settings.value,
+      clock: clock.value
     }))
     stripHydratedAttachmentUrls(payload)
     return payload
@@ -1604,6 +1633,166 @@ export const useTaskStore = defineStore('task', () => {
     if (!value || typeof value !== 'object') return
     if (value.relativePath) delete value.url
     Object.values(value).forEach(stripHydratedAttachmentUrls)
+  }
+
+  function normalizeClock(rawClock = {}) {
+    const rawProfiles = Array.isArray(rawClock?.profiles) && rawClock.profiles.length
+      ? rawClock.profiles
+      : DEFAULT_FOCUS_PROFILES
+    const profiles = rawProfiles
+      .map((profile, index) => normalizeFocusProfile(profile, index))
+      .filter((profile, index, items) => items.findIndex(item => item.id === profile.id) === index)
+    const activeSession = normalizeFocusSession(rawClock?.activeSession, profiles)
+    const history = Array.isArray(rawClock?.history)
+      ? rawClock.history.map(item => normalizeFocusHistory(item, profiles)).filter(Boolean).slice(0, 500)
+      : []
+    return { profiles, activeSession, history }
+  }
+
+  function normalizeFocusProfile(rawProfile, index = 0) {
+    const known = DEFAULT_FOCUS_PROFILES.find(item => item.id === rawProfile?.id)
+    const duration = rawProfile?.durationSeconds
+    const durationSeconds = duration === null || duration === undefined
+      ? (known?.durationSeconds ?? null)
+      : Math.max(60, Math.min(8 * 60 * 60, Math.round(Number(duration) || 0)))
+    return {
+      id: String(rawProfile?.id || known?.id || genId()),
+      name: String(rawProfile?.name || known?.name || '自定义专注').trim().slice(0, 32) || '自定义专注',
+      durationSeconds,
+      description: String(rawProfile?.description || known?.description || '').trim().slice(0, 120),
+      sortOrder: Number.isFinite(Number(rawProfile?.sortOrder)) ? Number(rawProfile.sortOrder) : (index + 1) * 1000
+    }
+  }
+
+  function normalizeFocusSession(rawSession, profiles = focusProfiles.value) {
+    if (!rawSession || typeof rawSession !== 'object' || Array.isArray(rawSession)) return null
+    const profileId = profiles.find(item => item.id === rawSession.profileId)?.id || profiles[0]?.id
+    if (!profileId) return null
+    const status = rawSession.status === 'paused' ? 'paused' : 'running'
+    const startedAt = status === 'running' && isValidIsoDate(rawSession.startedAt) ? rawSession.startedAt : null
+    const taskId = tasks.value.some(task => !task.deleted && task.id === rawSession.taskId) ? rawSession.taskId : null
+    return {
+      id: String(rawSession.id || genId()),
+      profileId,
+      taskId,
+      status: startedAt ? status : 'paused',
+      createdAt: isValidIsoDate(rawSession.createdAt) ? rawSession.createdAt : nowIso(),
+      startedAt,
+      elapsedSeconds: Math.max(0, Math.min(8 * 60 * 60, Math.round(Number(rawSession.elapsedSeconds) || 0)))
+    }
+  }
+
+  function normalizeFocusHistory(rawHistory, profiles = focusProfiles.value) {
+    if (!rawHistory || typeof rawHistory !== 'object' || Array.isArray(rawHistory)) return null
+    const profileId = profiles.find(item => item.id === rawHistory.profileId)?.id || null
+    if (!profileId || !isValidIsoDate(rawHistory.finishedAt)) return null
+    return {
+      id: String(rawHistory.id || genId()),
+      profileId,
+      taskId: tasks.value.some(task => !task.deleted && task.id === rawHistory.taskId) ? rawHistory.taskId : null,
+      startedAt: isValidIsoDate(rawHistory.startedAt) ? rawHistory.startedAt : rawHistory.finishedAt,
+      finishedAt: rawHistory.finishedAt,
+      elapsedSeconds: Math.max(0, Math.min(8 * 60 * 60, Math.round(Number(rawHistory.elapsedSeconds) || 0))),
+      result: ['completed', 'abandoned', 'interrupted'].includes(rawHistory.result) ? rawHistory.result : 'completed',
+      note: String(rawHistory.note || '').trim().slice(0, 240)
+    }
+  }
+
+  function isValidIsoDate(value) {
+    return typeof value === 'string' && Number.isFinite(new Date(value).getTime())
+  }
+
+  function getFocusElapsedSeconds(session, now = Date.now()) {
+    if (!session) return 0
+    const base = Math.max(0, Number(session.elapsedSeconds) || 0)
+    if (session.status !== 'running' || !session.startedAt) return base
+    const live = Math.floor((now - new Date(session.startedAt).getTime()) / 1000)
+    return base + Math.max(0, live)
+  }
+
+  function syncFocusTimer() {
+    if (focusTickTimer) window.clearInterval(focusTickTimer)
+    focusTickTimer = null
+    if (!clock.value.activeSession || clock.value.activeSession.status !== 'running') return
+    focusClockNow.value = Date.now()
+    focusTickTimer = window.setInterval(() => {
+      focusClockNow.value = Date.now()
+      const session = clock.value.activeSession
+      const profile = currentFocusProfile.value
+      if (session && profile?.durationSeconds && getFocusElapsedSeconds(session, focusClockNow.value) >= profile.durationSeconds) {
+        finishFocus('completed')
+      }
+    }, 1000)
+  }
+
+  function startFocus(profileId = 'pomodoro', taskId = null) {
+    if (clock.value.activeSession) return false
+    const profile = focusProfiles.value.find(item => item.id === profileId) || focusProfiles.value[0]
+    if (!profile) return false
+    const validTaskId = activeTasks.value.some(task => task.id === taskId) ? taskId : null
+    clock.value.activeSession = {
+      id: genId(),
+      profileId: profile.id,
+      taskId: validTaskId,
+      status: 'running',
+      createdAt: nowIso(),
+      startedAt: nowIso(),
+      elapsedSeconds: 0
+    }
+    focusClockNow.value = Date.now()
+    syncFocusTimer()
+    showNotice(`已开始${profile.name}`, 'success')
+    return true
+  }
+
+  function pauseFocus() {
+    const session = clock.value.activeSession
+    if (!session || session.status !== 'running') return false
+    session.elapsedSeconds = getFocusElapsedSeconds(session)
+    session.startedAt = null
+    session.status = 'paused'
+    focusClockNow.value = Date.now()
+    syncFocusTimer()
+    return true
+  }
+
+  function resumeFocus() {
+    const session = clock.value.activeSession
+    if (!session || session.status !== 'paused') return false
+    session.startedAt = nowIso()
+    session.status = 'running'
+    focusClockNow.value = Date.now()
+    syncFocusTimer()
+    return true
+  }
+
+  function updateFocusTask(taskId = null) {
+    const session = clock.value.activeSession
+    if (!session) return false
+    session.taskId = activeTasks.value.some(task => task.id === taskId) ? taskId : null
+    return true
+  }
+
+  function finishFocus(result = 'completed', note = '') {
+    const session = clock.value.activeSession
+    if (!session) return false
+    const elapsedSeconds = getFocusElapsedSeconds(session)
+    clock.value.history.unshift({
+      id: genId(),
+      profileId: session.profileId,
+      taskId: session.taskId,
+      startedAt: session.createdAt,
+      finishedAt: nowIso(),
+      elapsedSeconds,
+      result: ['completed', 'abandoned', 'interrupted'].includes(result) ? result : 'completed',
+      note: String(note || '').trim().slice(0, 240)
+    })
+    clock.value.history = clock.value.history.slice(0, 500)
+    clock.value.activeSession = null
+    focusClockNow.value = Date.now()
+    syncFocusTimer()
+    showNotice(result === 'completed' ? '本次专注已完成' : '本次专注已记录', 'success')
+    return true
   }
 
   function normalizeGroups(rawGroups) {
@@ -1940,6 +2129,7 @@ export const useTaskStore = defineStore('task', () => {
     notice,
     settings,
     profile,
+    clock,
     settingsOpen,
     helpCenterOpen,
     activeTasks,
@@ -1964,6 +2154,11 @@ export const useTaskStore = defineStore('task', () => {
     calendarTasksByDate,
     statsSummary,
     statsTrend7Days,
+    focusProfiles,
+    activeFocusSession,
+    currentFocusProfile,
+    focusElapsedSeconds,
+    focusRemainingSeconds,
     listDistribution,
     currentViewMode,
     currentListGroups,
@@ -2031,6 +2226,11 @@ export const useTaskStore = defineStore('task', () => {
     setActiveModule,
     previewSound,
     updateProfile,
+    startFocus,
+    pauseFocus,
+    resumeFocus,
+    updateFocusTask,
+    finishFocus,
     testReminderNotification,
     loadData,
     saveData,

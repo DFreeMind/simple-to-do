@@ -1140,10 +1140,57 @@ body.is-resizing {
 .clock-workspace {
   display: grid;
   min-height: 0;
-  place-items: center;
+  align-content: center;
+  justify-items: center;
+  gap: 18px;
+  overflow: auto;
   padding: 32px;
   background: linear-gradient(90deg, rgba(248, 250, 249, 0.78), var(--surface-92-surface-muted-fallback));
 }
+
+.focus-panel {
+  width: min(100%, 580px);
+  padding: 30px;
+  border: 1px solid var(--divider-soft);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-popover);
+}
+
+.focus-panel__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.focus-panel__header .eyebrow { margin: 0 0 5px; }
+.focus-panel__header h1 { margin: 0; color: var(--text); font-size: 25px; letter-spacing: -0.03em; }
+.focus-status { flex: 0 0 auto; padding: 5px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-strong); font-size: 12px; font-weight: 650; }
+.focus-status--paused { background: var(--surface-muted); color: var(--text-muted); }
+
+.focus-timer { display: grid; place-items: center; min-height: 230px; margin: 24px 0; border: 1px solid var(--divider-soft); border-radius: 24px; background: radial-gradient(circle at 50% 20%, var(--accent-soft), transparent 66%), var(--surface-muted); text-align: center; }
+.focus-timer__label { color: var(--text-muted); font-size: 13px; }
+.focus-timer strong { color: var(--text); font-size: clamp(54px, 9vw, 76px); font-variant-numeric: tabular-nums; letter-spacing: -0.075em; line-height: 0.95; }
+.focus-timer__detail { max-width: 80%; overflow: hidden; color: var(--text-muted); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.focus-timer--free { background: radial-gradient(circle at 50% 20%, rgba(112, 142, 220, 0.16), transparent 66%), var(--surface-muted); }
+
+.focus-profile-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 16px; }
+.focus-profile { display: grid; gap: 4px; min-height: 72px; padding: 12px; border: 1px solid var(--divider-soft); border-radius: var(--radius-md); background: var(--surface); color: var(--text); text-align: left; }
+.focus-profile:hover, .focus-profile.active { border-color: var(--accent); background: var(--accent-soft); }
+.focus-profile strong { font-size: 13px; }
+.focus-profile span { color: var(--text-muted); font-size: 12px; }
+
+.focus-field { display: grid; gap: 7px; margin-bottom: 16px; color: var(--text-muted); font-size: 12px; font-weight: 600; }
+.focus-field select { width: 100%; min-width: 0; min-height: 40px; padding: 0 10px; border: 1px solid var(--divider-soft); border-radius: var(--radius-sm); outline: none; background: var(--surface); color: var(--text); font: inherit; font-weight: 400; }
+.focus-field select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+.focus-primary-action, .focus-secondary-action { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; border-radius: var(--radius-sm); font-weight: 650; }
+.focus-primary-action { width: 100%; background: var(--accent); color: #fff; }
+.focus-primary-action:hover { filter: brightness(0.96); }
+.focus-secondary-action { flex: 1; border: 1px solid var(--divider-soft); background: var(--surface); color: var(--text); }
+.focus-secondary-action:hover { background: var(--surface-muted); }
+.focus-actions { display: flex; gap: 10px; }
+
+.focus-summary { display: grid; width: min(100%, 580px); grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--divider-soft); border-radius: var(--radius-md); background: var(--divider-soft); }
+.focus-summary > div { display: grid; gap: 4px; padding: 16px 18px; background: var(--surface); }
+.focus-summary span { color: var(--text-muted); font-size: 12px; }
+.focus-summary strong { color: var(--text); font-size: 20px; font-variant-numeric: tabular-nums; }
+.focus-summary p { grid-column: 1 / -1; margin: 0; padding: 12px 18px; background: var(--surface-muted); color: var(--text-muted); font-size: 12px; line-height: 1.55; }
 
 .clock-workspace__empty {
   max-width: 390px;
