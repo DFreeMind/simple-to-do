@@ -362,8 +362,8 @@ select:focus-visible,
   width: 48px;
   min-width: 48px;
   padding: 12px 0 16px;
-  background: linear-gradient(180deg, var(--surface), var(--surface-92-surface-muted-fallback));
-  box-shadow: inset -1px 0 0 var(--divider-soft);
+  background: linear-gradient(180deg, var(--accent-16-surface-muted-fallback), var(--accent-soft-58-surface-fallback));
+  box-shadow: inset -1px 0 0 var(--accent-34-text-muted-fallback), 1px 0 14px var(--text-4-fallback);
   z-index: 20;
 }
 
@@ -378,8 +378,8 @@ select:focus-visible,
   color: var(--text-muted);
   transition: background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
 
-  &:hover { background: var(--surface-muted); color: var(--text); }
-  &.active { background: var(--accent-soft); color: var(--accent-strong); box-shadow: inset 0 0 0 1px var(--accent-20-border-fallback); }
+  &:hover { background: var(--accent-soft-70-surface-fallback); color: var(--text); }
+  &.active { background: var(--surface-92-fallback); color: var(--accent-strong); box-shadow: inset 0 0 0 1px var(--accent-34-fallback), 0 2px 5px var(--text-4-fallback); }
 }
 
 .app-rail__profile {
@@ -395,7 +395,7 @@ select:focus-visible,
   img { width: 100%; height: 100%; object-fit: cover; }
 }
 
-.app-rail__divider { width: 24px; height: 1px; margin: 12px 0; background: var(--divider-soft); }
+.app-rail__divider { width: 24px; height: 1px; margin: 12px 0; background: var(--accent-34-text-muted-fallback); }
 .app-rail__modules { display: flex; flex-direction: column; gap: 8px; }
 .app-rail__spacer { flex: 1; }
 
