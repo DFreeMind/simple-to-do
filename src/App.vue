@@ -25,19 +25,27 @@
       ref="shellRef"
       class="app-shell"
       :class="{
+        'app-shell--clock': store.settings.activeModule === 'clock',
         'app-shell--detail-closed': !store.settings.detailOpen,
         'app-shell--sidebar-closed': store.settings.sidebarCollapsed
       }"
       :style="{ '--detail-w': layoutDetailWidth + 'px' }"
     >
-      <Sidebar />
-      <TaskList />
-      <div
-        v-if="store.settings.detailOpen"
-        class="col-resizer"
-        @pointerdown="onResizeStart"
-      />
-      <TaskDetail v-if="store.settings.detailOpen" />
+      <AppRail />
+      <template v-if="store.settings.activeModule === 'tasks'">
+        <Sidebar v-if="!store.settings.sidebarCollapsed" />
+        <TaskList />
+        <div
+          v-if="store.settings.detailOpen"
+          class="col-resizer"
+          @pointerdown="onResizeStart"
+        />
+        <TaskDetail v-if="store.settings.detailOpen" />
+      </template>
+      <template v-else>
+        <ClockSidebar v-if="!store.settings.sidebarCollapsed" />
+        <ClockWorkspace />
+      </template>
     </div>
 
     <SettingsPanel />
@@ -59,9 +67,12 @@
 <script setup>
 import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
 import { listen } from '@tauri-apps/api/event'
+import AppRail from './components/AppRail.vue'
 import Sidebar from './components/Sidebar.vue'
 import TaskList from './components/TaskList.vue'
 import TaskDetail from './components/TaskDetail.vue'
+import ClockSidebar from './components/ClockSidebar.vue'
+import ClockWorkspace from './components/ClockWorkspace.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
 import HelpCenter from './components/HelpCenter.vue'
 import { useTaskStore } from './stores/task'
@@ -146,7 +157,7 @@ function clampDetailWidth(value, max = DETAIL_WIDTH_MAX) {
 
 function getDetailMaxWidth() {
   const currentShellWidth = shellWidth.value || shellRef.value?.clientWidth || window.innerWidth
-  const sidebarWidth = store.settings.sidebarCollapsed ? 56 : 286
+  const sidebarWidth = 48 + (store.settings.sidebarCollapsed ? 0 : 286)
   return Math.max(
     DETAIL_WIDTH_MIN,
     Math.min(DETAIL_WIDTH_MAX, currentShellWidth - sidebarWidth - TASK_LIST_WIDTH_MIN - RESIZER_WIDTH)

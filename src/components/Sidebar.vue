@@ -160,17 +160,10 @@
     <!-- 展开完整模式 -->
     <template v-else>
       <header class="sidebar__header">
-        <button class="profile-entry" type="button" aria-label="打开个人资料" @click="profilePanelOpen = true">
-          <img v-if="profileAvatarSrc" class="profile-avatar" :src="profileAvatarSrc" alt="" />
-          <span v-else class="profile-avatar">{{ profileInitial }}</span>
-          <span class="profile-entry__copy"><strong>{{ store.profile.nickname }}</strong><small><i></i>本地空间</small></span>
-        </button>
+        <strong class="sidebar__module-title">清单</strong>
         <div class="sidebar__header-actions">
           <button class="icon-btn sidebar-header-action" type="button" aria-label="折叠侧栏" title="收起侧栏" @click="collapse">
             <PanelLeft :size="18" />
-          </button>
-          <button class="icon-btn sidebar-header-action" type="button" aria-label="打开设置" title="应用设置" @click="store.openSettings">
-            <SettingsIcon :size="18" />
           </button>
         </div>
       </header>

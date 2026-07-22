@@ -62,6 +62,7 @@ const DEFAULT_LISTS = [
 ]
 
 const DEFAULT_SETTINGS = {
+  activeModule: 'tasks',
   theme: 'mint',
   themeBackgrounds: false,
   density: 'comfortable',
@@ -587,6 +588,11 @@ export const useTaskStore = defineStore('task', () => {
         .catch(error => console.warn('[Store] 同步窗口关闭方式失败:', error))
     }
     purgeExpiredTrash()
+  }
+
+  function setActiveModule(module) {
+    if (!['tasks', 'clock'].includes(module)) return
+    updateSettings({ activeModule: module })
   }
 
   function previewSound(name) {
@@ -1708,6 +1714,9 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   function normalizeSettings(rawSettings = {}) {
+    const activeModule = ['tasks', 'clock'].includes(rawSettings.activeModule)
+      ? rawSettings.activeModule
+      : DEFAULT_SETTINGS.activeModule
     const theme = THEME_IDS.includes(rawSettings.theme) ? rawSettings.theme : DEFAULT_SETTINGS.theme
     const density = ['comfortable', 'compact'].includes(rawSettings.density) ? rawSettings.density : DEFAULT_SETTINGS.density
     const startView = SYSTEM_VIEW_IDS.includes(rawSettings.startView) ? rawSettings.startView : DEFAULT_SETTINGS.startView
@@ -1735,6 +1744,7 @@ export const useTaskStore = defineStore('task', () => {
       ...DEFAULT_SETTINGS,
       ...rawSettings,
       theme,
+      activeModule,
       themeBackgrounds: rawSettings.themeBackgrounds === true,
       density,
       startView,
@@ -2018,6 +2028,7 @@ export const useTaskStore = defineStore('task', () => {
     openHelpCenter,
     closeHelpCenter,
     updateSettings,
+    setActiveModule,
     previewSound,
     updateProfile,
     testReminderNotification,
