@@ -63,6 +63,7 @@ const DEFAULT_LISTS = [
 
 const DEFAULT_SETTINGS = {
   activeModule: 'tasks',
+  clockView: 'focus',
   theme: 'mint',
   themeBackgrounds: false,
   density: 'comfortable',
@@ -111,12 +112,25 @@ const DEFAULT_FOCUS_SETTINGS = {
   autoStartBreaks: false
 }
 
+const DEFAULT_RHYTHM_REMINDERS = [
+  { id: 'eyes', title: '护眼休息', icon: 'eye', color: 'cyan', enabled: true, triggerType: 'interval', intervalSeconds: 20 * 60, time: '09:00', weekdays: [1, 2, 3, 4, 5], workStart: '09:00', workEnd: '18:00', quietStart: null, quietEnd: null, message: '抬眼看看远处，让眼睛放松一下。', createdAt: '' },
+  { id: 'hydration', title: '补水', icon: 'droplets', color: 'blue', enabled: true, triggerType: 'interval', intervalSeconds: 60 * 60, time: '09:00', weekdays: [1, 2, 3, 4, 5], workStart: '09:00', workEnd: '18:00', quietStart: null, quietEnd: null, message: '喝几口水，给自己一个短暂的转换。', createdAt: '' },
+  { id: 'stand', title: '站立活动', icon: 'accessibility', color: 'green', enabled: true, triggerType: 'interval', intervalSeconds: 60 * 60, time: '09:00', weekdays: [1, 2, 3, 4, 5], workStart: '09:00', workEnd: '18:00', quietStart: null, quietEnd: null, message: '起身活动一下，换个姿势。', createdAt: '' },
+  { id: 'sedentary', title: '久坐提醒', icon: 'armchair', color: 'amber', enabled: false, triggerType: 'active-duration', intervalSeconds: 60 * 60, time: '09:00', weekdays: [1, 2, 3, 4, 5], workStart: '09:00', workEnd: '18:00', quietStart: null, quietEnd: null, message: '你已连续使用电脑一段时间，建议离开座位活动。', createdAt: '' }
+]
+
+const DEFAULT_RHYTHM = {
+  pausedUntil: null,
+  reminders: DEFAULT_RHYTHM_REMINDERS
+}
+
 const DEFAULT_CLOCK = {
   profiles: DEFAULT_FOCUS_PROFILES,
   focusSettings: DEFAULT_FOCUS_SETTINGS,
   activeSession: null,
   pendingBreak: null,
   cycleFocusCount: 0,
+  rhythm: DEFAULT_RHYTHM,
   history: []
 }
 
@@ -270,7 +284,9 @@ export const useTaskStore = defineStore('task', () => {
   let reminderSyncPending = false
   let pendingPermissionRequest = false
   let focusTickTimer = null
+  let rhythmTimer = null
   const focusClockNow = ref(Date.now())
+  const rhythmClockNow = ref(Date.now())
 
   const trashedListIds = computed(() => new Set(listTrash.value.map(item => item.id)))
   const activeTasks = computed(() => tasks.value.filter(task => !task.deleted && !trashedListIds.value.has(task.listId)))
@@ -279,6 +295,11 @@ export const useTaskStore = defineStore('task', () => {
   const focusProfiles = computed(() => clock.value.profiles)
   const activeFocusSession = computed(() => clock.value.activeSession)
   const focusPendingBreak = computed(() => clock.value.pendingBreak)
+  const rhythmReminders = computed(() => clock.value.rhythm.reminders)
+  const rhythmPaused = computed(() => {
+    const pausedUntil = clock.value.rhythm.pausedUntil
+    return pausedUntil && new Date(pausedUntil).getTime() > rhythmClockNow.value
+  })
   const currentFocusProfile = computed(() => {
     const session = activeFocusSession.value
     return focusProfiles.value.find(profile => profile.id === session?.profileId) || focusProfiles.value[0] || null
@@ -630,6 +651,11 @@ export const useTaskStore = defineStore('task', () => {
   function setActiveModule(module) {
     if (!['tasks', 'clock'].includes(module)) return
     updateSettings({ activeModule: module })
+  }
+
+  function setClockView(view) {
+    if (!['focus', 'rhythm'].includes(view)) return
+    updateSettings({ clockView: view, activeModule: 'clock' })
   }
 
   function previewSound(name) {
@@ -1475,6 +1501,7 @@ export const useTaskStore = defineStore('task', () => {
         console.log(`[Store] 数据初始化完成: ${tasks.value.length} 任务, ${lists.value.length} 清单`)
       }
       syncFocusTimer()
+      syncRhythmTimer()
       currentView.value = settings.value.startView || 'today'
       migrationBlocked.value = false
       saveError.value = ''
@@ -1654,6 +1681,7 @@ export const useTaskStore = defineStore('task', () => {
       .map((profile, index) => normalizeFocusProfile(profile, index))
       .filter((profile, index, items) => items.findIndex(item => item.id === profile.id) === index)
     const focusSettings = normalizeFocusSettings(rawClock?.focusSettings)
+    const rhythm = normalizeRhythm(rawClock?.rhythm)
     const activeSession = normalizeFocusSession(rawClock?.activeSession, profiles)
     const pendingBreak = normalizePendingBreak(rawClock?.pendingBreak, profiles, focusSettings)
     const history = Array.isArray(rawClock?.history)
@@ -1665,6 +1693,7 @@ export const useTaskStore = defineStore('task', () => {
       activeSession,
       pendingBreak,
       cycleFocusCount: Math.max(0, Math.min(focusSettings.focusesBeforeLongBreak - 1, Math.floor(Number(rawClock?.cycleFocusCount) || 0))),
+      rhythm,
       history
     }
   }
@@ -1676,6 +1705,52 @@ export const useTaskStore = defineStore('task', () => {
       focusesBeforeLongBreak: Math.max(2, Math.min(12, Math.round(Number(rawSettings?.focusesBeforeLongBreak) || DEFAULT_FOCUS_SETTINGS.focusesBeforeLongBreak))),
       autoStartBreaks: rawSettings?.autoStartBreaks === true
     }
+  }
+
+  function normalizeRhythm(rawRhythm = {}) {
+    const source = Array.isArray(rawRhythm?.reminders) && rawRhythm.reminders.length
+      ? rawRhythm.reminders
+      : DEFAULT_RHYTHM_REMINDERS
+    return {
+      pausedUntil: isValidIsoDate(rawRhythm?.pausedUntil) ? rawRhythm.pausedUntil : null,
+      reminders: source.map((reminder, index) => normalizeRhythmReminder(reminder, index))
+    }
+  }
+
+  function normalizeRhythmReminder(rawReminder = {}, index = 0) {
+    const known = DEFAULT_RHYTHM_REMINDERS.find(item => item.id === rawReminder?.id)
+    const triggerType = ['interval', 'fixed-time', 'active-duration'].includes(rawReminder?.triggerType)
+      ? rawReminder.triggerType
+      : known?.triggerType || 'interval'
+    const weekdays = Array.isArray(rawReminder?.weekdays)
+      ? rawReminder.weekdays.map(Number).filter(day => Number.isInteger(day) && day >= 0 && day <= 6)
+      : (known?.weekdays || [1, 2, 3, 4, 5])
+    return {
+      id: String(rawReminder?.id || known?.id || genId()),
+      title: String(rawReminder?.title || known?.title || '自定义提醒').trim().slice(0, 32) || '自定义提醒',
+      icon: String(rawReminder?.icon || known?.icon || 'bell').slice(0, 32),
+      color: ['cyan', 'blue', 'green', 'amber', 'violet', 'rose'].includes(rawReminder?.color) ? rawReminder.color : (known?.color || 'cyan'),
+      enabled: triggerType === 'active-duration' ? false : rawReminder?.enabled !== false,
+      triggerType,
+      intervalSeconds: normalizeDuration(rawReminder?.intervalSeconds, known?.intervalSeconds || 60 * 60),
+      time: normalizeClockTime(rawReminder?.time || known?.time || '09:00'),
+      weekdays: weekdays.length ? [...new Set(weekdays)].sort() : [0, 1, 2, 3, 4, 5, 6],
+      workStart: normalizeClockTime(rawReminder?.workStart || known?.workStart || '09:00'),
+      workEnd: normalizeClockTime(rawReminder?.workEnd || known?.workEnd || '18:00'),
+      quietStart: rawReminder?.quietStart ? normalizeClockTime(rawReminder.quietStart) : null,
+      quietEnd: rawReminder?.quietEnd ? normalizeClockTime(rawReminder.quietEnd) : null,
+      message: String(rawReminder?.message || known?.message || '').trim().slice(0, 160),
+      createdAt: isValidIsoDate(rawReminder?.createdAt) ? rawReminder.createdAt : nowIso(),
+      lastCompletedAt: isValidIsoDate(rawReminder?.lastCompletedAt) ? rawReminder.lastCompletedAt : null,
+      lastNotifiedAt: isValidIsoDate(rawReminder?.lastNotifiedAt) ? rawReminder.lastNotifiedAt : null,
+      snoozedUntil: isValidIsoDate(rawReminder?.snoozedUntil) ? rawReminder.snoozedUntil : null,
+      skippedDate: /^\d{4}-\d{2}-\d{2}$/.test(rawReminder?.skippedDate || '') ? rawReminder.skippedDate : null,
+      sortOrder: Number.isFinite(Number(rawReminder?.sortOrder)) ? Number(rawReminder.sortOrder) : (index + 1) * 1000
+    }
+  }
+
+  function normalizeClockTime(value) {
+    return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(value || '')) ? String(value) : '09:00'
   }
 
   function normalizeDuration(value, fallback) {
@@ -1921,6 +1996,154 @@ export const useTaskStore = defineStore('task', () => {
     return true
   }
 
+  function syncRhythmTimer() {
+    if (rhythmTimer) window.clearInterval(rhythmTimer)
+    rhythmTimer = null
+    rhythmClockNow.value = Date.now()
+    void runRhythmSync()
+    rhythmTimer = window.setInterval(() => {
+      rhythmClockNow.value = Date.now()
+      void runRhythmSync()
+    }, 30 * 1000)
+  }
+
+  async function runRhythmSync() {
+    if (rhythmPaused.value) return
+    const dueReminder = rhythmReminders.value.find(isRhythmReminderDue)
+    if (!dueReminder) return
+    dueReminder.lastNotifiedAt = nowIso()
+    showNotice(`${dueReminder.title}：${dueReminder.message || '该给自己一点时间了。'}`, 'info')
+  }
+
+  function isRhythmReminderDue(reminder) {
+    if (!reminder?.enabled || reminder.triggerType === 'active-duration' || rhythmPaused.value) return false
+    const now = new Date(rhythmClockNow.value)
+    const today = localDateKey(now)
+    if (reminder.skippedDate === today || !isReminderInSchedule(reminder, now)) return false
+    const snoozedAt = reminder.snoozedUntil ? new Date(reminder.snoozedUntil).getTime() : 0
+    if (snoozedAt > now.getTime()) return false
+    if (reminder.triggerType === 'fixed-time') {
+      const dueAt = timeToday(reminder.time, now).getTime()
+      const lastNotified = reminder.lastNotifiedAt ? new Date(reminder.lastNotifiedAt).getTime() : 0
+      return now.getTime() >= dueAt && lastNotified < dueAt
+    }
+    const baseline = reminder.lastCompletedAt || reminder.createdAt
+    const dueAt = new Date(baseline).getTime() + reminder.intervalSeconds * 1000
+    const lastNotified = reminder.lastNotifiedAt ? new Date(reminder.lastNotifiedAt).getTime() : 0
+    return now.getTime() >= dueAt && lastNotified < dueAt
+  }
+
+  function isReminderInSchedule(reminder, date) {
+    if (!reminder.weekdays.includes(date.getDay())) return false
+    const current = minutesSinceMidnight(date)
+    if (!isTimeInWindow(current, reminder.workStart, reminder.workEnd)) return false
+    if (reminder.quietStart && reminder.quietEnd && isTimeInWindow(current, reminder.quietStart, reminder.quietEnd)) return false
+    return true
+  }
+
+  function minutesSinceMidnight(date) {
+    return date.getHours() * 60 + date.getMinutes()
+  }
+
+  function timeToMinutes(value) {
+    const [hour, minute] = normalizeClockTime(value).split(':').map(Number)
+    return hour * 60 + minute
+  }
+
+  function isTimeInWindow(current, start, end) {
+    const startMinute = timeToMinutes(start)
+    const endMinute = timeToMinutes(end)
+    if (startMinute === endMinute) return true
+    return startMinute < endMinute
+      ? current >= startMinute && current < endMinute
+      : current >= startMinute || current < endMinute
+  }
+
+  function timeToday(value, baseDate = new Date()) {
+    const [hour, minute] = normalizeClockTime(value).split(':').map(Number)
+    const date = new Date(baseDate)
+    date.setHours(hour, minute, 0, 0)
+    return date
+  }
+
+  function addRhythmReminder(values = {}) {
+    const reminder = normalizeRhythmReminder({
+      id: genId(),
+      title: '自定义提醒',
+      enabled: true,
+      triggerType: 'interval',
+      intervalSeconds: 60 * 60,
+      weekdays: [1, 2, 3, 4, 5],
+      workStart: '09:00',
+      workEnd: '18:00',
+      ...values,
+      createdAt: nowIso(),
+      sortOrder: (rhythmReminders.value.length + 1) * 1000
+    }, rhythmReminders.value.length)
+    clock.value.rhythm.reminders.push(reminder)
+    syncRhythmTimer()
+    return reminder.id
+  }
+
+  function updateRhythmReminder(reminderId, updates = {}) {
+    const index = clock.value.rhythm.reminders.findIndex(item => item.id === reminderId)
+    if (index < 0) return false
+    clock.value.rhythm.reminders[index] = normalizeRhythmReminder({ ...clock.value.rhythm.reminders[index], ...updates }, index)
+    syncRhythmTimer()
+    return true
+  }
+
+  function toggleRhythmReminder(reminderId, enabled) {
+    return updateRhythmReminder(reminderId, { enabled: typeof enabled === 'boolean' ? enabled : !clock.value.rhythm.reminders.find(item => item.id === reminderId)?.enabled })
+  }
+
+  function deleteRhythmReminder(reminderId) {
+    const index = clock.value.rhythm.reminders.findIndex(item => item.id === reminderId)
+    if (index < 0) return false
+    clock.value.rhythm.reminders.splice(index, 1)
+    syncRhythmTimer()
+    return true
+  }
+
+  function completeRhythmReminder(reminderId) {
+    const reminder = clock.value.rhythm.reminders.find(item => item.id === reminderId)
+    if (!reminder) return false
+    reminder.lastCompletedAt = nowIso()
+    reminder.lastNotifiedAt = nowIso()
+    reminder.snoozedUntil = null
+    showNotice(`${reminder.title}已完成`, 'success')
+    syncRhythmTimer()
+    return true
+  }
+
+  function snoozeRhythmReminder(reminderId, minutes = 5) {
+    const reminder = clock.value.rhythm.reminders.find(item => item.id === reminderId)
+    if (!reminder) return false
+    reminder.snoozedUntil = new Date(Date.now() + Math.max(1, Number(minutes) || 5) * 60 * 1000).toISOString()
+    reminder.lastNotifiedAt = null
+    syncRhythmTimer()
+    return true
+  }
+
+  function skipRhythmReminderToday(reminderId) {
+    const reminder = clock.value.rhythm.reminders.find(item => item.id === reminderId)
+    if (!reminder) return false
+    reminder.skippedDate = localDateKey()
+    reminder.snoozedUntil = null
+    syncRhythmTimer()
+    return true
+  }
+
+  function pauseRhythmReminders(minutes = 60) {
+    clock.value.rhythm.pausedUntil = new Date(Date.now() + Math.max(1, Number(minutes) || 60) * 60 * 1000).toISOString()
+    syncRhythmTimer()
+  }
+
+  function resumeRhythmReminders() {
+    clock.value.rhythm.pausedUntil = null
+    syncRhythmTimer()
+  }
+
   function normalizeGroups(rawGroups) {
     const source = Array.isArray(rawGroups) && rawGroups.length ? rawGroups : DEFAULT_GROUPS
     return source.map((group, index) => ({
@@ -2060,6 +2283,7 @@ export const useTaskStore = defineStore('task', () => {
       ...rawSettings,
       theme,
       activeModule,
+      clockView: ['focus', 'rhythm'].includes(rawSettings.clockView) ? rawSettings.clockView : DEFAULT_SETTINGS.clockView,
       themeBackgrounds: rawSettings.themeBackgrounds === true,
       density,
       startView,
@@ -2283,6 +2507,8 @@ export const useTaskStore = defineStore('task', () => {
     focusProfiles,
     activeFocusSession,
     focusPendingBreak,
+    rhythmReminders,
+    rhythmPaused,
     currentFocusProfile,
     focusElapsedSeconds,
     focusRemainingSeconds,
@@ -2351,6 +2577,7 @@ export const useTaskStore = defineStore('task', () => {
     closeHelpCenter,
     updateSettings,
     setActiveModule,
+    setClockView,
     previewSound,
     updateProfile,
     startFocus,
@@ -2361,6 +2588,15 @@ export const useTaskStore = defineStore('task', () => {
     updateFocusProfile,
     startPendingBreak,
     skipPendingBreak,
+    addRhythmReminder,
+    updateRhythmReminder,
+    toggleRhythmReminder,
+    deleteRhythmReminder,
+    completeRhythmReminder,
+    snoozeRhythmReminder,
+    skipRhythmReminderToday,
+    pauseRhythmReminders,
+    resumeRhythmReminders,
     finishFocus,
     testReminderNotification,
     loadData,

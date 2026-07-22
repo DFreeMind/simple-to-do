@@ -1,5 +1,5 @@
 <template>
-  <main class="clock-workspace">
+  <main v-if="store.settings.clockView === 'focus'" class="clock-workspace">
     <section class="focus-panel" aria-labelledby="focus-title">
       <header class="focus-panel__header">
         <div>
@@ -117,12 +117,14 @@
       <p>节律提醒和完整回顾将在后续任务中加入；当前专注记录已安全保存在本机。</p>
     </section>
   </main>
+  <RhythmWorkspace v-else />
 </template>
 
 <script setup>
 import { computed, ref } from 'vue'
 import { Check, Pause, Play, Square } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
+import RhythmWorkspace from './RhythmWorkspace.vue'
 
 const store = useTaskStore()
 const selectedProfileId = ref('pomodoro')

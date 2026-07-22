@@ -1212,6 +1212,41 @@ body.is-resizing {
 .focus-summary strong { color: var(--text); font-size: 20px; font-variant-numeric: tabular-nums; }
 .focus-summary p { grid-column: 1 / -1; margin: 0; padding: 12px 18px; background: var(--surface-muted); color: var(--text-muted); font-size: 12px; line-height: 1.55; }
 
+.rhythm-workspace { align-content: start; padding: 32px; }
+.rhythm-panel { width: min(100%, 760px); padding: 28px; border: 1px solid var(--divider-soft); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow-popover); }
+.rhythm-panel__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.rhythm-panel__header .eyebrow { margin: 0 0 5px; }
+.rhythm-panel__header h1 { margin: 0; color: var(--text); font-size: 23px; letter-spacing: -0.025em; }
+.rhythm-panel__intro { margin: 13px 0 22px; color: var(--text-muted); font-size: 13px; line-height: 1.6; }
+.rhythm-list { display: grid; gap: 10px; }
+.rhythm-card { padding: 16px; border: 1px solid var(--divider-soft); border-radius: var(--radius-md); background: var(--surface); }
+.rhythm-card--disabled { background: var(--surface-muted); }
+.rhythm-card__heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.rhythm-card__heading > div { display: grid; gap: 3px; }
+.rhythm-card__heading strong { color: var(--text); }
+.rhythm-card__heading span, .rhythm-card > p { color: var(--text-muted); font-size: 12px; }
+.rhythm-card > p { margin: 8px 0 0; line-height: 1.5; }
+.rhythm-card__pending { color: #a86c14 !important; }
+.rhythm-card__actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 13px; }
+.rhythm-card__actions button, .rhythm-editor__delete { min-height: 30px; padding: 0 9px; border: 1px solid var(--divider-soft); border-radius: 7px; background: var(--surface); color: var(--text-muted); font-size: 12px; }
+.rhythm-card__actions button:hover { border-color: var(--accent); color: var(--accent-strong); }
+.rhythm-switch { position: relative; display: inline-flex; width: 36px; height: 21px; flex: 0 0 auto; cursor: pointer; }
+.rhythm-switch input { position: absolute; opacity: 0; }
+.rhythm-switch i { width: 100%; border-radius: 999px; background: var(--divider-soft); transition: background var(--transition-fast); }
+.rhythm-switch i::after { position: absolute; top: 3px; left: 3px; width: 15px; height: 15px; border-radius: 50%; background: #fff; content: ''; transition: transform var(--transition-fast); }
+.rhythm-switch input:checked + i { background: var(--accent); }
+.rhythm-switch input:checked + i::after { transform: translateX(15px); }
+.rhythm-switch input:disabled + i { cursor: not-allowed; opacity: 0.55; }
+.rhythm-editor { margin-top: 13px; border-top: 1px solid var(--divider-soft); }
+.rhythm-editor summary { padding-top: 12px; cursor: pointer; color: var(--text-muted); font-size: 12px; }
+.rhythm-editor__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-top: 12px; }
+.rhythm-editor label, .rhythm-editor__message { display: grid; gap: 5px; color: var(--text-muted); font-size: 11px; }
+.rhythm-editor input, .rhythm-editor select { width: 100%; min-width: 0; min-height: 34px; padding: 0 8px; border: 1px solid var(--divider-soft); border-radius: 7px; background: var(--surface); color: var(--text); font: inherit; }
+.rhythm-editor__message { margin-top: 9px; }
+.rhythm-editor__delete { margin-top: 11px; color: var(--danger, #c64f4f); }
+.rhythm-add { width: 100%; min-height: 40px; margin-top: 14px; border: 1px dashed var(--accent-38-fallback); border-radius: var(--radius-sm); color: var(--accent-strong); }
+.rhythm-add:hover { background: var(--accent-soft); }
+
 .clock-workspace__empty {
   max-width: 390px;
   padding: 36px;
