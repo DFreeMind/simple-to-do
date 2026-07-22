@@ -129,10 +129,16 @@ fn get_system_idle_seconds() -> Result<Option<u64>, String> {
 }
 
 fn app_data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    let dir = app
+    let production_dir = app
         .path()
         .app_data_dir()
         .map_err(|err| format!("获取应用数据目录失败: {err}"))?;
+    // `tauri dev` 使用独立目录，避免开发中的数据库迁移影响已安装的正式版本。
+    let dir = if cfg!(debug_assertions) {
+        production_dir.with_file_name("cn.duqimeng.simpletodo.dev")
+    } else {
+        production_dir
+    };
     fs::create_dir_all(&dir).map_err(|err| format!("创建应用数据目录失败: {err}"))?;
     Ok(dir)
 }
@@ -590,11 +596,7 @@ fn restore_data_backup(app: tauri::AppHandle, backup_id: String) -> Result<bool,
 }
 
 fn attachment_root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    let dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|err| format!("获取应用数据目录失败: {err}"))?
-        .join("attachments");
+    let dir = app_data_dir(app)?.join("attachments");
     fs::create_dir_all(&dir).map_err(|err| format!("创建附件目录失败: {err}"))?;
     Ok(dir)
 }
@@ -1587,6 +1589,34 @@ fn query_settings(conn: &Connection) -> Result<serde_json::Value, String> {
         map.insert(key, value);
     }
     Ok(serde_json::Value::Object(map))
+}
+
+const RELEASE_PAGE_URL: &str = "https://github.com/DFreeMind/simple-to-do/releases/latest";
+
+#[tauri::command]
+fn open_release_page() -> Result<bool, String> {
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("rundll32.exe")
+            .args(["url.dll,FileProtocolHandler", RELEASE_PAGE_URL])
+            .spawn()
+            .map_err(|err| format!("打开下载页失败: {err}"))?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .arg(RELEASE_PAGE_URL)
+            .spawn()
+            .map_err(|err| format!("打开下载页失败: {err}"))?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        Command::new("xdg-open")
+            .arg(RELEASE_PAGE_URL)
+            .spawn()
+            .map_err(|err| format!("打开下载页失败: {err}"))?;
+    }
+    Ok(true)
 }
 
 fn query_clock_state(conn: &Connection) -> Result<serde_json::Value, String> {
@@ -2669,6 +2699,7 @@ fn main() {
             list_data_backups,
             data_backup_location,
             open_data_backup_location,
+            open_release_page,
             open_data_backup,
             delete_data_backup,
             restore_data_backup,

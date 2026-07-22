@@ -1,6 +1,6 @@
 [package]
 name = "simple-to-do"
-version = "0.3.2"
+version = "0.3.3"
 description = "滴答清单 MVP 复刻版"
 authors = ["simple-to-do"]
 edition = "2021"

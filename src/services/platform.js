@@ -290,6 +290,18 @@ export async function sendTaskReminderNotification(task, settings = {}, options 
   }
 }
 
+export async function openReleasePage() {
+  if (!isTauri()) {
+    window.open('https://github.com/DFreeMind/simple-to-do/releases/latest', '_blank', 'noopener,noreferrer')
+    return true
+  }
+  try {
+    return await invoke('open_release_page')
+  } catch (error) {
+    throw new Error(formatPlatformError(error, '打开下载页失败'))
+  }
+}
+
 export async function sendRhythmReminderNotification(reminder, settings = {}) {
   if (!isTauri() || !reminder?.id || settings.reminderNotificationsEnabled === false) {
     return { sent: false, reason: 'unsupported' }
