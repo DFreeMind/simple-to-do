@@ -11,9 +11,20 @@
         <span v-else>{{ profileInitial }}</span>
       </button>
       <div class="app-rail__profile-tip" role="tooltip">
-        <strong>{{ store.profile.nickname }}</strong>
-        <span>本地个人空间</span>
-        <small>{{ store.lists.length }} 个清单 · 数据仅保存在此设备</small>
+        <div class="app-rail__profile-tip-avatar">
+          <img v-if="profileAvatarSrc" :src="profileAvatarSrc" alt="" />
+          <span v-else>{{ profileInitial }}</span>
+          <b><HardDrive :size="13" /> 本机</b>
+        </div>
+        <div class="app-rail__profile-tip-copy">
+          <p>你的个人空间</p>
+          <strong>{{ store.profile.nickname }}</strong>
+          <div class="app-rail__profile-tip-tags">
+            <span><i></i>本地资料</span>
+            <span>仅此设备</span>
+          </div>
+          <small>{{ store.lists.length }} 个清单 · 数据仅保存在此设备</small>
+        </div>
       </div>
     </div>
 
@@ -64,7 +75,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { AlarmClock, CalendarCheck, CheckCircle2, Compass, Folder, Inbox, ListChecks, PanelLeft, Search, Settings, Star, Trash2 } from 'lucide-vue-next'
+import { AlarmClock, CalendarCheck, CheckCircle2, Compass, Folder, HardDrive, Inbox, ListChecks, PanelLeft, Search, Settings, Star, Trash2 } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import { readProfileAvatar } from '@/services/platform'
 import ProfilePanel from './ProfilePanel.vue'
