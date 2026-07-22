@@ -152,27 +152,25 @@
 
     <!-- 展开完整模式 -->
     <template v-else>
-      <div class="sidebar__topbar">
-        <header class="sidebar__header">
-          <strong class="sidebar__module-title">清单</strong>
-          <div class="sidebar__header-actions">
-            <button class="icon-btn sidebar-header-action" type="button" aria-label="折叠侧栏" title="收起侧栏" @click="collapse">
-              <PanelLeft :size="18" />
-            </button>
-          </div>
-        </header>
-
-        <div class="sidebar-search">
-          <Search :size="17" />
-          <input
-            :value="store.searchQuery"
-            type="search"
-            placeholder="搜索任务、标签、备注"
-            aria-label="搜索任务"
-            @focus="store.setSearch(store.searchQuery)"
-            @input="store.setSearch($event.target.value)"
-          />
+      <header class="sidebar__header">
+        <strong class="sidebar__module-title">清单</strong>
+        <div class="sidebar__header-actions">
+          <button class="icon-btn sidebar-header-action" type="button" aria-label="折叠侧栏" title="收起侧栏" @click="collapse">
+            <PanelLeft :size="18" />
+          </button>
         </div>
+      </header>
+
+      <div class="sidebar-search">
+        <Search :size="17" />
+        <input
+          :value="store.searchQuery"
+          type="search"
+          placeholder="搜索任务、标签、备注"
+          aria-label="搜索任务"
+          @focus="store.setSearch(store.searchQuery)"
+          @input="store.setSearch($event.target.value)"
+        />
       </div>
 
       <nav class="sidebar__nav" aria-label="主要视图">
