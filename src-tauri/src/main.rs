@@ -23,6 +23,11 @@ use tauri::{
 use notify_rust::{Notification, NotificationResponse};
 #[cfg(target_os = "windows")]
 use tauri::Emitter;
+#[cfg(target_os = "windows")]
+use windows_sys::Win32::{
+    System::SystemInformation::GetTickCount,
+    UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO},
+};
 
 struct WindowCloseBehavior(AtomicBool);
 
@@ -98,6 +103,29 @@ fn set_window_close_behavior(
         .0
         .store(hide_on_close, Ordering::Relaxed);
     Ok(true)
+}
+
+/// 返回系统最后一次键鼠输入距今的秒数。只读取系统汇总时间，不读取输入内容、
+/// 轨迹或前台应用名称；目前 Windows 使用原生 API，其他平台明确返回不支持。
+#[tauri::command]
+fn get_system_idle_seconds() -> Result<Option<u64>, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let mut info = LASTINPUTINFO {
+            cbSize: std::mem::size_of::<LASTINPUTINFO>() as u32,
+            dwTime: 0,
+        };
+        if unsafe { GetLastInputInfo(&mut info) } == 0 {
+            return Err("读取系统空闲时长失败".to_string());
+        }
+        let elapsed = unsafe { GetTickCount() }.wrapping_sub(info.dwTime);
+        return Ok(Some((elapsed / 1000) as u64));
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Ok(None)
+    }
 }
 
 fn app_data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -2660,7 +2688,8 @@ fn main() {
             restore_quarantined_attachments,
             purge_quarantined_attachments,
             send_interactive_task_reminder,
-            set_window_close_behavior
+            set_window_close_behavior,
+            get_system_idle_seconds
         ])
         .build(tauri::generate_context!())
         .expect("初始化 Tauri 应用失败")

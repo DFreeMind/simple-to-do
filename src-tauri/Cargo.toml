@@ -25,3 +25,4 @@ tauri-plugin-updater = "2"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 notify-rust = "4.18"
+windows-sys = { version = "0.59", features = ["Win32_System_SystemInformation", "Win32_UI_Input_KeyboardAndMouse"] }

@@ -8,6 +8,7 @@ import {
   saveData as savePlatformData,
   saveMigrationBackup,
   setWindowCloseBehavior,
+  getSystemIdleSeconds,
   sendReminderTestNotification,
   sendTaskReminderNotification
 } from '@/services/platform'
@@ -116,6 +117,8 @@ const DEFAULT_RHYTHM_REMINDERS = [
   { id: 'eyes', title: '护眼休息', icon: 'eye', color: 'cyan', enabled: true, triggerType: 'interval', intervalSeconds: 20 * 60, time: '09:00', weekdays: [1, 2, 3, 4, 5], workStart: '09:00', workEnd: '18:00', quietStart: null, quietEnd: null, message: '抬眼看看远处，让眼睛放松一下。', createdAt: '' },
   { id: 'hydration', title: '补水', icon: 'droplets', color: 'blue', enabled: true, triggerType: 'interval', intervalSeconds: 60 * 60, time: '09:00', weekdays: [1, 2, 3, 4, 5], workStart: '09:00', workEnd: '18:00', quietStart: null, quietEnd: null, message: '喝几口水，给自己一个短暂的转换。', createdAt: '' },
   { id: 'stand', title: '站立活动', icon: 'accessibility', color: 'green', enabled: true, triggerType: 'interval', intervalSeconds: 60 * 60, time: '09:00', weekdays: [1, 2, 3, 4, 5], workStart: '09:00', workEnd: '18:00', quietStart: null, quietEnd: null, message: '起身活动一下，换个姿势。', createdAt: '' },
+  { id: 'blink', title: '眨眼放松', icon: 'sparkles', color: 'violet', enabled: false, triggerType: 'interval', intervalSeconds: 30 * 60, time: '09:00', weekdays: [1, 2, 3, 4, 5], workStart: '09:00', workEnd: '18:00', quietStart: null, quietEnd: null, message: '缓慢眨几次眼，让视线重新聚焦。', createdAt: '' },
+  { id: 'breathe', title: '呼吸放松', icon: 'wind', color: 'rose', enabled: false, triggerType: 'interval', intervalSeconds: 90 * 60, time: '09:00', weekdays: [1, 2, 3, 4, 5], workStart: '09:00', workEnd: '18:00', quietStart: null, quietEnd: null, message: '停下来做几次缓慢深呼吸。', createdAt: '' },
   { id: 'sedentary', title: '久坐提醒', icon: 'armchair', color: 'amber', enabled: false, triggerType: 'active-duration', intervalSeconds: 60 * 60, time: '09:00', weekdays: [1, 2, 3, 4, 5], workStart: '09:00', workEnd: '18:00', quietStart: null, quietEnd: null, message: '你已连续使用电脑一段时间，建议离开座位活动。', createdAt: '' }
 ]
 
@@ -287,6 +290,7 @@ export const useTaskStore = defineStore('task', () => {
   let rhythmTimer = null
   const focusClockNow = ref(Date.now())
   const rhythmClockNow = ref(Date.now())
+  const activityMonitoringAvailable = ref(false)
 
   const trashedListIds = computed(() => new Set(listTrash.value.map(item => item.id)))
   const activeTasks = computed(() => tasks.value.filter(task => !task.deleted && !trashedListIds.value.has(task.listId)))
@@ -1501,6 +1505,7 @@ export const useTaskStore = defineStore('task', () => {
         console.log(`[Store] 数据初始化完成: ${tasks.value.length} 任务, ${lists.value.length} 清单`)
       }
       syncFocusTimer()
+      void refreshActivityMonitoring()
       syncRhythmTimer()
       currentView.value = settings.value.startView || 'today'
       migrationBlocked.value = false
@@ -1730,7 +1735,7 @@ export const useTaskStore = defineStore('task', () => {
       title: String(rawReminder?.title || known?.title || '自定义提醒').trim().slice(0, 32) || '自定义提醒',
       icon: String(rawReminder?.icon || known?.icon || 'bell').slice(0, 32),
       color: ['cyan', 'blue', 'green', 'amber', 'violet', 'rose'].includes(rawReminder?.color) ? rawReminder.color : (known?.color || 'cyan'),
-      enabled: triggerType === 'active-duration' ? false : rawReminder?.enabled !== false,
+      enabled: rawReminder?.enabled !== false,
       triggerType,
       intervalSeconds: normalizeDuration(rawReminder?.intervalSeconds, known?.intervalSeconds || 60 * 60),
       time: normalizeClockTime(rawReminder?.time || known?.time || '09:00'),
@@ -1745,6 +1750,8 @@ export const useTaskStore = defineStore('task', () => {
       lastNotifiedAt: isValidIsoDate(rawReminder?.lastNotifiedAt) ? rawReminder.lastNotifiedAt : null,
       snoozedUntil: isValidIsoDate(rawReminder?.snoozedUntil) ? rawReminder.snoozedUntil : null,
       skippedDate: /^\d{4}-\d{2}-\d{2}$/.test(rawReminder?.skippedDate || '') ? rawReminder.skippedDate : null,
+      activitySeconds: Math.max(0, Math.min(8 * 60 * 60, Math.round(Number(rawReminder?.activitySeconds) || 0))),
+      lastActivitySampleAt: isValidIsoDate(rawReminder?.lastActivitySampleAt) ? rawReminder.lastActivitySampleAt : null,
       sortOrder: Number.isFinite(Number(rawReminder?.sortOrder)) ? Number(rawReminder.sortOrder) : (index + 1) * 1000
     }
   }
@@ -2009,6 +2016,8 @@ export const useTaskStore = defineStore('task', () => {
 
   async function runRhythmSync() {
     if (rhythmPaused.value) return
+    const idleSeconds = await refreshActivityMonitoring()
+    if (Number.isFinite(idleSeconds)) updateActiveRhythmReminders(idleSeconds)
     const dueReminder = rhythmReminders.value.find(isRhythmReminderDue)
     if (!dueReminder) return
     dueReminder.lastNotifiedAt = nowIso()
@@ -2016,12 +2025,15 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   function isRhythmReminderDue(reminder) {
-    if (!reminder?.enabled || reminder.triggerType === 'active-duration' || rhythmPaused.value) return false
+    if (!reminder?.enabled || rhythmPaused.value) return false
     const now = new Date(rhythmClockNow.value)
     const today = localDateKey(now)
     if (reminder.skippedDate === today || !isReminderInSchedule(reminder, now)) return false
     const snoozedAt = reminder.snoozedUntil ? new Date(reminder.snoozedUntil).getTime() : 0
     if (snoozedAt > now.getTime()) return false
+    if (reminder.triggerType === 'active-duration') {
+      return reminder.activitySeconds >= reminder.intervalSeconds && !reminder.lastNotifiedAt
+    }
     if (reminder.triggerType === 'fixed-time') {
       const dueAt = timeToday(reminder.time, now).getTime()
       const lastNotified = reminder.lastNotifiedAt ? new Date(reminder.lastNotifiedAt).getTime() : 0
@@ -2031,6 +2043,30 @@ export const useTaskStore = defineStore('task', () => {
     const dueAt = new Date(baseline).getTime() + reminder.intervalSeconds * 1000
     const lastNotified = reminder.lastNotifiedAt ? new Date(reminder.lastNotifiedAt).getTime() : 0
     return now.getTime() >= dueAt && lastNotified < dueAt
+  }
+
+  async function refreshActivityMonitoring() {
+    const idleSeconds = await getSystemIdleSeconds()
+    activityMonitoringAvailable.value = Number.isFinite(idleSeconds)
+    return idleSeconds
+  }
+
+  function updateActiveRhythmReminders(idleSeconds) {
+    const now = new Date(rhythmClockNow.value)
+    for (const reminder of rhythmReminders.value) {
+      if (!reminder.enabled || reminder.triggerType !== 'active-duration') continue
+      const lastSample = reminder.lastActivitySampleAt ? new Date(reminder.lastActivitySampleAt).getTime() : rhythmClockNow.value
+      const elapsed = Math.max(0, Math.min(60, Math.floor((rhythmClockNow.value - lastSample) / 1000)))
+      reminder.lastActivitySampleAt = nowIso()
+      // 当前持续空闲至少 30 秒时，将其视为自然离席并重置累计活跃时间。
+      // 这里只保存聚合秒数，不保存任何键鼠事件或输入内容。
+      if (idleSeconds >= 30) {
+        reminder.activitySeconds = 0
+        reminder.lastNotifiedAt = null
+      } else if (elapsed > 0) {
+        reminder.activitySeconds = Math.min(8 * 60 * 60, reminder.activitySeconds + Math.max(0, elapsed - Math.min(elapsed, idleSeconds)))
+      }
+    }
   }
 
   function isReminderInSchedule(reminder, date) {
@@ -2094,7 +2130,13 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   function toggleRhythmReminder(reminderId, enabled) {
-    return updateRhythmReminder(reminderId, { enabled: typeof enabled === 'boolean' ? enabled : !clock.value.rhythm.reminders.find(item => item.id === reminderId)?.enabled })
+    const reminder = clock.value.rhythm.reminders.find(item => item.id === reminderId)
+    const nextEnabled = typeof enabled === 'boolean' ? enabled : !reminder?.enabled
+    if (reminder?.triggerType === 'active-duration' && nextEnabled && !activityMonitoringAvailable.value) {
+      showNotice('当前平台暂不支持连续活跃时长提醒', 'error')
+      return false
+    }
+    return updateRhythmReminder(reminderId, { enabled: nextEnabled })
   }
 
   function deleteRhythmReminder(reminderId) {
@@ -2111,6 +2153,7 @@ export const useTaskStore = defineStore('task', () => {
     reminder.lastCompletedAt = nowIso()
     reminder.lastNotifiedAt = nowIso()
     reminder.snoozedUntil = null
+    if (reminder.triggerType === 'active-duration') reminder.activitySeconds = 0
     showNotice(`${reminder.title}已完成`, 'success')
     syncRhythmTimer()
     return true
@@ -2509,6 +2552,7 @@ export const useTaskStore = defineStore('task', () => {
     focusPendingBreak,
     rhythmReminders,
     rhythmPaused,
+    activityMonitoringAvailable,
     currentFocusProfile,
     focusElapsedSeconds,
     focusRemainingSeconds,

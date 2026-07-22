@@ -43,6 +43,17 @@ export async function setWindowCloseBehavior(behavior) {
   return invoke('set_window_close_behavior', { behavior })
 }
 
+export async function getSystemIdleSeconds() {
+  if (!isTauri()) return null
+  try {
+    const value = await invoke('get_system_idle_seconds')
+    return Number.isFinite(Number(value)) ? Number(value) : null
+  } catch (error) {
+    console.warn('[Platform] 无法读取系统空闲时长:', error)
+    return null
+  }
+}
+
 export async function saveMigrationBackup(data) {
   try {
     if (isTauri()) return await invoke('save_migration_backup', { data })

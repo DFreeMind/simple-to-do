@@ -19,13 +19,13 @@
               <strong>{{ reminder.title }}</strong>
               <span>{{ triggerSummary(reminder) }}</span>
             </div>
-            <label class="rhythm-switch" :title="reminder.triggerType === 'active-duration' ? '原生活跃度检测将在下一阶段接入' : `${reminder.enabled ? '关闭' : '启用'}${reminder.title}`">
-              <input type="checkbox" :checked="reminder.enabled" :disabled="reminder.triggerType === 'active-duration'" @change="store.toggleRhythmReminder(reminder.id, $event.target.checked)" />
+            <label class="rhythm-switch" :title="reminder.triggerType === 'active-duration' && !store.activityMonitoringAvailable ? '当前平台不支持原生活跃度检测' : `${reminder.enabled ? '关闭' : '启用'}${reminder.title}`">
+              <input type="checkbox" :checked="reminder.enabled" :disabled="reminder.triggerType === 'active-duration' && !store.activityMonitoringAvailable" @change="store.toggleRhythmReminder(reminder.id, $event.target.checked)" />
               <i></i>
             </label>
           </div>
           <p>{{ reminder.message }}</p>
-          <p v-if="reminder.triggerType === 'active-duration'" class="rhythm-card__pending">需要原生活跃时长检测，当前先保留模板和设置，尚不会投递提醒。</p>
+          <p v-if="reminder.triggerType === 'active-duration' && !store.activityMonitoringAvailable" class="rhythm-card__pending">当前平台不支持原生活跃时长检测，因此该提醒不会投递。</p>
           <div v-else class="rhythm-card__actions">
             <button type="button" @click="store.completeRhythmReminder(reminder.id)">完成</button>
             <button type="button" @click="store.snoozeRhythmReminder(reminder.id, 5)">延后 5 分钟</button>
