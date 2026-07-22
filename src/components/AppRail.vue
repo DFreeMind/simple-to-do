@@ -31,13 +31,7 @@
 
         <div class="app-rail__quick-divider"></div>
         <div class="app-rail__list-anchor">
-          <button class="app-rail__button" :class="{ active: isCurrentViewList }" type="button" title="我的清单" aria-label="我的清单" @click.stop="listsFlyout = !listsFlyout"><Folder :size="20" /></button>
-          <div v-if="listsFlyout" class="app-rail__list-flyout" @click.stop>
-            <template v-for="group in store.groupedLists" :key="group.id">
-              <p v-if="group.id !== 'ungrouped'" class="app-rail__list-group">{{ group.name }}</p>
-              <button v-for="list in group.lists" :key="list.id" type="button" :class="{ active: store.currentView === list.id }" @click="selectList(list.id)"><i :style="{ background: list.color }"></i><span>{{ list.name }}</span><b v-if="store.listTaskCounts[list.id]">{{ store.listTaskCounts[list.id] }}</b></button>
-            </template>
-          </div>
+          <button ref="listsAnchor" class="app-rail__button" :class="{ active: isCurrentViewList }" type="button" title="我的清单" aria-label="我的清单" @click.stop="toggleListsFlyout"><Folder :size="20" /></button>
         </div>
         <button class="app-rail__button app-rail__button--badge" :class="{ active: store.currentView === 'completed' }" type="button" title="已完成" aria-label="已完成" @click="store.setView('completed')"><CheckCircle2 :size="20" /><span v-if="store.listTaskCounts.completed" class="app-rail__badge">{{ store.listTaskCounts.completed }}</span></button>
         <button class="app-rail__button app-rail__button--badge" :class="{ active: store.currentView === 'trash' }" type="button" title="垃圾桶" aria-label="垃圾桶" @click="store.setView('trash')"><Trash2 :size="20" /><span v-if="store.listTaskCounts.trash" class="app-rail__badge">{{ store.listTaskCounts.trash }}</span></button>
@@ -53,12 +47,21 @@
       <button class="app-rail__button" type="button" title="设置" aria-label="设置" @click="store.openSettings"><Settings :size="20" /></button>
     </div>
 
+    <Teleport to="body">
+      <div v-if="listsFlyout" class="app-rail__list-flyout" :style="listsFlyoutStyle" @click.stop>
+        <template v-for="group in store.groupedLists" :key="group.id">
+          <p v-if="group.id !== 'ungrouped'" class="app-rail__list-group">{{ group.name }}</p>
+          <button v-for="list in group.lists" :key="list.id" type="button" :class="{ active: store.currentView === list.id }" @click="selectList(list.id)"><i :style="{ background: list.color }"></i><span>{{ list.name }}</span><b v-if="store.listTaskCounts[list.id]">{{ store.listTaskCounts[list.id] }}</b></button>
+        </template>
+      </div>
+    </Teleport>
+
     <ProfilePanel v-if="profilePanelOpen" @close="profilePanelOpen = false" />
   </aside>
 </template>
 
 <script setup>
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { AlarmClock, CalendarCheck, CheckCircle2, Compass, Folder, Inbox, ListChecks, PanelLeft, Search, Settings, Star, Trash2 } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import { readProfileAvatar } from '@/services/platform'
@@ -68,6 +71,8 @@ const store = useTaskStore()
 const profilePanelOpen = ref(false)
 const profileAvatarUrl = ref('')
 const listsFlyout = ref(false)
+const listsAnchor = ref(null)
+const listsFlyoutStyle = ref({})
 const profileInitial = computed(() => Array.from(store.profile.nickname?.trim() || '易')[0] || '易')
 const taskQuickViews = [
   { id: 'today', label: '今日', icon: CalendarCheck },
@@ -93,6 +98,24 @@ function selectModule(module) {
   store.setActiveModule(module)
 }
 
+function updateListsFlyoutPosition() {
+  if (!listsAnchor.value) return
+  const rect = listsAnchor.value.getBoundingClientRect()
+  listsFlyoutStyle.value = {
+    left: `${rect.right + 8}px`,
+    top: `${Math.max(12, Math.min(rect.top - 10, window.innerHeight - 300))}px`
+  }
+}
+
+function toggleListsFlyout() {
+  if (!listsFlyout.value) updateListsFlyoutPosition()
+  listsFlyout.value = !listsFlyout.value
+}
+
+function closeListsFlyout() {
+  listsFlyout.value = false
+}
+
 function openSearch() {
   store.setSearch(store.searchQuery)
   nextTick(() => window.dispatchEvent(new Event('task-list:focus-search')))
@@ -105,4 +128,12 @@ function selectList(id) {
 
 watch(() => store.profile.avatarRelativePath, loadProfileAvatar, { immediate: true })
 watch(() => store.settings.sidebarCollapsed, (collapsed) => { if (!collapsed) listsFlyout.value = false })
+onMounted(() => {
+  window.addEventListener('click', closeListsFlyout)
+  window.addEventListener('resize', updateListsFlyoutPosition)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('click', closeListsFlyout)
+  window.removeEventListener('resize', updateListsFlyoutPosition)
+})
 </script>

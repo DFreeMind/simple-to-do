@@ -414,30 +414,28 @@ select:focus-visible,
 .app-rail__button--badge { position: relative; }
 .app-rail__badge {
   position: absolute;
-  top: -5px;
-  right: -5px;
+  top: -2px;
+  right: -2px;
   display: grid;
   box-sizing: border-box;
-  width: 16px;
-  min-width: 16px;
-  height: 16px;
+  width: 14px;
+  min-width: 14px;
+  height: 14px;
   place-items: center;
   padding: 0 1px;
   border: 1px solid var(--surface);
   border-radius: 999px;
   background: var(--accent);
   color: #fff;
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 700;
   line-height: 1;
 }
-.app-rail__button--badge > svg { transform: translateX(-3px); }
+.app-rail__button--badge > svg { transform: translateX(-4px); }
 
 .app-rail__list-anchor { position: relative; }
 .app-rail__list-flyout {
-  position: absolute;
-  top: -10px;
-  left: 42px;
+  position: fixed;
   z-index: 1200;
   display: grid;
   min-width: 210px;
@@ -1430,9 +1428,11 @@ body.is-resizing {
   position: absolute;
   top: 4px;
   right: 2px;
+  box-sizing: border-box;
+  width: 16px;
   min-width: 16px;
   height: 16px;
-  padding: 0 4px;
+  padding: 0 1px;
   border-radius: 8px;
   background: var(--accent);
   color: #fff;
@@ -1441,6 +1441,7 @@ body.is-resizing {
   line-height: 16px;
   text-align: center;
 }
+.sidebar--collapsed .rail-item:has(.rail-badge) > svg { transform: translateX(-4px); }
 
 .task-list {
   position: relative;
