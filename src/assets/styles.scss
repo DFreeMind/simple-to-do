@@ -420,6 +420,11 @@ select:focus-visible,
 }
 .app-rail__profile-wrap:hover .app-rail__profile-tip,
 .app-rail__profile-wrap:focus-within .app-rail__profile-tip { opacity: 1; transform: translateX(0) scale(1); }
+.app-rail__profile-wrap--panel-open .app-rail__profile-tip {
+  visibility: hidden;
+  opacity: 0;
+  transform: translateX(-4px) scale(0.98);
+}
 .app-rail__profile-tip-avatar {
   position: relative;
   display: grid;

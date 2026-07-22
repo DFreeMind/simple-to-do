@@ -1,6 +1,6 @@
 <template>
   <aside class="app-rail" aria-label="应用模块">
-    <div class="app-rail__profile-wrap">
+    <div class="app-rail__profile-wrap" :class="{ 'app-rail__profile-wrap--panel-open': profilePanelOpen }">
       <button
         class="app-rail__profile"
         type="button"
