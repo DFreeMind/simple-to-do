@@ -33,7 +33,7 @@
     >
       <AppRail />
       <template v-if="store.settings.activeModule === 'tasks'">
-        <Sidebar />
+        <Sidebar v-if="!store.settings.sidebarCollapsed" />
         <TaskList />
         <div
           v-if="store.settings.detailOpen"
@@ -157,7 +157,7 @@ function clampDetailWidth(value, max = DETAIL_WIDTH_MAX) {
 
 function getDetailMaxWidth() {
   const currentShellWidth = shellWidth.value || shellRef.value?.clientWidth || window.innerWidth
-  const sidebarWidth = 48 + (store.settings.sidebarCollapsed ? 56 : 286)
+  const sidebarWidth = 48 + (store.settings.sidebarCollapsed ? 0 : 286)
   return Math.max(
     DETAIL_WIDTH_MIN,
     Math.min(DETAIL_WIDTH_MAX, currentShellWidth - sidebarWidth - TASK_LIST_WIDTH_MIN - RESIZER_WIDTH)
