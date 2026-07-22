@@ -1,5 +1,9 @@
 <template>
-  <aside class="app-rail" aria-label="应用模块">
+  <aside
+    class="app-rail"
+    :class="{ 'app-rail--quick': store.settings.sidebarCollapsed }"
+    aria-label="应用模块"
+  >
     <button
       class="app-rail__profile"
       type="button"
