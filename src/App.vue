@@ -65,7 +65,7 @@
 
     <SettingsPanel />
     <HelpCenter />
-    <FocusCelebration v-if="!isNativeReminderWindow" :celebration="store.focusCelebration" @dismiss="store.dismissFocusCelebration" @start-break="startBreakFromInApp" />
+    <FocusCelebration :celebration="store.focusCelebration" @dismiss="store.dismissFocusCelebration" @start-break="startBreakFromInApp" />
 
     <div
       v-if="store.notice"
@@ -77,14 +77,12 @@
       {{ store.notice.message }}
     </div>
     </template>
-    <FocusCelebration v-if="isNativeReminderWindow" />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
 import { listen } from '@tauri-apps/api/event'
-import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { getVersion } from '@tauri-apps/api/app'
 import { check } from '@tauri-apps/plugin-updater'
 import AppRail from './components/AppRail.vue'
@@ -103,7 +101,6 @@ import { openDataBackupLocation, openReleasePage as openReleasePageInBrowser } f
 const store = useTaskStore()
 const appVersion = ref(__APP_VERSION__)
 const isDevelopment = import.meta.env.DEV
-const isNativeReminderWindow = typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__) && getCurrentWebviewWindow().label === 'focus-reminder'
 const recoveryUpdateState = ref(isDevelopment ? 'development' : 'idle')
 const recoveryUpdateError = ref('')
 const recoveryUpdate = ref(null)
@@ -121,16 +118,18 @@ const detailWidth = ref(store.settings.detailWidth || 380)
 const shellRef = ref(null)
 const shellWidth = ref(0)
 let unlistenReminderAction
-let unlistenFocusReminderAction
+let unlistenFocusElapsed
+let unlistenFocusNotificationOpen
 let shellResizeObserver
 
-function handleFocusReminder(event) {
-  if (event.payload?.action !== 'start-break') {
-    store.dismissFocusCelebration()
-    return
-  }
-  store.dismissFocusCelebration()
-  store.startPendingBreak()
+function handleFocusElapsed(event) {
+  const sessionId = event.payload?.sessionId
+  if (!sessionId) return
+  store.completeFocusSessionFromNative(sessionId)
+}
+
+function openFocusCompletion() {
+  store.setClockView('focus')
 }
 
 function startBreakFromInApp() {
@@ -289,16 +288,20 @@ onMounted(async () => {
     listen('task-reminder:open', openReminderTask)
       .then(unlisten => { unlistenReminderAction = unlisten })
       .catch(error => console.warn('[App] 注册提醒点击事件失败:', error))
-    listen('focus-reminder:action', handleFocusReminder)
-      .then(unlisten => { unlistenFocusReminderAction = unlisten })
-      .catch(error => console.warn('[App] 注册专注提醒操作失败:', error))
+    listen('focus-timer:elapsed', handleFocusElapsed)
+      .then(unlisten => { unlistenFocusElapsed = unlisten })
+      .catch(error => console.warn('[App] 注册专注计时完成事件失败:', error))
+    listen('focus-notification:open', openFocusCompletion)
+      .then(unlisten => { unlistenFocusNotificationOpen = unlisten })
+      .catch(error => console.warn('[App] 注册专注通知点击事件失败:', error))
   }
   store.loadData()
 })
 
 onBeforeUnmount(() => {
   unlistenReminderAction?.()
-  unlistenFocusReminderAction?.()
+  unlistenFocusElapsed?.()
+  unlistenFocusNotificationOpen?.()
   shellResizeObserver?.disconnect()
 })
 

@@ -12,6 +12,10 @@ function isTauri() {
   return typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__)
 }
 
+export function hasNativeFocusScheduler() {
+  return isTauri()
+}
+
 export async function loadData() {
   try {
     if (isTauri()) {
@@ -229,12 +233,12 @@ export function reminderNotificationId(taskId) {
 }
 
 export async function getReminderNotificationStatus() {
-  if (!isTauri() || typeof window === 'undefined' || !window.Notification) {
+  if (!isTauri()) {
     return { supported: false, granted: false, permission: 'unsupported' }
   }
   try {
     const granted = await isPermissionGranted()
-    return { supported: true, granted, permission: granted ? 'granted' : window.Notification.permission }
+    return { supported: true, granted, permission: granted ? 'granted' : 'denied' }
   } catch (error) {
     return { supported: false, granted: false, permission: 'unsupported', error }
   }
@@ -324,24 +328,45 @@ export async function sendRhythmReminderNotification(reminder, settings = {}) {
   }
 }
 
-export async function showFocusReminder(reminder) {
+export async function scheduleFocusCompletion(schedule, settings = {}) {
   if (!isTauri()) return false
   try {
-    return await invoke('show_focus_reminder', { reminder })
+    return await invoke('schedule_focus_completion', {
+      schedule: {
+        ...schedule,
+        notificationEnabled: settings.focusCompletionNotificationsEnabled !== false,
+        soundEnabled: settings.focusCompletionSoundEnabled !== false
+      }
+    })
   } catch (error) {
-    console.error('[Platform] 显示专注提醒窗口失败:', error)
+    console.error('[Platform] 调度专注完成提醒失败:', error)
     return false
   }
 }
 
-export async function handleFocusReminderAction(action) {
+export async function cancelFocusCompletion(sessionId = null) {
   if (!isTauri()) return false
-  return invoke('handle_focus_reminder_action', { action })
+  try {
+    return await invoke('cancel_focus_completion', { sessionId })
+  } catch (error) {
+    console.warn('[Platform] 取消专注完成提醒失败:', error)
+    return false
+  }
 }
 
-export async function getPendingFocusReminder() {
-  if (!isTauri()) return null
-  return invoke('get_pending_focus_reminder')
+export async function sendFocusCompletionTestNotification(settings = {}) {
+  if (!isTauri()) return { sent: false, reason: 'unsupported' }
+  const granted = await ensureReminderNotificationPermission({ request: true })
+  if (!granted) return { sent: false, reason: 'permission' }
+  try {
+    await invoke('send_focus_completion_test_notification', {
+      soundEnabled: settings.focusCompletionSoundEnabled !== false
+    })
+    return { sent: true }
+  } catch (error) {
+    console.error('[Platform] 发送专注完成测试提醒失败:', error)
+    return { sent: false, reason: 'send-failed', error }
+  }
 }
 
 export async function sendReminderTestNotification(settings = {}) {

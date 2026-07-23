@@ -12,7 +12,10 @@ import {
   sendReminderTestNotification,
   sendTaskReminderNotification,
   sendRhythmReminderNotification,
-  showFocusReminder
+  scheduleFocusCompletion,
+  cancelFocusCompletion,
+  sendFocusCompletionTestNotification,
+  hasNativeFocusScheduler
 } from '@/services/platform'
 import {
   playCompleteSound,
@@ -86,6 +89,8 @@ const DEFAULT_SETTINGS = {
   soundDragEnabled: true,
   reminderNotificationsEnabled: true,
   reminderSoundEnabled: true,
+  focusCompletionNotificationsEnabled: true,
+  focusCompletionSoundEnabled: true,
   windowCloseBehavior: 'hide',
   dailyGuidanceEnabled: true,
   dailyGuidanceStyle: 'practical'
@@ -291,6 +296,7 @@ export const useTaskStore = defineStore('task', () => {
   let reminderSyncPending = false
   let pendingPermissionRequest = false
   let focusTickTimer = null
+  let nativeFocusScheduleActive = false
   let rhythmTimer = null
   const focusClockNow = ref(Date.now())
   const rhythmClockNow = ref(Date.now())
@@ -649,6 +655,13 @@ export const useTaskStore = defineStore('task', () => {
       syncReminderNotifications({ requestPermission: Boolean(updates.reminderNotificationsEnabled) })
       if (updates.reminderNotificationsEnabled === false) showNotice('任务提醒通知已关闭', 'info')
     }
+    if ('focusCompletionNotificationsEnabled' in updates || 'focusCompletionSoundEnabled' in updates) {
+      if (updates.focusCompletionNotificationsEnabled === true) {
+        void ensureReminderNotificationPermission({ request: true })
+      }
+      syncNativeFocusCompletion()
+      if (updates.focusCompletionNotificationsEnabled === false) showNotice('专注完成系统提醒已关闭', 'info')
+    }
     if ('windowCloseBehavior' in updates) {
       setWindowCloseBehavior(settings.value.windowCloseBehavior)
         .catch(error => console.warn('[Store] 同步窗口关闭方式失败:', error))
@@ -679,6 +692,18 @@ export const useTaskStore = defineStore('task', () => {
       showNotice('通知权限未开启，请在系统设置中允许通知', 'error')
     } else {
       showNotice('当前环境不支持系统通知', 'error')
+    }
+    return result
+  }
+
+  async function testFocusCompletionNotification() {
+    const result = await sendFocusCompletionTestNotification(settings.value)
+    if (result.sent) {
+      showNotice('已发送专注完成测试提醒', 'success')
+    } else if (result.reason === 'permission') {
+      showNotice('通知权限未开启，请在系统设置中允许通知', 'error')
+    } else {
+      showNotice('专注完成提醒发送失败，请检查系统通知设置', 'error')
     }
     return result
   }
@@ -1872,16 +1897,58 @@ export const useTaskStore = defineStore('task', () => {
   function syncFocusTimer() {
     if (focusTickTimer) window.clearInterval(focusTickTimer)
     focusTickTimer = null
-    if (!clock.value.activeSession || clock.value.activeSession.status !== 'running') return
+    if (!clock.value.activeSession || clock.value.activeSession.status !== 'running') {
+      void cancelFocusCompletion(clock.value.activeSession?.id || null)
+      return
+    }
+    syncNativeFocusCompletion()
     focusClockNow.value = Date.now()
     focusTickTimer = window.setInterval(() => {
       focusClockNow.value = Date.now()
       const session = clock.value.activeSession
       const duration = getFocusSessionDuration(session)
       if (session && duration && getFocusElapsedSeconds(session, focusClockNow.value) >= duration) {
-        finishFocus('completed')
+        if (!nativeFocusScheduleActive) finishFocus('completed')
       }
     }, 1000)
+  }
+
+  function syncNativeFocusCompletion() {
+    const session = clock.value.activeSession
+    if (!session || session.status !== 'running') {
+      nativeFocusScheduleActive = false
+      void cancelFocusCompletion(session?.id || null)
+      return
+    }
+    const duration = getFocusSessionDuration(session)
+    if (!duration || !session.startedAt) {
+      nativeFocusScheduleActive = false
+      void cancelFocusCompletion(session.id)
+      return
+    }
+    const startedAt = new Date(session.startedAt).getTime()
+    if (!Number.isFinite(startedAt)) return
+    const dueAt = startedAt + Math.max(0, duration - (Number(session.elapsedSeconds) || 0)) * 1000
+    const nextFocusCount = clock.value.cycleFocusCount + 1
+    const isLongBreak = nextFocusCount >= clock.value.focusSettings.focusesBeforeLongBreak
+    const taskTitle = session.taskId
+      ? tasks.value.find(task => !task.deleted && task.id === session.taskId)?.title || null
+      : null
+    nativeFocusScheduleActive = hasNativeFocusScheduler()
+    void scheduleFocusCompletion({
+      sessionId: session.id,
+      dueAt: Math.round(dueAt),
+      phase: session.phase || 'focus',
+      taskTitle,
+      focusedSeconds: duration,
+      breakSeconds: session.phase === 'focus'
+        ? (isLongBreak ? clock.value.focusSettings.longBreakSeconds : clock.value.focusSettings.shortBreakSeconds)
+        : null
+    }, settings.value).then(scheduled => {
+      if (clock.value.activeSession?.id === session.id) {
+        nativeFocusScheduleActive = Boolean(scheduled)
+      }
+    })
   }
 
   function startFocus(profileId = 'pomodoro', taskId = null, durationOverride = undefined) {
@@ -1904,6 +1971,9 @@ export const useTaskStore = defineStore('task', () => {
     }
     focusClockNow.value = Date.now()
     syncFocusTimer()
+    if (settings.value.focusCompletionNotificationsEnabled !== false) {
+      void ensureReminderNotificationPermission({ request: true })
+    }
     showNotice(`已开始${profile.name}`, 'success')
     return true
   }
@@ -1933,6 +2003,7 @@ export const useTaskStore = defineStore('task', () => {
     const session = clock.value.activeSession
     if (!session) return false
     session.taskId = activeTasks.value.some(task => task.id === taskId) ? taskId : null
+    syncNativeFocusCompletion()
     return true
   }
 
@@ -1952,6 +2023,7 @@ export const useTaskStore = defineStore('task', () => {
   function updateFocusSettings(updates = {}) {
     clock.value.focusSettings = normalizeFocusSettings({ ...clock.value.focusSettings, ...updates })
     clock.value.cycleFocusCount = Math.min(clock.value.cycleFocusCount, clock.value.focusSettings.focusesBeforeLongBreak - 1)
+    syncNativeFocusCompletion()
   }
 
   function updateFocusProfile(profileId, updates = {}) {
@@ -1963,6 +2035,7 @@ export const useTaskStore = defineStore('task', () => {
     profile.durationSeconds = next.durationSeconds
     if (clock.value.activeSession?.profileId === profile.id && clock.value.activeSession.phase === 'focus') {
       clock.value.activeSession.durationSeconds = next.durationSeconds
+      syncFocusTimer()
     }
     return true
   }
@@ -1995,9 +2068,10 @@ export const useTaskStore = defineStore('task', () => {
     return true
   }
 
-  function finishFocus(result = 'completed', note = '') {
+  function finishFocus(result = 'completed', note = '', options = {}) {
     const session = clock.value.activeSession
     if (!session) return false
+    if (options.sessionId && session.id !== options.sessionId) return false
     const elapsedSeconds = getFocusElapsedSeconds(session)
     const reward = session.phase === 'focus' && result === 'completed' ? getFocusReward(elapsedSeconds) : null
     clock.value.history.unshift({
@@ -2013,6 +2087,8 @@ export const useTaskStore = defineStore('task', () => {
       note: String(note || '').trim().slice(0, 240)
     })
     clock.value.history = clock.value.history.slice(0, 500)
+    void cancelFocusCompletion(session.id)
+    nativeFocusScheduleActive = false
     clock.value.activeSession = null
     if (session.phase === 'focus' && result === 'completed') {
       const nextFocusCount = clock.value.cycleFocusCount + 1
@@ -2031,22 +2107,25 @@ export const useTaskStore = defineStore('task', () => {
     if (session.phase === 'focus' && result === 'completed') {
       focusCelebration.value = {
         id: genId(),
+        sessionId: session.id,
         reward,
         elapsedSeconds,
+        taskTitle: session.taskId
+          ? tasks.value.find(task => !task.deleted && task.id === session.taskId)?.title || null
+          : null,
         pendingBreak: Boolean(clock.value.pendingBreak),
         breakSeconds: clock.value.pendingBreak?.durationSeconds || null
       }
-      const reminder = focusCelebration.value
-      void showFocusReminder(reminder).then(shown => {
-        // 原生窗口已接管提示时撤掉应用内兜底；失败则保留兜底，确保完成专注必有反馈。
-        if (shown && focusCelebration.value?.id === reminder.id) focusCelebration.value = null
-      })
     }
     const message = session.phase !== 'focus' && result === 'completed'
         ? '休息完成，准备继续投入'
         : '本次专注已记录'
     if (session.phase !== 'focus' || result !== 'completed') showNotice(message, 'success')
     return true
+  }
+
+  function completeFocusSessionFromNative(sessionId) {
+    return finishFocus('completed', '', { sessionId })
   }
 
   function dismissFocusCelebration() {
@@ -2395,6 +2474,8 @@ export const useTaskStore = defineStore('task', () => {
     const soundDragEnabled = rawSettings.soundDragEnabled !== false
     const reminderNotificationsEnabled = rawSettings.reminderNotificationsEnabled !== false
     const reminderSoundEnabled = rawSettings.reminderSoundEnabled !== false
+    const focusCompletionNotificationsEnabled = rawSettings.focusCompletionNotificationsEnabled !== false
+    const focusCompletionSoundEnabled = rawSettings.focusCompletionSoundEnabled !== false
     const windowCloseBehavior = ['hide', 'quit'].includes(rawSettings.windowCloseBehavior)
       ? rawSettings.windowCloseBehavior
       : DEFAULT_SETTINGS.windowCloseBehavior
@@ -2428,6 +2509,8 @@ export const useTaskStore = defineStore('task', () => {
       soundDragEnabled,
       reminderNotificationsEnabled,
       reminderSoundEnabled,
+      focusCompletionNotificationsEnabled,
+      focusCompletionSoundEnabled,
       windowCloseBehavior,
       dailyGuidanceEnabled,
       dailyGuidanceStyle
@@ -2727,10 +2810,12 @@ export const useTaskStore = defineStore('task', () => {
     pauseRhythmReminders,
     resumeRhythmReminders,
     finishFocus,
+    completeFocusSessionFromNative,
     deleteFocusHistory,
     clearFocusHistoryBefore,
     clearFocusHistoryForDay,
     testReminderNotification,
+    testFocusCompletionNotification,
     loadData,
     saveData,
     playDragStartSound,

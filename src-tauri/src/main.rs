@@ -3,21 +3,25 @@
 use base64::{engine::general_purpose, Engine as _};
 use chrono::{Datelike, Local};
 use rusqlite::{backup::Backup, params, Connection, OpenFlags, OptionalExtension};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
     collections::HashSet,
     fs,
     path::{Path, PathBuf},
     process::Command,
-    sync::{atomic::{AtomicBool, Ordering}, Mutex},
-    time::Duration,
+    sync::{
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        Mutex,
+    },
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
+use tauri::{Emitter, Manager};
+use tauri_plugin_notification::NotificationExt;
 
 #[cfg(target_os = "windows")]
 use notify_rust::{Notification, NotificationResponse};
@@ -29,12 +33,31 @@ use windows_sys::Win32::{
 
 struct WindowCloseBehavior(AtomicBool);
 
-struct FocusReminderState(Mutex<Option<serde_json::Value>>);
+struct FocusCompletionScheduler {
+    revision: AtomicU64,
+    pending: Mutex<Option<FocusCompletionSchedule>>,
+}
 
-impl Default for FocusReminderState {
+impl Default for FocusCompletionScheduler {
     fn default() -> Self {
-        Self(Mutex::new(None))
+        Self {
+            revision: AtomicU64::new(0),
+            pending: Mutex::new(None),
+        }
     }
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FocusCompletionSchedule {
+    session_id: String,
+    due_at: i64,
+    phase: String,
+    task_title: Option<String>,
+    focused_seconds: u64,
+    break_seconds: Option<u64>,
+    notification_enabled: bool,
+    sound_enabled: bool,
 }
 
 impl Default for WindowCloseBehavior {
@@ -46,6 +69,7 @@ impl Default for WindowCloseBehavior {
 
 fn show_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
     }
@@ -96,10 +120,7 @@ fn send_interactive_task_reminder(
 }
 
 #[tauri::command]
-fn set_window_close_behavior(
-    app: tauri::AppHandle,
-    behavior: String,
-) -> Result<bool, String> {
+fn set_window_close_behavior(app: tauri::AppHandle, behavior: String) -> Result<bool, String> {
     let hide_on_close = match behavior.as_str() {
         "hide" => true,
         "quit" => false,
@@ -111,54 +132,194 @@ fn set_window_close_behavior(
     Ok(true)
 }
 
-/// 显示独立的专注完成窗口。它不依赖主窗口是否最小化，行为更接近桌面待办
-/// 应用的置顶提醒窗，而不是操作系统通知或网页内遮罩。
 #[tauri::command]
-fn show_focus_reminder(app: tauri::AppHandle, reminder: serde_json::Value) -> Result<bool, String> {
-    *app.state::<FocusReminderState>().0.lock().map_err(|_| "专注提醒状态不可用".to_string())? = Some(reminder.clone());
-    if app.get_webview_window("focus-reminder").is_none() {
-        WebviewWindowBuilder::new(&app, "focus-reminder", WebviewUrl::App("index.html".into()))
-            .title("易简清单 · 专注时刻")
-            .inner_size(460.0, 390.0)
-            .min_inner_size(460.0, 390.0)
-            .max_inner_size(460.0, 390.0)
-            .resizable(false)
-            .decorations(false)
-            .always_on_top(true)
-            .skip_taskbar(true)
-            .center()
-            .visible(false)
-            .build()
-            .map_err(|err| format!("创建专注提醒窗口失败: {err}"))?;
+fn schedule_focus_completion(
+    app: tauri::AppHandle,
+    schedule: FocusCompletionSchedule,
+) -> Result<bool, String> {
+    if schedule.session_id.trim().is_empty() || schedule.due_at <= 0 {
+        return Err("专注提醒调度参数无效".to_string());
     }
-    let app_handle = app.clone();
-    std::thread::spawn(move || {
-        // 新窗口需要先加载前端并注册事件监听；首次创建时留出初始化时间。
-        std::thread::sleep(Duration::from_millis(600));
-        let _ = app_handle.emit_to("focus-reminder", "focus-reminder:show", reminder);
-        if let Some(window) = app_handle.get_webview_window("focus-reminder") {
-            let _ = window.show();
-            let _ = window.set_focus();
+    let scheduler = app.state::<FocusCompletionScheduler>();
+    let revision = scheduler.revision.fetch_add(1, Ordering::Relaxed) + 1;
+    *scheduler
+        .pending
+        .lock()
+        .map_err(|_| "专注提醒调度器不可用".to_string())? = Some(schedule.clone());
+
+    std::thread::spawn(move || loop {
+        let state = app.state::<FocusCompletionScheduler>();
+        if state.revision.load(Ordering::Relaxed) != revision {
+            return;
         }
+        let now = unix_time_millis();
+        if schedule.due_at > now {
+            let remaining = (schedule.due_at - now) as u64;
+            std::thread::sleep(Duration::from_millis(remaining.min(1000)));
+            continue;
+        }
+
+        let should_deliver = state
+            .pending
+            .lock()
+            .ok()
+            .and_then(|mut pending| {
+                let matches = pending.as_ref().is_some_and(|item| {
+                    item.session_id == schedule.session_id && item.due_at == schedule.due_at
+                });
+                if matches {
+                    pending.take()
+                } else {
+                    None
+                }
+            })
+            .is_some();
+        if !should_deliver {
+            return;
+        }
+
+        let main_is_focused = app.get_webview_window("main").is_some_and(|window| {
+            window.is_visible().unwrap_or(false)
+                && !window.is_minimized().unwrap_or(false)
+                && window.is_focused().unwrap_or(false)
+        });
+        let delivery = if main_is_focused { "in-app" } else { "system" };
+        let _ = app.emit_to(
+            "main",
+            "focus-timer:elapsed",
+            serde_json::json!({
+                "sessionId": schedule.session_id,
+                "delivery": delivery
+            }),
+        );
+        if !main_is_focused && schedule.notification_enabled {
+            let _ = send_focus_system_notification(&app, &schedule);
+        }
+        return;
     });
     Ok(true)
 }
 
 #[tauri::command]
-fn get_pending_focus_reminder(app: tauri::AppHandle) -> Result<Option<serde_json::Value>, String> {
-    app.state::<FocusReminderState>().0.lock()
-        .map(|reminder| reminder.clone())
-        .map_err(|_| "读取专注提醒状态失败".to_string())
+fn cancel_focus_completion(
+    app: tauri::AppHandle,
+    session_id: Option<String>,
+) -> Result<bool, String> {
+    let scheduler = app.state::<FocusCompletionScheduler>();
+    let mut pending = scheduler
+        .pending
+        .lock()
+        .map_err(|_| "专注提醒调度器不可用".to_string())?;
+    let should_cancel = match session_id.as_ref() {
+        None => true,
+        Some(id) => pending.as_ref().is_some_and(|item| &item.session_id == id),
+    };
+    if should_cancel {
+        pending.take();
+        scheduler.revision.fetch_add(1, Ordering::Relaxed);
+    }
+    Ok(should_cancel)
 }
 
 #[tauri::command]
-fn handle_focus_reminder_action(app: tauri::AppHandle, action: String) -> Result<bool, String> {
-    if let Some(window) = app.get_webview_window("focus-reminder") {
-        let _ = window.hide();
-    }
-    app.emit_to("main", "focus-reminder:action", serde_json::json!({ "action": action }))
-        .map_err(|err| format!("发送专注提醒操作失败: {err}"))?;
+fn send_focus_completion_test_notification(
+    app: tauri::AppHandle,
+    sound_enabled: bool,
+) -> Result<bool, String> {
+    let schedule = FocusCompletionSchedule {
+        session_id: "focus-notification-test".to_string(),
+        due_at: unix_time_millis(),
+        phase: "focus".to_string(),
+        task_title: Some("测试专注任务".to_string()),
+        focused_seconds: 25 * 60,
+        break_seconds: Some(5 * 60),
+        notification_enabled: true,
+        sound_enabled,
+    };
+    send_focus_system_notification(&app, &schedule)?;
     Ok(true)
+}
+
+fn unix_time_millis() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+        .min(i64::MAX as u128) as i64
+}
+
+fn focus_notification_copy(schedule: &FocusCompletionSchedule) -> (String, String) {
+    if schedule.phase != "focus" {
+        return (
+            "易简清单 · 休息结束".to_string(),
+            "休息完成，可以回来选择下一轮专注了。".to_string(),
+        );
+    }
+    let minutes = (schedule.focused_seconds.max(60) + 30) / 60;
+    let task = schedule
+        .task_title
+        .as_deref()
+        .map(str::trim)
+        .filter(|title| !title.is_empty());
+    let mut body = match task {
+        Some(title) => format!("已专注 {minutes} 分钟：{title}"),
+        None => format!("已完成 {minutes} 分钟专注"),
+    };
+    if let Some(seconds) = schedule.break_seconds {
+        let break_minutes = (seconds.max(60) + 30) / 60;
+        body.push_str(&format!("。建议休息 {break_minutes} 分钟"));
+    }
+    ("易简清单 · 专注完成".to_string(), body)
+}
+
+fn send_focus_system_notification(
+    app: &tauri::AppHandle,
+    schedule: &FocusCompletionSchedule,
+) -> Result<(), String> {
+    let (title, body) = focus_notification_copy(schedule);
+
+    #[cfg(target_os = "windows")]
+    {
+        let mut notification = Notification::new();
+        notification
+            .app_id("cn.duqimeng.simpletodo")
+            .summary(&title)
+            .body(&body);
+        if schedule.sound_enabled {
+            notification.sound_name("Default");
+        }
+        let handle = notification
+            .show()
+            .map_err(|err| format!("发送 Windows 专注提醒失败: {err}"))?;
+        let app_handle = app.clone();
+        std::thread::spawn(move || {
+            let _ = handle.wait_for_response(move |response: &NotificationResponse| {
+                if matches!(
+                    response,
+                    NotificationResponse::Default | NotificationResponse::Action(_)
+                ) {
+                    show_main_window(&app_handle);
+                    let _ = app_handle.emit_to(
+                        "main",
+                        "focus-notification:open",
+                        serde_json::json!({ "source": "system" }),
+                    );
+                }
+            });
+        });
+        return Ok(());
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let mut notification = app.notification().builder().title(title).body(body);
+        if schedule.sound_enabled {
+            notification = notification.sound("Ping");
+        }
+        notification
+            .show()
+            .map_err(|err| format!("发送系统专注提醒失败: {err}"))
+    }
 }
 
 /// 返回系统最后一次键鼠输入距今的秒数。只读取系统汇总时间，不读取输入内容、
@@ -1677,11 +1838,15 @@ fn open_release_page() -> Result<bool, String> {
 
 fn query_clock_state(conn: &Connection) -> Result<serde_json::Value, String> {
     let raw = conn
-        .query_row("SELECT value FROM clock_state WHERE id = 1", [], |row| row.get::<_, String>(0))
+        .query_row("SELECT value FROM clock_state WHERE id = 1", [], |row| {
+            row.get::<_, String>(0)
+        })
         .optional()
         .map_err(|err| format!("读取时钟数据失败: {err}"))?;
     match raw {
-        Some(value) => serde_json::from_str(&value).map_err(|err| format!("时钟数据格式无效: {err}")),
+        Some(value) => {
+            serde_json::from_str(&value).map_err(|err| format!("时钟数据格式无效: {err}"))
+        }
         None => Ok(serde_json::json!({})),
     }
 }
@@ -2638,6 +2803,42 @@ mod tests {
     }
 
     #[test]
+    fn focus_notification_copy_includes_task_and_break() {
+        let schedule = FocusCompletionSchedule {
+            session_id: "focus-1".to_string(),
+            due_at: 1,
+            phase: "focus".to_string(),
+            task_title: Some("整理发布说明".to_string()),
+            focused_seconds: 25 * 60,
+            break_seconds: Some(5 * 60),
+            notification_enabled: true,
+            sound_enabled: true,
+        };
+
+        let (title, body) = focus_notification_copy(&schedule);
+        assert_eq!(title, "易简清单 · 专注完成");
+        assert_eq!(body, "已专注 25 分钟：整理发布说明。建议休息 5 分钟");
+    }
+
+    #[test]
+    fn break_notification_copy_uses_recovery_message() {
+        let schedule = FocusCompletionSchedule {
+            session_id: "break-1".to_string(),
+            due_at: 1,
+            phase: "short-break".to_string(),
+            task_title: None,
+            focused_seconds: 5 * 60,
+            break_seconds: None,
+            notification_enabled: true,
+            sound_enabled: false,
+        };
+
+        let (title, body) = focus_notification_copy(&schedule);
+        assert_eq!(title, "易简清单 · 休息结束");
+        assert_eq!(body, "休息完成，可以回来选择下一轮专注了。");
+    }
+
+    #[test]
     fn sqlite_backup_preserves_wal_data() {
         let root = test_root("backup-test");
         let source_path = root.join("source.db");
@@ -2707,7 +2908,7 @@ mod tests {
 fn main() {
     tauri::Builder::default()
         .manage(WindowCloseBehavior::default())
-        .manage(FocusReminderState::default())
+        .manage(FocusCompletionScheduler::default())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {
@@ -2776,9 +2977,9 @@ fn main() {
             restore_quarantined_attachments,
             purge_quarantined_attachments,
             send_interactive_task_reminder,
-            show_focus_reminder,
-            get_pending_focus_reminder,
-            handle_focus_reminder_action,
+            schedule_focus_completion,
+            cancel_focus_completion,
+            send_focus_completion_test_notification,
             set_window_close_behavior,
             get_system_idle_seconds
         ])
@@ -2791,12 +2992,7 @@ fn main() {
                 ..
             } = &_event
             {
-                if label == "focus-reminder" {
-                    api.prevent_close();
-                    if let Some(window) = _app.get_webview_window("focus-reminder") {
-                        let _ = window.hide();
-                    }
-                } else if label == "main"
+                if label == "main"
                     && _app
                         .state::<WindowCloseBehavior>()
                         .0
@@ -2825,11 +3021,7 @@ fn main() {
             // macOS 从 Dock 重新激活一个已隐藏窗口时会发出 Reopen；此前没有
             // 处理这个事件，导致只能通过菜单栏恢复主窗口。
             #[cfg(target_os = "macos")]
-            if let tauri::RunEvent::Reopen {
-                has_visible_windows: false,
-                ..
-            } = &_event
-            {
+            if let tauri::RunEvent::Reopen { .. } = &_event {
                 show_main_window(_app);
             }
         });
