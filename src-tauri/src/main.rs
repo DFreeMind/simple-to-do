@@ -267,7 +267,7 @@ fn report_focus_reminder_failure(
     }
 }
 
-/// 后台完成时优先显示独立置顶窗口。只有窗口在限定时间内没有由前端主动
+/// 后台完成时优先显示独立提醒窗口。只有窗口在限定时间内没有由前端主动
 /// 报告“已经渲染完成”，才回退到系统通知，避免空白窗口吞掉真正的提醒。
 fn deliver_focus_reminder(app: tauri::AppHandle, schedule: FocusCompletionSchedule) {
     let state = app.state::<FocusReminderState>();
@@ -283,6 +283,7 @@ fn deliver_focus_reminder(app: tauri::AppHandle, schedule: FocusCompletionSchedu
 
     let window_result = if let Some(window) = app.get_webview_window("focus-reminder") {
         let _ = window.hide();
+        let _ = window.set_always_on_top(false);
         let _ = app.emit_to(
             "focus-reminder",
             "focus-reminder:refresh",
@@ -299,7 +300,7 @@ fn deliver_focus_reminder(app: tauri::AppHandle, schedule: FocusCompletionSchedu
             .maximizable(false)
             .minimizable(false)
             .decorations(false)
-            .always_on_top(true)
+            .always_on_top(false)
             .skip_taskbar(true)
             .shadow(true)
             .center()
@@ -378,7 +379,7 @@ fn focus_reminder_ready(app: tauri::AppHandle, revision: u64) -> Result<bool, St
     let window = app
         .get_webview_window("focus-reminder")
         .ok_or_else(|| "专注提醒窗口不存在".to_string())?;
-    let _ = window.center();
+    let _ = window.set_always_on_top(false);
     window
         .show()
         .map_err(|error| format!("显示专注提醒窗口失败: {error}"))?;

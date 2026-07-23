@@ -353,7 +353,7 @@
                     </span>
                     <span class="sound-item-content">
                       <strong>专注完成提醒</strong>
-                      <small>后台时显示置顶完成弹窗，失败则用系统通知兜底</small>
+                      <small>后台时显示可拖动完成弹窗，失败则用系统通知兜底</small>
                     </span>
                     <input
                       type="checkbox"
@@ -414,7 +414,7 @@
                     <Timer :size="16" />
                     <span>
                       <strong>测试专注完成提醒</strong>
-                      <small>预览置顶完成弹窗与提醒声音</small>
+                      <small>预览后台完成弹窗与提醒声音</small>
                     </span>
                   </button>
 

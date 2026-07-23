@@ -1,15 +1,15 @@
 <template>
   <main class="focus-reminder-window" @keydown.esc="dismiss">
     <section v-if="reminder" class="focus-reminder-card" role="dialog" aria-modal="true" aria-labelledby="focus-reminder-title" aria-describedby="focus-reminder-description">
-      <header class="focus-reminder-titlebar" data-tauri-drag-region>
-        <span class="focus-reminder-brand" data-tauri-drag-region>
-          <span class="focus-reminder-brand-icon" data-tauri-drag-region><TimerReset :size="16" :stroke-width="1.9" /></span>
-          <span class="focus-reminder-brand-copy" data-tauri-drag-region>
-            <strong data-tauri-drag-region>易简清单</strong>
-            <small data-tauri-drag-region>专注时刻</small>
+      <header class="focus-reminder-titlebar" @pointerdown="startWindowDrag">
+        <span class="focus-reminder-brand">
+          <span class="focus-reminder-brand-icon"><TimerReset :size="16" :stroke-width="1.9" /></span>
+          <span class="focus-reminder-brand-copy">
+            <strong>易简清单</strong>
+            <small>专注时刻</small>
           </span>
         </span>
-        <button type="button" aria-label="关闭提醒" @click="dismiss">
+        <button type="button" aria-label="关闭提醒" @pointerdown.stop @click="dismiss">
           <X :size="18" />
         </button>
       </header>
@@ -66,6 +66,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { listen } from '@tauri-apps/api/event'
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { ArrowRight, Check, CircleCheck, Coffee, ListChecks, Sparkles, TimerReset, X } from 'lucide-vue-next'
 import FocusRewardBadge from './FocusRewardBadge.vue'
 import {
@@ -151,6 +152,12 @@ function dismiss() {
   return perform('dismiss')
 }
 
+function startWindowDrag(event) {
+  if (event.button !== 0) return
+  getCurrentWebviewWindow().startDragging()
+    .catch(error => console.warn('[FocusReminder] 拖动提醒窗口失败:', error))
+}
+
 function durationText(seconds) {
   const minutes = Math.max(1, Math.round((Number(seconds) || 0) / 60))
   return minutes >= 60
@@ -215,6 +222,7 @@ onBeforeUnmount(() => unlistenRefresh?.())
   font-size: 12px;
   font-weight: 650;
   letter-spacing: .01em;
+  cursor: move;
   user-select: none;
 }
 
