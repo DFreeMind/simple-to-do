@@ -33,10 +33,11 @@
           <header><span class="clock-side-card__icon"><Target :size="19" /></span><h2>专注方式</h2></header>
           <template v-if="!activeSession && !pendingBreak">
             <div class="clock-mode-picker">
-              <button v-for="profile in store.focusProfiles" :key="profile.id" type="button" :class="{ active: selectedProfileId === profile.id }" @click="selectedProfileId = profile.id">
+              <button v-for="profile in primaryFocusProfiles" :key="profile.id" type="button" :class="{ active: selectedProfileId === profile.id }" @click="selectedProfileId = profile.id">
                 <component :is="profile.id === 'pomodoro' ? Timer : profile.id === 'deep-work' ? Focus : Clock3" :size="24" /><strong>{{ profile.name }}</strong><small>{{ durationText(profile.durationSeconds) }}</small>
               </button>
             </div>
+            <button class="clock-custom-trigger" type="button" :class="{ active: selectedProfileId === 'custom-focus' }" @click="selectedProfileId = 'custom-focus'">自定义本次时长</button>
             <label v-if="selectedProfileId === 'custom-focus'" class="clock-custom-duration"><span>本次专注时长</span><div><input v-model.number="customDurationMinutes" type="number" min="1" max="480" step="1" /><small>分钟</small></div></label>
           </template>
           <p v-else class="clock-side-card__current-mode">{{ currentProfile?.name || '专注中' }} · {{ durationText(activeSession?.durationSeconds) }}</p>
@@ -100,6 +101,7 @@ const activeSession = computed(() => store.activeFocusSession)
 const pendingBreak = computed(() => store.focusPendingBreak)
 const selectedProfile = computed(() => store.focusProfiles.find(item => item.id === selectedProfileId.value) || store.focusProfiles[0])
 const currentProfile = computed(() => store.currentFocusProfile || selectedProfile.value)
+const primaryFocusProfiles = computed(() => store.focusProfiles.filter(profile => profile.id !== 'custom-focus'))
 const openTasks = computed(() => store.activeTasks.filter(task => !task.completed))
 const taskOptions = computed(() => openTasks.value.slice(0, 8).map(task => ({
   ...task,
