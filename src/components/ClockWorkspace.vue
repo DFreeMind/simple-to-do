@@ -13,9 +13,9 @@
         <section class="clock-stage" :class="{ 'clock-stage--break': activeSession?.phase !== 'focus' && activeSession }" aria-live="polite">
           <div class="clock-stage__dial">
             <svg class="clock-stage__ring" viewBox="0 0 220 220" aria-hidden="true">
-              <g class="clock-stage__ticks"><line v-for="tick in 60" :key="tick" :class="{ major: tick % 5 === 0 }" x1="110" y1="17" :y2="tick % 5 === 0 ? 30 : 24" :transform="`rotate(${tick * 6} 110 110)`" /></g>
-              <text class="clock-stage__number" x="110" y="27" text-anchor="middle">12</text><text class="clock-stage__number" x="194" y="115" text-anchor="middle">3</text><text class="clock-stage__number" x="110" y="201" text-anchor="middle">6</text><text class="clock-stage__number" x="26" y="115" text-anchor="middle">9</text>
-              <g transform="rotate(-90 110 110)"><circle class="clock-stage__ring-track" cx="110" cy="110" r="96" /><circle class="clock-stage__ring-progress" cx="110" cy="110" r="96" :style="timerRingStyle" /></g>
+              <g class="clock-stage__ticks"><line v-for="tick in 60" :key="tick" :class="{ major: tick % 5 === 0 }" x1="110" x2="110" y1="27" :y2="tick % 5 === 0 ? 40 : 35" :transform="`rotate(${tick * 6} 110 110)`" /></g>
+              <text class="clock-stage__number" x="110" y="51" text-anchor="middle">12</text><text class="clock-stage__number" x="174" y="115" text-anchor="middle">3</text><text class="clock-stage__number" x="110" y="179" text-anchor="middle">6</text><text class="clock-stage__number" x="46" y="115" text-anchor="middle">9</text>
+              <g transform="rotate(-90 110 110)"><circle class="clock-stage__ring-track" cx="110" cy="110" r="101" /><circle class="clock-stage__ring-progress" cx="110" cy="110" r="101" :style="timerRingStyle" /></g>
             </svg>
             <div class="clock-stage__content">
               <span class="clock-stage__status">{{ stageLabel }}</span>
@@ -113,7 +113,7 @@ const timerProgress = computed(() => {
   const seconds = activeSession.value ? remainingSeconds.value : timerDuration.value
   return Math.max(0, Math.min(1, Number(seconds) / timerDuration.value))
 })
-const timerRingStyle = computed(() => ({ '--ring-offset': String(603.19 * (1 - timerProgress.value)) }))
+const timerRingStyle = computed(() => ({ '--ring-offset': String(634.6 * (1 - timerProgress.value)) }))
 const formattedTime = computed(() => formatClock(activeSession.value ? (remainingSeconds.value === null ? store.focusElapsedSeconds : remainingSeconds.value) : (selectedDurationSeconds.value || 0)))
 const stageLabel = computed(() => activeSession.value ? (activeSession.value.status === 'paused' ? '已暂停' : activeSession.value.phase === 'focus' ? '正在专注' : '正在休息') : pendingBreak.value ? '下一步' : '准备开始')
 const stageDetail = computed(() => activeSession.value ? (activeSession.value.phase === 'focus' ? currentTaskTitle.value : '暂时离开屏幕，回来再继续。') : pendingBreak.value ? '刚完成一段专注，给自己一点恢复时间。' : selectedProfile.value?.description || '')
