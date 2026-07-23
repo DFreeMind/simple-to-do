@@ -83,6 +83,7 @@
 <script setup>
 import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
 import { listen } from '@tauri-apps/api/event'
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { getVersion } from '@tauri-apps/api/app'
 import { check } from '@tauri-apps/plugin-updater'
 import AppRail from './components/AppRail.vue'
@@ -101,7 +102,7 @@ import { openDataBackupLocation, openReleasePage as openReleasePageInBrowser } f
 const store = useTaskStore()
 const appVersion = ref(__APP_VERSION__)
 const isDevelopment = import.meta.env.DEV
-const isNativeReminderWindow = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('focus-reminder')
+const isNativeReminderWindow = typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__) && getCurrentWebviewWindow().label === 'focus-reminder'
 const recoveryUpdateState = ref(isDevelopment ? 'development' : 'idle')
 const recoveryUpdateError = ref('')
 const recoveryUpdate = ref(null)

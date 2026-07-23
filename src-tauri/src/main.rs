@@ -108,7 +108,7 @@ fn set_window_close_behavior(
 #[tauri::command]
 fn show_focus_reminder(app: tauri::AppHandle, reminder: serde_json::Value) -> Result<bool, String> {
     if app.get_webview_window("focus-reminder").is_none() {
-        WebviewWindowBuilder::new(&app, "focus-reminder", WebviewUrl::App("index.html?focus-reminder=1".into()))
+        WebviewWindowBuilder::new(&app, "focus-reminder", WebviewUrl::App("index.html".into()))
             .title("易简清单 · 专注时刻")
             .inner_size(460.0, 390.0)
             .min_inner_size(460.0, 390.0)

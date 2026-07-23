@@ -33,6 +33,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { CircleCheck, Coffee, X } from 'lucide-vue-next'
 import { listen } from '@tauri-apps/api/event'
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import FocusRewardBadge from './FocusRewardBadge.vue'
 import { handleFocusReminderAction } from '@/services/platform'
 
@@ -42,7 +43,7 @@ const props = defineProps({
 
 const emit = defineEmits(['dismiss', 'start-break'])
 const nativeCelebration = ref(null)
-const isNativeReminderWindow = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('focus-reminder')
+const isNativeReminderWindow = typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__) && getCurrentWebviewWindow().label === 'focus-reminder'
 let unlistenReminder
 const displayCelebration = computed(() => nativeCelebration.value || props.celebration)
 
