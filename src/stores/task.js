@@ -1751,7 +1751,7 @@ export const useTaskStore = defineStore('task', () => {
       : DEFAULT_RHYTHM_REMINDERS
     return {
       pausedUntil: isValidIsoDate(rawRhythm?.pausedUntil) ? rawRhythm.pausedUntil : null,
-      reminders: source.map((reminder, index) => normalizeRhythmReminder(reminder, index)).map((reminder, index) => ({ ...reminder, enabled: reminder.enabled && !source.slice(0, index).some(item => item.enabled !== false) }))
+      reminders: source.map((reminder, index) => normalizeRhythmReminder(reminder, index))
     }
   }
 
@@ -2292,12 +2292,7 @@ export const useTaskStore = defineStore('task', () => {
       showNotice('当前平台暂不支持连续活跃时长提醒', 'error')
       return false
     }
-    if (nextEnabled) {
-      clock.value.rhythm.reminders.forEach(reminder => { reminder.enabled = reminder.id === reminderId })
-      syncRhythmTimer()
-      return true
-    }
-    return updateRhythmReminder(reminderId, { enabled: false })
+    return updateRhythmReminder(reminderId, { enabled: nextEnabled })
   }
 
   function deleteRhythmReminder(reminderId) {
