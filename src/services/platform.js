@@ -354,9 +354,29 @@ export async function cancelFocusCompletion(sessionId = null) {
   }
 }
 
+export async function requestFocusNotificationPermission() {
+  if (!isTauri()) return false
+  try {
+    return await invoke('request_focus_notification_permission')
+  } catch (error) {
+    console.error('[Platform] 请求专注完成通知权限失败:', error)
+    return false
+  }
+}
+
+export async function openSystemNotificationSettings() {
+  if (!isTauri()) return false
+  try {
+    return await invoke('open_system_notification_settings')
+  } catch (error) {
+    console.error('[Platform] 打开系统通知设置失败:', error)
+    return false
+  }
+}
+
 export async function sendFocusCompletionTestNotification(settings = {}) {
   if (!isTauri()) return { sent: false, reason: 'unsupported' }
-  const granted = await ensureReminderNotificationPermission({ request: true })
+  const granted = await requestFocusNotificationPermission()
   if (!granted) return { sent: false, reason: 'permission' }
   try {
     await invoke('send_focus_completion_test_notification', {

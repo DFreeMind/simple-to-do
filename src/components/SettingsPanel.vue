@@ -417,6 +417,14 @@
                       <small>验证后台通知样式与声音</small>
                     </span>
                   </button>
+
+                  <button class="setting-action-card" type="button" @click="openNotificationSettings">
+                    <ExternalLink :size="16" />
+                    <span>
+                      <strong>打开系统通知设置</strong>
+                      <small>被系统关闭时在这里重新允许</small>
+                    </span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -776,10 +784,10 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { Bell, Check, Compass, Database, Info, PanelTop, Palette, ShieldCheck, SlidersHorizontal, Timer, Trash2, X, Volume2, CheckSquare, Folder, Tag } from 'lucide-vue-next'
+import { Bell, Check, Compass, Database, Download, ExternalLink, Info, PanelTop, Palette, ShieldCheck, SlidersHorizontal, Timer, Trash2, X, Volume2, CheckSquare, Folder, Tag } from 'lucide-vue-next'
 import { check } from '@tauri-apps/plugin-updater'
 import { useTaskStore } from '@/stores/task'
-import { purgeQuarantinedAttachments, quarantineOrphanAttachments, readAttachment, readQuarantinedAttachment, restoreQuarantinedAttachments, scanStorageHealth } from '@/services/platform'
+import { openSystemNotificationSettings, purgeQuarantinedAttachments, quarantineOrphanAttachments, readAttachment, readQuarantinedAttachment, restoreQuarantinedAttachments, scanStorageHealth } from '@/services/platform'
 import ImageLightbox from './ImageLightbox.vue'
 import appIcon from '@/assets/app-icon.svg'
 
@@ -820,6 +828,11 @@ const updateState = ref(isDevelopment ? 'development' : 'idle')
 const availableUpdate = ref(null)
 const updateError = ref('')
 const updateProgress = ref({ downloaded: 0, total: 0 })
+
+async function openNotificationSettings() {
+  const opened = await openSystemNotificationSettings()
+  if (!opened) store.showNotice('当前平台无法直接打开通知设置', 'error')
+}
 
 const sections = [
   { id: 'appearance', label: '外观与布局', summary: '主题、密度与面板', icon: Palette },

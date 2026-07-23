@@ -120,6 +120,7 @@ const shellWidth = ref(0)
 let unlistenReminderAction
 let unlistenFocusElapsed
 let unlistenFocusNotificationOpen
+let unlistenFocusNotificationError
 let shellResizeObserver
 
 function handleFocusElapsed(event) {
@@ -130,6 +131,12 @@ function handleFocusElapsed(event) {
 
 function openFocusCompletion() {
   store.setClockView('focus')
+}
+
+function reportFocusNotificationError(event) {
+  const message = event.payload?.message || '系统没有接受这次专注完成提醒'
+  console.error('[App] 专注完成系统提醒失败:', message)
+  store.showNotice('系统提醒发送失败，请检查系统通知设置', 'error')
 }
 
 function startBreakFromInApp() {
@@ -294,6 +301,9 @@ onMounted(async () => {
     listen('focus-notification:open', openFocusCompletion)
       .then(unlisten => { unlistenFocusNotificationOpen = unlisten })
       .catch(error => console.warn('[App] 注册专注通知点击事件失败:', error))
+    listen('focus-notification:error', reportFocusNotificationError)
+      .then(unlisten => { unlistenFocusNotificationError = unlisten })
+      .catch(error => console.warn('[App] 注册专注通知错误事件失败:', error))
   }
   store.loadData()
 })
@@ -302,6 +312,7 @@ onBeforeUnmount(() => {
   unlistenReminderAction?.()
   unlistenFocusElapsed?.()
   unlistenFocusNotificationOpen?.()
+  unlistenFocusNotificationError?.()
   shellResizeObserver?.disconnect()
 })
 

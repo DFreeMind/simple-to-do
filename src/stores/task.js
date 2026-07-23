@@ -14,6 +14,7 @@ import {
   sendRhythmReminderNotification,
   scheduleFocusCompletion,
   cancelFocusCompletion,
+  requestFocusNotificationPermission,
   sendFocusCompletionTestNotification,
   hasNativeFocusScheduler
 } from '@/services/platform'
@@ -657,7 +658,7 @@ export const useTaskStore = defineStore('task', () => {
     }
     if ('focusCompletionNotificationsEnabled' in updates || 'focusCompletionSoundEnabled' in updates) {
       if (updates.focusCompletionNotificationsEnabled === true) {
-        void ensureReminderNotificationPermission({ request: true })
+        void requestFocusNotificationPermission()
       }
       syncNativeFocusCompletion()
       if (updates.focusCompletionNotificationsEnabled === false) showNotice('专注完成系统提醒已关闭', 'info')
@@ -1972,7 +1973,7 @@ export const useTaskStore = defineStore('task', () => {
     focusClockNow.value = Date.now()
     syncFocusTimer()
     if (settings.value.focusCompletionNotificationsEnabled !== false) {
-      void ensureReminderNotificationPermission({ request: true })
+      void requestFocusNotificationPermission()
     }
     showNotice(`已开始${profile.name}`, 'success')
     return true

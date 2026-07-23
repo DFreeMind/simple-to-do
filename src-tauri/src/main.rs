@@ -21,10 +21,13 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
 use tauri::{Emitter, Manager};
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use tauri_plugin_notification::NotificationExt;
 
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+use notify_rust::Notification;
 #[cfg(target_os = "windows")]
-use notify_rust::{Notification, NotificationResponse};
+use notify_rust::NotificationResponse;
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::{
     System::SystemInformation::GetTickCount,
@@ -193,7 +196,16 @@ fn schedule_focus_completion(
             }),
         );
         if !main_is_focused && schedule.notification_enabled {
-            let _ = send_focus_system_notification(&app, &schedule);
+            if let Err(error) = send_focus_system_notification(&app, &schedule) {
+                let _ = app.emit_to(
+                    "main",
+                    "focus-notification:error",
+                    serde_json::json!({
+                        "sessionId": schedule.session_id,
+                        "message": error
+                    }),
+                );
+            }
         }
         return;
     });
@@ -219,6 +231,53 @@ fn cancel_focus_completion(
         scheduler.revision.fetch_add(1, Ordering::Relaxed);
     }
     Ok(should_cancel)
+}
+
+#[tauri::command]
+fn request_focus_notification_permission() -> Result<bool, String> {
+    #[cfg(target_os = "macos")]
+    {
+        notify_rust::request_auth_blocking()
+            .map_err(|err| format!("请求 macOS 通知权限失败: {err}"))
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        Ok(true)
+    }
+}
+
+#[tauri::command]
+fn open_system_notification_settings() -> Result<bool, String> {
+    #[cfg(target_os = "macos")]
+    {
+        let legacy_pane = Path::new("/System/Library/PreferencePanes/Notifications.prefPane");
+        let target = if legacy_pane.exists() {
+            legacy_pane.to_string_lossy().into_owned()
+        } else {
+            "x-apple.systempreferences:com.apple.Notifications-Settings.extension?cn.duqimeng.simpletodo"
+                .to_string()
+        };
+        Command::new("open")
+            .arg(target)
+            .spawn()
+            .map_err(|err| format!("打开 macOS 通知设置失败: {err}"))?;
+        Ok(true)
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("cmd")
+            .args(["/C", "start", "", "ms-settings:notifications"])
+            .spawn()
+            .map_err(|err| format!("打开 Windows 通知设置失败: {err}"))?;
+        Ok(true)
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        Ok(false)
+    }
 }
 
 #[tauri::command]
@@ -310,7 +369,29 @@ fn send_focus_system_notification(
         return Ok(());
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
+    {
+        let _ = app;
+        // Tauri 通知插件旧的 NSUserNotificationCenter 路径不会注册现代 macOS
+        // 通知权限，且发送错误会被异步丢弃。这里使用 UNUserNotificationCenter，
+        // 同时依赖应用包的 ad-hoc 签名，确保前台测试与后台完成都能展示横幅。
+        let granted = notify_rust::request_auth_blocking()
+            .map_err(|err| format!("读取 macOS 通知权限失败: {err}"))?;
+        if !granted {
+            return Err("macOS 通知权限未开启".to_string());
+        }
+        let mut notification = Notification::new();
+        notification.summary(&title).body(&body);
+        if schedule.sound_enabled {
+            notification.sound_name("Ping");
+        }
+        notification
+            .show()
+            .map(|_| ())
+            .map_err(|err| format!("发送 macOS 专注提醒失败: {err}"))
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         let mut notification = app.notification().builder().title(title).body(body);
         if schedule.sound_enabled {
@@ -2979,6 +3060,8 @@ fn main() {
             send_interactive_task_reminder,
             schedule_focus_completion,
             cancel_focus_completion,
+            request_focus_notification_permission,
+            open_system_notification_settings,
             send_focus_completion_test_notification,
             set_window_close_behavior,
             get_system_idle_seconds
