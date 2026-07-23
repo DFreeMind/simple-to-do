@@ -116,8 +116,8 @@ const DEFAULT_FOCUS_SETTINGS = {
 
 const DEFAULT_RHYTHM_REMINDERS = [
   { id: 'eyes', title: '护眼休息', icon: 'eye', color: 'cyan', enabled: true, triggerType: 'interval', intervalSeconds: 20 * 60, time: '09:00', weekdays: [1, 2, 3, 4, 5], workStart: '09:00', workEnd: '18:00', quietStart: null, quietEnd: null, message: '抬眼看看远处，让眼睛放松一下。', createdAt: '' },
-  { id: 'hydration', title: '补水', icon: 'droplets', color: 'blue', enabled: true, triggerType: 'interval', intervalSeconds: 60 * 60, time: '09:00', weekdays: [1, 2, 3, 4, 5], workStart: '09:00', workEnd: '18:00', quietStart: null, quietEnd: null, message: '喝几口水，给自己一个短暂的转换。', createdAt: '' },
-  { id: 'stand', title: '站立活动', icon: 'accessibility', color: 'green', enabled: true, triggerType: 'interval', intervalSeconds: 60 * 60, time: '09:00', weekdays: [1, 2, 3, 4, 5], workStart: '09:00', workEnd: '18:00', quietStart: null, quietEnd: null, message: '起身活动一下，换个姿势。', createdAt: '' },
+  { id: 'hydration', title: '补水', icon: 'droplets', color: 'blue', enabled: false, triggerType: 'interval', intervalSeconds: 60 * 60, time: '09:00', weekdays: [1, 2, 3, 4, 5], workStart: '09:00', workEnd: '18:00', quietStart: null, quietEnd: null, message: '喝几口水，给自己一个短暂的转换。', createdAt: '' },
+  { id: 'stand', title: '站立活动', icon: 'accessibility', color: 'green', enabled: false, triggerType: 'interval', intervalSeconds: 60 * 60, time: '09:00', weekdays: [1, 2, 3, 4, 5], workStart: '09:00', workEnd: '18:00', quietStart: null, quietEnd: null, message: '起身活动一下，换个姿势。', createdAt: '' },
   { id: 'blink', title: '眨眼放松', icon: 'sparkles', color: 'violet', enabled: false, triggerType: 'interval', intervalSeconds: 30 * 60, time: '09:00', weekdays: [1, 2, 3, 4, 5], workStart: '09:00', workEnd: '18:00', quietStart: null, quietEnd: null, message: '缓慢眨几次眼，让视线重新聚焦。', createdAt: '' },
   { id: 'breathe', title: '呼吸放松', icon: 'wind', color: 'rose', enabled: false, triggerType: 'interval', intervalSeconds: 90 * 60, time: '09:00', weekdays: [1, 2, 3, 4, 5], workStart: '09:00', workEnd: '18:00', quietStart: null, quietEnd: null, message: '停下来做几次缓慢深呼吸。', createdAt: '' },
   { id: 'sedentary', title: '久坐提醒', icon: 'armchair', color: 'amber', enabled: false, triggerType: 'active-duration', intervalSeconds: 60 * 60, time: '09:00', weekdays: [1, 2, 3, 4, 5], workStart: '09:00', workEnd: '18:00', quietStart: null, quietEnd: null, message: '你已连续使用电脑一段时间，建议离开座位活动。', createdAt: '' }
@@ -1719,7 +1719,7 @@ export const useTaskStore = defineStore('task', () => {
       : DEFAULT_RHYTHM_REMINDERS
     return {
       pausedUntil: isValidIsoDate(rawRhythm?.pausedUntil) ? rawRhythm.pausedUntil : null,
-      reminders: source.map((reminder, index) => normalizeRhythmReminder(reminder, index))
+      reminders: source.map((reminder, index) => normalizeRhythmReminder(reminder, index)).map((reminder, index) => ({ ...reminder, enabled: reminder.enabled && !source.slice(0, index).some(item => item.enabled !== false) }))
     }
   }
 
@@ -2163,7 +2163,12 @@ export const useTaskStore = defineStore('task', () => {
       showNotice('当前平台暂不支持连续活跃时长提醒', 'error')
       return false
     }
-    return updateRhythmReminder(reminderId, { enabled: nextEnabled })
+    if (nextEnabled) {
+      clock.value.rhythm.reminders.forEach(reminder => { reminder.enabled = reminder.id === reminderId })
+      syncRhythmTimer()
+      return true
+    }
+    return updateRhythmReminder(reminderId, { enabled: false })
   }
 
   function deleteRhythmReminder(reminderId) {
