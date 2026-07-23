@@ -405,6 +405,23 @@
                     <span class="switch-control" aria-hidden="true"></span>
                   </label>
 
+                  <label class="sound-item">
+                    <span class="sound-item-icon">
+                      <Pin :size="16" />
+                    </span>
+                    <span class="sound-item-content">
+                      <strong>提醒窗保持在最前面</strong>
+                      <small>默认置顶以免错过；仍可拖动位置，也可随时关闭</small>
+                    </span>
+                    <input
+                      type="checkbox"
+                      :checked="store.settings.focusReminderAlwaysOnTop"
+                      :disabled="!store.settings.focusCompletionNotificationsEnabled"
+                      @change="store.updateSettings({ focusReminderAlwaysOnTop: $event.target.checked })"
+                    />
+                    <span class="switch-control" aria-hidden="true"></span>
+                  </label>
+
                   <button
                     class="setting-action-card"
                     type="button"
@@ -784,7 +801,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { Bell, Check, Compass, Database, Download, ExternalLink, Info, PanelTop, Palette, ShieldCheck, SlidersHorizontal, Timer, Trash2, X, Volume2, CheckSquare, Folder, Tag } from 'lucide-vue-next'
+import { Bell, Check, Compass, Database, Download, ExternalLink, Info, PanelTop, Palette, Pin, ShieldCheck, SlidersHorizontal, Timer, Trash2, X, Volume2, CheckSquare, Folder, Tag } from 'lucide-vue-next'
 import { check } from '@tauri-apps/plugin-updater'
 import { useTaskStore } from '@/stores/task'
 import { openSystemNotificationSettings, purgeQuarantinedAttachments, quarantineOrphanAttachments, readAttachment, readQuarantinedAttachment, restoreQuarantinedAttachments, scanStorageHealth } from '@/services/platform'

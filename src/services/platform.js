@@ -335,7 +335,8 @@ export async function scheduleFocusCompletion(schedule, settings = {}) {
       schedule: {
         ...schedule,
         notificationEnabled: settings.focusCompletionNotificationsEnabled !== false,
-        soundEnabled: settings.focusCompletionSoundEnabled !== false
+        soundEnabled: settings.focusCompletionSoundEnabled !== false,
+        alwaysOnTop: settings.focusReminderAlwaysOnTop !== false
       }
     })
   } catch (error) {
@@ -378,7 +379,8 @@ export async function sendFocusCompletionTestNotification(settings = {}) {
   if (!isTauri()) return { sent: false, reason: 'unsupported' }
   try {
     await invoke('send_focus_completion_test_notification', {
-      soundEnabled: settings.focusCompletionSoundEnabled !== false
+      soundEnabled: settings.focusCompletionSoundEnabled !== false,
+      alwaysOnTop: settings.focusReminderAlwaysOnTop !== false
     })
     return { sent: true }
   } catch (error) {

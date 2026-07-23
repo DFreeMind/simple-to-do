@@ -92,6 +92,7 @@ const DEFAULT_SETTINGS = {
   reminderSoundEnabled: true,
   focusCompletionNotificationsEnabled: true,
   focusCompletionSoundEnabled: true,
+  focusReminderAlwaysOnTop: true,
   windowCloseBehavior: 'hide',
   dailyGuidanceEnabled: true,
   dailyGuidanceStyle: 'practical'
@@ -656,7 +657,7 @@ export const useTaskStore = defineStore('task', () => {
       syncReminderNotifications({ requestPermission: Boolean(updates.reminderNotificationsEnabled) })
       if (updates.reminderNotificationsEnabled === false) showNotice('任务提醒通知已关闭', 'info')
     }
-    if ('focusCompletionNotificationsEnabled' in updates || 'focusCompletionSoundEnabled' in updates) {
+    if ('focusCompletionNotificationsEnabled' in updates || 'focusCompletionSoundEnabled' in updates || 'focusReminderAlwaysOnTop' in updates) {
       if (updates.focusCompletionNotificationsEnabled === true) {
         void requestFocusNotificationPermission()
       }
@@ -2472,6 +2473,7 @@ export const useTaskStore = defineStore('task', () => {
     const reminderSoundEnabled = rawSettings.reminderSoundEnabled !== false
     const focusCompletionNotificationsEnabled = rawSettings.focusCompletionNotificationsEnabled !== false
     const focusCompletionSoundEnabled = rawSettings.focusCompletionSoundEnabled !== false
+    const focusReminderAlwaysOnTop = rawSettings.focusReminderAlwaysOnTop !== false
     const windowCloseBehavior = ['hide', 'quit'].includes(rawSettings.windowCloseBehavior)
       ? rawSettings.windowCloseBehavior
       : DEFAULT_SETTINGS.windowCloseBehavior
@@ -2507,6 +2509,7 @@ export const useTaskStore = defineStore('task', () => {
       reminderSoundEnabled,
       focusCompletionNotificationsEnabled,
       focusCompletionSoundEnabled,
+      focusReminderAlwaysOnTop,
       windowCloseBehavior,
       dailyGuidanceEnabled,
       dailyGuidanceStyle

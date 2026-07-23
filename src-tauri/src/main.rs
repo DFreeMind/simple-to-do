@@ -77,6 +77,7 @@ struct FocusCompletionSchedule {
     break_seconds: Option<u64>,
     notification_enabled: bool,
     sound_enabled: bool,
+    always_on_top: bool,
 }
 
 #[derive(Clone, Serialize)]
@@ -89,6 +90,7 @@ struct FocusReminderPayload {
     focused_seconds: u64,
     break_seconds: Option<u64>,
     sound_enabled: bool,
+    always_on_top: bool,
 }
 
 impl Default for WindowCloseBehavior {
@@ -247,6 +249,7 @@ fn focus_reminder_payload(
         focused_seconds: schedule.focused_seconds,
         break_seconds: schedule.break_seconds,
         sound_enabled: schedule.sound_enabled,
+        always_on_top: schedule.always_on_top,
     }
 }
 
@@ -283,7 +286,7 @@ fn deliver_focus_reminder(app: tauri::AppHandle, schedule: FocusCompletionSchedu
 
     let window_result = if let Some(window) = app.get_webview_window("focus-reminder") {
         let _ = window.hide();
-        let _ = window.set_always_on_top(false);
+        let _ = window.set_always_on_top(schedule.always_on_top);
         let _ = app.emit_to(
             "focus-reminder",
             "focus-reminder:refresh",
@@ -300,7 +303,7 @@ fn deliver_focus_reminder(app: tauri::AppHandle, schedule: FocusCompletionSchedu
             .maximizable(false)
             .minimizable(false)
             .decorations(false)
-            .always_on_top(false)
+            .always_on_top(schedule.always_on_top)
             .skip_taskbar(true)
             .shadow(true)
             .center()
@@ -367,19 +370,22 @@ fn get_focus_reminder_payload(
 #[tauri::command]
 fn focus_reminder_ready(app: tauri::AppHandle, revision: u64) -> Result<bool, String> {
     let state = app.state::<FocusReminderState>();
-    let matches = state
+    let always_on_top = state
         .pending
         .lock()
         .map_err(|_| "专注提醒窗口状态不可用".to_string())?
         .as_ref()
-        .is_some_and(|item| item.revision == revision);
-    if !matches {
+        .filter(|item| item.revision == revision)
+        .map(|item| item.always_on_top);
+    let Some(always_on_top) = always_on_top else {
         return Ok(false);
-    }
+    };
     let window = app
         .get_webview_window("focus-reminder")
         .ok_or_else(|| "专注提醒窗口不存在".to_string())?;
-    let _ = window.set_always_on_top(false);
+    window
+        .set_always_on_top(always_on_top)
+        .map_err(|error| format!("设置专注提醒窗口置顶状态失败: {error}"))?;
     window
         .show()
         .map_err(|error| format!("显示专注提醒窗口失败: {error}"))?;
@@ -499,6 +505,7 @@ fn open_system_notification_settings() -> Result<bool, String> {
 fn send_focus_completion_test_notification(
     app: tauri::AppHandle,
     sound_enabled: bool,
+    always_on_top: bool,
 ) -> Result<bool, String> {
     let schedule = FocusCompletionSchedule {
         session_id: "focus-notification-test".to_string(),
@@ -509,6 +516,7 @@ fn send_focus_completion_test_notification(
         break_seconds: Some(5 * 60),
         notification_enabled: true,
         sound_enabled,
+        always_on_top,
     };
     std::thread::spawn(move || deliver_focus_reminder(app, schedule));
     Ok(true)
@@ -3109,11 +3117,13 @@ mod tests {
             break_seconds: Some(5 * 60),
             notification_enabled: true,
             sound_enabled: true,
+            always_on_top: true,
         };
 
         let (title, body) = focus_notification_copy(&schedule);
         assert_eq!(title, "易简清单 · 专注完成");
         assert_eq!(body, "已专注 25 分钟：整理发布说明。建议休息 5 分钟");
+        assert!(focus_reminder_payload(&schedule, 7).always_on_top);
     }
 
     #[test]
@@ -3127,11 +3137,13 @@ mod tests {
             break_seconds: None,
             notification_enabled: true,
             sound_enabled: false,
+            always_on_top: false,
         };
 
         let (title, body) = focus_notification_copy(&schedule);
         assert_eq!(title, "易简清单 · 休息结束");
         assert_eq!(body, "休息完成，可以回来选择下一轮专注了。");
+        assert!(!focus_reminder_payload(&schedule, 8).always_on_top);
     }
 
     #[test]
