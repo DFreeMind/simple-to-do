@@ -105,7 +105,7 @@ const DEFAULT_FOCUS_PROFILES = [
   { id: 'pomodoro', name: '番茄专注', durationSeconds: 25 * 60, description: '25 分钟专注，适合从下一步开始。', sortOrder: 1000 },
   { id: 'deep-work', name: '深度专注', durationSeconds: 50 * 60, description: '50 分钟连续投入，适合需要沉浸的事项。', sortOrder: 2000 },
   { id: 'custom-focus', name: '自定义时长', durationSeconds: 30 * 60, description: '按本次需要设定专注时间。', sortOrder: 3000 },
-  { id: 'free-focus', name: '自由计时', durationSeconds: null, description: '不设结束时间，记录真实投入。', sortOrder: 4000 }
+  { id: 'free-focus', name: '自由时长', durationSeconds: 25 * 60, description: '按本次需要自由设定倒计时。', sortOrder: 4000 }
 ]
 
 const DEFAULT_FOCUS_SETTINGS = {

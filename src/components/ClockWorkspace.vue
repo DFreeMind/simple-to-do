@@ -8,7 +8,7 @@
             </svg>
             <div class="clock-stage__content">
               <span class="clock-stage__status"><i v-if="activeSession?.status === 'running'"></i>{{ stageLabel }}</span>
-              <div class="clock-stage__time-row"><button v-if="canSetFreeDuration" class="clock-free-time" type="button" title="点击设定本次自由计时时长" @click="freeDurationEditing = true">{{ formattedTime }}</button><strong v-else>{{ formattedTime }}</strong><div v-if="freeDurationEditing" class="clock-free-time__editor"><p>给本次自由专注设一个终点</p><div class="clock-free-time__presets"><button v-for="minutes in [15, 25, 45, 60]" :key="minutes" type="button" @click="setFreeDuration(minutes)">{{ minutes }} 分钟</button></div><label>自定义 <input v-model.number="freeDurationMinutes" type="number" min="1" max="480" /> 分钟</label><div><button class="clock-free-time__confirm" type="button" @click="confirmFreeDuration">开始倒计时</button><button type="button" @click="clearFreeDuration">保持自由</button></div></div></div>
+              <div class="clock-stage__time-row"><button v-if="canSetFreeDuration" class="clock-free-time" type="button" title="点击设定本次自由专注时长" @click="freeDurationEditing = true">{{ formattedTime }}</button><strong v-else>{{ formattedTime }}</strong><div v-if="freeDurationEditing" class="clock-free-time__editor"><p>设定本次倒计时</p><div class="clock-free-time__presets"><button v-for="minutes in [15, 25, 45, 60]" :key="minutes" type="button" @click="setFreeDuration(minutes)">{{ minutes }} 分钟</button></div><label>自定义 <input v-model.number="freeDurationMinutes" type="number" min="1" max="480" /> 分钟</label><div><button class="clock-free-time__confirm" type="button" @click="confirmFreeDuration">使用此时长</button><button type="button" @click="freeDurationEditing = false">取消</button></div></div></div>
               <p>{{ stageDetail }}</p>
             </div>
           </div>
@@ -93,7 +93,7 @@ import FocusRewardBadge from './FocusRewardBadge.vue'
 const store = useTaskStore()
 const selectedProfileId = ref('pomodoro')
 const selectedTaskId = ref(null)
-const freeDurationMinutes = ref(null)
+const freeDurationMinutes = ref(25)
 const freeDurationEditing = ref(false)
 const finishNote = ref('')
 const taskPicker = ref(null)
@@ -111,7 +111,7 @@ const taskOptions = computed(() => openTasks.value.slice(0, 8).map(task => ({
 const currentTaskTitle = computed(() => openTasks.value.find(task => task.id === activeSession.value?.taskId)?.title || '不关联任务')
 const selectedTaskTitle = computed(() => openTasks.value.find(task => task.id === selectedTaskId.value)?.title || '不关联任务')
 const remainingSeconds = computed(() => store.focusRemainingSeconds)
-const selectedDurationSeconds = computed(() => selectedProfileId.value === 'free-focus' && freeDurationMinutes.value ? Math.max(60, Math.min(480 * 60, Math.round(Number(freeDurationMinutes.value) || 0) * 60)) : selectedProfile.value?.durationSeconds)
+const selectedDurationSeconds = computed(() => selectedProfileId.value === 'free-focus' ? Math.max(60, Math.min(480 * 60, Math.round(Number(freeDurationMinutes.value) || 25) * 60)) : selectedProfile.value?.durationSeconds)
 const timerDuration = computed(() => activeSession.value?.durationSeconds ?? pendingBreak.value?.durationSeconds ?? selectedDurationSeconds.value ?? null)
 const timerProgress = computed(() => {
   if (timerDuration.value === null) return 1
@@ -143,12 +143,11 @@ const todayRewards = computed(() => {
   const names = { sesame: '芝麻', strawberry: '草莓', tomato: '番茄', watermelon: '西瓜', pumpkin: '南瓜' }
   return Object.keys(names).map(id => ({ id, name: names[id], count: rewards.filter(reward => reward === id).length })).filter(item => item.count)
 })
-function start() { store.startFocus(selectedProfile.value?.id, selectedTaskId.value, selectedProfileId.value === 'free-focus' && selectedDurationSeconds.value !== null ? selectedDurationSeconds.value : undefined) }
+function start() { store.startFocus(selectedProfile.value?.id, selectedTaskId.value, selectedProfileId.value === 'free-focus' ? selectedDurationSeconds.value : undefined) }
 function finish(result) { store.finishFocus(result, finishNote.value); finishNote.value = '' }
 function adjustTime(minutes) { return store.adjustFocusDuration(minutes * 60) }
 function setFreeDuration(minutes) { freeDurationMinutes.value = minutes }
 function confirmFreeDuration() { freeDurationMinutes.value = Math.max(1, Math.min(480, Math.round(Number(freeDurationMinutes.value) || 25))); freeDurationEditing.value = false }
-function clearFreeDuration() { freeDurationMinutes.value = null; freeDurationEditing.value = false }
 function chooseTask(taskId) { selectedTaskId.value = taskId; taskPickerOpen.value = false }
 function formatClock(seconds) { const value = Math.max(0, Math.floor(seconds || 0)); return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}` }
 function formatTime(date) { return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}` }
