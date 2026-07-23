@@ -324,6 +324,28 @@ export async function sendRhythmReminderNotification(reminder, settings = {}) {
   }
 }
 
+export async function sendFocusCompletionNotification({ elapsedSeconds, breakSeconds } = {}, settings = {}) {
+  if (!isTauri() || settings.reminderNotificationsEnabled === false) return { sent: false, reason: 'unsupported' }
+  const granted = await ensureReminderNotificationPermission()
+  if (!granted) return { sent: false, reason: 'permission' }
+  const focusedMinutes = Math.max(1, Math.round((Number(elapsedSeconds) || 0) / 60))
+  const breakMinutes = Math.max(1, Math.round((Number(breakSeconds) || 0) / 60))
+  try {
+    sendNotification({
+      id: reminderNotificationId(`focus-complete-${Date.now()}`),
+      title: '易简清单 · 一轮专注完成',
+      body: breakSeconds ? `完成 ${focusedMinutes} 分钟专注，休息 ${breakMinutes} 分钟再继续。` : `完成 ${focusedMinutes} 分钟专注，做得很稳。`,
+      group: REMINDER_GROUP,
+      autoCancel: true,
+      silent: settings.reminderSoundEnabled === false
+    })
+    return { sent: true }
+  } catch (error) {
+    console.error('[Platform] 发送专注完成通知失败:', error)
+    return { sent: false, reason: 'send-failed', error }
+  }
+}
+
 export async function sendReminderTestNotification(settings = {}) {
   if (!isTauri()) return { sent: false, reason: 'unsupported' }
   const granted = await ensureReminderNotificationPermission({ request: true })
