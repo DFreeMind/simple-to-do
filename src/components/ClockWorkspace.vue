@@ -13,14 +13,13 @@
         <section class="clock-stage" :class="{ 'clock-stage--break': activeSession?.phase !== 'focus' && activeSession }" aria-live="polite">
           <div class="clock-stage__dial">
             <svg class="clock-stage__ring" viewBox="0 0 220 220" aria-hidden="true">
-              <g class="clock-stage__ticks"><line v-for="tick in 60" :key="tick" :class="{ major: tick % 5 === 0 }" x1="110" x2="110" y1="27" :y2="tick % 5 === 0 ? 40 : 35" :transform="`rotate(${tick * 6} 110 110)`" /></g>
-              <text class="clock-stage__number" x="110" y="51" text-anchor="middle">12</text><text class="clock-stage__number" x="174" y="115" text-anchor="middle">3</text><text class="clock-stage__number" x="110" y="179" text-anchor="middle">6</text><text class="clock-stage__number" x="46" y="115" text-anchor="middle">9</text>
               <g transform="rotate(-90 110 110)"><circle class="clock-stage__ring-track" cx="110" cy="110" r="101" /><circle class="clock-stage__ring-progress" cx="110" cy="110" r="101" :style="timerRingStyle" /></g>
             </svg>
             <div class="clock-stage__content">
               <span class="clock-stage__status">{{ stageLabel }}</span>
-              <strong>{{ formattedTime }}</strong>
+              <div class="clock-stage__time-row"><button v-if="canAdjustTime" class="clock-stage__adjust-button" type="button" title="减少 5 分钟" aria-label="减少 5 分钟" @click="adjustTime(-5)"><Minus :size="18" /></button><strong>{{ formattedTime }}</strong><button v-if="canAdjustTime" class="clock-stage__adjust-button" type="button" title="增加 5 分钟" aria-label="增加 5 分钟" @click="adjustTime(5)"><Plus :size="18" /></button></div>
               <p>{{ stageDetail }}</p>
+              <span v-if="activeSession" class="clock-stage__schedule" role="tooltip">{{ sessionTimeRange }}</span>
             </div>
           </div>
 
@@ -30,7 +29,6 @@
             <button class="clock-button clock-button--secondary" type="button" @click="finish(activeSession.phase === 'focus' ? 'completed' : 'completed')"><Check :size="18" />{{ activeSession.phase === 'focus' ? '完成本轮' : '完成休息' }}</button>
             <button v-if="activeSession.phase === 'focus'" class="clock-button clock-button--quiet" type="button" @click="finish('abandoned')">结束</button>
           </div>
-          <div v-if="activeSession?.phase === 'focus' && activeSession.durationSeconds !== null" class="clock-stage__time-adjust" aria-label="调整本次专注时长"><button type="button" @click="store.adjustFocusDuration(-5 * 60)"><Minus :size="15" />5 分钟</button><span>可随时调整</span><button type="button" @click="store.adjustFocusDuration(5 * 60)"><Plus :size="15" />5 分钟</button></div>
           <div v-else-if="pendingBreak" class="clock-stage__actions">
             <button class="clock-button clock-button--primary" type="button" @click="store.startPendingBreak"><Coffee :size="18" />开始{{ pendingBreak.phase === 'long-break' ? '长休息' : '短休息' }}</button>
             <button class="clock-button clock-button--quiet" type="button" @click="store.skipPendingBreak">暂不休息</button>
@@ -115,6 +113,16 @@ const timerProgress = computed(() => {
 })
 const timerRingStyle = computed(() => ({ '--ring-offset': String(634.6 * (1 - timerProgress.value)) }))
 const formattedTime = computed(() => formatClock(activeSession.value ? (remainingSeconds.value === null ? store.focusElapsedSeconds : remainingSeconds.value) : (selectedDurationSeconds.value || 0)))
+const canAdjustTime = computed(() => activeSession.value?.phase === 'focus' && activeSession.value.durationSeconds !== null)
+const sessionTimeRange = computed(() => {
+  const session = activeSession.value
+  if (!session) return ''
+  const startedAt = new Date(session.startedAt || session.createdAt)
+  const start = formatTime(startedAt)
+  if (session.durationSeconds === null) return `开始于 ${start} · 自由计时`
+  const end = new Date(startedAt.getTime() + session.durationSeconds * 1000)
+  return `${start} — 预计 ${formatTime(end)} 结束`
+})
 const stageLabel = computed(() => activeSession.value ? (activeSession.value.status === 'paused' ? '已暂停' : activeSession.value.phase === 'focus' ? '正在专注' : '正在休息') : pendingBreak.value ? '下一步' : '准备开始')
 const stageDetail = computed(() => activeSession.value ? (activeSession.value.phase === 'focus' ? currentTaskTitle.value : '暂时离开屏幕，回来再继续。') : pendingBreak.value ? '刚完成一段专注，给自己一点恢复时间。' : selectedProfile.value?.description || '')
 const headline = computed(() => activeSession.value ? (activeSession.value.phase === 'focus' ? '保持在这件事上' : '让大脑真正休息') : pendingBreak.value ? '先恢复，再继续' : '从一件小事开始')
@@ -123,8 +131,10 @@ const todaySeconds = computed(() => todayHistory.value.filter(item => item.phase
 const todayCompletedCount = computed(() => todayHistory.value.filter(item => item.phase === 'focus' && item.result === 'completed').length)
 function start() { store.startFocus(selectedProfile.value?.id, selectedTaskId.value, selectedProfileId.value === 'custom-focus' ? selectedDurationSeconds.value : undefined) }
 function finish(result) { store.finishFocus(result, finishNote.value); finishNote.value = '' }
+function adjustTime(minutes) { store.adjustFocusDuration(minutes * 60) }
 function chooseTask(taskId) { selectedTaskId.value = taskId; taskPickerOpen.value = false }
 function formatClock(seconds) { const value = Math.max(0, Math.floor(seconds || 0)); return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}` }
+function formatTime(date) { return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}` }
 function durationText(seconds) { if (seconds === null || seconds === undefined) return '自由计时'; const minutes = Math.round(seconds / 60); return minutes >= 60 ? `${Math.floor(minutes / 60)} 小时` : `${minutes} 分钟` }
 function closeTaskPicker(event) { if (!taskPicker.value?.contains(event.target)) taskPickerOpen.value = false }
 onMounted(() => window.addEventListener('pointerdown', closeTaskPicker))
