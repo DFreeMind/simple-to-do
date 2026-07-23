@@ -13,15 +13,15 @@
       <button class="clock-sidebar__nav-item" :class="{ active: store.settings.clockView === 'history' }" type="button" @click="store.setClockView('history')"><ChartNoAxesColumnIncreasing :size="19" /><span>专注回顾</span></button>
     </nav>
 
-    <p class="clock-sidebar__hint">把专注和日常提醒放进同一个节奏里，提醒可以按你的工作时间调整。</p>
-
-    <div class="clock-sidebar__spacer"></div>
-    <button class="clock-sidebar__help" type="button" @click="store.openHelpCenter"><CircleHelp :size="18" />使用指南</button>
+    <div class="clock-sidebar__note">
+      <span class="clock-sidebar__note-dot"></span>
+      <p>在专注、提醒与回顾之间，找到自己的节奏。</p>
+    </div>
   </aside>
 </template>
 
 <script setup>
-import { Bell, ChartNoAxesColumnIncreasing, CircleHelp, PanelLeft, Timer } from 'lucide-vue-next'
+import { Bell, ChartNoAxesColumnIncreasing, PanelLeft, Timer } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 
 const store = useTaskStore()

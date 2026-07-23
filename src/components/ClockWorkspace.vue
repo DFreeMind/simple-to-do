@@ -34,7 +34,7 @@
           <template v-if="!activeSession && !pendingBreak">
             <div class="clock-mode-picker">
               <button v-for="profile in primaryFocusProfiles" :key="profile.id" type="button" :class="{ active: selectedProfileId === profile.id }" @click="selectedProfileId = profile.id">
-                <component :is="profile.id === 'pomodoro' ? Timer : profile.id === 'deep-work' ? Focus : Clock3" :size="24" /><strong>{{ profile.name }}</strong><small>{{ durationText(profile.durationSeconds) }}</small>
+                <component :is="profile.id === 'pomodoro' ? Timer : profile.id === 'deep-work' ? Focus : Clock3" :size="24" /><strong>{{ profile.name }}</strong><small>{{ profile.id === 'free-focus' ? '不设上限' : durationText(profile.durationSeconds) }}</small>
               </button>
             </div>
           </template>
@@ -66,13 +66,13 @@
         </section>
 
         <section class="clock-side-card clock-side-card--stats">
-          <header><span class="clock-side-card__icon"><BarChart3 :size="19" /></span><h2>今日状态</h2><button type="button" @click="store.setClockView('history')">查看回顾</button></header>
+          <header><span class="clock-side-card__icon"><BarChart3 :size="19" /></span><span class="clock-side-card__heading"><h2>今日状态</h2><small>每一次投入，都算数</small></span><button class="clock-side-card__history-link" type="button" @click="store.setClockView('history')">回顾 <ChevronDown :size="14" /></button></header>
           <div class="clock-today">
             <span>今日已专注</span><strong>{{ durationText(todaySeconds) }}</strong>
             <small>{{ todayCompletedCount }} 次完成专注</small>
           </div>
           <div class="clock-stat-grid"><div><span>累计</span><strong>{{ durationText(todaySeconds) }}</strong></div><div><span>专注轮次</span><strong>{{ todayCompletedCount }} 轮</strong></div><div><span>中断</span><strong>{{ todayInterruptedCount }} 次</strong></div></div>
-          <p v-if="todayRewards.length" class="clock-reward-strip">今日收获：<span v-for="reward in todayRewards" :key="reward.id"><FocusRewardBadge :reward="reward.id" size="sm" />{{ reward.name }} ×{{ reward.count }}</span></p>
+          <div v-if="todayRewards.length" class="clock-reward-strip"><span class="clock-reward-strip__label">今日收获</span><div class="clock-reward-strip__items"><span v-for="reward in todayRewards" :key="reward.id"><FocusRewardBadge :reward="reward.id" size="sm" />{{ reward.name }} ×{{ reward.count }}</span></div></div>
         </section>
       </aside>
     </div>
