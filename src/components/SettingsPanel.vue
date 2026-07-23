@@ -345,7 +345,7 @@
                   <span class="switch-control" aria-hidden="true"></span>
                 </label>
 
-                <p v-if="!store.settings.reminderNotificationsEnabled && !store.settings.focusCompletionNotificationsEnabled" class="setting-summary">系统通知已关闭；应用内的专注完成反馈仍会保留。</p>
+                <p v-if="!store.settings.reminderNotificationsEnabled && !store.settings.focusCompletionNotificationsEnabled" class="setting-summary">后台提醒已关闭；应用内的专注完成反馈仍会保留。</p>
                 <div class="sound-categories sound-categories--two">
                   <label class="sound-item">
                     <span class="sound-item-icon">
@@ -353,7 +353,7 @@
                     </span>
                     <span class="sound-item-content">
                       <strong>专注完成提醒</strong>
-                      <small>应用在后台时发送系统通知</small>
+                      <small>后台时显示置顶完成弹窗，失败则用系统通知兜底</small>
                     </span>
                     <input
                       type="checkbox"
@@ -394,7 +394,7 @@
                     </span>
                     <span class="sound-item-content">
                       <strong>专注提醒声音</strong>
-                      <small>跟随操作系统的通知声音</small>
+                      <small>弹窗播放完成音，系统通知兜底时跟随系统</small>
                     </span>
                     <input
                       type="checkbox"
@@ -414,7 +414,7 @@
                     <Timer :size="16" />
                     <span>
                       <strong>测试专注完成提醒</strong>
-                      <small>验证后台通知样式与声音</small>
+                      <small>预览置顶完成弹窗与提醒声音</small>
                     </span>
                   </button>
 

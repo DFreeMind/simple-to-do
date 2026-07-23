@@ -376,8 +376,6 @@ export async function openSystemNotificationSettings() {
 
 export async function sendFocusCompletionTestNotification(settings = {}) {
   if (!isTauri()) return { sent: false, reason: 'unsupported' }
-  const granted = await requestFocusNotificationPermission()
-  if (!granted) return { sent: false, reason: 'permission' }
   try {
     await invoke('send_focus_completion_test_notification', {
       soundEnabled: settings.focusCompletionSoundEnabled !== false
@@ -387,6 +385,25 @@ export async function sendFocusCompletionTestNotification(settings = {}) {
     console.error('[Platform] 发送专注完成测试提醒失败:', error)
     return { sent: false, reason: 'send-failed', error }
   }
+}
+
+export async function getFocusReminderPayload() {
+  if (!isTauri()) return null
+  return invoke('get_focus_reminder_payload')
+}
+
+export async function markFocusReminderReady(revision) {
+  if (!isTauri()) return false
+  return invoke('focus_reminder_ready', { revision })
+}
+
+export async function handleFocusReminderAction(reminder, action) {
+  if (!isTauri() || !reminder?.sessionId) return false
+  return invoke('handle_focus_reminder_action', {
+    revision: reminder.revision,
+    sessionId: reminder.sessionId,
+    action
+  })
 }
 
 export async function sendReminderTestNotification(settings = {}) {

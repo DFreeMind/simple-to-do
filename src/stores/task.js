@@ -661,7 +661,7 @@ export const useTaskStore = defineStore('task', () => {
         void requestFocusNotificationPermission()
       }
       syncNativeFocusCompletion()
-      if (updates.focusCompletionNotificationsEnabled === false) showNotice('专注完成系统提醒已关闭', 'info')
+      if (updates.focusCompletionNotificationsEnabled === false) showNotice('专注完成后台提醒已关闭', 'info')
     }
     if ('windowCloseBehavior' in updates) {
       setWindowCloseBehavior(settings.value.windowCloseBehavior)
@@ -700,11 +700,11 @@ export const useTaskStore = defineStore('task', () => {
   async function testFocusCompletionNotification() {
     const result = await sendFocusCompletionTestNotification(settings.value)
     if (result.sent) {
-      showNotice('已发送专注完成测试提醒', 'success')
+      showNotice('已打开专注完成测试弹窗', 'success')
     } else if (result.reason === 'permission') {
       showNotice('通知权限未开启，请在系统设置中允许通知', 'error')
     } else {
-      showNotice('专注完成提醒发送失败，请检查系统通知设置', 'error')
+      showNotice('专注完成提醒打开失败', 'error')
     }
     return result
   }

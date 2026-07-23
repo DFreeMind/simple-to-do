@@ -1,5 +1,7 @@
 <template>
+  <FocusReminderWindow v-if="isFocusReminderWindow" />
   <div
+    v-else
     class="app"
     :class="{ 'app--theme-backgrounds': store.settings.themeBackgrounds }"
     :data-theme="store.settings.theme"
@@ -83,6 +85,7 @@
 <script setup>
 import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
 import { listen } from '@tauri-apps/api/event'
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { getVersion } from '@tauri-apps/api/app'
 import { check } from '@tauri-apps/plugin-updater'
 import AppRail from './components/AppRail.vue'
@@ -94,11 +97,15 @@ import ClockWorkspace from './components/ClockWorkspace.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
 import HelpCenter from './components/HelpCenter.vue'
 import FocusCelebration from './components/FocusCelebration.vue'
+import FocusReminderWindow from './components/FocusReminderWindow.vue'
 import { useTaskStore } from './stores/task'
 import { useTheme } from './composables/useTheme'
 import { openDataBackupLocation, openReleasePage as openReleasePageInBrowser } from './services/platform'
 
 const store = useTaskStore()
+const isFocusReminderWindow = typeof window !== 'undefined'
+  && Boolean(window.__TAURI_INTERNALS__)
+  && getCurrentWebviewWindow().label === 'focus-reminder'
 const appVersion = ref(__APP_VERSION__)
 const isDevelopment = import.meta.env.DEV
 const recoveryUpdateState = ref(isDevelopment ? 'development' : 'idle')
@@ -119,6 +126,7 @@ const shellRef = ref(null)
 const shellWidth = ref(0)
 let unlistenReminderAction
 let unlistenFocusElapsed
+let unlistenFocusReminderAction
 let unlistenFocusNotificationOpen
 let unlistenFocusNotificationError
 let shellResizeObserver
@@ -131,6 +139,15 @@ function handleFocusElapsed(event) {
 
 function openFocusCompletion() {
   store.setClockView('focus')
+}
+
+function handleFocusReminderAction(event) {
+  const sessionId = event.payload?.sessionId
+  const action = event.payload?.action
+  if (sessionId) store.completeFocusSessionFromNative(sessionId)
+  store.dismissFocusCelebration()
+  if (action === 'start-break') store.startPendingBreak()
+  if (action === 'open-app') store.setClockView('focus')
 }
 
 function reportFocusNotificationError(event) {
@@ -284,6 +301,7 @@ async function openReleasePage() {
 }
 
 onMounted(async () => {
+  if (isFocusReminderWindow) return
   if (window.__TAURI_INTERNALS__) {
     getVersion().then(version => { appVersion.value = version }).catch(() => {})
   }
@@ -298,6 +316,9 @@ onMounted(async () => {
     listen('focus-timer:elapsed', handleFocusElapsed)
       .then(unlisten => { unlistenFocusElapsed = unlisten })
       .catch(error => console.warn('[App] 注册专注计时完成事件失败:', error))
+    listen('focus-reminder:action', handleFocusReminderAction)
+      .then(unlisten => { unlistenFocusReminderAction = unlisten })
+      .catch(error => console.warn('[App] 注册专注提醒操作失败:', error))
     listen('focus-notification:open', openFocusCompletion)
       .then(unlisten => { unlistenFocusNotificationOpen = unlisten })
       .catch(error => console.warn('[App] 注册专注通知点击事件失败:', error))
@@ -311,6 +332,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   unlistenReminderAction?.()
   unlistenFocusElapsed?.()
+  unlistenFocusReminderAction?.()
   unlistenFocusNotificationOpen?.()
   unlistenFocusNotificationError?.()
   shellResizeObserver?.disconnect()
