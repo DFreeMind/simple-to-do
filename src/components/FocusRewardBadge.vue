@@ -7,27 +7,28 @@
 
 <script setup>
 import { computed } from 'vue'
+import blueberryIcon from '@/assets/rewards/blueberry.png'
 import pumpkinIcon from '@/assets/rewards/pumpkin.png'
-import sesameIcon from '@/assets/rewards/sesame.png'
 import strawberryIcon from '@/assets/rewards/strawberry.png'
 import tomatoIcon from '@/assets/rewards/tomato.png'
 import watermelonIcon from '@/assets/rewards/watermelon.png'
 
 const props = defineProps({
-  reward: { type: String, default: 'sesame' },
+  reward: { type: String, default: 'blueberry' },
   size: { type: String, default: 'sm' },
   label: { type: Boolean, default: false }
 })
 
 const name = computed(() => ({
-  sesame: '芝麻', strawberry: '草莓', tomato: '番茄', watermelon: '西瓜', pumpkin: '南瓜'
-}[props.reward] || '芝麻'))
+  blueberry: '蓝莓', sesame: '蓝莓', strawberry: '草莓', tomato: '番茄', watermelon: '西瓜', pumpkin: '南瓜'
+}[props.reward] || '蓝莓'))
 
 const iconSrc = computed(() => ({
-  sesame: sesameIcon,
+  blueberry: blueberryIcon,
+  sesame: blueberryIcon,
   strawberry: strawberryIcon,
   tomato: tomatoIcon,
   watermelon: watermelonIcon,
   pumpkin: pumpkinIcon
-}[props.reward] || sesameIcon))
+}[props.reward] || blueberryIcon))
 </script>

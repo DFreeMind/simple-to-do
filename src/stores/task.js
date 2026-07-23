@@ -273,6 +273,7 @@ export const useTaskStore = defineStore('task', () => {
   const dataLoadError = ref('')
   const isSaving = ref(false)
   const notice = ref(null)
+  const focusCelebration = ref(null)
   const settings = ref({ ...DEFAULT_SETTINGS })
   const clock = ref(normalizeClock(DEFAULT_CLOCK))
   const profile = ref({ ...DEFAULT_PROFILE })
@@ -1835,7 +1836,7 @@ export const useTaskStore = defineStore('task', () => {
       elapsedSeconds: Math.max(0, Math.min(8 * 60 * 60, Math.round(Number(rawHistory.elapsedSeconds) || 0))),
       phase: ['focus', 'short-break', 'long-break'].includes(rawHistory.phase) ? rawHistory.phase : 'focus',
       result: ['completed', 'abandoned', 'interrupted'].includes(rawHistory.result) ? rawHistory.result : 'completed',
-      reward: ['sesame', 'strawberry', 'tomato', 'watermelon', 'pumpkin'].includes(rawHistory.reward) ? rawHistory.reward : (rawHistory.phase === 'focus' && rawHistory.result === 'completed' ? getFocusReward(rawHistory.elapsedSeconds) : null),
+      reward: rawHistory.reward === 'sesame' ? 'blueberry' : (['blueberry', 'strawberry', 'tomato', 'watermelon', 'pumpkin'].includes(rawHistory.reward) ? rawHistory.reward : (rawHistory.phase === 'focus' && rawHistory.result === 'completed' ? getFocusReward(rawHistory.elapsedSeconds) : null)),
       note: String(rawHistory.note || '').trim().slice(0, 240)
     }
   }
@@ -1858,7 +1859,7 @@ export const useTaskStore = defineStore('task', () => {
     if (minutes >= 45) return 'watermelon'
     if (minutes >= 25) return 'tomato'
     if (minutes >= 10) return 'strawberry'
-    return 'sesame'
+    return 'blueberry'
   }
 
   function getFocusSessionDuration(session) {
@@ -2026,13 +2027,23 @@ export const useTaskStore = defineStore('task', () => {
     }
     focusClockNow.value = Date.now()
     syncFocusTimer()
-    const message = session.phase === 'focus' && result === 'completed'
-      ? `专注完成，收获${({ sesame: '芝麻 ⚪', strawberry: '草莓 🍓', tomato: '番茄 🍅', watermelon: '西瓜 🍉', pumpkin: '南瓜 🎃' })[reward]}${clock.value.pendingBreak ? '，可以开始休息' : '，已开始休息'}`
-      : session.phase !== 'focus' && result === 'completed'
+    if (session.phase === 'focus' && result === 'completed') {
+      focusCelebration.value = {
+        id: genId(),
+        reward,
+        elapsedSeconds,
+        pendingBreak: Boolean(clock.value.pendingBreak)
+      }
+    }
+    const message = session.phase !== 'focus' && result === 'completed'
         ? '休息完成，准备继续投入'
         : '本次专注已记录'
-    showNotice(message, 'success')
+    if (session.phase !== 'focus' || result !== 'completed') showNotice(message, 'success')
     return true
+  }
+
+  function dismissFocusCelebration() {
+    focusCelebration.value = null
   }
 
   function deleteFocusHistory(historyId) {
@@ -2583,6 +2594,7 @@ export const useTaskStore = defineStore('task', () => {
     dataLoadError,
     isSaving,
     notice,
+    focusCelebration,
     settings,
     profile,
     clock,
@@ -2679,6 +2691,7 @@ export const useTaskStore = defineStore('task', () => {
     selectTask,
     showNotice,
     clearNotice,
+    dismissFocusCelebration,
     openSettings,
     closeSettings,
     openHelpCenter,
