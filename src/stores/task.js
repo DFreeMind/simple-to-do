@@ -1835,6 +1835,7 @@ export const useTaskStore = defineStore('task', () => {
       elapsedSeconds: Math.max(0, Math.min(8 * 60 * 60, Math.round(Number(rawHistory.elapsedSeconds) || 0))),
       phase: ['focus', 'short-break', 'long-break'].includes(rawHistory.phase) ? rawHistory.phase : 'focus',
       result: ['completed', 'abandoned', 'interrupted'].includes(rawHistory.result) ? rawHistory.result : 'completed',
+      reward: ['sesame', 'tomato', 'watermelon'].includes(rawHistory.reward) ? rawHistory.reward : (rawHistory.phase === 'focus' && rawHistory.result === 'completed' ? getFocusReward(rawHistory.elapsedSeconds) : null),
       note: String(rawHistory.note || '').trim().slice(0, 240)
     }
   }
@@ -1849,6 +1850,13 @@ export const useTaskStore = defineStore('task', () => {
     if (session.status !== 'running' || !session.startedAt) return base
     const live = Math.floor((now - new Date(session.startedAt).getTime()) / 1000)
     return base + Math.max(0, live)
+  }
+
+  function getFocusReward(elapsedSeconds) {
+    const minutes = Math.floor(Math.max(0, Number(elapsedSeconds) || 0) / 60)
+    if (minutes >= 45) return 'watermelon'
+    if (minutes >= 15) return 'tomato'
+    return 'sesame'
   }
 
   function getFocusSessionDuration(session) {
@@ -1987,6 +1995,7 @@ export const useTaskStore = defineStore('task', () => {
     const session = clock.value.activeSession
     if (!session) return false
     const elapsedSeconds = getFocusElapsedSeconds(session)
+    const reward = session.phase === 'focus' && result === 'completed' ? getFocusReward(elapsedSeconds) : null
     clock.value.history.unshift({
       id: genId(),
       profileId: session.profileId,
@@ -1996,6 +2005,7 @@ export const useTaskStore = defineStore('task', () => {
       elapsedSeconds,
       phase: session.phase || 'focus',
       result: ['completed', 'abandoned', 'interrupted'].includes(result) ? result : 'completed',
+      reward,
       note: String(note || '').trim().slice(0, 240)
     })
     clock.value.history = clock.value.history.slice(0, 500)
@@ -2015,7 +2025,7 @@ export const useTaskStore = defineStore('task', () => {
     focusClockNow.value = Date.now()
     syncFocusTimer()
     const message = session.phase === 'focus' && result === 'completed'
-      ? (clock.value.pendingBreak ? '专注完成，可以开始休息' : '专注完成，已开始休息')
+      ? `专注完成，收获${reward === 'watermelon' ? '西瓜 🍉' : reward === 'tomato' ? '番茄 🍅' : '芝麻 ⚪'}${clock.value.pendingBreak ? '，可以开始休息' : '，已开始休息'}`
       : session.phase !== 'focus' && result === 'completed'
         ? '休息完成，准备继续投入'
         : '本次专注已记录'

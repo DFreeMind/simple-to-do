@@ -8,7 +8,7 @@
             </svg>
             <div class="clock-stage__content">
               <span class="clock-stage__status"><i v-if="activeSession?.status === 'running'"></i>{{ stageLabel }}</span>
-              <div class="clock-stage__time-row"><strong>{{ formattedTime }}</strong></div>
+              <div class="clock-stage__time-row"><button v-if="canSetFreeDuration" class="clock-free-time" type="button" title="点击设定本次自由计时时长" @click="freeDurationEditing = true">{{ formattedTime }}</button><strong v-else>{{ formattedTime }}</strong><div v-if="freeDurationEditing" class="clock-free-time__editor"><label>设定时长<input v-model.number="freeDurationMinutes" type="number" min="1" max="480" autofocus />分钟</label><button type="button" @click="confirmFreeDuration">确定</button><button type="button" @click="clearFreeDuration">不设时长</button></div></div>
               <p>{{ stageDetail }}</p>
             </div>
           </div>
@@ -37,8 +37,6 @@
                 <component :is="profile.id === 'pomodoro' ? Timer : profile.id === 'deep-work' ? Focus : Clock3" :size="24" /><strong>{{ profile.name }}</strong><small>{{ durationText(profile.durationSeconds) }}</small>
               </button>
             </div>
-            <button class="clock-custom-trigger" type="button" :class="{ active: selectedProfileId === 'custom-focus' }" @click="selectedProfileId = 'custom-focus'">自定义本次时长</button>
-            <label v-if="selectedProfileId === 'custom-focus'" class="clock-custom-duration"><span>本次专注时长</span><div><input v-model.number="customDurationMinutes" type="number" min="1" max="480" step="1" /><small>分钟</small></div></label>
           </template>
           <p v-else class="clock-side-card__current-mode">{{ currentProfile?.name || '专注中' }} · {{ durationText(activeSession?.durationSeconds) }}</p>
         </section>
@@ -74,6 +72,7 @@
             <small>{{ todayCompletedCount }} 次完成专注</small>
           </div>
           <div class="clock-stat-grid"><div><span>累计</span><strong>{{ durationText(todaySeconds) }}</strong></div><div><span>专注轮次</span><strong>{{ todayCompletedCount }} 轮</strong></div><div><span>中断</span><strong>{{ todayInterruptedCount }} 次</strong></div></div>
+          <p v-if="todayRewards.length" class="clock-reward-strip">今日收获：<span v-for="reward in todayRewards" :key="reward.id">{{ reward.emoji }} {{ reward.name }} ×{{ reward.count }}</span></p>
         </section>
       </aside>
     </div>
@@ -93,7 +92,8 @@ import FocusHistoryWorkspace from './FocusHistoryWorkspace.vue'
 const store = useTaskStore()
 const selectedProfileId = ref('pomodoro')
 const selectedTaskId = ref(null)
-const customDurationMinutes = ref(30)
+const freeDurationMinutes = ref(null)
+const freeDurationEditing = ref(false)
 const finishNote = ref('')
 const taskPicker = ref(null)
 const taskPickerOpen = ref(false)
@@ -110,7 +110,7 @@ const taskOptions = computed(() => openTasks.value.slice(0, 8).map(task => ({
 const currentTaskTitle = computed(() => openTasks.value.find(task => task.id === activeSession.value?.taskId)?.title || '不关联任务')
 const selectedTaskTitle = computed(() => openTasks.value.find(task => task.id === selectedTaskId.value)?.title || '不关联任务')
 const remainingSeconds = computed(() => store.focusRemainingSeconds)
-const selectedDurationSeconds = computed(() => selectedProfileId.value === 'custom-focus' ? Math.max(60, Math.min(480 * 60, Math.round(Number(customDurationMinutes.value) || 30) * 60)) : selectedProfile.value?.durationSeconds)
+const selectedDurationSeconds = computed(() => selectedProfileId.value === 'free-focus' && freeDurationMinutes.value ? Math.max(60, Math.min(480 * 60, Math.round(Number(freeDurationMinutes.value) || 0) * 60)) : selectedProfile.value?.durationSeconds)
 const timerDuration = computed(() => activeSession.value?.durationSeconds ?? pendingBreak.value?.durationSeconds ?? selectedDurationSeconds.value ?? null)
 const timerProgress = computed(() => {
   if (timerDuration.value === null) return 1
@@ -120,6 +120,7 @@ const timerProgress = computed(() => {
 const timerRingStyle = computed(() => ({ '--ring-offset': String(634.6 * (1 - timerProgress.value)) }))
 const formattedTime = computed(() => formatClock(activeSession.value ? (remainingSeconds.value === null ? store.focusElapsedSeconds : remainingSeconds.value) : (selectedDurationSeconds.value || 0)))
 const canAdjustTime = computed(() => activeSession.value?.phase === 'focus' && activeSession.value.durationSeconds !== null)
+const canSetFreeDuration = computed(() => !activeSession.value && !pendingBreak.value && selectedProfileId.value === 'free-focus')
 const sessionTimeRange = computed(() => {
   const session = activeSession.value
   if (!session) return ''
@@ -130,15 +131,21 @@ const sessionTimeRange = computed(() => {
   return `${start} — 预计 ${formatTime(end)} 结束`
 })
 const stageLabel = computed(() => activeSession.value ? (activeSession.value.status === 'paused' ? '已暂停' : activeSession.value.phase === 'focus' ? '正在专注' : '正在休息') : pendingBreak.value ? '下一步' : '准备开始')
-const stageDetail = computed(() => activeSession.value ? (activeSession.value.phase === 'focus' ? currentTaskTitle.value : '暂时离开屏幕，回来再继续。') : pendingBreak.value ? '刚完成一段专注，给自己一点恢复时间。' : selectedProfile.value?.description || '')
+const stageDetail = computed(() => activeSession.value ? (activeSession.value.phase === 'focus' ? currentTaskTitle.value : '暂时离开屏幕，回来再继续。') : pendingBreak.value ? '刚完成一段专注，给自己一点恢复时间。' : selectedProfileId.value === 'free-focus' && selectedDurationSeconds.value ? `自由设定 ${durationText(selectedDurationSeconds.value)}，点击时间可修改。` : selectedProfile.value?.description || '')
 const headline = computed(() => activeSession.value ? (activeSession.value.phase === 'focus' ? '保持在这件事上' : '让大脑真正休息') : pendingBreak.value ? '先恢复，再继续' : '从一件小事开始')
 const todayHistory = computed(() => store.focusHistory.filter(item => new Date(item.finishedAt).toDateString() === new Date().toDateString()))
 const todaySeconds = computed(() => todayHistory.value.filter(item => item.phase === 'focus').reduce((total, item) => total + item.elapsedSeconds, 0))
 const todayCompletedCount = computed(() => todayHistory.value.filter(item => item.phase === 'focus' && item.result === 'completed').length)
 const todayInterruptedCount = computed(() => todayHistory.value.filter(item => item.phase === 'focus' && item.result !== 'completed').length)
-function start() { store.startFocus(selectedProfile.value?.id, selectedTaskId.value, selectedProfileId.value === 'custom-focus' ? selectedDurationSeconds.value : undefined) }
+const todayRewards = computed(() => {
+  const rewards = todayHistory.value.filter(item => item.phase === 'focus' && item.result === 'completed').map(item => item.reward).filter(Boolean)
+  return ['sesame', 'tomato', 'watermelon'].map(id => ({ id, name: id === 'sesame' ? '芝麻' : id === 'tomato' ? '番茄' : '西瓜', emoji: id === 'sesame' ? '⚪' : id === 'tomato' ? '🍅' : '🍉', count: rewards.filter(reward => reward === id).length })).filter(item => item.count)
+})
+function start() { store.startFocus(selectedProfile.value?.id, selectedTaskId.value, selectedProfileId.value === 'free-focus' && selectedDurationSeconds.value !== null ? selectedDurationSeconds.value : undefined) }
 function finish(result) { store.finishFocus(result, finishNote.value); finishNote.value = '' }
 function adjustTime(minutes) { return store.adjustFocusDuration(minutes * 60) }
+function confirmFreeDuration() { freeDurationMinutes.value = Math.max(1, Math.min(480, Math.round(Number(freeDurationMinutes.value) || 25))); freeDurationEditing.value = false }
+function clearFreeDuration() { freeDurationMinutes.value = null; freeDurationEditing.value = false }
 function chooseTask(taskId) { selectedTaskId.value = taskId; taskPickerOpen.value = false }
 function formatClock(seconds) { const value = Math.max(0, Math.floor(seconds || 0)); return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}` }
 function formatTime(date) { return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}` }
