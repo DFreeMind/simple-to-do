@@ -98,6 +98,8 @@ const freeDurationEditing = ref(false)
 const finishNote = ref('')
 const taskPicker = ref(null)
 const taskPickerOpen = ref(false)
+const visualClockNow = ref(Date.now())
+let visualClockFrame = null
 const activeSession = computed(() => store.activeFocusSession)
 const pendingBreak = computed(() => store.focusPendingBreak)
 const selectedProfile = computed(() => store.focusProfiles.find(item => item.id === selectedProfileId.value) || store.focusProfiles[0])
@@ -115,7 +117,10 @@ const selectedDurationSeconds = computed(() => selectedProfileId.value === 'free
 const timerDuration = computed(() => activeSession.value?.durationSeconds ?? pendingBreak.value?.durationSeconds ?? selectedDurationSeconds.value ?? null)
 const timerProgress = computed(() => {
   if (timerDuration.value === null) return 1
-  const seconds = activeSession.value ? remainingSeconds.value : timerDuration.value
+  const session = activeSession.value
+  const seconds = session?.status === 'running' && session.startedAt
+    ? Math.max(0, timerDuration.value - (Number(session.elapsedSeconds) || 0) - Math.max(0, (visualClockNow.value - new Date(session.startedAt).getTime()) / 1000))
+    : (session ? remainingSeconds.value : timerDuration.value)
   return Math.max(0, Math.min(1, Number(seconds) / timerDuration.value))
 })
 const timerRingStyle = computed(() => ({ '--ring-offset': String(634.6 * (1 - timerProgress.value)) }))
@@ -153,6 +158,16 @@ function formatClock(seconds) { const value = Math.max(0, Math.floor(seconds || 
 function formatTime(date) { return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}` }
 function durationText(seconds) { if (seconds === null || seconds === undefined) return '自由计时'; const minutes = Math.round(seconds / 60); return minutes >= 60 ? `${Math.floor(minutes / 60)} 小时` : `${minutes} 分钟` }
 function closeTaskPicker(event) { if (!taskPicker.value?.contains(event.target)) taskPickerOpen.value = false }
-onMounted(() => window.addEventListener('pointerdown', closeTaskPicker))
-onBeforeUnmount(() => window.removeEventListener('pointerdown', closeTaskPicker))
+function syncVisualClock() {
+  visualClockNow.value = Date.now()
+  visualClockFrame = window.requestAnimationFrame(syncVisualClock)
+}
+onMounted(() => {
+  window.addEventListener('pointerdown', closeTaskPicker)
+  visualClockFrame = window.requestAnimationFrame(syncVisualClock)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('pointerdown', closeTaskPicker)
+  if (visualClockFrame) window.cancelAnimationFrame(visualClockFrame)
+})
 </script>
