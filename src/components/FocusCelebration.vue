@@ -9,39 +9,45 @@
 
           <div class="focus-celebration__hero" aria-hidden="true">
             <span class="focus-celebration__halo"></span>
+            <span class="focus-celebration__orbit"></span>
             <span class="focus-celebration__check"><CircleCheck :size="43" :stroke-width="1.8" /></span>
             <Sparkles class="focus-celebration__sparkle focus-celebration__sparkle--one" :size="18" />
             <Sparkles class="focus-celebration__sparkle focus-celebration__sparkle--two" :size="13" />
           </div>
 
           <div class="focus-celebration__copy">
-            <p class="focus-celebration__eyebrow">专注完成</p>
-            <h2 id="focus-celebration-title">这一段时间，属于重要的事</h2>
+            <div class="focus-celebration__kicker">
+              <p class="focus-celebration__eyebrow"><span></span>专注完成</p>
+              <span class="focus-celebration__saved"><Check :size="13" :stroke-width="2.2" />已记录</span>
+            </div>
+            <h2 id="focus-celebration-title">重要的事，又向前了一步</h2>
             <p class="focus-celebration__metric">
               <strong>{{ durationParts.value }}</strong>
               <span>{{ durationParts.unit }}</span>
             </p>
-            <p id="focus-celebration-description" class="focus-celebration__duration">已经记录到你的专注历程</p>
+            <p id="focus-celebration-description" class="focus-celebration__duration">这一轮专注，已经安静地收进你的历程</p>
           </div>
 
-          <div v-if="celebration.taskTitle" class="focus-celebration__task">
-            <span>本轮推进</span>
-            <strong>{{ celebration.taskTitle }}</strong>
-          </div>
+          <div v-if="celebration.taskTitle || celebration.reward" class="focus-celebration__summary">
+            <div v-if="celebration.taskTitle" class="focus-celebration__task">
+              <span><ListChecks :size="15" />本轮推进</span>
+              <strong>{{ celebration.taskTitle }}</strong>
+            </div>
 
-          <div v-if="celebration.reward" class="focus-celebration__reward">
-            <span class="focus-celebration__reward-icon"><FocusRewardBadge :reward="celebration.reward" size="md" /></span>
-            <span><small>专注收获</small><strong>{{ rewardName }}</strong></span>
+            <div v-if="celebration.reward" class="focus-celebration__reward">
+              <span class="focus-celebration__reward-icon"><FocusRewardBadge :reward="celebration.reward" size="md" /></span>
+              <span><small>专注收获</small><strong>{{ rewardName }}</strong></span>
+            </div>
           </div>
 
           <p v-if="celebration.pendingBreak" class="focus-celebration__tip">
             <span><Coffee :size="18" /></span>
-            <span><strong>接下来，休息 {{ durationText(celebration.breakSeconds) }}</strong><small>起身喝水，看看远处，让注意力重新充电。</small></span>
+            <span><strong>给自己 {{ durationText(celebration.breakSeconds) }} 空白</strong><small>起身喝水，看看远处，让注意力慢慢回满。</small></span>
           </p>
 
           <div class="focus-celebration__actions">
-            <button v-if="celebration.pendingBreak" ref="primaryAction" class="focus-celebration__primary" type="button" @click="$emit('start-break')">开始休息</button>
-            <button v-else ref="primaryAction" class="focus-celebration__primary" type="button" @click="$emit('dismiss')">收下这次专注</button>
+            <button v-if="celebration.pendingBreak" ref="primaryAction" class="focus-celebration__primary" type="button" @click="$emit('start-break')"><Coffee :size="17" />开始休息</button>
+            <button v-else ref="primaryAction" class="focus-celebration__primary" type="button" @click="$emit('dismiss')"><Check :size="17" />收下这次专注</button>
             <button v-if="celebration.pendingBreak" class="focus-celebration__secondary" type="button" @click="$emit('dismiss')">稍后休息</button>
           </div>
         </section>
@@ -52,7 +58,7 @@
 
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
-import { CircleCheck, Coffee, Sparkles, X } from 'lucide-vue-next'
+import { Check, CircleCheck, Coffee, ListChecks, Sparkles, X } from 'lucide-vue-next'
 import FocusRewardBadge from './FocusRewardBadge.vue'
 
 const props = defineProps({

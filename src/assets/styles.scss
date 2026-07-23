@@ -7308,18 +7308,31 @@ body.is-resizing {
   position: relative;
   display: grid;
   justify-items: stretch;
-  width: min(100%, 440px);
-  padding: 34px 36px 30px;
+  width: min(100%, 456px);
+  padding: 32px 34px 30px;
   overflow: hidden;
-  border: 1px solid rgba(155, 207, 196, .52);
-  border-radius: 28px;
+  border: 1px solid rgba(151, 203, 192, .58);
+  border-radius: 30px;
   background:
-    linear-gradient(155deg, rgba(255, 255, 255, .98), rgba(247, 252, 250, .98));
+    radial-gradient(circle at 9% 10%, rgba(218, 244, 237, .62), transparent 28%),
+    linear-gradient(155deg, rgba(255, 255, 255, .99), rgba(246, 251, 249, .99));
   box-shadow:
-    0 30px 80px rgba(4, 30, 25, .34),
-    0 2px 8px rgba(24, 91, 78, .08),
+    0 34px 90px rgba(4, 30, 25, .36),
+    0 3px 10px rgba(24, 91, 78, .1),
     inset 0 1px rgba(255, 255, 255, .9);
   text-align: center;
+}
+
+.focus-celebration__card::before {
+  position: absolute;
+  top: 0;
+  right: 82px;
+  left: 82px;
+  height: 3px;
+  border-radius: 0 0 999px 999px;
+  background: linear-gradient(90deg, transparent, #4db39f 22%, #d7ae57 78%, transparent);
+  content: '';
+  opacity: .82;
 }
 
 .focus-celebration__glow {
@@ -7371,25 +7384,49 @@ body.is-resizing {
 .focus-celebration__hero {
   position: relative;
   display: grid;
-  width: 104px;
-  height: 104px;
+  width: 112px;
+  height: 112px;
   place-items: center;
-  margin: 2px auto 18px;
+  margin: 1px auto 16px;
 }
 
 .focus-celebration__halo {
   position: absolute;
-  inset: 3px;
+  inset: 4px;
   border: 1px solid rgba(46, 154, 134, .2);
   border-radius: 50%;
   background:
     radial-gradient(circle at 38% 30%, rgba(255, 255, 255, .96) 0 8%, transparent 9%),
     linear-gradient(145deg, #dff6ef, #bce9dd);
   box-shadow:
-    0 15px 34px rgba(40, 142, 122, .18),
+    0 17px 38px rgba(40, 142, 122, .2),
     inset 0 0 0 8px rgba(255, 255, 255, .5);
   animation: focus-halo-in .38s cubic-bezier(.2, .9, .25, 1.15) both;
 }
+
+.focus-celebration__orbit {
+  position: absolute;
+  inset: -2px;
+  border: 1px dashed rgba(40, 142, 122, .28);
+  border-radius: 50%;
+  transform: rotate(18deg);
+  animation: focus-orbit-in .45s .04s ease-out both;
+}
+
+.focus-celebration__orbit::before,
+.focus-celebration__orbit::after {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border: 2px solid #f7fbfa;
+  border-radius: 50%;
+  background: #d6ab4f;
+  box-shadow: 0 2px 6px rgba(112, 83, 24, .18);
+  content: '';
+}
+
+.focus-celebration__orbit::before { top: 7px; left: 18px; }
+.focus-celebration__orbit::after { right: 7px; bottom: 20px; background: #4aac98; }
 
 .focus-celebration__check {
   position: relative;
@@ -7430,19 +7467,51 @@ body.is-resizing {
   margin: 0;
 }
 
+.focus-celebration__kicker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin-bottom: 8px;
+}
+
 .focus-celebration__eyebrow {
-  margin: 0 0 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
   color: #208171;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 760;
-  letter-spacing: .18em;
+  letter-spacing: .12em;
+}
+
+.focus-celebration__eyebrow span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #38a48f;
+  box-shadow: 0 0 0 4px rgba(56, 164, 143, .11);
+}
+
+.focus-celebration__saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 7px;
+  border: 1px solid #dce9e5;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .7);
+  color: #75847f;
+  font-size: 9px;
+  font-weight: 680;
 }
 
 .focus-celebration h2 {
-  max-width: 340px;
+  max-width: 360px;
   margin: 0 auto;
   color: #172824;
-  font-size: 24px;
+  font-size: 25px;
   font-weight: 720;
   line-height: 1.35;
   letter-spacing: -.035em;
@@ -7453,12 +7522,12 @@ body.is-resizing {
   align-items: baseline;
   justify-content: center;
   gap: 7px;
-  margin: 14px 0 0;
+  margin: 13px 0 0;
   color: #1b7566;
 }
 
 .focus-celebration__metric strong {
-  font-size: 45px;
+  font-size: 47px;
   font-weight: 730;
   line-height: 1;
   letter-spacing: -.055em;
@@ -7471,23 +7540,32 @@ body.is-resizing {
 }
 
 .focus-celebration__duration {
-  margin: 7px 0 0;
+  margin: 8px 0 0;
   color: #71817d;
   font-size: 12px;
 }
 
-.focus-celebration__task {
+.focus-celebration__summary {
   position: relative;
   z-index: 1;
   display: grid;
-  gap: 4px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  width: 100%;
+  margin-top: 20px;
+}
+
+.focus-celebration__task {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
   max-width: 100%;
-  margin: 22px 0 0;
-  padding: 13px 15px;
+  margin: 0;
+  padding: 12px 14px;
   overflow: visible;
   border: 1px solid #dceae6;
   border-radius: 14px;
-  background: rgba(255, 255, 255, .72);
+  background: rgba(255, 255, 255, .82);
   color: #263c36;
   text-align: left;
   box-shadow: 0 5px 16px rgba(25, 82, 70, .045);
@@ -7495,6 +7573,9 @@ body.is-resizing {
 }
 
 .focus-celebration__task span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: #7c8c87;
   font-size: 11px;
   font-weight: 650;
@@ -7511,18 +7592,16 @@ body.is-resizing {
 }
 
 .focus-celebration__reward {
-  position: relative;
-  z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-self: center;
   gap: 9px;
   width: fit-content;
-  margin: 14px 0 0;
-  padding: 7px 13px 7px 8px;
+  margin: 0;
+  padding: 8px 13px 8px 8px;
   border: 1px solid #e7dfc8;
-  border-radius: 999px;
-  background: #fffaf0;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #fffdf8, #fff8e9);
   color: #5c4b24;
   box-shadow: none;
   text-align: left;
@@ -7565,12 +7644,11 @@ body.is-resizing {
   display: flex;
   align-items: center;
   gap: 11px;
-  margin: 19px 0 0;
+  margin: 12px 0 0;
   padding: 12px 14px;
-  border: 1px solid #d9ebe6;
-  border-left: 1px solid #d9ebe6;
-  border-radius: 14px;
-  background: #eef8f5;
+  border: 1px solid #d5e8e3;
+  border-radius: 15px;
+  background: linear-gradient(100deg, #edf8f5, #f7fbfa);
   color: #365049;
   font-size: 12px;
   text-align: left;
@@ -7615,6 +7693,10 @@ body.is-resizing {
 }
 
 .focus-celebration__actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   min-height: 44px;
   padding: 0 20px;
   border-radius: 13px;
@@ -7667,6 +7749,11 @@ body.is-resizing {
   to { opacity: 1; transform: scale(1) rotate(0); }
 }
 
+@keyframes focus-orbit-in {
+  from { opacity: 0; transform: rotate(-8deg) scale(.82); }
+  to { opacity: 1; transform: rotate(18deg) scale(1); }
+}
+
 @media (width <= 520px) {
   .focus-celebration {
     padding: 16px;
@@ -7684,10 +7771,19 @@ body.is-resizing {
   .focus-celebration__actions {
     flex-direction: column;
   }
+
+  .focus-celebration__summary {
+    grid-template-columns: 1fr;
+  }
+
+  .focus-celebration__reward {
+    justify-self: stretch;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .focus-celebration__halo,
+  .focus-celebration__orbit,
   .focus-celebration__check,
   .focus-celebration__sparkle {
     animation: none;

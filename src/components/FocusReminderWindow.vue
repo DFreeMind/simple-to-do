@@ -3,8 +3,11 @@
     <section v-if="reminder" class="focus-reminder-card" role="dialog" aria-modal="true" aria-labelledby="focus-reminder-title" aria-describedby="focus-reminder-description">
       <header class="focus-reminder-titlebar" data-tauri-drag-region>
         <span class="focus-reminder-brand" data-tauri-drag-region>
-          <TimerReset :size="16" :stroke-width="1.8" />
-          易简清单 · 专注时刻
+          <span class="focus-reminder-brand-icon" data-tauri-drag-region><TimerReset :size="16" :stroke-width="1.9" /></span>
+          <span class="focus-reminder-brand-copy" data-tauri-drag-region>
+            <strong data-tauri-drag-region>易简清单</strong>
+            <small data-tauri-drag-region>专注时刻</small>
+          </span>
         </span>
         <button type="button" aria-label="关闭提醒" @click="dismiss">
           <X :size="18" />
@@ -13,13 +16,17 @@
 
       <div class="focus-reminder-hero" aria-hidden="true">
         <span class="focus-reminder-halo"></span>
+        <span class="focus-reminder-orbit"></span>
         <span class="focus-reminder-check"><CircleCheck :size="48" :stroke-width="1.75" /></span>
         <Sparkles class="focus-reminder-sparkle focus-reminder-sparkle--one" :size="18" />
         <Sparkles class="focus-reminder-sparkle focus-reminder-sparkle--two" :size="13" />
       </div>
 
       <div class="focus-reminder-copy">
-        <p>{{ reminder.phase === 'focus' ? '专注完成' : '休息完成' }}</p>
+        <div class="focus-reminder-kicker">
+          <p><span></span>{{ reminder.phase === 'focus' ? '专注完成' : '休息完成' }}</p>
+          <span><Check :size="12" :stroke-width="2.2" />已记录</span>
+        </div>
         <h1 id="focus-reminder-title">{{ headline }}</h1>
         <div v-if="reminder.phase === 'focus'" class="focus-reminder-metric">
           <strong>{{ durationParts.value }}</strong>
@@ -36,7 +43,7 @@
       <div v-if="reminder.phase === 'focus'" class="focus-reminder-insight">
         <span class="focus-reminder-reward"><FocusRewardBadge :reward="reward" size="md" /></span>
         <span>
-          <small>{{ breakAvailable ? '接下来' : '专注收获' }}</small>
+          <small>{{ breakAvailable ? '给注意力充充电' : '专注收获' }}</small>
           <strong>{{ breakAvailable ? `休息 ${breakText}` : rewardName }}</strong>
         </span>
         <Coffee v-if="breakAvailable" :size="19" />
@@ -59,7 +66,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { listen } from '@tauri-apps/api/event'
-import { ArrowRight, CircleCheck, Coffee, ListChecks, Sparkles, TimerReset, X } from 'lucide-vue-next'
+import { ArrowRight, Check, CircleCheck, Coffee, ListChecks, Sparkles, TimerReset, X } from 'lucide-vue-next'
 import FocusRewardBadge from './FocusRewardBadge.vue'
 import {
   getFocusReminderPayload,
@@ -98,11 +105,11 @@ const rewardName = computed(() => ({
 const breakText = computed(() => durationText(reminder.value?.breakSeconds))
 const headline = computed(() => {
   if (reminder.value?.phase !== 'focus') return '休息好了，准备回来吧'
-  return '这一段时间，属于重要的事'
+  return '重要的事，又向前了一步'
 })
 const description = computed(() => {
   if (reminder.value?.phase !== 'focus') return '回到清单，选择下一件值得投入的事情。'
-  if (breakAvailable.value) return '这一轮已经稳稳记下。起身喝水、看看远处，让注意力重新充电。'
+  if (breakAvailable.value) return '这一轮已经稳稳记下。现在离开屏幕一会儿，让节奏自然续上。'
   return '这一轮已经稳稳记下，保持自己的节奏就好。'
 })
 const primaryLabel = computed(() => {
@@ -161,6 +168,9 @@ onBeforeUnmount(() => unlistenRefresh?.())
 
 <style scoped>
 .focus-reminder-window {
+  --reminder-accent: #238f80;
+  --reminder-accent-strong: #176f64;
+  --reminder-gold: #d3a747;
   min-height: 100vh;
   overflow: hidden;
   color: #1d2b27;
@@ -174,20 +184,33 @@ onBeforeUnmount(() => unlistenRefresh?.())
   min-height: 560px;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid #d9e9e5;
+  border: 1px solid #d2e5e0;
   background:
-    radial-gradient(circle at 12% 4%, rgba(178, 229, 218, .5), transparent 28%),
-    radial-gradient(circle at 94% 36%, rgba(221, 244, 237, .76), transparent 34%),
-    linear-gradient(160deg, #ffffff 0%, #f7fbfa 62%, #f1f8f6 100%);
+    radial-gradient(circle at 10% 2%, rgba(176, 228, 216, .58), transparent 29%),
+    radial-gradient(circle at 97% 40%, rgba(225, 246, 239, .82), transparent 36%),
+    linear-gradient(160deg, #ffffff 0%, #f8fcfb 58%, #eff7f5 100%);
   box-shadow: inset 0 1px rgba(255, 255, 255, .9);
+}
+
+.focus-reminder-card::before {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: 74px;
+  left: 74px;
+  height: 3px;
+  border-radius: 0 0 999px 999px;
+  background: linear-gradient(90deg, transparent, #4caf9c 24%, #d9ae50 76%, transparent);
+  content: '';
+  opacity: .86;
 }
 
 .focus-reminder-titlebar {
   display: flex;
-  height: 52px;
+  height: 58px;
   align-items: center;
   justify-content: space-between;
-  padding: 0 14px 0 18px;
+  padding: 0 13px 0 17px;
   color: #63736e;
   font-size: 12px;
   font-weight: 650;
@@ -198,7 +221,36 @@ onBeforeUnmount(() => unlistenRefresh?.())
 .focus-reminder-brand {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 9px;
+}
+
+.focus-reminder-brand-icon {
+  display: grid;
+  width: 31px;
+  height: 31px;
+  place-items: center;
+  border: 1px solid rgba(35, 143, 128, .16);
+  border-radius: 10px;
+  color: var(--reminder-accent);
+  background: rgba(255, 255, 255, .72);
+  box-shadow: 0 4px 12px rgba(38, 108, 96, .08);
+}
+
+.focus-reminder-brand-copy {
+  display: grid;
+  gap: 1px;
+}
+
+.focus-reminder-brand-copy strong {
+  color: #344641;
+  font-size: 11px;
+  font-weight: 720;
+}
+
+.focus-reminder-brand-copy small {
+  color: #899691;
+  font-size: 9px;
+  font-weight: 560;
 }
 
 .focus-reminder-titlebar button {
@@ -219,48 +271,101 @@ onBeforeUnmount(() => unlistenRefresh?.())
 .focus-reminder-hero {
   position: relative;
   display: grid;
-  width: 108px;
-  height: 108px;
-  margin: 12px auto 0;
+  width: 116px;
+  height: 116px;
+  margin: 7px auto 0;
   place-items: center;
 }
 
 .focus-reminder-halo {
   position: absolute;
-  inset: 5px;
+  inset: 6px;
   border-radius: 50%;
   background: linear-gradient(145deg, #dff5ee, #eefaf6);
-  box-shadow: 0 16px 36px rgba(48, 133, 117, .18), inset 0 0 0 1px rgba(79, 160, 144, .18);
+  box-shadow: 0 18px 40px rgba(48, 133, 117, .2), inset 0 0 0 8px rgba(255, 255, 255, .42);
   animation: halo-in 360ms cubic-bezier(.2, .78, .25, 1) both;
 }
+
+.focus-reminder-orbit {
+  position: absolute;
+  inset: 0;
+  border: 1px dashed rgba(35, 143, 128, .3);
+  border-radius: 50%;
+  transform: rotate(18deg);
+  animation: orbit-in 420ms 40ms ease-out both;
+}
+
+.focus-reminder-orbit::before,
+.focus-reminder-orbit::after {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border: 2px solid #f8fcfb;
+  border-radius: 50%;
+  background: var(--reminder-gold);
+  box-shadow: 0 2px 6px rgba(108, 78, 18, .16);
+  content: '';
+}
+
+.focus-reminder-orbit::before { top: 7px; left: 20px; }
+.focus-reminder-orbit::after { right: 7px; bottom: 21px; background: #4caf9c; }
 
 .focus-reminder-check {
   position: relative;
   display: grid;
-  width: 70px;
-  height: 70px;
+  width: 74px;
+  height: 74px;
   place-items: center;
   border-radius: 50%;
-  color: #238f80;
-  background: rgba(255, 255, 255, .9);
-  box-shadow: 0 8px 20px rgba(31, 119, 104, .13);
+  color: #fff;
+  background: linear-gradient(145deg, #2f9c89, #19786a);
+  box-shadow: 0 10px 23px rgba(31, 119, 104, .27), inset 0 1px rgba(255, 255, 255, .22);
 }
 
 .focus-reminder-sparkle { position: absolute; color: #d6a833; }
 .focus-reminder-sparkle--one { top: 2px; right: 2px; }
 .focus-reminder-sparkle--two { bottom: 13px; left: -1px; color: #5ab9aa; }
 
-.focus-reminder-copy { padding: 10px 34px 0; text-align: center; }
-.focus-reminder-copy > p:first-child {
-  margin: 0 0 7px;
-  color: #238f80;
-  font-size: 12px;
-  font-weight: 750;
-  letter-spacing: .12em;
+.focus-reminder-copy { padding: 7px 34px 0; text-align: center; }
+.focus-reminder-kicker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 7px;
 }
-.focus-reminder-copy h1 { margin: 0; color: #17231f; font-size: 23px; line-height: 1.3; letter-spacing: -.02em; }
+.focus-reminder-kicker p {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--reminder-accent);
+  font-size: 11px;
+  font-weight: 760;
+  letter-spacing: .1em;
+}
+.focus-reminder-kicker p span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #3da48f;
+  box-shadow: 0 0 0 4px rgba(61, 164, 143, .1);
+}
+.focus-reminder-kicker > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 7px;
+  border: 1px solid #dbe8e4;
+  border-radius: 999px;
+  color: #788782;
+  background: rgba(255, 255, 255, .7);
+  font-size: 9px;
+  font-weight: 650;
+}
+.focus-reminder-copy h1 { margin: 0; color: #17231f; font-size: 24px; line-height: 1.3; letter-spacing: -.035em; }
 .focus-reminder-metric { display: flex; align-items: baseline; justify-content: center; gap: 6px; margin-top: 9px; }
-.focus-reminder-metric strong { color: #176f64; font-size: 35px; line-height: 1; letter-spacing: -.04em; }
+.focus-reminder-metric strong { color: var(--reminder-accent-strong); font-size: 38px; line-height: 1; letter-spacing: -.055em; font-variant-numeric: tabular-nums; }
 .focus-reminder-metric span { color: #57706a; font-size: 13px; font-weight: 650; }
 .focus-reminder-description { max-width: 338px; margin: 10px auto 0; color: #63736f; font-size: 13px; line-height: 1.65; }
 
@@ -268,26 +373,28 @@ onBeforeUnmount(() => unlistenRefresh?.())
 .focus-reminder-insight {
   margin-right: 28px;
   margin-left: 28px;
-  border: 1px solid #dfebe8;
-  border-radius: 13px;
-  background: rgba(255, 255, 255, .78);
+  border: 1px solid #d9e9e5;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .82);
+  box-shadow: 0 5px 16px rgba(31, 99, 87, .045);
 }
 
-.focus-reminder-task { display: grid; gap: 5px; margin-top: 16px; padding: 11px 13px; }
+.focus-reminder-task { display: grid; gap: 5px; margin-top: 15px; padding: 11px 13px; }
 .focus-reminder-task span { display: flex; align-items: center; gap: 6px; color: #75837f; font-size: 11px; }
 .focus-reminder-task strong { overflow: hidden; color: #293934; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-.focus-reminder-insight { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 10px 13px; }
+.focus-reminder-insight { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 10px 13px; background: linear-gradient(100deg, rgba(239, 249, 246, .95), rgba(255, 253, 247, .86)); }
 .focus-reminder-insight > span:nth-child(2) { display: grid; gap: 2px; flex: 1; }
 .focus-reminder-insight small { color: #75837f; font-size: 10px; }
 .focus-reminder-insight strong { color: #31413c; font-size: 13px; }
 .focus-reminder-insight > svg { color: #379d8e; }
-.focus-reminder-reward { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 11px; background: #edf7f4; }
+.focus-reminder-reward { display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid rgba(216, 178, 91, .2); border-radius: 11px; background: #fff; box-shadow: 0 3px 9px rgba(95, 70, 20, .07); }
 
 .focus-reminder-actions {
   display: grid;
-  gap: 9px;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 10px;
   margin-top: auto;
-  padding: 18px 28px 25px;
+  padding: 17px 28px 25px;
 }
 .focus-reminder-actions button {
   display: flex;
@@ -304,8 +411,9 @@ onBeforeUnmount(() => unlistenRefresh?.())
 .focus-reminder-actions button:focus-visible,
 .focus-reminder-titlebar button:focus-visible { outline: 3px solid rgba(35, 143, 128, .3); outline-offset: 2px; }
 .focus-reminder-actions button:disabled { cursor: default; opacity: .58; }
-.focus-reminder-primary { border: 1px solid #238f80; color: #fff; background: #238f80; box-shadow: 0 9px 20px rgba(35, 143, 128, .22); }
-.focus-reminder-primary:hover:not(:disabled) { border-color: #1c786c; background: #1c786c; box-shadow: 0 11px 24px rgba(35, 143, 128, .27); }
+.focus-reminder-primary { border: 1px solid #238f80; color: #fff; background: linear-gradient(135deg, #2d9b88, #19786a); box-shadow: 0 10px 22px rgba(35, 143, 128, .25); }
+.focus-reminder-primary:only-child { grid-column: 1 / -1; }
+.focus-reminder-primary:hover:not(:disabled) { border-color: #1c786c; background: linear-gradient(135deg, #278d7c, #146d60); box-shadow: 0 12px 26px rgba(35, 143, 128, .3); }
 .focus-reminder-secondary { border: 1px solid #d9e5e2; color: #53635f; background: rgba(255, 255, 255, .74); }
 .focus-reminder-secondary:hover:not(:disabled) { border-color: #c8d9d5; color: #283833; background: #fff; }
 
@@ -314,8 +422,14 @@ onBeforeUnmount(() => unlistenRefresh?.())
   to { opacity: 1; transform: scale(1); }
 }
 
+@keyframes orbit-in {
+  from { opacity: 0; transform: rotate(-8deg) scale(.82); }
+  to { opacity: 1; transform: rotate(18deg) scale(1); }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .focus-reminder-halo { animation: none; }
+  .focus-reminder-halo,
+  .focus-reminder-orbit { animation: none; }
   .focus-reminder-actions button,
   .focus-reminder-titlebar button { transition: none; }
 }
