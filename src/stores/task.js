@@ -104,7 +104,8 @@ const DEFAULT_PROFILE = {
 const DEFAULT_FOCUS_PROFILES = [
   { id: 'pomodoro', name: '番茄专注', durationSeconds: 25 * 60, description: '25 分钟专注，适合从下一步开始。', sortOrder: 1000 },
   { id: 'deep-work', name: '深度专注', durationSeconds: 50 * 60, description: '50 分钟连续投入，适合需要沉浸的事项。', sortOrder: 2000 },
-  { id: 'free-focus', name: '自由计时', durationSeconds: null, description: '不设结束时间，记录真实投入。', sortOrder: 3000 }
+  { id: 'custom-focus', name: '自定义时长', durationSeconds: 30 * 60, description: '按本次需要设定专注时间。', sortOrder: 3000 },
+  { id: 'free-focus', name: '自由计时', durationSeconds: null, description: '不设结束时间，记录真实投入。', sortOrder: 4000 }
 ]
 
 const DEFAULT_FOCUS_SETTINGS = {
@@ -1686,6 +1687,9 @@ export const useTaskStore = defineStore('task', () => {
     const profiles = rawProfiles
       .map((profile, index) => normalizeFocusProfile(profile, index))
       .filter((profile, index, items) => items.findIndex(item => item.id === profile.id) === index)
+    DEFAULT_FOCUS_PROFILES.forEach(profile => {
+      if (!profiles.some(item => item.id === profile.id)) profiles.push({ ...profile })
+    })
     const focusSettings = normalizeFocusSettings(rawClock?.focusSettings)
     const rhythm = normalizeRhythm(rawClock?.rhythm)
     const activeSession = normalizeFocusSession(rawClock?.activeSession, profiles)
@@ -1868,7 +1872,7 @@ export const useTaskStore = defineStore('task', () => {
     }, 1000)
   }
 
-  function startFocus(profileId = 'pomodoro', taskId = null) {
+  function startFocus(profileId = 'pomodoro', taskId = null, durationOverride = undefined) {
     if (clock.value.activeSession) return false
     const profile = focusProfiles.value.find(item => item.id === profileId) || focusProfiles.value[0]
     if (!profile) return false
@@ -1882,7 +1886,9 @@ export const useTaskStore = defineStore('task', () => {
       startedAt: nowIso(),
       elapsedSeconds: 0,
       phase: 'focus',
-      durationSeconds: profile.durationSeconds
+      durationSeconds: durationOverride === undefined || profile.durationSeconds === null
+        ? profile.durationSeconds
+        : normalizeDuration(durationOverride, profile.durationSeconds)
     }
     focusClockNow.value = Date.now()
     syncFocusTimer()
@@ -1915,6 +1921,15 @@ export const useTaskStore = defineStore('task', () => {
     const session = clock.value.activeSession
     if (!session) return false
     session.taskId = activeTasks.value.some(task => task.id === taskId) ? taskId : null
+    return true
+  }
+
+  function adjustFocusDuration(deltaSeconds) {
+    const session = clock.value.activeSession
+    if (!session || session.durationSeconds === null) return false
+    const elapsedSeconds = getFocusElapsedSeconds(session)
+    session.durationSeconds = Math.max(elapsedSeconds + 60, Math.min(8 * 60 * 60, session.durationSeconds + Math.round(Number(deltaSeconds) || 0)))
+    focusClockNow.value = Date.now()
     return true
   }
 
@@ -2661,6 +2676,7 @@ export const useTaskStore = defineStore('task', () => {
     pauseFocus,
     resumeFocus,
     updateFocusTask,
+    adjustFocusDuration,
     updateFocusSettings,
     updateFocusProfile,
     startPendingBreak,
