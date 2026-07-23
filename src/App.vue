@@ -65,6 +65,7 @@
 
     <SettingsPanel />
     <HelpCenter />
+    <FocusCelebration :celebration="store.focusCelebration" @dismiss="store.dismissFocusCelebration" @start-break="startBreakFromCelebration" />
 
     <div
       v-if="store.notice"
@@ -92,6 +93,7 @@ import ClockSidebar from './components/ClockSidebar.vue'
 import ClockWorkspace from './components/ClockWorkspace.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
 import HelpCenter from './components/HelpCenter.vue'
+import FocusCelebration from './components/FocusCelebration.vue'
 import { useTaskStore } from './stores/task'
 import { useTheme } from './composables/useTheme'
 import { openDataBackupLocation, openReleasePage as openReleasePageInBrowser } from './services/platform'
@@ -117,6 +119,11 @@ const shellRef = ref(null)
 const shellWidth = ref(0)
 let unlistenReminderAction
 let shellResizeObserver
+
+function startBreakFromCelebration() {
+  store.dismissFocusCelebration()
+  store.startPendingBreak()
+}
 
 const layoutDetailWidth = computed(() => clampDetailWidth(detailWidth.value, getDetailMaxWidth()))
 const isCheckingRecoveryUpdate = computed(() => ['checking', 'downloading', 'installing'].includes(recoveryUpdateState.value))

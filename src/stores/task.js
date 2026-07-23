@@ -2032,7 +2032,8 @@ export const useTaskStore = defineStore('task', () => {
         id: genId(),
         reward,
         elapsedSeconds,
-        pendingBreak: Boolean(clock.value.pendingBreak)
+        pendingBreak: Boolean(clock.value.pendingBreak),
+        breakSeconds: clock.value.pendingBreak?.durationSeconds || null
       }
     }
     const message = session.phase !== 'focus' && result === 'completed'

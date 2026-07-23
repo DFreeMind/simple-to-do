@@ -80,7 +80,6 @@
   </main>
   <RhythmWorkspace v-else-if="store.settings.clockView === 'rhythm'" />
   <FocusHistoryWorkspace v-else />
-  <FocusCelebration :celebration="store.focusCelebration" @dismiss="store.dismissFocusCelebration" @start-break="startBreakFromCelebration" />
 </template>
 
 <script setup>
@@ -90,7 +89,6 @@ import { useTaskStore } from '@/stores/task'
 import RhythmWorkspace from './RhythmWorkspace.vue'
 import FocusHistoryWorkspace from './FocusHistoryWorkspace.vue'
 import FocusRewardBadge from './FocusRewardBadge.vue'
-import FocusCelebration from './FocusCelebration.vue'
 
 const store = useTaskStore()
 const selectedProfileId = ref('pomodoro')
@@ -151,7 +149,6 @@ function adjustTime(minutes) { return store.adjustFocusDuration(minutes * 60) }
 function setFreeDuration(minutes) { freeDurationMinutes.value = minutes }
 function confirmFreeDuration() { freeDurationMinutes.value = Math.max(1, Math.min(480, Math.round(Number(freeDurationMinutes.value) || 25))); freeDurationEditing.value = false }
 function chooseTask(taskId) { selectedTaskId.value = taskId; taskPickerOpen.value = false }
-function startBreakFromCelebration() { store.dismissFocusCelebration(); store.startPendingBreak() }
 function formatClock(seconds) { const value = Math.max(0, Math.floor(seconds || 0)); return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}` }
 function formatTime(date) { return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}` }
 function durationText(seconds) { if (seconds === null || seconds === undefined) return '自由计时'; const minutes = Math.round(seconds / 60); return minutes >= 60 ? `${Math.floor(minutes / 60)} 小时` : `${minutes} 分钟` }
