@@ -21,7 +21,7 @@
         <ul v-else class="history-list">
           <li v-for="item in recentHistory" :key="item.id">
             <div>
-              <strong>{{ phaseLabel(item.phase) }} · {{ formatDuration(item.elapsedSeconds) }}</strong>
+              <strong><FocusRewardBadge v-if="item.reward" :reward="item.reward" size="sm" />{{ phaseLabel(item.phase) }} · {{ formatDuration(item.elapsedSeconds) }}</strong>
               <span>{{ formatFinishedAt(item.finishedAt) }}{{ taskTitle(item) ? ` · ${taskTitle(item)}` : '' }}</span>
               <small v-if="item.note">{{ item.note }}</small>
             </div>
@@ -36,6 +36,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useTaskStore } from '@/stores/task'
+import FocusRewardBadge from './FocusRewardBadge.vue'
 
 const store = useTaskStore()
 const todayStart = computed(() => { const date = new Date(); date.setHours(0, 0, 0, 0); return date })

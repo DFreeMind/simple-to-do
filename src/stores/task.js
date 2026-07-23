@@ -1835,7 +1835,7 @@ export const useTaskStore = defineStore('task', () => {
       elapsedSeconds: Math.max(0, Math.min(8 * 60 * 60, Math.round(Number(rawHistory.elapsedSeconds) || 0))),
       phase: ['focus', 'short-break', 'long-break'].includes(rawHistory.phase) ? rawHistory.phase : 'focus',
       result: ['completed', 'abandoned', 'interrupted'].includes(rawHistory.result) ? rawHistory.result : 'completed',
-      reward: ['sesame', 'tomato', 'watermelon'].includes(rawHistory.reward) ? rawHistory.reward : (rawHistory.phase === 'focus' && rawHistory.result === 'completed' ? getFocusReward(rawHistory.elapsedSeconds) : null),
+      reward: ['sesame', 'strawberry', 'tomato', 'watermelon', 'pumpkin'].includes(rawHistory.reward) ? rawHistory.reward : (rawHistory.phase === 'focus' && rawHistory.result === 'completed' ? getFocusReward(rawHistory.elapsedSeconds) : null),
       note: String(rawHistory.note || '').trim().slice(0, 240)
     }
   }
@@ -1854,8 +1854,10 @@ export const useTaskStore = defineStore('task', () => {
 
   function getFocusReward(elapsedSeconds) {
     const minutes = Math.floor(Math.max(0, Number(elapsedSeconds) || 0) / 60)
+    if (minutes >= 90) return 'pumpkin'
     if (minutes >= 45) return 'watermelon'
-    if (minutes >= 15) return 'tomato'
+    if (minutes >= 25) return 'tomato'
+    if (minutes >= 10) return 'strawberry'
     return 'sesame'
   }
 
@@ -2025,7 +2027,7 @@ export const useTaskStore = defineStore('task', () => {
     focusClockNow.value = Date.now()
     syncFocusTimer()
     const message = session.phase === 'focus' && result === 'completed'
-      ? `专注完成，收获${reward === 'watermelon' ? '西瓜 🍉' : reward === 'tomato' ? '番茄 🍅' : '芝麻 ⚪'}${clock.value.pendingBreak ? '，可以开始休息' : '，已开始休息'}`
+      ? `专注完成，收获${({ sesame: '芝麻 ⚪', strawberry: '草莓 🍓', tomato: '番茄 🍅', watermelon: '西瓜 🍉', pumpkin: '南瓜 🎃' })[reward]}${clock.value.pendingBreak ? '，可以开始休息' : '，已开始休息'}`
       : session.phase !== 'focus' && result === 'completed'
         ? '休息完成，准备继续投入'
         : '本次专注已记录'
