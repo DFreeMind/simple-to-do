@@ -339,6 +339,11 @@ export async function handleFocusReminderAction(action) {
   return invoke('handle_focus_reminder_action', { action })
 }
 
+export async function getPendingFocusReminder() {
+  if (!isTauri()) return null
+  return invoke('get_pending_focus_reminder')
+}
+
 export async function sendReminderTestNotification(settings = {}) {
   if (!isTauri()) return { sent: false, reason: 'unsupported' }
   const granted = await ensureReminderNotificationPermission({ request: true })

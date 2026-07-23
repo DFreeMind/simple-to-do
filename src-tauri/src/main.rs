@@ -10,7 +10,7 @@ use std::{
     fs,
     path::{Path, PathBuf},
     process::Command,
-    sync::atomic::{AtomicBool, Ordering},
+    sync::{atomic::{AtomicBool, Ordering}, Mutex},
     time::Duration,
 };
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
@@ -28,6 +28,14 @@ use windows_sys::Win32::{
 };
 
 struct WindowCloseBehavior(AtomicBool);
+
+struct FocusReminderState(Mutex<Option<serde_json::Value>>);
+
+impl Default for FocusReminderState {
+    fn default() -> Self {
+        Self(Mutex::new(None))
+    }
+}
 
 impl Default for WindowCloseBehavior {
     fn default() -> Self {
@@ -107,6 +115,7 @@ fn set_window_close_behavior(
 /// 应用的置顶提醒窗，而不是操作系统通知或网页内遮罩。
 #[tauri::command]
 fn show_focus_reminder(app: tauri::AppHandle, reminder: serde_json::Value) -> Result<bool, String> {
+    *app.state::<FocusReminderState>().0.lock().map_err(|_| "专注提醒状态不可用".to_string())? = Some(reminder.clone());
     if app.get_webview_window("focus-reminder").is_none() {
         WebviewWindowBuilder::new(&app, "focus-reminder", WebviewUrl::App("index.html".into()))
             .title("易简清单 · 专注时刻")
@@ -133,6 +142,13 @@ fn show_focus_reminder(app: tauri::AppHandle, reminder: serde_json::Value) -> Re
         }
     });
     Ok(true)
+}
+
+#[tauri::command]
+fn get_pending_focus_reminder(app: tauri::AppHandle) -> Result<Option<serde_json::Value>, String> {
+    app.state::<FocusReminderState>().0.lock()
+        .map(|reminder| reminder.clone())
+        .map_err(|_| "读取专注提醒状态失败".to_string())
 }
 
 #[tauri::command]
@@ -2691,6 +2707,7 @@ mod tests {
 fn main() {
     tauri::Builder::default()
         .manage(WindowCloseBehavior::default())
+        .manage(FocusReminderState::default())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {
@@ -2760,6 +2777,7 @@ fn main() {
             purge_quarantined_attachments,
             send_interactive_task_reminder,
             show_focus_reminder,
+            get_pending_focus_reminder,
             handle_focus_reminder_action,
             set_window_close_behavior,
             get_system_idle_seconds

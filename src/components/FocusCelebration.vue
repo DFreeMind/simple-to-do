@@ -35,7 +35,7 @@ import { CircleCheck, Coffee, X } from 'lucide-vue-next'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import FocusRewardBadge from './FocusRewardBadge.vue'
-import { handleFocusReminderAction } from '@/services/platform'
+import { getPendingFocusReminder, handleFocusReminderAction } from '@/services/platform'
 
 const props = defineProps({
   celebration: { type: Object, default: null }
@@ -72,6 +72,7 @@ async function startBreak() {
 onMounted(async () => {
   if (!isNativeReminderWindow) return
   unlistenReminder = await listen('focus-reminder:show', event => { nativeCelebration.value = event.payload })
+  nativeCelebration.value = await getPendingFocusReminder()
 })
 
 onBeforeUnmount(() => unlistenReminder?.())
