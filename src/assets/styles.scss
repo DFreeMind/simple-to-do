@@ -7296,14 +7296,403 @@ body.is-resizing {
   background: var(--danger);
 }
 
-/* 全局专注提醒：短暂打断，给出下一步，也保留用户自己决定的空间。 */
-.focus-celebration { z-index: 1300; background: rgba(20, 34, 32, .3); backdrop-filter: none; }
-.focus-celebration__card { display: grid; width: min(100%, 430px); padding: 22px 24px 23px; overflow: hidden; border: 1px solid #d7ebe7; border-radius: 20px; background: radial-gradient(circle at 92% 8%, #dff4ef 0, transparent 29%), linear-gradient(145deg, #fff 0%, #fbfefd 100%); box-shadow: 0 22px 60px rgba(17, 44, 39, .28); text-align: left; }
-.focus-celebration__close { position: absolute; top: 13px; right: 13px; display: grid; width: 30px; height: 30px; place-items: center; border-radius: 9px; color: var(--text-muted); }.focus-celebration__close:hover { background: var(--surface-muted); color: var(--text); }
-.focus-celebration__header { display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 12px; font-weight: 650; }.focus-celebration__brand { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 10px; background: var(--accent-soft); color: var(--accent); }
-.focus-celebration__copy { margin-top: 22px; }.focus-celebration__eyebrow { margin: 0 0 6px; color: #16796f; font-size: 12px; font-weight: 700; letter-spacing: .06em; }.focus-celebration h2 { color: #182522; font-size: 23px; }.focus-celebration__task { display: -webkit-box; max-width: 100%; margin: 10px 0 0; overflow: hidden; color: #30413c; font-size: 14px; font-weight: 650; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }.focus-celebration__duration { margin: 7px 0 0; color: #60706c; font-size: 13px; line-height: 1.6; }
-.focus-celebration__reward { display: inline-flex; align-items: center; gap: 5px; width: fit-content; margin: 15px 0 0; padding: 6px 11px 6px 7px; border: 1px solid #e1ece9; border-radius: 999px; background: #f5faf8; color: #30413c; font-size: 12px; box-shadow: 0 5px 12px rgba(31, 104, 92, .08); }.focus-celebration__reward .focus-reward-badge img { width: 24px; height: 24px; }.focus-celebration__tip { display: flex; align-items: center; gap: 6px; margin: 17px 0 0; padding: 10px 11px; border-left: 3px solid #42aa9e; border-radius: 0 9px 9px 0; background: #eef8f5; color: #50615c; font-size: 12px; }.focus-celebration__tip svg { color: #278f83; }
-.focus-celebration__actions { justify-content: flex-end; margin-top: 22px; }.focus-celebration__actions button { min-height: 40px; padding: 0 16px; border-radius: 10px; }.focus-celebration__primary { flex: 0 0 auto; background: #278f83; color: #fff; box-shadow: 0 8px 16px rgba(39, 143, 131, .26); }.focus-celebration__primary:hover { background: #20796f; filter: none; }.focus-celebration__secondary { border: 1px solid #d9e1df; color: #52615d; background: #fff; }.focus-celebration__secondary:hover { background: #f2f7f6; color: #24332f; }
+/* 全局专注完成页：用一个克制的完成仪式承接结果，再自然引导到休息。 */
+.focus-celebration {
+  z-index: 1300;
+  padding: 28px;
+  background: rgba(9, 25, 22, .48);
+  backdrop-filter: blur(12px) saturate(.85);
+}
+
+.focus-celebration__card {
+  position: relative;
+  display: grid;
+  justify-items: stretch;
+  width: min(100%, 440px);
+  padding: 34px 36px 30px;
+  overflow: hidden;
+  border: 1px solid rgba(155, 207, 196, .52);
+  border-radius: 28px;
+  background:
+    linear-gradient(155deg, rgba(255, 255, 255, .98), rgba(247, 252, 250, .98));
+  box-shadow:
+    0 30px 80px rgba(4, 30, 25, .34),
+    0 2px 8px rgba(24, 91, 78, .08),
+    inset 0 1px rgba(255, 255, 255, .9);
+  text-align: center;
+}
+
+.focus-celebration__glow {
+  position: absolute;
+  border-radius: 999px;
+  pointer-events: none;
+  filter: blur(2px);
+}
+
+.focus-celebration__glow--top {
+  top: -112px;
+  right: -86px;
+  width: 260px;
+  height: 260px;
+  background: radial-gradient(circle, rgba(117, 211, 190, .28), rgba(117, 211, 190, 0) 69%);
+}
+
+.focus-celebration__glow--bottom {
+  bottom: -126px;
+  left: -88px;
+  width: 240px;
+  height: 240px;
+  background: radial-gradient(circle, rgba(235, 185, 91, .15), rgba(235, 185, 91, 0) 70%);
+}
+
+.focus-celebration__close {
+  position: absolute;
+  z-index: 2;
+  top: 16px;
+  right: 16px;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 12px;
+  color: #657873;
+  transition: color .18s ease, background .18s ease, transform .18s ease;
+}
+
+.focus-celebration__close:hover {
+  background: rgba(37, 117, 102, .09);
+  color: #193d36;
+}
+
+.focus-celebration__close:active {
+  transform: scale(.94);
+}
+
+.focus-celebration__hero {
+  position: relative;
+  display: grid;
+  width: 104px;
+  height: 104px;
+  place-items: center;
+  margin: 2px auto 18px;
+}
+
+.focus-celebration__halo {
+  position: absolute;
+  inset: 3px;
+  border: 1px solid rgba(46, 154, 134, .2);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 38% 30%, rgba(255, 255, 255, .96) 0 8%, transparent 9%),
+    linear-gradient(145deg, #dff6ef, #bce9dd);
+  box-shadow:
+    0 15px 34px rgba(40, 142, 122, .18),
+    inset 0 0 0 8px rgba(255, 255, 255, .5);
+  animation: focus-halo-in .38s cubic-bezier(.2, .9, .25, 1.15) both;
+}
+
+.focus-celebration__check {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 72px;
+  height: 72px;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #2d9b88, #197969);
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(30, 123, 105, .28);
+  animation: focus-check-in .3s .08s cubic-bezier(.2, .9, .25, 1.2) both;
+}
+
+.focus-celebration__sparkle {
+  position: absolute;
+  z-index: 2;
+  color: #d5a442;
+  animation: focus-sparkle-in .3s .18s ease-out both;
+}
+
+.focus-celebration__sparkle--one {
+  top: 4px;
+  right: -3px;
+}
+
+.focus-celebration__sparkle--two {
+  bottom: 9px;
+  left: -2px;
+  color: #3fa792;
+  animation-delay: .24s;
+}
+
+.focus-celebration__copy {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+}
+
+.focus-celebration__eyebrow {
+  margin: 0 0 8px;
+  color: #208171;
+  font-size: 12px;
+  font-weight: 760;
+  letter-spacing: .18em;
+}
+
+.focus-celebration h2 {
+  max-width: 340px;
+  margin: 0 auto;
+  color: #172824;
+  font-size: 24px;
+  font-weight: 720;
+  line-height: 1.35;
+  letter-spacing: -.035em;
+}
+
+.focus-celebration__metric {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 7px;
+  margin: 14px 0 0;
+  color: #1b7566;
+}
+
+.focus-celebration__metric strong {
+  font-size: 45px;
+  font-weight: 730;
+  line-height: 1;
+  letter-spacing: -.055em;
+  font-variant-numeric: tabular-nums;
+}
+
+.focus-celebration__metric span {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.focus-celebration__duration {
+  margin: 7px 0 0;
+  color: #71817d;
+  font-size: 12px;
+}
+
+.focus-celebration__task {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 4px;
+  max-width: 100%;
+  margin: 22px 0 0;
+  padding: 13px 15px;
+  overflow: visible;
+  border: 1px solid #dceae6;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .72);
+  color: #263c36;
+  text-align: left;
+  box-shadow: 0 5px 16px rgba(25, 82, 70, .045);
+  -webkit-line-clamp: initial;
+}
+
+.focus-celebration__task span {
+  color: #7c8c87;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.focus-celebration__task strong {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 680;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.focus-celebration__reward {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-self: center;
+  gap: 9px;
+  width: fit-content;
+  margin: 14px 0 0;
+  padding: 7px 13px 7px 8px;
+  border: 1px solid #e7dfc8;
+  border-radius: 999px;
+  background: #fffaf0;
+  color: #5c4b24;
+  box-shadow: none;
+  text-align: left;
+}
+
+.focus-celebration__reward-icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 3px 8px rgba(104, 79, 26, .1);
+}
+
+.focus-celebration__reward .focus-reward-badge img {
+  width: 25px;
+  height: 25px;
+}
+
+.focus-celebration__reward > span:last-child {
+  display: grid;
+  gap: 1px;
+}
+
+.focus-celebration__reward small {
+  color: #92815c;
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.focus-celebration__reward strong {
+  color: #55431d;
+  font-size: 12px;
+}
+
+.focus-celebration__tip {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 19px 0 0;
+  padding: 12px 14px;
+  border: 1px solid #d9ebe6;
+  border-left: 1px solid #d9ebe6;
+  border-radius: 14px;
+  background: #eef8f5;
+  color: #365049;
+  font-size: 12px;
+  text-align: left;
+}
+
+.focus-celebration__tip > span:first-child {
+  display: grid;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 11px;
+  background: #fff;
+  color: #278f7e;
+  box-shadow: 0 3px 10px rgba(31, 111, 96, .08);
+}
+
+.focus-celebration__tip > span:last-child {
+  display: grid;
+  gap: 2px;
+}
+
+.focus-celebration__tip strong {
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.focus-celebration__tip small {
+  color: #6d807a;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.focus-celebration__actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 22px;
+}
+
+.focus-celebration__actions button {
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 13px;
+  font-size: 13px;
+  font-weight: 720;
+  transition: transform .16s ease, background .18s ease, box-shadow .18s ease;
+}
+
+.focus-celebration__actions button:active {
+  transform: translateY(1px) scale(.985);
+}
+
+.focus-celebration__primary {
+  flex: 1;
+  color: #fff;
+  background: linear-gradient(135deg, #2c9a87, #19786a);
+  box-shadow: 0 10px 22px rgba(31, 129, 111, .24);
+}
+
+.focus-celebration__primary:hover {
+  background: linear-gradient(135deg, #268c7b, #146d60);
+  box-shadow: 0 12px 26px rgba(31, 129, 111, .3);
+  filter: none;
+}
+
+.focus-celebration__secondary {
+  flex: 0 0 auto;
+  border: 1px solid #d6e1de;
+  color: #51625d;
+  background: rgba(255, 255, 255, .85);
+}
+
+.focus-celebration__secondary:hover {
+  background: #f2f7f6;
+  color: #24332f;
+}
+
+@keyframes focus-halo-in {
+  from { opacity: 0; transform: scale(.72) rotate(-8deg); }
+  to { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+@keyframes focus-check-in {
+  from { opacity: 0; transform: scale(.62); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes focus-sparkle-in {
+  from { opacity: 0; transform: scale(.3) rotate(-16deg); }
+  to { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+@media (width <= 520px) {
+  .focus-celebration {
+    padding: 16px;
+  }
+
+  .focus-celebration__card {
+    padding: 30px 22px 24px;
+    border-radius: 23px;
+  }
+
+  .focus-celebration h2 {
+    font-size: 21px;
+  }
+
+  .focus-celebration__actions {
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .focus-celebration__halo,
+  .focus-celebration__check,
+  .focus-celebration__sparkle {
+    animation: none;
+  }
+}
 
 .image-preview {
   position: fixed;
