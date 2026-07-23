@@ -65,7 +65,6 @@
 
     <SettingsPanel />
     <HelpCenter />
-    <FocusCelebration :celebration="store.focusCelebration" @dismiss="store.dismissFocusCelebration" @start-break="startBreakFromCelebration" />
 
     <div
       v-if="store.notice"
@@ -77,6 +76,7 @@
       {{ store.notice.message }}
     </div>
     </template>
+    <FocusCelebration v-if="isNativeReminderWindow" />
   </div>
 </template>
 
@@ -101,6 +101,7 @@ import { openDataBackupLocation, openReleasePage as openReleasePageInBrowser } f
 const store = useTaskStore()
 const appVersion = ref(__APP_VERSION__)
 const isDevelopment = import.meta.env.DEV
+const isNativeReminderWindow = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('focus-reminder')
 const recoveryUpdateState = ref(isDevelopment ? 'development' : 'idle')
 const recoveryUpdateError = ref('')
 const recoveryUpdate = ref(null)
@@ -118,9 +119,14 @@ const detailWidth = ref(store.settings.detailWidth || 380)
 const shellRef = ref(null)
 const shellWidth = ref(0)
 let unlistenReminderAction
+let unlistenFocusReminderAction
 let shellResizeObserver
 
-function startBreakFromCelebration() {
+function handleFocusReminder(event) {
+  if (event.payload?.action !== 'start-break') {
+    store.dismissFocusCelebration()
+    return
+  }
   store.dismissFocusCelebration()
   store.startPendingBreak()
 }
@@ -276,12 +282,16 @@ onMounted(async () => {
     listen('task-reminder:open', openReminderTask)
       .then(unlisten => { unlistenReminderAction = unlisten })
       .catch(error => console.warn('[App] 注册提醒点击事件失败:', error))
+    listen('focus-reminder:action', handleFocusReminder)
+      .then(unlisten => { unlistenFocusReminderAction = unlisten })
+      .catch(error => console.warn('[App] 注册专注提醒操作失败:', error))
   }
   store.loadData()
 })
 
 onBeforeUnmount(() => {
   unlistenReminderAction?.()
+  unlistenFocusReminderAction?.()
   shellResizeObserver?.disconnect()
 })
 

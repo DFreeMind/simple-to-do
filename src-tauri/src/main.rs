@@ -13,7 +13,7 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
     time::Duration,
 };
-use tauri::Manager;
+use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -21,8 +21,6 @@ use tauri::{
 
 #[cfg(target_os = "windows")]
 use notify_rust::{Notification, NotificationResponse};
-#[cfg(target_os = "windows")]
-use tauri::Emitter;
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::{
     System::SystemInformation::GetTickCount,
@@ -102,6 +100,48 @@ fn set_window_close_behavior(
     app.state::<WindowCloseBehavior>()
         .0
         .store(hide_on_close, Ordering::Relaxed);
+    Ok(true)
+}
+
+/// 显示独立的专注完成窗口。它不依赖主窗口是否最小化，行为更接近桌面待办
+/// 应用的置顶提醒窗，而不是操作系统通知或网页内遮罩。
+#[tauri::command]
+fn show_focus_reminder(app: tauri::AppHandle, reminder: serde_json::Value) -> Result<bool, String> {
+    if app.get_webview_window("focus-reminder").is_none() {
+        WebviewWindowBuilder::new(&app, "focus-reminder", WebviewUrl::App("index.html?focus-reminder=1".into()))
+            .title("易简清单 · 专注时刻")
+            .inner_size(460.0, 390.0)
+            .min_inner_size(460.0, 390.0)
+            .max_inner_size(460.0, 390.0)
+            .resizable(false)
+            .decorations(false)
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .center()
+            .visible(false)
+            .build()
+            .map_err(|err| format!("创建专注提醒窗口失败: {err}"))?;
+    }
+    let app_handle = app.clone();
+    std::thread::spawn(move || {
+        // 新窗口需要先加载前端并注册事件监听；首次创建时留出初始化时间。
+        std::thread::sleep(Duration::from_millis(600));
+        let _ = app_handle.emit_to("focus-reminder", "focus-reminder:show", reminder);
+        if let Some(window) = app_handle.get_webview_window("focus-reminder") {
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+    });
+    Ok(true)
+}
+
+#[tauri::command]
+fn handle_focus_reminder_action(app: tauri::AppHandle, action: String) -> Result<bool, String> {
+    if let Some(window) = app.get_webview_window("focus-reminder") {
+        let _ = window.hide();
+    }
+    app.emit_to("main", "focus-reminder:action", serde_json::json!({ "action": action }))
+        .map_err(|err| format!("发送专注提醒操作失败: {err}"))?;
     Ok(true)
 }
 
@@ -2719,6 +2759,8 @@ fn main() {
             restore_quarantined_attachments,
             purge_quarantined_attachments,
             send_interactive_task_reminder,
+            show_focus_reminder,
+            handle_focus_reminder_action,
             set_window_close_behavior,
             get_system_idle_seconds
         ])
@@ -2731,7 +2773,12 @@ fn main() {
                 ..
             } = &_event
             {
-                if label == "main"
+                if label == "focus-reminder" {
+                    api.prevent_close();
+                    if let Some(window) = _app.get_webview_window("focus-reminder") {
+                        let _ = window.hide();
+                    }
+                } else if label == "main"
                     && _app
                         .state::<WindowCloseBehavior>()
                         .0

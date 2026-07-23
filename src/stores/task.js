@@ -12,7 +12,7 @@ import {
   sendReminderTestNotification,
   sendTaskReminderNotification,
   sendRhythmReminderNotification,
-  sendFocusCompletionNotification
+  showFocusReminder
 } from '@/services/platform'
 import {
   playCompleteSound,
@@ -1904,7 +1904,6 @@ export const useTaskStore = defineStore('task', () => {
     }
     focusClockNow.value = Date.now()
     syncFocusTimer()
-    if (settings.value.reminderNotificationsEnabled !== false) void ensureReminderNotificationPermission({ request: true })
     showNotice(`已开始${profile.name}`, 'success')
     return true
   }
@@ -2037,7 +2036,7 @@ export const useTaskStore = defineStore('task', () => {
         pendingBreak: Boolean(clock.value.pendingBreak),
         breakSeconds: clock.value.pendingBreak?.durationSeconds || null
       }
-      void sendFocusCompletionNotification({ elapsedSeconds, breakSeconds: clock.value.pendingBreak?.durationSeconds || null }, settings.value)
+      void showFocusReminder(focusCelebration.value)
     }
     const message = session.phase !== 'focus' && result === 'completed'
         ? '休息完成，准备继续投入'
