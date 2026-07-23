@@ -2036,7 +2036,11 @@ export const useTaskStore = defineStore('task', () => {
         pendingBreak: Boolean(clock.value.pendingBreak),
         breakSeconds: clock.value.pendingBreak?.durationSeconds || null
       }
-      void showFocusReminder(focusCelebration.value)
+      const reminder = focusCelebration.value
+      void showFocusReminder(reminder).then(shown => {
+        // 原生窗口已接管提示时撤掉应用内兜底；失败则保留兜底，确保完成专注必有反馈。
+        if (shown && focusCelebration.value?.id === reminder.id) focusCelebration.value = null
+      })
     }
     const message = session.phase !== 'focus' && result === 'completed'
         ? '休息完成，准备继续投入'

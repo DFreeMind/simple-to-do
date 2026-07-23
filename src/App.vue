@@ -65,6 +65,7 @@
 
     <SettingsPanel />
     <HelpCenter />
+    <FocusCelebration v-if="!isNativeReminderWindow" :celebration="store.focusCelebration" @dismiss="store.dismissFocusCelebration" @start-break="startBreakFromInApp" />
 
     <div
       v-if="store.notice"
@@ -128,6 +129,11 @@ function handleFocusReminder(event) {
     store.dismissFocusCelebration()
     return
   }
+  store.dismissFocusCelebration()
+  store.startPendingBreak()
+}
+
+function startBreakFromInApp() {
   store.dismissFocusCelebration()
   store.startPendingBreak()
 }
