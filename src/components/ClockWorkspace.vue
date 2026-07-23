@@ -1,16 +1,7 @@
 <template>
   <main v-if="store.settings.clockView === 'focus'" class="clock-workspace clock-home">
-    <section class="clock-home__hero" aria-labelledby="clock-home-title">
-      <header class="clock-home__header">
-        <div>
-          <p class="eyebrow">今天的节奏</p>
-          <h1 id="clock-home-title">{{ headline }}</h1>
-        </div>
-        <button class="clock-home__link" type="button" @click="store.setClockView('history')">查看回顾</button>
-      </header>
-
-      <div class="clock-home__body">
-        <section class="clock-stage" :class="{ 'clock-stage--break': activeSession?.phase !== 'focus' && activeSession }" aria-live="polite">
+    <div class="clock-home__body">
+      <section class="clock-stage" :class="{ 'clock-stage--break': activeSession?.phase !== 'focus' && activeSession }" aria-live="polite">
           <div class="clock-stage__dial" :title="activeSession ? sessionTimeRange : ''">
             <svg class="clock-stage__ring" viewBox="0 0 220 220" aria-hidden="true">
               <g transform="rotate(-90 110 110)"><circle class="clock-stage__ring-track" cx="110" cy="110" r="101" /><circle class="clock-stage__ring-progress" cx="110" cy="110" r="101" :style="timerRingStyle" /></g>
@@ -33,17 +24,27 @@
             <button class="clock-button clock-button--primary" type="button" @click="store.startPendingBreak"><Coffee :size="18" />开始{{ pendingBreak.phase === 'long-break' ? '长休息' : '短休息' }}</button>
             <button class="clock-button clock-button--quiet" type="button" @click="store.skipPendingBreak">暂不休息</button>
           </div>
-          <button v-else class="clock-button clock-button--primary clock-button--start" type="button" @click="start"><Play :size="19" fill="currentColor" />开始专注</button>
-        </section>
+        <button v-else class="clock-button clock-button--primary clock-button--start" type="button" @click="start"><Play :size="20" fill="currentColor" />开始专注</button>
+        <span class="clock-stage__caption">专注即成长</span>
+      </section>
 
-        <aside class="clock-setup" aria-label="本次专注设置">
+      <aside class="clock-side" aria-label="本次专注设置">
+        <section class="clock-side-card clock-side-card--modes">
+          <header><span class="clock-side-card__icon"><Target :size="19" /></span><h2>专注方式</h2></header>
           <template v-if="!activeSession && !pendingBreak">
-            <span class="clock-setup__label">专注方式</span>
             <div class="clock-mode-picker">
               <button v-for="profile in store.focusProfiles" :key="profile.id" type="button" :class="{ active: selectedProfileId === profile.id }" @click="selectedProfileId = profile.id">
-                <strong>{{ profile.name }}</strong><small>{{ durationText(profile.durationSeconds) }}</small>
+                <component :is="profile.id === 'pomodoro' ? Timer : profile.id === 'deep-work' ? Focus : Clock3" :size="24" /><strong>{{ profile.name }}</strong><small>{{ durationText(profile.durationSeconds) }}</small>
               </button>
             </div>
+            <label v-if="selectedProfileId === 'custom-focus'" class="clock-custom-duration"><span>本次专注时长</span><div><input v-model.number="customDurationMinutes" type="number" min="1" max="480" step="1" /><small>分钟</small></div></label>
+          </template>
+          <p v-else class="clock-side-card__current-mode">{{ currentProfile?.name || '专注中' }} · {{ durationText(activeSession?.durationSeconds) }}</p>
+        </section>
+
+        <section class="clock-side-card">
+          <header><span class="clock-side-card__icon"><ListChecks :size="19" /></span><h2>本次专注</h2></header>
+          <template v-if="!activeSession && !pendingBreak">
             <div ref="taskPicker" class="clock-task-picker">
               <span>这段时间要推进什么？</span>
               <button class="clock-task-picker__trigger" type="button" :aria-expanded="taskPickerOpen" @click="taskPickerOpen = !taskPickerOpen">
@@ -58,20 +59,23 @@
                 <p v-if="!taskOptions.length" class="clock-task-picker__empty">没有可关联的未完成任务</p>
               </div>
             </div>
-            <label v-if="selectedProfileId === 'custom-focus'" class="clock-custom-duration"><span>本次专注时长</span><div><input v-model.number="customDurationMinutes" type="number" min="1" max="480" step="1" /><small>分钟</small></div></label>
           </template>
           <template v-else>
-            <span class="clock-setup__label">当前事项</span>
             <p class="clock-setup__task">{{ currentTaskTitle }}</p>
             <label v-if="activeSession?.phase === 'focus'" class="clock-task-picker"><span>结束备注（可选）</span><input v-model="finishNote" maxlength="240" placeholder="例如：已完成初稿" /></label>
           </template>
+        </section>
+
+        <section class="clock-side-card clock-side-card--stats">
+          <header><span class="clock-side-card__icon"><BarChart3 :size="19" /></span><h2>今日状态</h2><button type="button" @click="store.setClockView('history')">查看回顾</button></header>
           <div class="clock-today">
             <span>今日已专注</span><strong>{{ durationText(todaySeconds) }}</strong>
             <small>{{ todayCompletedCount }} 次完成专注</small>
           </div>
-        </aside>
-      </div>
-    </section>
+          <div class="clock-stat-grid"><div><span>累计</span><strong>{{ durationText(todaySeconds) }}</strong></div><div><span>专注轮次</span><strong>{{ todayCompletedCount }} 轮</strong></div><div><span>中断</span><strong>{{ todayInterruptedCount }} 次</strong></div></div>
+        </section>
+      </aside>
+    </div>
 
   </main>
   <RhythmWorkspace v-else-if="store.settings.clockView === 'rhythm'" />
@@ -80,7 +84,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { Check, ChevronDown, Coffee, ListTodo, Minus, Pause, Play, Plus } from 'lucide-vue-next'
+import { BarChart3, Check, ChevronDown, Clock3, Coffee, Focus, ListChecks, ListTodo, Minus, Pause, Play, Plus, Target, Timer } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import RhythmWorkspace from './RhythmWorkspace.vue'
 import FocusHistoryWorkspace from './FocusHistoryWorkspace.vue'
@@ -129,6 +133,7 @@ const headline = computed(() => activeSession.value ? (activeSession.value.phase
 const todayHistory = computed(() => store.focusHistory.filter(item => new Date(item.finishedAt).toDateString() === new Date().toDateString()))
 const todaySeconds = computed(() => todayHistory.value.filter(item => item.phase === 'focus').reduce((total, item) => total + item.elapsedSeconds, 0))
 const todayCompletedCount = computed(() => todayHistory.value.filter(item => item.phase === 'focus' && item.result === 'completed').length)
+const todayInterruptedCount = computed(() => todayHistory.value.filter(item => item.phase === 'focus' && item.result !== 'completed').length)
 function start() { store.startFocus(selectedProfile.value?.id, selectedTaskId.value, selectedProfileId.value === 'custom-focus' ? selectedDurationSeconds.value : undefined) }
 function finish(result) { store.finishFocus(result, finishNote.value); finishNote.value = '' }
 function adjustTime(minutes) { return store.adjustFocusDuration(minutes * 60) }
