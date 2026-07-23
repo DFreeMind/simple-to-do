@@ -16,7 +16,7 @@
               <g transform="rotate(-90 110 110)"><circle class="clock-stage__ring-track" cx="110" cy="110" r="101" /><circle class="clock-stage__ring-progress" cx="110" cy="110" r="101" :style="timerRingStyle" /></g>
             </svg>
             <div class="clock-stage__content">
-              <span class="clock-stage__status">{{ stageLabel }}</span>
+              <span class="clock-stage__status"><i v-if="activeSession?.status === 'running'"></i>{{ stageLabel }}</span>
               <div class="clock-stage__time-row"><button v-if="canAdjustTime" class="clock-stage__adjust-button" type="button" title="减少 5 分钟" aria-label="减少 5 分钟" @click="adjustTime(-5)"><Minus :size="18" /></button><strong>{{ formattedTime }}</strong><button v-if="canAdjustTime" class="clock-stage__adjust-button" type="button" title="增加 5 分钟" aria-label="增加 5 分钟" @click="adjustTime(5)"><Plus :size="18" /></button></div>
               <p>{{ stageDetail }}</p>
               <span v-if="activeSession" class="clock-stage__schedule" role="tooltip">{{ sessionTimeRange }}</span>
@@ -63,6 +63,7 @@
           <template v-else>
             <span class="clock-setup__label">当前事项</span>
             <p class="clock-setup__task">{{ currentTaskTitle }}</p>
+            <div class="clock-session-info"><div><span>专注方式</span><strong>{{ currentProfile?.name || '专注' }}</strong></div><div><span>开始于</span><strong>{{ sessionStartTime }}</strong></div><div><span>预计结束</span><strong>{{ sessionEndTime }}</strong></div></div>
             <label v-if="activeSession?.phase === 'focus'" class="clock-task-picker"><span>结束备注（可选）</span><input v-model="finishNote" maxlength="240" placeholder="例如：已完成初稿" /></label>
           </template>
           <div class="clock-today">
@@ -122,6 +123,14 @@ const sessionTimeRange = computed(() => {
   if (session.durationSeconds === null) return `开始于 ${start} · 自由计时`
   const end = new Date(startedAt.getTime() + session.durationSeconds * 1000)
   return `${start} — 预计 ${formatTime(end)} 结束`
+})
+const sessionStartTime = computed(() => activeSession.value ? formatTime(new Date(activeSession.value.startedAt || activeSession.value.createdAt)) : '—')
+const sessionEndTime = computed(() => {
+  const session = activeSession.value
+  if (!session) return '—'
+  if (session.durationSeconds === null) return '自由计时'
+  const startedAt = new Date(session.startedAt || session.createdAt)
+  return formatTime(new Date(startedAt.getTime() + session.durationSeconds * 1000))
 })
 const stageLabel = computed(() => activeSession.value ? (activeSession.value.status === 'paused' ? '已暂停' : activeSession.value.phase === 'focus' ? '正在专注' : '正在休息') : pendingBreak.value ? '下一步' : '准备开始')
 const stageDetail = computed(() => activeSession.value ? (activeSession.value.phase === 'focus' ? currentTaskTitle.value : '暂时离开屏幕，回来再继续。') : pendingBreak.value ? '刚完成一段专注，给自己一点恢复时间。' : selectedProfile.value?.description || '')

@@ -1928,8 +1928,12 @@ export const useTaskStore = defineStore('task', () => {
     const session = clock.value.activeSession
     if (!session || session.durationSeconds === null) return false
     const elapsedSeconds = getFocusElapsedSeconds(session)
-    session.durationSeconds = Math.max(elapsedSeconds + 60, Math.min(8 * 60 * 60, session.durationSeconds + Math.round(Number(deltaSeconds) || 0)))
+    const nextDuration = Math.max(elapsedSeconds + 60, Math.min(8 * 60 * 60, session.durationSeconds + Math.round(Number(deltaSeconds) || 0)))
+    if (nextDuration === session.durationSeconds) return false
+    // 以新对象回写，确保运行中的会话、倒计时派生值和持久化观察器同步更新。
+    clock.value.activeSession = { ...session, durationSeconds: nextDuration }
     focusClockNow.value = Date.now()
+    showNotice(`本次专注已${deltaSeconds > 0 ? '增加' : '减少'} ${Math.abs(Math.round(deltaSeconds / 60))} 分钟`, 'success')
     return true
   }
 
