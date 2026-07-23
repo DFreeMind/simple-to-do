@@ -22,7 +22,7 @@
           </div>
           <div v-else-if="pendingBreak" class="clock-stage__actions">
             <button class="clock-button clock-button--primary" type="button" @click="store.startPendingBreak"><Coffee :size="18" />开始{{ pendingBreak.phase === 'long-break' ? '长休息' : '短休息' }}</button>
-            <button class="clock-button clock-button--quiet" type="button" @click="store.skipPendingBreak">暂不休息</button>
+            <button class="clock-button clock-button--quiet" type="button" title="跳过本次休息，回到专注类型选择" @click="store.skipPendingBreak">跳过休息，选择下一轮</button>
           </div>
         <button v-else class="clock-button clock-button--primary clock-button--start" type="button" @click="start"><Play :size="20" fill="currentColor" />开始专注</button>
         <span class="clock-stage__caption">专注即成长</span>
