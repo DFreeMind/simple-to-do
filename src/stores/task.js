@@ -8,8 +8,20 @@ import {
   saveData as savePlatformData,
   saveMigrationBackup,
   setWindowCloseBehavior,
+  getSystemIdleSeconds,
   sendReminderTestNotification,
-  sendTaskReminderNotification
+  sendTaskReminderNotification,
+  sendRhythmReminderNotification,
+  presentRhythmReminder,
+  scheduleRhythmReminder,
+  cancelRhythmReminder,
+  scheduleFocusCompletion,
+  cancelFocusCompletion,
+  syncFocusController,
+  requestFocusNotificationPermission,
+  sendFocusCompletionTestNotification,
+  hasNativeFocusScheduler,
+  hasNativeRhythmScheduler
 } from '@/services/platform'
 import {
   playCompleteSound,
@@ -49,6 +61,8 @@ const THEME_IDS = ['mint', 'blue', 'violet', 'graphite']
 const TASK_GROUP_COLOR_IDS = ['auto', 'accent', 'blue', 'violet', 'amber', 'rose', 'green', 'cyan', 'coral', 'indigo', 'teal', 'brick', 'custom']
 const DETAIL_WIDTH_MIN = 320
 const DETAIL_WIDTH_MAX = 800
+const MAX_FOCUS_HISTORY = 5000
+const MAX_RHYTHM_HISTORY = 5000
 
 const DEFAULT_GROUPS = [
   { id: 'life', name: '生活', collapsed: false, sortOrder: 1000 },
@@ -62,6 +76,8 @@ const DEFAULT_LISTS = [
 ]
 
 const DEFAULT_SETTINGS = {
+  activeModule: 'tasks',
+  clockView: 'focus',
   theme: 'mint',
   themeBackgrounds: false,
   density: 'comfortable',
@@ -81,6 +97,10 @@ const DEFAULT_SETTINGS = {
   soundDragEnabled: true,
   reminderNotificationsEnabled: true,
   reminderSoundEnabled: true,
+  focusCompletionNotificationsEnabled: true,
+  focusCompletionSoundEnabled: true,
+  focusReminderAlwaysOnTop: true,
+  focusControllerAlwaysOnTop: true,
   windowCloseBehavior: 'hide',
   dailyGuidanceEnabled: true,
   dailyGuidanceStyle: 'practical'
@@ -95,6 +115,49 @@ const DEFAULT_PROFILE = {
   accountId: null,
   createdAt: '',
   updatedAt: ''
+}
+
+const DEFAULT_FOCUS_PROFILES = [
+  { id: 'pomodoro', name: '番茄专注', durationSeconds: 25 * 60, description: '25 分钟专注，适合从下一步开始。', sortOrder: 1000 },
+  { id: 'deep-work', name: '深度专注', durationSeconds: 50 * 60, description: '50 分钟连续投入，适合需要沉浸的事项。', sortOrder: 2000 },
+  { id: 'custom-focus', name: '自定义时长', durationSeconds: 30 * 60, description: '按本次需要设定专注时间。', sortOrder: 3000 },
+  { id: 'free-focus', name: '自由时长', durationSeconds: 25 * 60, description: '按本次需要自由设定倒计时。', sortOrder: 4000 }
+]
+
+const DEFAULT_FOCUS_SETTINGS = {
+  shortBreakSeconds: 5 * 60,
+  longBreakSeconds: 15 * 60,
+  focusesBeforeLongBreak: 4,
+  autoStartBreaks: false
+}
+
+const DEFAULT_RHYTHM_REMINDERS = [
+  { id: 'eyes', title: '护眼远望', icon: 'eye', color: 'cyan', enabled: true, triggerType: 'interval', intervalSeconds: 20 * 60, time: '09:00', weekdays: [1, 2, 3, 4, 5], workStart: '09:00', workEnd: '18:00', quietStart: null, quietEnd: null, message: '看向远处 20 秒，让视线换个焦点。', createdAt: '' },
+  { id: 'hydration', title: '补水', icon: 'droplets', color: 'blue', enabled: false, triggerType: 'interval', intervalSeconds: 60 * 60, time: '09:00', weekdays: [1, 2, 3, 4, 5], workStart: '09:00', workEnd: '18:00', quietStart: null, quietEnd: null, message: '喝几口水，给自己一个短暂的转换。', createdAt: '' },
+  { id: 'sedentary', title: '起身活动', icon: 'accessibility', color: 'green', enabled: false, triggerType: 'active-duration', intervalSeconds: 45 * 60, time: '09:00', weekdays: [1, 2, 3, 4, 5], workStart: '09:00', workEnd: '18:00', quietStart: null, quietEnd: null, message: '已连续使用电脑一段时间，起身走动一下。', createdAt: '' },
+  { id: 'shoulders', title: '肩颈舒展', icon: 'accessibility', color: 'violet', enabled: false, triggerType: 'active-duration', intervalSeconds: 90 * 60, time: '09:00', weekdays: [1, 2, 3, 4, 5], workStart: '09:00', workEnd: '18:00', quietStart: null, quietEnd: null, message: '放松肩颈，做几次轻柔伸展。', createdAt: '' },
+  { id: 'breathe', title: '呼吸放松', icon: 'wind', color: 'rose', enabled: false, triggerType: 'interval', intervalSeconds: 120 * 60, time: '09:00', weekdays: [1, 2, 3, 4, 5], workStart: '09:00', workEnd: '18:00', quietStart: null, quietEnd: null, message: '停下来做几次缓慢呼吸，重新回到当下。', createdAt: '' },
+  { id: 'wrap-up', title: '今日收尾', icon: 'check', color: 'amber', enabled: false, triggerType: 'fixed-time', intervalSeconds: 60 * 60, time: '17:45', weekdays: [1, 2, 3, 4, 5], workStart: '09:00', workEnd: '18:00', quietStart: null, quietEnd: null, message: '花两分钟收好今天，写下明天的第一步。', createdAt: '' }
+]
+
+const MAX_ACTIVE_RHYTHM_REMINDERS = 3
+const NATURAL_BREAK_SECONDS = 3 * 60
+
+const DEFAULT_RHYTHM = {
+  pausedUntil: null,
+  pausedManually: false,
+  reminders: DEFAULT_RHYTHM_REMINDERS,
+  history: []
+}
+
+const DEFAULT_CLOCK = {
+  profiles: DEFAULT_FOCUS_PROFILES,
+  focusSettings: DEFAULT_FOCUS_SETTINGS,
+  activeSession: null,
+  pendingBreak: null,
+  cycleFocusCount: 0,
+  rhythm: DEFAULT_RHYTHM,
+  history: []
 }
 
 function nowIso() {
@@ -231,7 +294,9 @@ export const useTaskStore = defineStore('task', () => {
   const dataLoadError = ref('')
   const isSaving = ref(false)
   const notice = ref(null)
+  const focusCelebration = ref(null)
   const settings = ref({ ...DEFAULT_SETTINGS })
+  const clock = ref(normalizeClock(DEFAULT_CLOCK))
   const profile = ref({ ...DEFAULT_PROFILE })
   const settingsOpen = ref(false)
   const helpCenterOpen = ref(false)
@@ -245,11 +310,39 @@ export const useTaskStore = defineStore('task', () => {
   let reminderSyncing = false
   let reminderSyncPending = false
   let pendingPermissionRequest = false
+  let focusTickTimer = null
+  let nativeFocusScheduleActive = false
+  let rhythmTimer = null
+  let nativeRhythmScheduleActive = false
+  let nativeRhythmScheduleKey = ''
+  const focusClockNow = ref(Date.now())
+  const rhythmClockNow = ref(Date.now())
+  const activityMonitoringAvailable = ref(false)
 
   const trashedListIds = computed(() => new Set(listTrash.value.map(item => item.id)))
   const activeTasks = computed(() => tasks.value.filter(task => !task.deleted && !trashedListIds.value.has(task.listId)))
   const visibleTrashTasks = computed(() => trash.value.filter(task => !task.deletedByListId || !trashedListIds.value.has(task.deletedByListId)))
   const todayKey = computed(() => localDateKey())
+  const focusProfiles = computed(() => clock.value.profiles)
+  const activeFocusSession = computed(() => clock.value.activeSession)
+  const focusPendingBreak = computed(() => clock.value.pendingBreak)
+  const rhythmReminders = computed(() => clock.value.rhythm.reminders)
+  const pendingRhythmReminder = computed(() => rhythmReminders.value
+    .filter(reminder => reminder.enabled && reminder.pendingSince)
+    .sort((a, b) => new Date(a.pendingSince).getTime() - new Date(b.pendingSince).getTime())[0] || null)
+  const rhythmPaused = computed(() => {
+    const pausedUntil = clock.value.rhythm.pausedUntil
+    return Boolean(clock.value.rhythm.pausedManually || (pausedUntil && new Date(pausedUntil).getTime() > rhythmClockNow.value))
+  })
+  const currentFocusProfile = computed(() => {
+    const session = activeFocusSession.value
+    return focusProfiles.value.find(profile => profile.id === session?.profileId) || focusProfiles.value[0] || null
+  })
+  const focusElapsedSeconds = computed(() => getFocusElapsedSeconds(activeFocusSession.value, focusClockNow.value))
+  const focusRemainingSeconds = computed(() => {
+    const duration = getFocusSessionDuration(activeFocusSession.value)
+    return duration === null || duration === undefined ? null : Math.max(0, duration - focusElapsedSeconds.value)
+  })
 
   const currentList = computed(() => {
     if (SYSTEM_VIEW_IDS.includes(currentView.value)) return null
@@ -580,13 +673,32 @@ export const useTaskStore = defineStore('task', () => {
     }
     if ('reminderNotificationsEnabled' in updates || 'reminderSoundEnabled' in updates) {
       syncReminderNotifications({ requestPermission: Boolean(updates.reminderNotificationsEnabled) })
+      syncNativeRhythmReminder()
       if (updates.reminderNotificationsEnabled === false) showNotice('任务提醒通知已关闭', 'info')
     }
+    if ('focusCompletionNotificationsEnabled' in updates || 'focusCompletionSoundEnabled' in updates || 'focusReminderAlwaysOnTop' in updates) {
+      if (updates.focusCompletionNotificationsEnabled === true) {
+        void requestFocusNotificationPermission()
+      }
+      syncNativeFocusCompletion()
+      if (updates.focusCompletionNotificationsEnabled === false) showNotice('专注完成后台提醒已关闭', 'info')
+    }
+    if ('focusControllerAlwaysOnTop' in updates) syncNativeFocusController()
     if ('windowCloseBehavior' in updates) {
       setWindowCloseBehavior(settings.value.windowCloseBehavior)
         .catch(error => console.warn('[Store] 同步窗口关闭方式失败:', error))
     }
     purgeExpiredTrash()
+  }
+
+  function setActiveModule(module) {
+    if (!['tasks', 'clock'].includes(module)) return
+    updateSettings({ activeModule: module })
+  }
+
+  function setClockView(view) {
+    if (!['focus', 'rhythm', 'history'].includes(view)) return
+    updateSettings({ clockView: view, activeModule: 'clock' })
   }
 
   function previewSound(name) {
@@ -602,6 +714,18 @@ export const useTaskStore = defineStore('task', () => {
       showNotice('通知权限未开启，请在系统设置中允许通知', 'error')
     } else {
       showNotice('当前环境不支持系统通知', 'error')
+    }
+    return result
+  }
+
+  async function testFocusCompletionNotification() {
+    const result = await sendFocusCompletionTestNotification(settings.value)
+    if (result.sent) {
+      showNotice('已打开专注完成测试弹窗', 'success')
+    } else if (result.reason === 'permission') {
+      showNotice('通知权限未开启，请在系统设置中允许通知', 'error')
+    } else {
+      showNotice('专注完成提醒打开失败', 'error')
     }
     return result
   }
@@ -1416,6 +1540,7 @@ export const useTaskStore = defineStore('task', () => {
         profile.value = normalizeProfile(data.profile)
         viewOrders.value = normalizeViewOrders(data.viewOrders)
         taskGroups.value = (data.taskGroups || []).map(normalizeTaskGroup)
+        clock.value = normalizeClock(data.clock)
         // 根据用户设置更新音效开关
         setSoundEnabled(settings.value.soundEnabled)
         setSoundCategories({
@@ -1430,6 +1555,9 @@ export const useTaskStore = defineStore('task', () => {
           .catch(error => console.warn('[Store] 初始化窗口关闭方式失败:', error))
         console.log(`[Store] 数据初始化完成: ${tasks.value.length} 任务, ${lists.value.length} 清单`)
       }
+      syncFocusTimer()
+      void refreshActivityMonitoring()
+      syncRhythmTimer()
       currentView.value = settings.value.startView || 'today'
       migrationBlocked.value = false
       saveError.value = ''
@@ -1471,7 +1599,7 @@ export const useTaskStore = defineStore('task', () => {
     }
   }
 
-  watch([groups, lists, tasks, trash, listTrash, settings, profile, viewOrders, taskGroups], () => {
+  watch([groups, lists, tasks, trash, listTrash, settings, profile, viewOrders, taskGroups, clock], () => {
     scheduleSave()
   }, { deep: true })
 
@@ -1584,7 +1712,8 @@ export const useTaskStore = defineStore('task', () => {
       viewOrders: viewOrders.value,
       taskGroups: taskGroups.value,
       profile: profile.value,
-      settings: settings.value
+      settings: settings.value,
+      clock: clock.value
     }))
     stripHydratedAttachmentUrls(payload)
     return payload
@@ -1598,6 +1727,1094 @@ export const useTaskStore = defineStore('task', () => {
     if (!value || typeof value !== 'object') return
     if (value.relativePath) delete value.url
     Object.values(value).forEach(stripHydratedAttachmentUrls)
+  }
+
+  function normalizeClock(rawClock = {}) {
+    const rawProfiles = Array.isArray(rawClock?.profiles) && rawClock.profiles.length
+      ? rawClock.profiles
+      : DEFAULT_FOCUS_PROFILES
+    const profiles = rawProfiles
+      .map((profile, index) => normalizeFocusProfile(profile, index))
+      .filter((profile, index, items) => items.findIndex(item => item.id === profile.id) === index)
+    DEFAULT_FOCUS_PROFILES.forEach(profile => {
+      if (!profiles.some(item => item.id === profile.id)) profiles.push({ ...profile })
+    })
+    const focusSettings = normalizeFocusSettings(rawClock?.focusSettings)
+    const rhythm = normalizeRhythm(rawClock?.rhythm)
+    const activeSession = normalizeFocusSession(rawClock?.activeSession, profiles)
+    const pendingBreak = normalizePendingBreak(rawClock?.pendingBreak, profiles, focusSettings)
+    const history = Array.isArray(rawClock?.history)
+      ? rawClock.history.map(item => normalizeFocusHistory(item, profiles)).filter(Boolean).slice(0, MAX_FOCUS_HISTORY)
+      : []
+    return {
+      profiles,
+      focusSettings,
+      activeSession,
+      pendingBreak,
+      cycleFocusCount: Math.max(0, Math.min(focusSettings.focusesBeforeLongBreak - 1, Math.floor(Number(rawClock?.cycleFocusCount) || 0))),
+      rhythm,
+      history
+    }
+  }
+
+  function normalizeFocusSettings(rawSettings = {}) {
+    return {
+      shortBreakSeconds: normalizeDuration(rawSettings?.shortBreakSeconds, DEFAULT_FOCUS_SETTINGS.shortBreakSeconds),
+      longBreakSeconds: normalizeDuration(rawSettings?.longBreakSeconds, DEFAULT_FOCUS_SETTINGS.longBreakSeconds),
+      focusesBeforeLongBreak: Math.max(2, Math.min(12, Math.round(Number(rawSettings?.focusesBeforeLongBreak) || DEFAULT_FOCUS_SETTINGS.focusesBeforeLongBreak))),
+      autoStartBreaks: rawSettings?.autoStartBreaks === true
+    }
+  }
+
+  function normalizeRhythm(rawRhythm = {}) {
+    const rawReminders = Array.isArray(rawRhythm?.reminders) ? rawRhythm.reminders : []
+    const byId = new Map(rawReminders.map(reminder => [String(reminder?.id || ''), reminder]))
+    const legacyStand = byId.get('stand')
+    const legacyBlink = byId.get('blink')
+    const builtIns = DEFAULT_RHYTHM_REMINDERS.map((template) => {
+      const existing = byId.get(template.id)
+      if (template.id === 'sedentary' && legacyStand) {
+        return existing
+          ? { ...legacyStand, ...existing, enabled: Boolean(existing.enabled || legacyStand.enabled) }
+          : { ...legacyStand, id: template.id, title: template.title, icon: template.icon, color: template.color, triggerType: template.triggerType, intervalSeconds: template.intervalSeconds }
+      }
+      if (template.id === 'shoulders' && legacyBlink) {
+        return { ...legacyBlink, id: template.id, title: template.title, icon: template.icon, color: template.color, triggerType: template.triggerType, intervalSeconds: template.intervalSeconds, message: template.message }
+      }
+      return existing || template
+    })
+    const custom = rawReminders.filter((reminder) => {
+      const id = String(reminder?.id || '')
+      return id && !DEFAULT_RHYTHM_REMINDERS.some(template => template.id === id) && !['stand', 'blink'].includes(id)
+    })
+    return {
+      pausedUntil: isValidIsoDate(rawRhythm?.pausedUntil) ? rawRhythm.pausedUntil : null,
+      pausedManually: Boolean(rawRhythm?.pausedManually),
+      reminders: [...builtIns, ...custom].map((reminder, index) => normalizeRhythmReminder(reminder, index)),
+      history: Array.isArray(rawRhythm?.history)
+        ? rawRhythm.history.map(normalizeRhythmHistory).filter(Boolean).slice(0, MAX_RHYTHM_HISTORY)
+        : []
+    }
+  }
+
+  function normalizeRhythmHistory(rawHistory) {
+    if (!rawHistory || typeof rawHistory !== 'object' || Array.isArray(rawHistory)) return null
+    if (!isValidIsoDate(rawHistory.triggeredAt) || !isValidIsoDate(rawHistory.resolvedAt)) return null
+    const action = ['completed', 'snoozed', 'skipped-today', 'dismissed', 'natural-break'].includes(rawHistory.action)
+      ? rawHistory.action
+      : 'dismissed'
+    return {
+      id: String(rawHistory.id || genId()),
+      reminderId: String(rawHistory.reminderId || ''),
+      reminderTitle: String(rawHistory.reminderTitle || '节律提醒').trim().slice(0, 32) || '节律提醒',
+      triggerType: ['interval', 'fixed-time', 'active-duration'].includes(rawHistory.triggerType) ? rawHistory.triggerType : 'interval',
+      triggerLabel: String(rawHistory.triggerLabel || '').trim().slice(0, 80),
+      triggeredAt: rawHistory.triggeredAt,
+      resolvedAt: rawHistory.resolvedAt,
+      action,
+      responseSeconds: Math.max(0, Math.min(24 * 60 * 60, Math.round(Number(rawHistory.responseSeconds) || 0))),
+      snoozeMinutes: action === 'snoozed' ? Math.max(1, Math.min(24 * 60, Math.round(Number(rawHistory.snoozeMinutes) || 5))) : null
+    }
+  }
+
+  function normalizeRhythmReminder(rawReminder = {}, index = 0) {
+    const known = DEFAULT_RHYTHM_REMINDERS.find(item => item.id === rawReminder?.id)
+    const triggerType = ['interval', 'fixed-time', 'active-duration'].includes(rawReminder?.triggerType)
+      ? rawReminder.triggerType
+      : known?.triggerType || 'interval'
+    const weekdays = Array.isArray(rawReminder?.weekdays)
+      ? rawReminder.weekdays.map(Number).filter(day => Number.isInteger(day) && day >= 0 && day <= 6)
+      : (known?.weekdays || [1, 2, 3, 4, 5])
+    const createdAt = isValidIsoDate(rawReminder?.createdAt) ? rawReminder.createdAt : nowIso()
+    const cycleStartedAt = isValidIsoDate(rawReminder?.cycleStartedAt) ? rawReminder.cycleStartedAt : nowIso()
+    const intervalSeconds = normalizeDuration(rawReminder?.intervalSeconds, known?.intervalSeconds || 60 * 60)
+    const nextDueAt = triggerType === 'interval'
+      ? (isValidIsoDate(rawReminder?.nextDueAt) ? rawReminder.nextDueAt : new Date(new Date(cycleStartedAt).getTime() + intervalSeconds * 1000).toISOString())
+      : null
+    return {
+      id: String(rawReminder?.id || known?.id || genId()),
+      title: String(rawReminder?.title || known?.title || '自定义提醒').trim().slice(0, 32) || '自定义提醒',
+      icon: String(rawReminder?.icon || known?.icon || 'bell').slice(0, 32),
+      color: ['cyan', 'blue', 'green', 'amber', 'violet', 'rose'].includes(rawReminder?.color) ? rawReminder.color : (known?.color || 'cyan'),
+      enabled: rawReminder?.enabled !== false,
+      triggerType,
+      intervalSeconds,
+      time: normalizeClockTime(rawReminder?.time || known?.time || '09:00'),
+      weekdays: weekdays.length ? [...new Set(weekdays)].sort() : [0, 1, 2, 3, 4, 5, 6],
+      workStart: normalizeClockTime(rawReminder?.workStart || known?.workStart || '09:00'),
+      workEnd: normalizeClockTime(rawReminder?.workEnd || known?.workEnd || '18:00'),
+      quietStart: rawReminder?.quietStart ? normalizeClockTime(rawReminder.quietStart) : null,
+      quietEnd: rawReminder?.quietEnd ? normalizeClockTime(rawReminder.quietEnd) : null,
+      message: String(rawReminder?.message || known?.message || '').trim().slice(0, 160),
+      createdAt,
+      cycleStartedAt,
+      nextDueAt,
+      manualCycleStartedAt: triggerType !== 'fixed-time' && isValidIsoDate(rawReminder?.manualCycleStartedAt) ? rawReminder.manualCycleStartedAt : null,
+      pendingSince: isValidIsoDate(rawReminder?.pendingSince) ? rawReminder.pendingSince : null,
+      lastResolvedAt: isValidIsoDate(rawReminder?.lastResolvedAt) ? rawReminder.lastResolvedAt : null,
+      lastCompletedAt: isValidIsoDate(rawReminder?.lastCompletedAt) ? rawReminder.lastCompletedAt : null,
+      lastNotifiedAt: isValidIsoDate(rawReminder?.lastNotifiedAt) ? rawReminder.lastNotifiedAt : null,
+      snoozedUntil: isValidIsoDate(rawReminder?.snoozedUntil) ? rawReminder.snoozedUntil : null,
+      pausedRemainingSeconds: triggerType === 'interval'
+        ? Math.max(0, Math.min(24 * 60 * 60, Math.round(Number(rawReminder?.pausedRemainingSeconds) || 0))) || null
+        : null,
+      skippedDate: /^\d{4}-\d{2}-\d{2}$/.test(rawReminder?.skippedDate || '') ? rawReminder.skippedDate : null,
+      activitySeconds: Math.max(0, Math.min(8 * 60 * 60, Math.round(Number(rawReminder?.activitySeconds) || 0))),
+      lastActivitySampleAt: isValidIsoDate(rawReminder?.lastActivitySampleAt) ? rawReminder.lastActivitySampleAt : null,
+      breakThresholdSeconds: Math.max(60, Math.min(30 * 60, Math.round(Number(rawReminder?.breakThresholdSeconds) || NATURAL_BREAK_SECONDS))),
+      sortOrder: Number.isFinite(Number(rawReminder?.sortOrder)) ? Number(rawReminder.sortOrder) : (index + 1) * 1000
+    }
+  }
+
+  function normalizeClockTime(value) {
+    return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(value || '')) ? String(value) : '09:00'
+  }
+
+  function normalizeDuration(value, fallback) {
+    return Math.max(60, Math.min(8 * 60 * 60, Math.round(Number(value) || fallback)))
+  }
+
+  function normalizeFocusProfile(rawProfile, index = 0) {
+    const known = DEFAULT_FOCUS_PROFILES.find(item => item.id === rawProfile?.id)
+    const duration = rawProfile?.durationSeconds
+    const durationSeconds = duration === null || duration === undefined
+      ? (known?.durationSeconds ?? null)
+      : normalizeDuration(duration, known?.durationSeconds || DEFAULT_FOCUS_SETTINGS.shortBreakSeconds)
+    return {
+      id: String(rawProfile?.id || known?.id || genId()),
+      name: String(rawProfile?.name || known?.name || '自定义专注').trim().slice(0, 32) || '自定义专注',
+      durationSeconds,
+      description: String(rawProfile?.description || known?.description || '').trim().slice(0, 120),
+      sortOrder: Number.isFinite(Number(rawProfile?.sortOrder)) ? Number(rawProfile.sortOrder) : (index + 1) * 1000
+    }
+  }
+
+  function normalizeFocusSession(rawSession, profiles = focusProfiles.value) {
+    if (!rawSession || typeof rawSession !== 'object' || Array.isArray(rawSession)) return null
+    const profileId = profiles.find(item => item.id === rawSession.profileId)?.id || profiles[0]?.id
+    if (!profileId) return null
+    const status = rawSession.status === 'paused' ? 'paused' : 'running'
+    const startedAt = status === 'running' && isValidIsoDate(rawSession.startedAt) ? rawSession.startedAt : null
+    const taskId = tasks.value.some(task => !task.deleted && task.id === rawSession.taskId) ? rawSession.taskId : null
+    const phase = ['focus', 'short-break', 'long-break'].includes(rawSession.phase) ? rawSession.phase : 'focus'
+    const profile = profiles.find(item => item.id === profileId)
+    const durationSeconds = rawSession.durationSeconds === null || rawSession.durationSeconds === undefined
+      ? (phase === 'focus' ? profile?.durationSeconds ?? null : null)
+      : normalizeDuration(rawSession.durationSeconds, profile?.durationSeconds || DEFAULT_FOCUS_SETTINGS.shortBreakSeconds)
+    return {
+      id: String(rawSession.id || genId()),
+      profileId,
+      taskId,
+      status: startedAt ? status : 'paused',
+      createdAt: isValidIsoDate(rawSession.createdAt) ? rawSession.createdAt : nowIso(),
+      startedAt,
+      elapsedSeconds: Math.max(0, Math.min(8 * 60 * 60, Math.round(Number(rawSession.elapsedSeconds) || 0))),
+      phase,
+      durationSeconds,
+      timeline: normalizeFocusTimeline(rawSession.timeline)
+    }
+  }
+
+  function normalizePendingBreak(rawBreak, profiles, focusSettings) {
+    if (!rawBreak || typeof rawBreak !== 'object' || Array.isArray(rawBreak)) return null
+    const phase = rawBreak.phase === 'long-break' ? 'long-break' : rawBreak.phase === 'short-break' ? 'short-break' : null
+    const profileId = profiles.find(item => item.id === rawBreak.profileId)?.id || profiles[0]?.id
+    if (!phase || !profileId) return null
+    return {
+      phase,
+      profileId,
+      durationSeconds: normalizeDuration(rawBreak.durationSeconds, phase === 'long-break' ? focusSettings.longBreakSeconds : focusSettings.shortBreakSeconds),
+      createdAt: isValidIsoDate(rawBreak.createdAt) ? rawBreak.createdAt : nowIso()
+    }
+  }
+
+  function normalizeFocusHistory(rawHistory, profiles = focusProfiles.value) {
+    if (!rawHistory || typeof rawHistory !== 'object' || Array.isArray(rawHistory)) return null
+    const profileId = profiles.find(item => item.id === rawHistory.profileId)?.id || null
+    if (!profileId || !isValidIsoDate(rawHistory.finishedAt)) return null
+    return {
+      id: String(rawHistory.id || genId()),
+      profileId,
+      taskId: tasks.value.some(task => !task.deleted && task.id === rawHistory.taskId) ? rawHistory.taskId : null,
+      taskTitle: String(rawHistory.taskTitle || '').trim().slice(0, 240),
+      startedAt: isValidIsoDate(rawHistory.startedAt) ? rawHistory.startedAt : rawHistory.finishedAt,
+      finishedAt: rawHistory.finishedAt,
+      elapsedSeconds: Math.max(0, Math.min(8 * 60 * 60, Math.round(Number(rawHistory.elapsedSeconds) || 0))),
+      phase: ['focus', 'short-break', 'long-break'].includes(rawHistory.phase) ? rawHistory.phase : 'focus',
+      result: ['completed', 'abandoned', 'interrupted'].includes(rawHistory.result) ? rawHistory.result : 'completed',
+      reward: rawHistory.reward === 'sesame' ? 'blueberry' : (['blueberry', 'strawberry', 'tomato', 'watermelon', 'pumpkin'].includes(rawHistory.reward) ? rawHistory.reward : (rawHistory.phase === 'focus' && rawHistory.result === 'completed' ? getFocusReward(rawHistory.elapsedSeconds) : null)),
+      note: String(rawHistory.note || '').trim().slice(0, 240),
+      timeline: normalizeFocusTimeline(rawHistory.timeline)
+    }
+  }
+
+  function normalizeFocusTimeline(rawTimeline) {
+    if (!Array.isArray(rawTimeline)) return []
+    return rawTimeline
+      .filter(event => event && typeof event === 'object' && isValidIsoDate(event.at) && ['started', 'paused', 'resumed', 'duration-adjusted', 'task-changed', 'finished'].includes(event.type))
+      .map(event => ({
+        type: event.type,
+        at: event.at,
+        pausedSeconds: event.type === 'resumed' || event.type === 'finished'
+          ? Math.max(0, Math.min(8 * 60 * 60, Math.round(Number(event.pausedSeconds) || 0)))
+          : null,
+        deltaSeconds: event.type === 'duration-adjusted'
+          ? Math.max(-8 * 60 * 60, Math.min(8 * 60 * 60, Math.round(Number(event.deltaSeconds) || 0)))
+          : null,
+        durationSeconds: event.type === 'duration-adjusted'
+          ? Math.max(60, Math.min(8 * 60 * 60, Math.round(Number(event.durationSeconds) || 60)))
+          : null,
+        taskId: event.type === 'task-changed' ? (event.taskId ? String(event.taskId) : null) : null,
+        result: event.type === 'finished' && ['completed', 'abandoned', 'interrupted'].includes(event.result) ? event.result : null
+      }))
+      .sort((a, b) => new Date(a.at) - new Date(b.at))
+      .slice(-200)
+  }
+
+  function isValidIsoDate(value) {
+    return typeof value === 'string' && Number.isFinite(new Date(value).getTime())
+  }
+
+  function getFocusElapsedSeconds(session, now = Date.now()) {
+    if (!session) return 0
+    const base = Math.max(0, Number(session.elapsedSeconds) || 0)
+    if (session.status !== 'running' || !session.startedAt) return base
+    const live = Math.floor((now - new Date(session.startedAt).getTime()) / 1000)
+    return base + Math.max(0, live)
+  }
+
+  function getFocusReward(elapsedSeconds) {
+    const minutes = Math.floor(Math.max(0, Number(elapsedSeconds) || 0) / 60)
+    if (minutes >= 90) return 'pumpkin'
+    if (minutes >= 45) return 'watermelon'
+    if (minutes >= 25) return 'tomato'
+    if (minutes >= 10) return 'strawberry'
+    return 'blueberry'
+  }
+
+  function getFocusSessionDuration(session) {
+    if (!session) return currentFocusProfile.value?.durationSeconds ?? null
+    if (session.durationSeconds === null || session.durationSeconds === undefined) return null
+    return Number(session.durationSeconds)
+  }
+
+  function appendFocusTimelineEvent(session, event) {
+    if (!session) return
+    if (!Array.isArray(session.timeline)) session.timeline = []
+    session.timeline.push(event)
+    session.timeline = session.timeline.slice(-200)
+  }
+
+  function currentPauseSeconds(session, endedAt = Date.now()) {
+    const lastEvent = Array.isArray(session?.timeline) ? session.timeline[session.timeline.length - 1] : null
+    if (lastEvent?.type !== 'paused' || !isValidIsoDate(lastEvent.at)) return 0
+    return Math.max(0, Math.round((endedAt - new Date(lastEvent.at).getTime()) / 1000))
+  }
+
+  function syncFocusTimer() {
+    if (focusTickTimer) window.clearInterval(focusTickTimer)
+    focusTickTimer = null
+    focusClockNow.value = Date.now()
+    syncNativeFocusController()
+    if (!clock.value.activeSession || clock.value.activeSession.status !== 'running') {
+      void cancelFocusCompletion(clock.value.activeSession?.id || null)
+      return
+    }
+    syncNativeFocusCompletion()
+    focusTickTimer = window.setInterval(() => {
+      focusClockNow.value = Date.now()
+      const session = clock.value.activeSession
+      const duration = getFocusSessionDuration(session)
+      if (session && duration && getFocusElapsedSeconds(session, focusClockNow.value) >= duration) {
+        if (!nativeFocusScheduleActive) finishFocus('completed')
+      }
+    }, 1000)
+  }
+
+  function syncNativeFocusController() {
+    const session = clock.value.activeSession
+    if (!session) {
+      void syncFocusController(null)
+      return
+    }
+    const duration = getFocusSessionDuration(session)
+    const elapsedSeconds = getFocusElapsedSeconds(session, focusClockNow.value)
+    const taskTitle = session.taskId
+      ? tasks.value.find(task => !task.deleted && task.id === session.taskId)?.title || null
+      : null
+    void syncFocusController({
+      revision: 0,
+      sessionId: session.id,
+      status: session.status,
+      phase: session.phase || 'focus',
+      taskTitle,
+      remainingSeconds: duration === null ? null : Math.max(0, Math.round(duration - elapsedSeconds)),
+      elapsedSeconds: Math.max(0, Math.round(elapsedSeconds)),
+      syncedAt: Date.now(),
+      alwaysOnTop: settings.value.focusControllerAlwaysOnTop !== false
+    })
+  }
+
+  function syncNativeFocusCompletion() {
+    const session = clock.value.activeSession
+    if (!session || session.status !== 'running') {
+      nativeFocusScheduleActive = false
+      void cancelFocusCompletion(session?.id || null)
+      return
+    }
+    const duration = getFocusSessionDuration(session)
+    if (!duration || !session.startedAt) {
+      nativeFocusScheduleActive = false
+      void cancelFocusCompletion(session.id)
+      return
+    }
+    const startedAt = new Date(session.startedAt).getTime()
+    if (!Number.isFinite(startedAt)) return
+    const dueAt = startedAt + Math.max(0, duration - (Number(session.elapsedSeconds) || 0)) * 1000
+    const nextFocusCount = clock.value.cycleFocusCount + 1
+    const isLongBreak = nextFocusCount >= clock.value.focusSettings.focusesBeforeLongBreak
+    const taskTitle = session.taskId
+      ? tasks.value.find(task => !task.deleted && task.id === session.taskId)?.title || null
+      : null
+    nativeFocusScheduleActive = hasNativeFocusScheduler()
+    void scheduleFocusCompletion({
+      sessionId: session.id,
+      dueAt: Math.round(dueAt),
+      phase: session.phase || 'focus',
+      taskTitle,
+      focusedSeconds: duration,
+      breakSeconds: session.phase === 'focus'
+        ? (isLongBreak ? clock.value.focusSettings.longBreakSeconds : clock.value.focusSettings.shortBreakSeconds)
+        : null
+    }, settings.value).then(scheduled => {
+      if (clock.value.activeSession?.id === session.id) {
+        nativeFocusScheduleActive = Boolean(scheduled)
+      }
+    })
+  }
+
+  function startFocus(profileId = 'pomodoro', taskId = null, durationOverride = undefined) {
+    if (clock.value.activeSession) return false
+    const profile = focusProfiles.value.find(item => item.id === profileId) || focusProfiles.value[0]
+    if (!profile) return false
+    const validTaskId = activeTasks.value.some(task => task.id === taskId) ? taskId : null
+    const startedAt = nowIso()
+    clock.value.activeSession = {
+      id: genId(),
+      profileId: profile.id,
+      taskId: validTaskId,
+      status: 'running',
+      createdAt: startedAt,
+      startedAt,
+      elapsedSeconds: 0,
+      phase: 'focus',
+      durationSeconds: durationOverride === undefined || profile.durationSeconds === null
+        ? profile.durationSeconds
+        : normalizeDuration(durationOverride, profile.durationSeconds),
+      timeline: [{ type: 'started', at: startedAt }]
+    }
+    focusClockNow.value = Date.now()
+    syncFocusTimer()
+    if (settings.value.focusCompletionNotificationsEnabled !== false) {
+      void requestFocusNotificationPermission()
+    }
+    showNotice(`已开始${profile.name}`, 'success')
+    return true
+  }
+
+  function pauseFocus() {
+    const session = clock.value.activeSession
+    if (!session || session.status !== 'running') return false
+    const pausedAt = nowIso()
+    session.elapsedSeconds = getFocusElapsedSeconds(session)
+    session.startedAt = null
+    session.status = 'paused'
+    appendFocusTimelineEvent(session, { type: 'paused', at: pausedAt })
+    focusClockNow.value = Date.now()
+    syncFocusTimer()
+    return true
+  }
+
+  function resumeFocus() {
+    const session = clock.value.activeSession
+    if (!session || session.status !== 'paused') return false
+    const resumedAt = nowIso()
+    const pausedSeconds = currentPauseSeconds(session, new Date(resumedAt).getTime())
+    session.startedAt = resumedAt
+    session.status = 'running'
+    appendFocusTimelineEvent(session, { type: 'resumed', at: resumedAt, pausedSeconds })
+    focusClockNow.value = Date.now()
+    syncFocusTimer()
+    return true
+  }
+
+  function updateFocusTask(taskId = null) {
+    const session = clock.value.activeSession
+    if (!session) return false
+    const nextTaskId = activeTasks.value.some(task => task.id === taskId) ? taskId : null
+    if (session.taskId === nextTaskId) return true
+    session.taskId = nextTaskId
+    appendFocusTimelineEvent(session, { type: 'task-changed', at: nowIso(), taskId: nextTaskId })
+    syncNativeFocusCompletion()
+    syncNativeFocusController()
+    return true
+  }
+
+  function adjustFocusDuration(deltaSeconds) {
+    const session = clock.value.activeSession
+    if (!session || session.durationSeconds === null) return false
+    const elapsedSeconds = getFocusElapsedSeconds(session)
+    const nextDuration = Math.max(elapsedSeconds + 60, Math.min(8 * 60 * 60, session.durationSeconds + Math.round(Number(deltaSeconds) || 0)))
+    if (nextDuration === session.durationSeconds) return false
+    // 以新对象回写，确保运行中的会话、倒计时派生值和持久化观察器同步更新。
+    const timeline = [...(session.timeline || []), {
+      type: 'duration-adjusted',
+      at: nowIso(),
+      deltaSeconds: nextDuration - session.durationSeconds,
+      durationSeconds: nextDuration
+    }].slice(-200)
+    clock.value = { ...clock.value, activeSession: { ...session, durationSeconds: nextDuration, timeline } }
+    focusClockNow.value = Date.now()
+    syncFocusTimer()
+    showNotice(`本次专注已${deltaSeconds > 0 ? '增加' : '减少'} ${Math.abs(Math.round(deltaSeconds / 60))} 分钟`, 'success')
+    return true
+  }
+
+  function updateFocusSettings(updates = {}) {
+    clock.value.focusSettings = normalizeFocusSettings({ ...clock.value.focusSettings, ...updates })
+    clock.value.cycleFocusCount = Math.min(clock.value.cycleFocusCount, clock.value.focusSettings.focusesBeforeLongBreak - 1)
+    syncNativeFocusCompletion()
+    syncNativeFocusController()
+  }
+
+  function updateFocusProfile(profileId, updates = {}) {
+    const profile = clock.value.profiles.find(item => item.id === profileId)
+    if (!profile) return false
+    const next = normalizeFocusProfile({ ...profile, ...updates }, profile.sortOrder / 1000 - 1)
+    profile.name = next.name
+    profile.description = next.description
+    profile.durationSeconds = next.durationSeconds
+    if (clock.value.activeSession?.profileId === profile.id && clock.value.activeSession.phase === 'focus') {
+      clock.value.activeSession.durationSeconds = next.durationSeconds
+      syncFocusTimer()
+    }
+    return true
+  }
+
+  function startPendingBreak() {
+    const pending = clock.value.pendingBreak
+    if (!pending || clock.value.activeSession) return false
+    const startedAt = nowIso()
+    clock.value.activeSession = {
+      id: genId(),
+      profileId: pending.profileId,
+      taskId: null,
+      status: 'running',
+      createdAt: startedAt,
+      startedAt,
+      elapsedSeconds: 0,
+      phase: pending.phase,
+      durationSeconds: pending.durationSeconds,
+      timeline: [{ type: 'started', at: startedAt }]
+    }
+    clock.value.pendingBreak = null
+    focusClockNow.value = Date.now()
+    syncFocusTimer()
+    showNotice(pending.phase === 'long-break' ? '已开始长休息' : '已开始短休息', 'success')
+    return true
+  }
+
+  function skipPendingBreak() {
+    if (!clock.value.pendingBreak) return false
+    clock.value.pendingBreak = null
+    showNotice('已跳过本次休息', 'info')
+    return true
+  }
+
+  function finishFocus(result = 'completed', note = '', options = {}) {
+    const session = clock.value.activeSession
+    if (!session) return false
+    if (options.sessionId && session.id !== options.sessionId) return false
+    const finishedAt = nowIso()
+    const elapsedSeconds = getFocusElapsedSeconds(session)
+    const normalizedResult = ['completed', 'abandoned', 'interrupted'].includes(result) ? result : 'completed'
+    const pausedSeconds = session.status === 'paused'
+      ? currentPauseSeconds(session, new Date(finishedAt).getTime())
+      : 0
+    const timeline = [
+      ...(session.timeline || []),
+      { type: 'finished', at: finishedAt, result: normalizedResult, pausedSeconds }
+    ].slice(-200)
+    const reward = session.phase === 'focus' && normalizedResult === 'completed' ? getFocusReward(elapsedSeconds) : null
+    const taskTitle = session.taskId
+      ? tasks.value.find(task => !task.deleted && task.id === session.taskId)?.title || ''
+      : ''
+    clock.value.history.unshift({
+      id: genId(),
+      profileId: session.profileId,
+      taskId: session.taskId,
+      taskTitle,
+      startedAt: session.createdAt,
+      finishedAt,
+      elapsedSeconds,
+      phase: session.phase || 'focus',
+      result: normalizedResult,
+      reward,
+      note: String(note || '').trim().slice(0, 240),
+      timeline
+    })
+    clock.value.history = clock.value.history.slice(0, MAX_FOCUS_HISTORY)
+    void cancelFocusCompletion(session.id)
+    nativeFocusScheduleActive = false
+    clock.value.activeSession = null
+    if (session.phase === 'focus' && result === 'completed') {
+      const nextFocusCount = clock.value.cycleFocusCount + 1
+      const isLongBreak = nextFocusCount >= clock.value.focusSettings.focusesBeforeLongBreak
+      clock.value.cycleFocusCount = isLongBreak ? 0 : nextFocusCount
+      clock.value.pendingBreak = {
+        phase: isLongBreak ? 'long-break' : 'short-break',
+        profileId: session.profileId,
+        durationSeconds: isLongBreak ? clock.value.focusSettings.longBreakSeconds : clock.value.focusSettings.shortBreakSeconds,
+        createdAt: nowIso()
+      }
+      if (clock.value.focusSettings.autoStartBreaks) startPendingBreak()
+    }
+    focusClockNow.value = Date.now()
+    syncFocusTimer()
+    if (session.phase === 'focus' && result === 'completed') {
+      focusCelebration.value = {
+        id: genId(),
+        sessionId: session.id,
+        reward,
+        elapsedSeconds,
+        taskTitle: session.taskId
+          ? tasks.value.find(task => !task.deleted && task.id === session.taskId)?.title || null
+          : null,
+        pendingBreak: Boolean(clock.value.pendingBreak),
+        breakSeconds: clock.value.pendingBreak?.durationSeconds || null
+      }
+    }
+    const message = session.phase !== 'focus' && result === 'completed'
+        ? '休息完成，准备继续投入'
+        : '本次专注已记录'
+    if (session.phase !== 'focus' || result !== 'completed') showNotice(message, 'success')
+    return true
+  }
+
+  function completeFocusSessionFromNative(sessionId) {
+    return finishFocus('completed', '', { sessionId })
+  }
+
+  function dismissFocusCelebration() {
+    focusCelebration.value = null
+  }
+
+  function deleteFocusHistory(historyId) {
+    const index = clock.value.history.findIndex(item => item.id === historyId)
+    if (index < 0) return false
+    clock.value.history.splice(index, 1)
+    showNotice('专注记录已删除', 'info')
+    return true
+  }
+
+  function clearFocusHistoryBefore(endDate) {
+    const end = new Date(endDate).getTime()
+    if (!Number.isFinite(end)) return false
+    const originalLength = clock.value.history.length
+    clock.value.history = clock.value.history.filter(item => new Date(item.finishedAt).getTime() > end)
+    if (clock.value.history.length !== originalLength) showNotice('已清理选定时间范围内的专注记录', 'info')
+    return true
+  }
+
+  function clearFocusHistoryForDay(dateValue = new Date()) {
+    const day = localDateKey(dateValue)
+    const originalLength = clock.value.history.length
+    clock.value.history = clock.value.history.filter(item => localDateKey(item.finishedAt) !== day)
+    if (clock.value.history.length !== originalLength) showNotice('已清理当天专注记录', 'info')
+    return true
+  }
+
+  function syncRhythmTimer() {
+    if (rhythmTimer) window.clearInterval(rhythmTimer)
+    rhythmTimer = null
+    rhythmClockNow.value = Date.now()
+    syncNativeRhythmReminder()
+    void runRhythmSync()
+    rhythmTimer = window.setInterval(() => {
+      rhythmClockNow.value = Date.now()
+      void runRhythmSync()
+    }, 30 * 1000)
+  }
+
+  async function runRhythmSync() {
+    if (rhythmPaused.value) return
+    const idleSeconds = await refreshActivityMonitoring()
+    if (Number.isFinite(idleSeconds)) updateActiveRhythmReminders(idleSeconds)
+    if (pendingRhythmReminder.value) return
+    const dueReminder = rhythmReminders.value
+      .filter(isRhythmReminderDue)
+      .sort(compareRhythmReminderPriority)[0]
+    if (!dueReminder) return
+    if (nativeRhythmScheduleActive && dueReminder.triggerType !== 'active-duration') return
+    if (nativeRhythmScheduleActive) {
+      nativeRhythmScheduleActive = false
+      nativeRhythmScheduleKey = ''
+      void cancelRhythmReminder()
+    }
+    markRhythmReminderElapsed(dueReminder.id)
+    void presentRhythmReminder(dueReminder, settings.value)
+      .then(delivery => {
+        if (delivery === 'disabled') dismissRhythmReminder(dueReminder.id)
+      })
+      .catch(async () => {
+        await sendRhythmReminderNotification(dueReminder, settings.value)
+        dismissRhythmReminder(dueReminder.id)
+      })
+  }
+
+  function markRhythmReminderElapsed(reminderId, dueAt = null) {
+    const dueReminder = rhythmReminders.value.find(item => item.id === reminderId)
+    if (!dueReminder || dueReminder.pendingSince) return false
+    const resolvedAt = dueReminder.lastResolvedAt ? new Date(dueReminder.lastResolvedAt).getTime() : 0
+    if (Number.isFinite(Number(dueAt)) && resolvedAt >= Number(dueAt)) return false
+    dueReminder.pendingSince = nowIso()
+    dueReminder.lastNotifiedAt = nowIso()
+    showNotice(`${dueReminder.title}：${dueReminder.message || '该给自己一点时间了。'}`, 'info')
+    return true
+  }
+
+  function handleRhythmElapsedFromNative(reminderId, dueAt = null) {
+    nativeRhythmScheduleActive = false
+    nativeRhythmScheduleKey = ''
+    return markRhythmReminderElapsed(reminderId, dueAt)
+  }
+
+  function syncNativeRhythmReminder() {
+    if (!hasNativeRhythmScheduler() || rhythmPaused.value || pendingRhythmReminder.value) {
+      nativeRhythmScheduleActive = false
+      nativeRhythmScheduleKey = ''
+      void cancelRhythmReminder()
+      return
+    }
+    const now = Date.now()
+    const candidate = rhythmReminders.value
+      .map(reminder => ({ reminder, dueAt: getNativeRhythmDueAt(reminder, now) }))
+      .filter(item => Number.isFinite(item.dueAt))
+      .sort((a, b) => a.dueAt - b.dueAt || compareRhythmReminderPriority(a.reminder, b.reminder))[0]
+    if (!candidate) {
+      nativeRhythmScheduleActive = false
+      nativeRhythmScheduleKey = ''
+      void cancelRhythmReminder()
+      return
+    }
+    const key = `${candidate.reminder.id}:${candidate.dueAt}`
+    if (nativeRhythmScheduleActive && nativeRhythmScheduleKey === key) return
+    nativeRhythmScheduleActive = true
+    nativeRhythmScheduleKey = key
+    void scheduleRhythmReminder({
+      reminderId: candidate.reminder.id,
+      dueAt: Math.round(candidate.dueAt),
+      title: candidate.reminder.title || '节律提醒',
+      message: candidate.reminder.message || '该给自己一点短暂的调整时间了。',
+      triggerLabel: rhythmReminderTriggerLabel(candidate.reminder)
+    }, settings.value).then(scheduled => {
+      if (nativeRhythmScheduleKey === key) nativeRhythmScheduleActive = Boolean(scheduled)
+    })
+  }
+
+  function getNativeRhythmDueAt(reminder, now = Date.now()) {
+    if (!reminder?.enabled || reminder.pendingSince || reminder.triggerType === 'active-duration') return null
+    const snoozedAt = reminder.snoozedUntil ? new Date(reminder.snoozedUntil).getTime() : 0
+    if (reminder.triggerType === 'fixed-time') {
+      if (snoozedAt > now) return getNextEligibleRhythmTime(reminder, snoozedAt)
+      for (let offset = 0; offset < 8; offset += 1) {
+        const date = new Date(now)
+        date.setDate(date.getDate() + offset)
+        const dueAt = timeToday(reminder.time, date)
+        const lastNotifiedAt = reminder.lastNotifiedAt ? new Date(reminder.lastNotifiedAt).getTime() : 0
+        if (lastNotifiedAt >= dueAt.getTime()) continue
+        if (offset === 0 && dueAt.getTime() <= now) {
+          const current = new Date(now)
+          if (isReminderEligibleAt(reminder, current)) return now
+          continue
+        }
+        if (!isReminderEligibleAt(reminder, dueAt)) continue
+        return dueAt.getTime()
+      }
+      return null
+    }
+    const rawDueAt = Math.max(
+      now,
+      new Date(reminder.nextDueAt || 0).getTime() || now,
+      snoozedAt
+    )
+    if (reminder.manualCycleStartedAt) return rawDueAt
+    return getNextEligibleRhythmTime(reminder, rawDueAt)
+  }
+
+  function getNextEligibleRhythmTime(reminder, rawDueAt) {
+    if (isReminderEligibleAt(reminder, new Date(rawDueAt))) return rawDueAt
+    const candidate = new Date(rawDueAt)
+    candidate.setSeconds(0, 0)
+    if (candidate.getTime() < rawDueAt) candidate.setMinutes(candidate.getMinutes() + 1)
+    for (let minute = 0; minute < 8 * 24 * 60; minute += 1) {
+      if (isReminderEligibleAt(reminder, candidate)) return Math.max(rawDueAt, candidate.getTime())
+      candidate.setMinutes(candidate.getMinutes() + 1)
+    }
+    return null
+  }
+
+  function isReminderEligibleAt(reminder, date) {
+    return reminder.skippedDate !== localDateKey(date) && isReminderInSchedule(reminder, date)
+  }
+
+  function rhythmReminderTriggerLabel(reminder) {
+    if (reminder.triggerType === 'fixed-time') return `固定时刻 ${reminder.time}`
+    if (reminder.triggerType === 'active-duration') return `连续使用 ${Math.round((reminder.intervalSeconds || 0) / 60)} 分钟`
+    return `每 ${Math.round((reminder.intervalSeconds || 0) / 60)} 分钟`
+  }
+
+  function compareRhythmReminderPriority(a, b) {
+    const priority = { 'active-duration': 0, interval: 1, 'fixed-time': 2 }
+    const byTrigger = (priority[a.triggerType] ?? 3) - (priority[b.triggerType] ?? 3)
+    if (byTrigger) return byTrigger
+    const aTime = a.triggerType === 'interval' ? new Date(a.nextDueAt || 0).getTime() : new Date(a.lastNotifiedAt || 0).getTime()
+    const bTime = b.triggerType === 'interval' ? new Date(b.nextDueAt || 0).getTime() : new Date(b.lastNotifiedAt || 0).getTime()
+    return aTime - bTime
+  }
+
+  function isRhythmReminderDue(reminder) {
+    if (!reminder?.enabled || rhythmPaused.value) return false
+    const now = new Date(rhythmClockNow.value)
+    const today = localDateKey(now)
+    const manuallyRunning = Boolean(reminder.manualCycleStartedAt) && reminder.triggerType !== 'fixed-time'
+    if (reminder.skippedDate === today || (!manuallyRunning && !isReminderInSchedule(reminder, now))) return false
+    if (reminder.pendingSince) return false
+    const snoozedAt = reminder.snoozedUntil ? new Date(reminder.snoozedUntil).getTime() : 0
+    if (snoozedAt > now.getTime()) return false
+    if (reminder.triggerType === 'active-duration') {
+      return reminder.activitySeconds >= reminder.intervalSeconds
+    }
+    if (reminder.triggerType === 'fixed-time') {
+      const dueAt = timeToday(reminder.time, now).getTime()
+      const lastNotified = reminder.lastNotifiedAt ? new Date(reminder.lastNotifiedAt).getTime() : 0
+      return now.getTime() >= dueAt && lastNotified < dueAt
+    }
+    const dueAt = new Date(reminder.nextDueAt || 0).getTime()
+    return Number.isFinite(dueAt) && now.getTime() >= dueAt
+  }
+
+  async function refreshActivityMonitoring() {
+    const idleSeconds = await getSystemIdleSeconds()
+    activityMonitoringAvailable.value = Number.isFinite(idleSeconds)
+    return idleSeconds
+  }
+
+  function updateActiveRhythmReminders(idleSeconds) {
+    const now = new Date(rhythmClockNow.value)
+    for (const reminder of rhythmReminders.value) {
+      if (!reminder.enabled || reminder.triggerType !== 'active-duration') continue
+      const lastSample = reminder.lastActivitySampleAt ? new Date(reminder.lastActivitySampleAt).getTime() : rhythmClockNow.value
+      const elapsed = Math.max(0, Math.min(60, Math.floor((rhythmClockNow.value - lastSample) / 1000)))
+      reminder.lastActivitySampleAt = nowIso()
+      // 仅在达到真实离席阈值时自动重置；短暂无输入不等于用户已活动。
+      // 这里只保存聚合秒数，不保存任何键鼠事件或输入内容。
+      if (idleSeconds >= reminder.breakThresholdSeconds) {
+        if (reminder.pendingSince) appendRhythmHistory(reminder, 'natural-break')
+        reminder.activitySeconds = 0
+        reminder.lastNotifiedAt = null
+        reminder.pendingSince = null
+        reminder.lastResolvedAt = nowIso()
+      } else if (elapsed > 0) {
+        reminder.activitySeconds = Math.min(8 * 60 * 60, reminder.activitySeconds + Math.max(0, elapsed - Math.min(elapsed, idleSeconds)))
+      }
+    }
+  }
+
+  function isReminderInSchedule(reminder, date) {
+    if (!reminder.weekdays.includes(date.getDay())) return false
+    const current = minutesSinceMidnight(date)
+    if (!isTimeInWindow(current, reminder.workStart, reminder.workEnd)) return false
+    if (reminder.quietStart && reminder.quietEnd && isTimeInWindow(current, reminder.quietStart, reminder.quietEnd)) return false
+    return true
+  }
+
+  function minutesSinceMidnight(date) {
+    return date.getHours() * 60 + date.getMinutes()
+  }
+
+  function timeToMinutes(value) {
+    const [hour, minute] = normalizeClockTime(value).split(':').map(Number)
+    return hour * 60 + minute
+  }
+
+  function isTimeInWindow(current, start, end) {
+    const startMinute = timeToMinutes(start)
+    const endMinute = timeToMinutes(end)
+    if (startMinute === endMinute) return true
+    return startMinute < endMinute
+      ? current >= startMinute && current < endMinute
+      : current >= startMinute || current < endMinute
+  }
+
+  function timeToday(value, baseDate = new Date()) {
+    const [hour, minute] = normalizeClockTime(value).split(':').map(Number)
+    const date = new Date(baseDate)
+    date.setHours(hour, minute, 0, 0)
+    return date
+  }
+
+  function addRhythmReminder(values = {}) {
+    const activeCount = rhythmReminders.value.filter(item => item.enabled && (item.triggerType !== 'active-duration' || activityMonitoringAvailable.value)).length
+    const reminder = normalizeRhythmReminder({
+      id: genId(),
+      title: '自定义提醒',
+      enabled: activeCount < MAX_ACTIVE_RHYTHM_REMINDERS,
+      triggerType: 'interval',
+      intervalSeconds: 60 * 60,
+      weekdays: [1, 2, 3, 4, 5],
+      workStart: '09:00',
+      workEnd: '18:00',
+      ...values,
+      createdAt: nowIso(),
+      sortOrder: (rhythmReminders.value.length + 1) * 1000
+    }, rhythmReminders.value.length)
+    clock.value.rhythm.reminders.push(reminder)
+    if (!reminder.enabled) showNotice(`自定义提醒已创建；同时最多运行 ${MAX_ACTIVE_RHYTHM_REMINDERS} 项`, 'info')
+    syncRhythmTimer()
+    return reminder.id
+  }
+
+  function updateRhythmReminder(reminderId, updates = {}) {
+    const index = clock.value.rhythm.reminders.findIndex(item => item.id === reminderId)
+    if (index < 0) return false
+    const current = clock.value.rhythm.reminders[index]
+    const next = { ...current, ...updates }
+    if (next.enabled && next.triggerType === 'interval' && (
+      updates.enabled === true ||
+      Object.prototype.hasOwnProperty.call(updates, 'intervalSeconds') ||
+      Object.prototype.hasOwnProperty.call(updates, 'triggerType')
+    )) {
+      next.cycleStartedAt = nowIso()
+      next.nextDueAt = new Date(Date.now() + Number(next.intervalSeconds) * 1000).toISOString()
+      next.pendingSince = null
+      next.snoozedUntil = null
+    }
+    if (updates.enabled === false) {
+      next.pendingSince = null
+      next.snoozedUntil = null
+    }
+    clock.value.rhythm.reminders[index] = normalizeRhythmReminder(next, index)
+    syncRhythmTimer()
+    return true
+  }
+
+  function toggleRhythmReminder(reminderId, enabled) {
+    const reminder = clock.value.rhythm.reminders.find(item => item.id === reminderId)
+    const nextEnabled = typeof enabled === 'boolean' ? enabled : !reminder?.enabled
+    if (reminder?.triggerType === 'active-duration' && nextEnabled && !activityMonitoringAvailable.value) {
+      showNotice('当前平台暂不支持连续活跃时长提醒', 'error')
+      return false
+    }
+    if (nextEnabled) {
+      const activeCount = clock.value.rhythm.reminders.filter(item => item.enabled && item.id !== reminderId && (item.triggerType !== 'active-duration' || activityMonitoringAvailable.value)).length
+      if (activeCount >= MAX_ACTIVE_RHYTHM_REMINDERS) {
+        showNotice(`同时最多运行 ${MAX_ACTIVE_RHYTHM_REMINDERS} 项提醒，请先关闭或替换一项`, 'info')
+        return false
+      }
+    }
+    return updateRhythmReminder(reminderId, { enabled: nextEnabled })
+  }
+
+  function deleteRhythmReminder(reminderId) {
+    const index = clock.value.rhythm.reminders.findIndex(item => item.id === reminderId)
+    if (index < 0) return false
+    clock.value.rhythm.reminders.splice(index, 1)
+    syncRhythmTimer()
+    return true
+  }
+
+  function appendRhythmHistory(reminder, action, details = {}) {
+    if (!reminder || !isValidIsoDate(reminder.pendingSince)) return false
+    const resolvedAt = nowIso()
+    const triggeredAt = reminder.pendingSince
+    clock.value.rhythm.history.unshift({
+      id: genId(),
+      reminderId: reminder.id,
+      reminderTitle: reminder.title,
+      triggerType: reminder.triggerType,
+      triggerLabel: rhythmReminderTriggerLabel(reminder),
+      triggeredAt,
+      resolvedAt,
+      action,
+      responseSeconds: Math.max(0, Math.round((new Date(resolvedAt).getTime() - new Date(triggeredAt).getTime()) / 1000)),
+      snoozeMinutes: action === 'snoozed' ? Math.max(1, Math.round(Number(details.snoozeMinutes) || 5)) : null
+    })
+    clock.value.rhythm.history = clock.value.rhythm.history.slice(0, MAX_RHYTHM_HISTORY)
+    return true
+  }
+
+  function completeRhythmReminder(reminderId) {
+    const reminder = clock.value.rhythm.reminders.find(item => item.id === reminderId)
+    if (!reminder) return false
+    appendRhythmHistory(reminder, 'completed')
+    reminder.lastCompletedAt = nowIso()
+    reminder.lastNotifiedAt = nowIso()
+    reminder.snoozedUntil = null
+    reminder.pendingSince = null
+    reminder.lastResolvedAt = nowIso()
+    reminder.manualCycleStartedAt = null
+    if (reminder.triggerType === 'interval') {
+      reminder.cycleStartedAt = nowIso()
+      reminder.nextDueAt = new Date(Date.now() + reminder.intervalSeconds * 1000).toISOString()
+    }
+    if (reminder.triggerType === 'active-duration') reminder.activitySeconds = 0
+    showNotice(`${reminder.title}已完成`, 'success')
+    syncRhythmTimer()
+    return true
+  }
+
+  function snoozeRhythmReminder(reminderId, minutes = 5) {
+    const reminder = clock.value.rhythm.reminders.find(item => item.id === reminderId)
+    if (!reminder) return false
+    const snoozeMinutes = Math.max(1, Number(minutes) || 5)
+    appendRhythmHistory(reminder, 'snoozed', { snoozeMinutes })
+    reminder.snoozedUntil = new Date(Date.now() + snoozeMinutes * 60 * 1000).toISOString()
+    reminder.lastNotifiedAt = null
+    reminder.pendingSince = null
+    syncRhythmTimer()
+    return true
+  }
+
+  function skipRhythmReminderToday(reminderId) {
+    const reminder = clock.value.rhythm.reminders.find(item => item.id === reminderId)
+    if (!reminder) return false
+    appendRhythmHistory(reminder, 'skipped-today')
+    reminder.skippedDate = localDateKey()
+    reminder.snoozedUntil = null
+    reminder.pendingSince = null
+    reminder.lastResolvedAt = nowIso()
+    reminder.manualCycleStartedAt = null
+    if (reminder.triggerType === 'interval') {
+      reminder.cycleStartedAt = nowIso()
+      reminder.nextDueAt = new Date(Date.now() + reminder.intervalSeconds * 1000).toISOString()
+    }
+    syncRhythmTimer()
+    return true
+  }
+
+  function dismissRhythmReminder(reminderId) {
+    const reminder = clock.value.rhythm.reminders.find(item => item.id === reminderId)
+    if (!reminder) return false
+    appendRhythmHistory(reminder, 'dismissed')
+    reminder.pendingSince = null
+    reminder.snoozedUntil = null
+    reminder.lastResolvedAt = nowIso()
+    reminder.manualCycleStartedAt = null
+    if (reminder.triggerType === 'interval') {
+      reminder.cycleStartedAt = nowIso()
+      reminder.nextDueAt = new Date(Date.now() + reminder.intervalSeconds * 1000).toISOString()
+    }
+    if (reminder.triggerType === 'active-duration') {
+      reminder.activitySeconds = 0
+      reminder.lastActivitySampleAt = nowIso()
+    }
+    syncRhythmTimer()
+    return true
+  }
+
+  function pauseRhythmReminders() {
+    const now = Date.now()
+    for (const reminder of rhythmReminders.value) {
+      if (!reminder.enabled || reminder.pendingSince) continue
+      if (reminder.triggerType === 'interval') {
+        const dueAt = new Date(reminder.nextDueAt || 0).getTime()
+        reminder.pausedRemainingSeconds = Math.max(1, Math.ceil(((Number.isFinite(dueAt) ? dueAt : now) - now) / 1000))
+      }
+      if (reminder.triggerType === 'active-duration') reminder.lastActivitySampleAt = nowIso()
+    }
+    clock.value.rhythm.pausedManually = true
+    clock.value.rhythm.pausedUntil = null
+    showNotice('节律提醒已暂停', 'info')
+    syncRhythmTimer()
+    return true
+  }
+
+  function resumeRhythmReminders() {
+    clock.value.rhythm.pausedUntil = null
+    clock.value.rhythm.pausedManually = false
+    const now = Date.now()
+    for (const reminder of rhythmReminders.value) {
+      if (!reminder.enabled) continue
+      if (reminder.triggerType === 'interval' && !reminder.pendingSince) {
+        const remainingSeconds = Math.max(1, Number(reminder.pausedRemainingSeconds) || Number(reminder.intervalSeconds) || 60)
+        reminder.nextDueAt = new Date(now + remainingSeconds * 1000).toISOString()
+        reminder.cycleStartedAt = new Date(now - Math.max(0, (Number(reminder.intervalSeconds) || remainingSeconds) - remainingSeconds) * 1000).toISOString()
+      }
+      if (reminder.triggerType === 'active-duration') reminder.lastActivitySampleAt = nowIso()
+      reminder.pausedRemainingSeconds = null
+    }
+    syncRhythmTimer()
+  }
+
+  function adjustRhythmReminderTiming(reminderId, minutes = 5) {
+    const reminder = clock.value.rhythm.reminders.find(item => item.id === reminderId)
+    const adjustment = Math.round(Number(minutes) || 0)
+    if (!reminder || !reminder.enabled || rhythmPaused.value || !adjustment || reminder.triggerType === 'fixed-time') return false
+
+    if (reminder.triggerType === 'active-duration') {
+      const target = Math.max(0, Math.min(Math.max(1, Number(reminder.intervalSeconds) || 1) - 1, (Number(reminder.activitySeconds) || 0) - adjustment * 60))
+      reminder.activitySeconds = target
+      reminder.lastActivitySampleAt = nowIso()
+    } else {
+      const currentDueAt = new Date(reminder.nextDueAt || 0).getTime() || Date.now() + (Number(reminder.intervalSeconds) || 60) * 1000
+      const nextDueAt = Math.max(Date.now() + 60 * 1000, currentDueAt + adjustment * 60 * 1000)
+      reminder.nextDueAt = new Date(nextDueAt).toISOString()
+      reminder.snoozedUntil = null
+      reminder.pendingSince = null
+      reminder.lastNotifiedAt = null
+    }
+
+    const direction = adjustment > 0 ? '延后' : '提前'
+    showNotice(`${reminder.title}本轮已${direction} ${Math.abs(adjustment)} 分钟`, 'success')
+    syncRhythmTimer()
+    return true
+  }
+
+  function startRhythmReminderNow(reminderId) {
+    const reminder = clock.value.rhythm.reminders.find(item => item.id === reminderId)
+    if (!reminder || !reminder.enabled || reminder.triggerType === 'fixed-time') return false
+    reminder.skippedDate = null
+    reminder.snoozedUntil = null
+    reminder.pendingSince = null
+    reminder.lastResolvedAt = nowIso()
+    reminder.manualCycleStartedAt = nowIso()
+    if (reminder.triggerType === 'interval') {
+      reminder.cycleStartedAt = nowIso()
+      reminder.nextDueAt = new Date(Date.now() + reminder.intervalSeconds * 1000).toISOString()
+    } else {
+      reminder.activitySeconds = 0
+      reminder.lastActivitySampleAt = nowIso()
+    }
+    showNotice(`${reminder.title}已从现在开始重新计时`, 'success')
+    syncRhythmTimer()
+    return true
+  }
+
+  function handleRhythmReminderWindowAction(reminderId, action) {
+    if (action === 'complete') return completeRhythmReminder(reminderId)
+    if (action === 'snooze') return snoozeRhythmReminder(reminderId, 5)
+    if (action === 'skip') return skipRhythmReminderToday(reminderId)
+    if (action === 'dismiss') return dismissRhythmReminder(reminderId)
+    return false
+  }
+
+  function deleteRhythmHistory(historyId) {
+    const index = clock.value.rhythm.history.findIndex(item => item.id === historyId)
+    if (index < 0) return false
+    clock.value.rhythm.history.splice(index, 1)
+    showNotice('节律记录已删除', 'info')
+    return true
   }
 
   function normalizeGroups(rawGroups) {
@@ -1708,6 +2925,9 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   function normalizeSettings(rawSettings = {}) {
+    const activeModule = ['tasks', 'clock'].includes(rawSettings.activeModule)
+      ? rawSettings.activeModule
+      : DEFAULT_SETTINGS.activeModule
     const theme = THEME_IDS.includes(rawSettings.theme) ? rawSettings.theme : DEFAULT_SETTINGS.theme
     const density = ['comfortable', 'compact'].includes(rawSettings.density) ? rawSettings.density : DEFAULT_SETTINGS.density
     const startView = SYSTEM_VIEW_IDS.includes(rawSettings.startView) ? rawSettings.startView : DEFAULT_SETTINGS.startView
@@ -1724,6 +2944,10 @@ export const useTaskStore = defineStore('task', () => {
     const soundDragEnabled = rawSettings.soundDragEnabled !== false
     const reminderNotificationsEnabled = rawSettings.reminderNotificationsEnabled !== false
     const reminderSoundEnabled = rawSettings.reminderSoundEnabled !== false
+    const focusCompletionNotificationsEnabled = rawSettings.focusCompletionNotificationsEnabled !== false
+    const focusCompletionSoundEnabled = rawSettings.focusCompletionSoundEnabled !== false
+    const focusReminderAlwaysOnTop = rawSettings.focusReminderAlwaysOnTop !== false
+    const focusControllerAlwaysOnTop = rawSettings.focusControllerAlwaysOnTop !== false
     const windowCloseBehavior = ['hide', 'quit'].includes(rawSettings.windowCloseBehavior)
       ? rawSettings.windowCloseBehavior
       : DEFAULT_SETTINGS.windowCloseBehavior
@@ -1735,6 +2959,8 @@ export const useTaskStore = defineStore('task', () => {
       ...DEFAULT_SETTINGS,
       ...rawSettings,
       theme,
+      activeModule,
+      clockView: ['focus', 'rhythm', 'history'].includes(rawSettings.clockView) ? rawSettings.clockView : DEFAULT_SETTINGS.clockView,
       themeBackgrounds: rawSettings.themeBackgrounds === true,
       density,
       startView,
@@ -1755,6 +2981,10 @@ export const useTaskStore = defineStore('task', () => {
       soundDragEnabled,
       reminderNotificationsEnabled,
       reminderSoundEnabled,
+      focusCompletionNotificationsEnabled,
+      focusCompletionSoundEnabled,
+      focusReminderAlwaysOnTop,
+      focusControllerAlwaysOnTop,
       windowCloseBehavior,
       dailyGuidanceEnabled,
       dailyGuidanceStyle
@@ -1928,8 +3158,10 @@ export const useTaskStore = defineStore('task', () => {
     dataLoadError,
     isSaving,
     notice,
+    focusCelebration,
     settings,
     profile,
+    clock,
     settingsOpen,
     helpCenterOpen,
     activeTasks,
@@ -1954,6 +3186,19 @@ export const useTaskStore = defineStore('task', () => {
     calendarTasksByDate,
     statsSummary,
     statsTrend7Days,
+    focusProfiles,
+    activeFocusSession,
+    focusPendingBreak,
+    rhythmReminders,
+    pendingRhythmReminder,
+    rhythmPaused,
+    rhythmActiveLimit: MAX_ACTIVE_RHYTHM_REMINDERS,
+    activityMonitoringAvailable,
+    currentFocusProfile,
+    focusElapsedSeconds,
+    focusRemainingSeconds,
+    focusHistory: computed(() => clock.value.history),
+    rhythmHistory: computed(() => clock.value.rhythm.history),
     listDistribution,
     currentViewMode,
     currentListGroups,
@@ -2013,14 +3258,47 @@ export const useTaskStore = defineStore('task', () => {
     selectTask,
     showNotice,
     clearNotice,
+    dismissFocusCelebration,
     openSettings,
     closeSettings,
     openHelpCenter,
     closeHelpCenter,
     updateSettings,
+    setActiveModule,
+    setClockView,
     previewSound,
     updateProfile,
+    startFocus,
+    pauseFocus,
+    resumeFocus,
+    updateFocusTask,
+    adjustFocusDuration,
+    updateFocusSettings,
+    updateFocusProfile,
+    startPendingBreak,
+    skipPendingBreak,
+    addRhythmReminder,
+    updateRhythmReminder,
+    toggleRhythmReminder,
+    deleteRhythmReminder,
+    completeRhythmReminder,
+    snoozeRhythmReminder,
+    skipRhythmReminderToday,
+    dismissRhythmReminder,
+    pauseRhythmReminders,
+    resumeRhythmReminders,
+    adjustRhythmReminderTiming,
+    startRhythmReminderNow,
+    deleteRhythmHistory,
+    handleRhythmElapsedFromNative,
+    handleRhythmReminderWindowAction,
+    finishFocus,
+    completeFocusSessionFromNative,
+    deleteFocusHistory,
+    clearFocusHistoryBefore,
+    clearFocusHistoryForDay,
     testReminderNotification,
+    testFocusCompletionNotification,
     loadData,
     saveData,
     playDragStartSound,

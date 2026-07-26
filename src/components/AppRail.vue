@@ -1,22 +1,173 @@
 <template>
-  <aside class="app-rail">
-    <button class="rail-avatar" title="易简清单" aria-label="易简清单">
-      <span>易</span>
-    </button>
-    <button
-      class="rail-btn active"
-      title="任务"
-      aria-label="任务"
-      @click="store.setView('inbox')"
-    >
-      ✓
-    </button>
-    <div class="rail-spacer"></div>
+  <aside class="app-rail" aria-label="应用模块">
+    <div class="app-rail__profile-wrap" :class="{ 'app-rail__profile-wrap--panel-open': profilePanelOpen }">
+      <button
+        class="app-rail__profile"
+        type="button"
+        :aria-label="`${store.profile.nickname}，打开个人资料`"
+        @click="profilePanelOpen = true"
+      >
+        <img v-if="profileAvatarSrc" :src="profileAvatarSrc" alt="" />
+        <span v-else>{{ profileInitial }}</span>
+      </button>
+      <div class="app-rail__profile-tip" role="tooltip">
+        <div class="app-rail__profile-tip-avatar">
+          <img v-if="profileAvatarSrc" :src="profileAvatarSrc" alt="" />
+          <span v-else>{{ profileInitial }}</span>
+          <b><HardDrive :size="13" /> 本机</b>
+        </div>
+        <div class="app-rail__profile-tip-copy">
+          <p>你的个人空间</p>
+          <strong>{{ store.profile.nickname }}</strong>
+          <div class="app-rail__profile-tip-tags">
+            <span><i></i>本地资料</span>
+            <span>仅此设备</span>
+          </div>
+          <small>{{ store.lists.length }} 个清单 · 数据仅保存在此设备</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="app-rail__divider"></div>
+
+    <nav class="app-rail__modules" aria-label="模块切换">
+      <button class="app-rail__button" :class="{ active: store.settings.activeModule === 'tasks' }" type="button" title="清单" aria-label="清单" :aria-current="store.settings.activeModule === 'tasks' ? 'page' : undefined" @click="selectModule('tasks')"><ListChecks :size="20" /></button>
+      <button class="app-rail__button" :class="{ active: store.settings.activeModule === 'clock' }" type="button" title="时钟" aria-label="时钟" :aria-current="store.settings.activeModule === 'clock' ? 'page' : undefined" @click="selectModule('clock')"><AlarmClock :size="20" /></button>
+    </nav>
+
+    <template v-if="store.settings.sidebarCollapsed">
+      <div class="app-rail__divider app-rail__divider--quick"></div>
+
+      <nav v-if="store.settings.activeModule === 'tasks'" class="app-rail__quick" aria-label="清单快捷操作">
+        <button class="app-rail__button" :class="{ active: store.currentView === 'search' }" type="button" title="搜索（Ctrl/Cmd + K）" aria-label="搜索" @click="openSearch"><Search :size="20" /></button>
+        <button v-for="item in taskQuickViews" :key="item.id" class="app-rail__button app-rail__button--badge" :class="{ active: store.currentView === item.id }" type="button" :title="item.label" :aria-label="item.label" @click="store.setView(item.id)"><component :is="item.icon" :size="20" /><span v-if="store.listTaskCounts[item.id]" class="app-rail__badge">{{ store.listTaskCounts[item.id] }}</span></button>
+
+        <div class="app-rail__quick-divider"></div>
+        <div class="app-rail__list-anchor">
+          <button ref="listsAnchor" class="app-rail__button" :class="{ active: isCurrentViewList }" type="button" title="我的清单" aria-label="我的清单" @click.stop="toggleListsFlyout"><Folder :size="20" /></button>
+        </div>
+        <button class="app-rail__button app-rail__button--badge" :class="{ active: store.currentView === 'completed' }" type="button" title="已完成" aria-label="已完成" @click="store.setView('completed')"><CheckCircle2 :size="20" /><span v-if="store.listTaskCounts.completed" class="app-rail__badge">{{ store.listTaskCounts.completed }}</span></button>
+        <button class="app-rail__button app-rail__button--badge" :class="{ active: store.currentView === 'trash' }" type="button" title="垃圾桶" aria-label="垃圾桶" @click="store.setView('trash')"><Trash2 :size="20" /><span v-if="store.listTaskCounts.trash" class="app-rail__badge">{{ store.listTaskCounts.trash }}</span></button>
+      </nav>
+
+      <nav v-else class="app-rail__quick" aria-label="时钟快捷操作">
+        <button
+          v-for="item in clockQuickViews"
+          :key="item.id"
+          class="app-rail__button"
+          :class="{ active: store.settings.clockView === item.id }"
+          type="button"
+          :title="item.label"
+          :aria-label="item.label"
+          :aria-current="store.settings.clockView === item.id ? 'page' : undefined"
+          @click="store.setClockView(item.id)"
+        >
+          <component :is="item.icon" :size="20" />
+        </button>
+      </nav>
+
+    </template>
+
+    <div class="app-rail__spacer"></div>
+
+    <div class="app-rail__footer">
+      <button v-if="store.settings.sidebarCollapsed" class="app-rail__button" type="button" :title="store.settings.activeModule === 'tasks' ? '展开清单栏' : '展开时钟栏'" :aria-label="store.settings.activeModule === 'tasks' ? '展开清单栏' : '展开时钟栏'" @click="store.updateSettings({ sidebarCollapsed: false })"><PanelLeft :size="20" /></button>
+      <button class="app-rail__button" type="button" title="使用指南" aria-label="使用指南" @click="store.openHelpCenter"><Compass :size="20" /></button>
+      <button class="app-rail__button" type="button" title="设置" aria-label="设置" @click="store.openSettings"><Settings :size="20" /></button>
+    </div>
+
+    <Teleport to=".app">
+      <div v-if="listsFlyout" class="app-rail__list-flyout" :style="listsFlyoutStyle" @click.stop>
+        <template v-for="group in store.groupedLists" :key="group.id">
+          <p v-if="group.id !== 'ungrouped'" class="app-rail__list-group">{{ group.name }}</p>
+          <button v-for="list in group.lists" :key="list.id" type="button" :class="{ active: store.currentView === list.id }" @click="selectList(list.id)"><i :style="{ background: list.color }"></i><span>{{ list.name }}</span><b v-if="store.listTaskCounts[list.id]">{{ store.listTaskCounts[list.id] }}</b></button>
+        </template>
+      </div>
+    </Teleport>
+
+    <ProfilePanel v-if="profilePanelOpen" @close="profilePanelOpen = false" />
   </aside>
 </template>
 
 <script setup>
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { AlarmClock, Bell, CalendarCheck, ChartNoAxesColumnIncreasing, CheckCircle2, Compass, Folder, HardDrive, Inbox, ListChecks, PanelLeft, Search, Settings, Star, Timer, Trash2 } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
+import { readProfileAvatar } from '@/services/platform'
+import ProfilePanel from './ProfilePanel.vue'
 
 const store = useTaskStore()
+const profilePanelOpen = ref(false)
+const profileAvatarUrl = ref('')
+const listsFlyout = ref(false)
+const listsAnchor = ref(null)
+const listsFlyoutStyle = ref({})
+const profileInitial = computed(() => Array.from(store.profile.nickname?.trim() || '易')[0] || '易')
+const taskQuickViews = [
+  { id: 'today', label: '今日', icon: CalendarCheck },
+  { id: 'inbox', label: '收集箱', icon: Inbox },
+  { id: 'planned', label: '计划', icon: ListChecks },
+  { id: 'important', label: '重要', icon: Star }
+]
+const clockQuickViews = [
+  { id: 'focus', label: '专注工作台', icon: Timer },
+  { id: 'rhythm', label: '节律提醒', icon: Bell },
+  { id: 'history', label: '专注回顾', icon: ChartNoAxesColumnIncreasing }
+]
+const isCurrentViewList = computed(() => store.lists.some(list => list.id === store.currentView))
+const builtInAvatarModules = import.meta.glob('@/assets/avatars/*.png', { eager: true, import: 'default' })
+const profileAvatarSrc = computed(() => {
+  if (profileAvatarUrl.value) return profileAvatarUrl.value
+  const id = store.profile.avatarRelativePath?.startsWith('builtin:') ? store.profile.avatarRelativePath.slice(8) : ''
+  return Object.entries(builtInAvatarModules).find(([path]) => path.endsWith(`/${id}.png`))?.[1] || ''
+})
+
+async function loadProfileAvatar() {
+  if (store.profile.avatarRelativePath?.startsWith('builtin:') || !store.profile.avatarRelativePath) { profileAvatarUrl.value = ''; return }
+  try { profileAvatarUrl.value = await readProfileAvatar(store.profile.avatarRelativePath) || '' } catch { profileAvatarUrl.value = '' }
+}
+
+function selectModule(module) {
+  listsFlyout.value = false
+  store.setActiveModule(module)
+}
+
+function updateListsFlyoutPosition() {
+  if (!listsAnchor.value) return
+  const rect = listsAnchor.value.getBoundingClientRect()
+  listsFlyoutStyle.value = {
+    left: `${rect.right + 8}px`,
+    top: `${Math.max(12, Math.min(rect.top - 10, window.innerHeight - 300))}px`
+  }
+}
+
+function toggleListsFlyout() {
+  if (!listsFlyout.value) updateListsFlyoutPosition()
+  listsFlyout.value = !listsFlyout.value
+}
+
+function closeListsFlyout() {
+  listsFlyout.value = false
+}
+
+function openSearch() {
+  store.setSearch(store.searchQuery)
+  nextTick(() => window.dispatchEvent(new Event('task-list:focus-search')))
+}
+
+function selectList(id) {
+  store.setView(id)
+  listsFlyout.value = false
+}
+
+watch(() => store.profile.avatarRelativePath, loadProfileAvatar, { immediate: true })
+watch(() => store.settings.sidebarCollapsed, (collapsed) => { if (!collapsed) listsFlyout.value = false })
+onMounted(() => {
+  window.addEventListener('click', closeListsFlyout)
+  window.addEventListener('resize', updateListsFlyoutPosition)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('click', closeListsFlyout)
+  window.removeEventListener('resize', updateListsFlyoutPosition)
+})
 </script>

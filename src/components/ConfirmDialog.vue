@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="visible" class="confirm-overlay" role="dialog" aria-modal="true" :aria-label="title" @keydown.esc.stop="cancel" @click.self="cancel">
+    <div v-if="visible" class="confirm-overlay" role="dialog" aria-modal="true" :aria-label="title" :style="{ zIndex }" @keydown.esc.stop="cancel" @click.self="cancel">
       <div class="confirm-dialog" @click.stop>
         <button class="confirm-close" type="button" @click="cancel">
           <X :size="18" />
@@ -68,7 +68,8 @@ const props = defineProps({
   details: { type: Array, default: () => [] },
   confirmText: { type: String, default: '确定' },
   cancelText: { type: String, default: '再想想' },
-  type: { type: String, default: 'danger' }
+  type: { type: String, default: 'danger' },
+  zIndex: { type: [String, Number], default: 'var(--z-confirm)' }
 })
 
 const emit = defineEmits(['confirm', 'cancel'])

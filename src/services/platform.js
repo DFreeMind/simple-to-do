@@ -12,6 +12,26 @@ function isTauri() {
   return typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__)
 }
 
+function isMacOS() {
+  return typeof navigator !== 'undefined' && /Macintosh|Mac OS X/.test(navigator.userAgent)
+}
+
+async function sendNativeNotification(payload) {
+  if (isTauri() && isMacOS()) {
+    await invoke('send_macos_notification', {
+      title: payload.title,
+      body: payload.body,
+      soundEnabled: payload.silent !== true
+    })
+    return
+  }
+  sendNotification(payload)
+}
+
+export function hasNativeFocusScheduler() {
+  return isTauri()
+}
+
 export async function loadData() {
   try {
     if (isTauri()) {
@@ -41,6 +61,17 @@ export async function saveData(data) {
 export async function setWindowCloseBehavior(behavior) {
   if (!isTauri()) return false
   return invoke('set_window_close_behavior', { behavior })
+}
+
+export async function getSystemIdleSeconds() {
+  if (!isTauri()) return null
+  try {
+    const value = await invoke('get_system_idle_seconds')
+    return Number.isFinite(Number(value)) ? Number(value) : null
+  } catch (error) {
+    console.warn('[Platform] 无法读取系统空闲时长:', error)
+    return null
+  }
 }
 
 export async function saveMigrationBackup(data) {
@@ -218,12 +249,16 @@ export function reminderNotificationId(taskId) {
 }
 
 export async function getReminderNotificationStatus() {
-  if (!isTauri() || typeof window === 'undefined' || !window.Notification) {
+  if (!isTauri()) {
     return { supported: false, granted: false, permission: 'unsupported' }
   }
+  // notify-rust 在部分 macOS 环境会从后台线程初始化
+  // UNUserNotificationCenter，触发系统断言并终止整个应用。macOS 改由
+  // 原生命令发送通知，因而不再触碰该插件的权限查询路径。
+  if (isMacOS()) return { supported: true, granted: true, permission: 'granted' }
   try {
     const granted = await isPermissionGranted()
-    return { supported: true, granted, permission: granted ? 'granted' : window.Notification.permission }
+    return { supported: true, granted, permission: granted ? 'granted' : 'denied' }
   } catch (error) {
     return { supported: false, granted: false, permission: 'unsupported', error }
   }
@@ -263,7 +298,7 @@ export async function sendTaskReminderNotification(task, settings = {}, options 
       console.warn('[Platform] 可交互提醒不可用，改用普通系统通知:', error)
     }
 
-    sendNotification({
+    await sendNativeNotification({
       id: reminderNotificationId(task.id),
       title,
       body,
@@ -277,6 +312,215 @@ export async function sendTaskReminderNotification(task, settings = {}, options 
     console.error('[Platform] 发送提醒失败:', error)
     return { sent: false, reason: 'send-failed', error }
   }
+}
+
+export async function openReleasePage() {
+  if (!isTauri()) {
+    window.open('https://github.com/DFreeMind/simple-to-do/releases/latest', '_blank', 'noopener,noreferrer')
+    return true
+  }
+  try {
+    return await invoke('open_release_page')
+  } catch (error) {
+    throw new Error(formatPlatformError(error, '打开下载页失败'))
+  }
+}
+
+export async function sendRhythmReminderNotification(reminder, settings = {}) {
+  if (!isTauri() || !reminder?.id || settings.reminderNotificationsEnabled === false) {
+    return { sent: false, reason: 'unsupported' }
+  }
+  const granted = await ensureReminderNotificationPermission()
+  if (!granted) return { sent: false, reason: 'permission' }
+  try {
+    await sendNativeNotification({
+      id: reminderNotificationId(`rhythm-${reminder.id}`),
+      title: reminder.title || '易简节律提醒',
+      body: reminder.message || '该给自己一点短暂的调整时间了。',
+      group: REMINDER_GROUP,
+      autoCancel: true,
+      silent: settings.reminderSoundEnabled === false
+    })
+    return { sent: true }
+  } catch (error) {
+    console.error('[Platform] 发送节律提醒失败:', error)
+    return { sent: false, reason: 'send-failed', error }
+  }
+}
+
+export async function scheduleFocusCompletion(schedule, settings = {}) {
+  if (!isTauri()) return false
+  try {
+    return await invoke('schedule_focus_completion', {
+      schedule: {
+        ...schedule,
+        notificationEnabled: settings.focusCompletionNotificationsEnabled !== false,
+        soundEnabled: settings.focusCompletionSoundEnabled !== false,
+        alwaysOnTop: settings.focusReminderAlwaysOnTop !== false
+      }
+    })
+  } catch (error) {
+    console.error('[Platform] 调度专注完成提醒失败:', error)
+    return false
+  }
+}
+
+export async function cancelFocusCompletion(sessionId = null) {
+  if (!isTauri()) return false
+  try {
+    return await invoke('cancel_focus_completion', { sessionId })
+  } catch (error) {
+    console.warn('[Platform] 取消专注完成提醒失败:', error)
+    return false
+  }
+}
+
+export async function syncFocusController(payload = null) {
+  if (!isTauri()) return false
+  try {
+    return await invoke('sync_focus_controller', { payload })
+  } catch (error) {
+    console.warn('[Platform] 同步专注控制器失败:', error)
+    return false
+  }
+}
+
+export async function openFocusController() {
+  if (!isTauri()) return false
+  return invoke('open_focus_controller')
+}
+
+export async function getFocusControllerPayload() {
+  if (!isTauri()) return null
+  return invoke('get_focus_controller_payload')
+}
+
+export async function markFocusControllerReady(revision) {
+  if (!isTauri()) return false
+  return invoke('focus_controller_ready', { revision })
+}
+
+export async function setFocusControllerAlwaysOnTop(alwaysOnTop) {
+  if (!isTauri()) return false
+  return invoke('set_focus_controller_always_on_top', { alwaysOnTop })
+}
+
+export async function handleFocusControllerAction(controller, action) {
+  if (!isTauri() || !controller?.sessionId) return false
+  return invoke('handle_focus_controller_action', {
+    sessionId: controller.sessionId,
+    action
+  })
+}
+
+export async function requestFocusNotificationPermission() {
+  if (!isTauri()) return false
+  try {
+    return await invoke('request_focus_notification_permission')
+  } catch (error) {
+    console.error('[Platform] 请求专注完成通知权限失败:', error)
+    return false
+  }
+}
+
+export async function openSystemNotificationSettings() {
+  if (!isTauri()) return false
+  try {
+    return await invoke('open_system_notification_settings')
+  } catch (error) {
+    console.error('[Platform] 打开系统通知设置失败:', error)
+    return false
+  }
+}
+
+export async function sendFocusCompletionTestNotification(settings = {}) {
+  if (!isTauri()) return { sent: false, reason: 'unsupported' }
+  try {
+    await invoke('send_focus_completion_test_notification', {
+      soundEnabled: settings.focusCompletionSoundEnabled !== false,
+      alwaysOnTop: settings.focusReminderAlwaysOnTop !== false
+    })
+    return { sent: true }
+  } catch (error) {
+    console.error('[Platform] 发送专注完成测试提醒失败:', error)
+    return { sent: false, reason: 'send-failed', error }
+  }
+}
+
+export async function getFocusReminderPayload() {
+  if (!isTauri()) return null
+  return invoke('get_focus_reminder_payload')
+}
+
+export async function markFocusReminderReady(revision) {
+  if (!isTauri()) return false
+  return invoke('focus_reminder_ready', { revision })
+}
+
+export async function handleFocusReminderAction(reminder, action) {
+  if (!isTauri() || !reminder?.sessionId) return false
+  return invoke('handle_focus_reminder_action', {
+    revision: reminder.revision,
+    sessionId: reminder.sessionId,
+    action
+  })
+}
+
+export async function presentRhythmReminder(reminder, settings = {}) {
+  if (!isTauri() || !reminder?.id) return false
+  return invoke('present_rhythm_reminder', {
+    reminderId: reminder.id,
+    title: reminder.title || '节律提醒',
+    message: reminder.message || '该给自己一点短暂的调整时间了。',
+    triggerLabel: reminder.triggerType === 'active-duration' ? `连续使用 ${Math.round((reminder.intervalSeconds || 0) / 60)} 分钟` : reminder.triggerType === 'fixed-time' ? `固定时刻 ${reminder.time}` : `每 ${Math.round((reminder.intervalSeconds || 0) / 60)} 分钟`,
+    notificationEnabled: settings.reminderNotificationsEnabled !== false,
+    soundEnabled: settings.reminderSoundEnabled !== false
+  })
+}
+
+export function hasNativeRhythmScheduler() {
+  return isTauri()
+}
+
+export async function scheduleRhythmReminder(schedule, settings = {}) {
+  if (!isTauri()) return false
+  try {
+    return await invoke('schedule_rhythm_reminder', {
+      schedule: {
+        ...schedule,
+        notificationEnabled: settings.reminderNotificationsEnabled !== false,
+        soundEnabled: settings.reminderSoundEnabled !== false
+      }
+    })
+  } catch (error) {
+    console.error('[Platform] 调度节律提醒失败:', error)
+    return false
+  }
+}
+
+export async function cancelRhythmReminder(reminderId = null) {
+  if (!isTauri()) return false
+  try {
+    return await invoke('cancel_rhythm_reminder', { reminderId })
+  } catch (error) {
+    console.warn('[Platform] 取消节律提醒调度失败:', error)
+    return false
+  }
+}
+
+export async function getRhythmReminderPayload() {
+  if (!isTauri()) return null
+  return invoke('get_rhythm_reminder_payload')
+}
+
+export async function markRhythmReminderReady(revision) {
+  if (!isTauri()) return false
+  return invoke('rhythm_reminder_ready', { revision })
+}
+
+export async function handleRhythmReminderAction(reminder, action) {
+  if (!isTauri() || !reminder?.reminderId) return false
+  return invoke('handle_rhythm_reminder_action', { revision: reminder.revision, reminderId: reminder.reminderId, action })
 }
 
 export async function sendReminderTestNotification(settings = {}) {

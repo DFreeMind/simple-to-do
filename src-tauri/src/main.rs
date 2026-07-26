@@ -3,28 +3,222 @@
 use base64::{engine::general_purpose, Engine as _};
 use chrono::{Datelike, Local};
 use rusqlite::{backup::Backup, params, Connection, OpenFlags, OptionalExtension};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
     collections::HashSet,
     fs,
     path::{Path, PathBuf},
     process::Command,
-    sync::atomic::{AtomicBool, Ordering},
-    time::Duration,
+    sync::{
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        Mutex,
+    },
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use tauri::Manager;
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
+use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+use tauri_plugin_notification::NotificationExt;
 
 #[cfg(target_os = "windows")]
-use notify_rust::{Notification, NotificationResponse};
+use notify_rust::Notification;
 #[cfg(target_os = "windows")]
-use tauri::Emitter;
+use notify_rust::NotificationResponse;
+#[cfg(target_os = "windows")]
+use windows_sys::Win32::{
+    System::SystemInformation::GetTickCount,
+    UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO},
+};
 
 struct WindowCloseBehavior(AtomicBool);
+
+struct FocusCompletionScheduler {
+    revision: AtomicU64,
+    pending: Mutex<Option<FocusCompletionSchedule>>,
+}
+
+struct RhythmReminderScheduler {
+    revision: AtomicU64,
+    pending: Mutex<Option<RhythmReminderSchedule>>,
+}
+
+struct FocusControllerState {
+    revision: AtomicU64,
+    ready_revision: AtomicU64,
+    visible_requested: AtomicBool,
+    pending: Mutex<Option<FocusControllerPayload>>,
+}
+
+struct ReminderWindowCoordinator {
+    state: Mutex<ReminderWindowState>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ReminderWindowKind {
+    FocusCompletion,
+    Rhythm,
+}
+
+impl ReminderWindowKind {
+    fn label(self) -> &'static str {
+        match self {
+            Self::FocusCompletion => "focus-reminder",
+            Self::Rhythm => "rhythm-reminder",
+        }
+    }
+
+    fn priority(self) -> u8 {
+        match self {
+            Self::FocusCompletion => 200,
+            Self::Rhythm => 100,
+        }
+    }
+}
+
+struct ReminderWindowState {
+    active: Option<ReminderWindowKind>,
+    queued: Vec<ReminderWindowKind>,
+}
+
+struct FocusReminderState {
+    revision: AtomicU64,
+    ready_revision: AtomicU64,
+    pending: Mutex<Option<FocusReminderPayload>>,
+}
+
+struct RhythmReminderState {
+    revision: AtomicU64,
+    ready_revision: AtomicU64,
+    pending: Mutex<Option<RhythmReminderPayload>>,
+}
+
+impl Default for FocusCompletionScheduler {
+    fn default() -> Self {
+        Self {
+            revision: AtomicU64::new(0),
+            pending: Mutex::new(None),
+        }
+    }
+}
+
+impl Default for RhythmReminderScheduler {
+    fn default() -> Self {
+        Self {
+            revision: AtomicU64::new(0),
+            pending: Mutex::new(None),
+        }
+    }
+}
+
+impl Default for FocusControllerState {
+    fn default() -> Self {
+        Self {
+            revision: AtomicU64::new(0),
+            ready_revision: AtomicU64::new(0),
+            visible_requested: AtomicBool::new(false),
+            pending: Mutex::new(None),
+        }
+    }
+}
+
+impl Default for ReminderWindowCoordinator {
+    fn default() -> Self {
+        Self {
+            state: Mutex::new(ReminderWindowState {
+                active: None,
+                queued: Vec::new(),
+            }),
+        }
+    }
+}
+
+impl Default for FocusReminderState {
+    fn default() -> Self {
+        Self {
+            revision: AtomicU64::new(0),
+            ready_revision: AtomicU64::new(0),
+            pending: Mutex::new(None),
+        }
+    }
+}
+
+impl Default for RhythmReminderState {
+    fn default() -> Self {
+        Self {
+            revision: AtomicU64::new(0),
+            ready_revision: AtomicU64::new(0),
+            pending: Mutex::new(None),
+        }
+    }
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FocusCompletionSchedule {
+    session_id: String,
+    due_at: i64,
+    phase: String,
+    task_title: Option<String>,
+    focused_seconds: u64,
+    break_seconds: Option<u64>,
+    notification_enabled: bool,
+    sound_enabled: bool,
+    always_on_top: bool,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FocusReminderPayload {
+    revision: u64,
+    session_id: String,
+    phase: String,
+    task_title: Option<String>,
+    focused_seconds: u64,
+    break_seconds: Option<u64>,
+    sound_enabled: bool,
+    always_on_top: bool,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RhythmReminderSchedule {
+    reminder_id: String,
+    due_at: i64,
+    title: String,
+    message: String,
+    trigger_label: String,
+    notification_enabled: bool,
+    sound_enabled: bool,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RhythmReminderPayload {
+    revision: u64,
+    reminder_id: String,
+    title: String,
+    message: String,
+    trigger_label: String,
+    sound_enabled: bool,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FocusControllerPayload {
+    revision: u64,
+    session_id: String,
+    status: String,
+    phase: String,
+    task_title: Option<String>,
+    remaining_seconds: Option<u64>,
+    elapsed_seconds: u64,
+    synced_at: i64,
+    always_on_top: bool,
+}
 
 impl Default for WindowCloseBehavior {
     fn default() -> Self {
@@ -35,6 +229,7 @@ impl Default for WindowCloseBehavior {
 
 fn show_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
     }
@@ -85,10 +280,7 @@ fn send_interactive_task_reminder(
 }
 
 #[tauri::command]
-fn set_window_close_behavior(
-    app: tauri::AppHandle,
-    behavior: String,
-) -> Result<bool, String> {
+fn set_window_close_behavior(app: tauri::AppHandle, behavior: String) -> Result<bool, String> {
     let hide_on_close = match behavior.as_str() {
         "hide" => true,
         "quit" => false,
@@ -100,11 +292,1340 @@ fn set_window_close_behavior(
     Ok(true)
 }
 
+fn main_window_is_focused(app: &tauri::AppHandle) -> bool {
+    app.get_webview_window("main").is_some_and(|window| {
+        window.is_visible().unwrap_or(false)
+            && !window.is_minimized().unwrap_or(false)
+            && window.is_focused().unwrap_or(false)
+    })
+}
+
+enum ReminderWindowDisposition {
+    ShowNow,
+    Queued,
+}
+
+fn request_interruptive_reminder(
+    app: &tauri::AppHandle,
+    kind: ReminderWindowKind,
+) -> Result<ReminderWindowDisposition, String> {
+    let coordinator = app.state::<ReminderWindowCoordinator>();
+    let mut state = coordinator
+        .state
+        .lock()
+        .map_err(|_| "提醒窗口协调器不可用".to_string())?;
+    if state.active == Some(kind) {
+        return Ok(ReminderWindowDisposition::ShowNow);
+    }
+    if state.active.is_none() {
+        state.active = Some(kind);
+        return Ok(ReminderWindowDisposition::ShowNow);
+    }
+    if !state.queued.contains(&kind) {
+        state.queued.push(kind);
+    }
+    Ok(ReminderWindowDisposition::Queued)
+}
+
+fn windows_overlap(
+    first_position: tauri::PhysicalPosition<i32>,
+    first_size: tauri::PhysicalSize<u32>,
+    second_position: tauri::PhysicalPosition<i32>,
+    second_size: tauri::PhysicalSize<u32>,
+) -> bool {
+    let first_left = i64::from(first_position.x);
+    let first_top = i64::from(first_position.y);
+    let first_right = first_left + i64::from(first_size.width);
+    let first_bottom = first_top + i64::from(first_size.height);
+    let second_left = i64::from(second_position.x);
+    let second_top = i64::from(second_position.y);
+    let second_right = second_left + i64::from(second_size.width);
+    let second_bottom = second_top + i64::from(second_size.height);
+    first_left < second_right
+        && first_right > second_left
+        && first_top < second_bottom
+        && first_bottom > second_top
+}
+
+fn separate_reminder_from_focus_controller(app: &tauri::AppHandle, reminder_label: &str) {
+    let Some(controller) = app.get_webview_window("focus-controller") else {
+        return;
+    };
+    if !controller.is_visible().unwrap_or(false) {
+        return;
+    }
+    let Some(reminder) = app.get_webview_window(reminder_label) else {
+        return;
+    };
+    let Ok(controller_position) = controller.outer_position() else {
+        return;
+    };
+    let Ok(controller_size) = controller.outer_size() else {
+        return;
+    };
+    let Ok(reminder_position) = reminder.outer_position() else {
+        return;
+    };
+    let Ok(reminder_size) = reminder.outer_size() else {
+        return;
+    };
+    if !windows_overlap(
+        controller_position,
+        controller_size,
+        reminder_position,
+        reminder_size,
+    ) {
+        return;
+    }
+    let monitor = controller
+        .current_monitor()
+        .ok()
+        .flatten()
+        .or_else(|| reminder.current_monitor().ok().flatten());
+    let Some(monitor) = monitor else {
+        return;
+    };
+    let monitor_position = monitor.position();
+    let monitor_size = monitor.size();
+    let monitor_left = i64::from(monitor_position.x);
+    let monitor_top = i64::from(monitor_position.y);
+    let monitor_right = monitor_left + i64::from(monitor_size.width);
+    let monitor_bottom = monitor_top + i64::from(monitor_size.height);
+    let controller_left = i64::from(controller_position.x);
+    let controller_top = i64::from(controller_position.y);
+    let controller_right = controller_left + i64::from(controller_size.width);
+    let controller_bottom = controller_top + i64::from(controller_size.height);
+    let reminder_width = i64::from(reminder_size.width);
+    let reminder_height = i64::from(reminder_size.height);
+    if reminder_width > i64::from(monitor_size.width)
+        || reminder_height > i64::from(monitor_size.height)
+    {
+        return;
+    }
+    let gap = 18_i64;
+    let candidates = [
+        (controller_left - reminder_width - gap, controller_top),
+        (controller_right + gap, controller_top),
+        (controller_left, controller_bottom + gap),
+        (controller_left, controller_top - reminder_height - gap),
+    ];
+    if let Some((x, y)) = candidates
+        .into_iter()
+        .map(|(x, y)| {
+            (
+                x.clamp(monitor_left, monitor_right - reminder_width),
+                y.clamp(monitor_top, monitor_bottom - reminder_height),
+            )
+        })
+        .find(|(x, y)| {
+            !windows_overlap(
+                controller_position,
+                controller_size,
+                tauri::PhysicalPosition::new(*x as i32, *y as i32),
+                reminder_size,
+            )
+        })
+    {
+        let _ = reminder.set_position(tauri::PhysicalPosition::new(x as i32, y as i32));
+    }
+}
+
+fn position_focus_controller_initially(window: &tauri::WebviewWindow) {
+    let monitor = window
+        .current_monitor()
+        .ok()
+        .flatten()
+        .or_else(|| window.primary_monitor().ok().flatten());
+    let Some(monitor) = monitor else {
+        return;
+    };
+    let Ok(window_size) = window.outer_size() else {
+        return;
+    };
+    let monitor_position = monitor.position();
+    let monitor_size = monitor.size();
+    let margin = 24_i64;
+    let x = i64::from(monitor_position.x) + i64::from(monitor_size.width)
+        - i64::from(window_size.width)
+        - margin;
+    let y = i64::from(monitor_position.y) + margin;
+    let _ = window.set_position(tauri::PhysicalPosition::new(x as i32, y as i32));
+}
+
+fn show_coordinated_reminder(
+    app: &tauri::AppHandle,
+    kind: ReminderWindowKind,
+) -> Result<(), String> {
+    let label = kind.label();
+    let window = app
+        .get_webview_window(label)
+        .ok_or_else(|| format!("{label} 窗口不存在"))?;
+    if kind == ReminderWindowKind::FocusCompletion {
+        let always_on_top = app
+            .state::<FocusReminderState>()
+            .pending
+            .lock()
+            .map_err(|_| "专注提醒窗口状态不可用".to_string())?
+            .as_ref()
+            .map(|payload| payload.always_on_top)
+            .ok_or_else(|| "专注提醒内容不存在".to_string())?;
+        window
+            .set_always_on_top(always_on_top)
+            .map_err(|error| format!("设置专注提醒窗口置顶状态失败: {error}"))?;
+    } else {
+        window
+            .set_always_on_top(true)
+            .map_err(|error| format!("设置节律提醒窗口置顶状态失败: {error}"))?;
+    }
+    separate_reminder_from_focus_controller(app, label);
+    window
+        .show()
+        .map_err(|error| format!("显示提醒窗口失败: {error}"))?;
+    let _ = window.set_focus();
+    Ok(())
+}
+
+fn fallback_queued_reminder(app: &tauri::AppHandle, kind: ReminderWindowKind, popup_error: String) {
+    if kind == ReminderWindowKind::FocusCompletion {
+        let payload = app
+            .state::<FocusReminderState>()
+            .pending
+            .lock()
+            .ok()
+            .and_then(|mut pending| pending.take());
+        if let Some(payload) = payload {
+            let schedule = FocusCompletionSchedule {
+                session_id: payload.session_id,
+                due_at: unix_time_millis(),
+                phase: payload.phase,
+                task_title: payload.task_title,
+                focused_seconds: payload.focused_seconds,
+                break_seconds: payload.break_seconds,
+                notification_enabled: true,
+                sound_enabled: payload.sound_enabled,
+                always_on_top: payload.always_on_top,
+            };
+            report_focus_reminder_failure(app, &schedule, popup_error);
+        }
+    } else {
+        let payload = app
+            .state::<RhythmReminderState>()
+            .pending
+            .lock()
+            .ok()
+            .and_then(|mut pending| pending.take());
+        if let Some(payload) = payload {
+            send_rhythm_system_notification(&payload);
+            let _ = app.emit_to(
+                "main",
+                "rhythm-reminder:action",
+                serde_json::json!({
+                    "reminderId": payload.reminder_id,
+                    "action": "dismiss"
+                }),
+            );
+        }
+    }
+}
+
+fn release_interruptive_reminder(app: &tauri::AppHandle, kind: ReminderWindowKind) {
+    let coordinator = app.state::<ReminderWindowCoordinator>();
+    let next_kind = if let Ok(mut state) = coordinator.state.lock() {
+        if state.active != Some(kind) {
+            state.queued.retain(|queued| *queued != kind);
+            return;
+        }
+        state.active.take();
+        let next_index = state
+            .queued
+            .iter()
+            .enumerate()
+            .max_by_key(|(_, queued)| queued.priority())
+            .map(|(index, _)| index);
+        next_index.map(|index| {
+            let next = state.queued.remove(index);
+            state.active = Some(next);
+            next
+        })
+    } else {
+        None
+    };
+    let Some(next_kind) = next_kind else {
+        return;
+    };
+    if let Err(error) = show_coordinated_reminder(app, next_kind) {
+        fallback_queued_reminder(app, next_kind, error);
+        release_interruptive_reminder(app, next_kind);
+        return;
+    }
+    if next_kind == ReminderWindowKind::FocusCompletion {
+        let revision = app
+            .state::<FocusReminderState>()
+            .pending
+            .lock()
+            .ok()
+            .and_then(|pending| pending.as_ref().map(|payload| payload.revision));
+        if let Some(revision) = revision {
+            let _ = app.emit_to(
+                "focus-reminder",
+                "focus-reminder:presented",
+                serde_json::json!({ "revision": revision }),
+            );
+        }
+    }
+}
+
+#[tauri::command]
+fn sync_focus_controller(
+    app: tauri::AppHandle,
+    payload: Option<FocusControllerPayload>,
+) -> Result<bool, String> {
+    let state = app.state::<FocusControllerState>();
+    let Some(mut payload) = payload else {
+        state.visible_requested.store(false, Ordering::Relaxed);
+        state.ready_revision.store(0, Ordering::Relaxed);
+        state
+            .pending
+            .lock()
+            .map_err(|_| "专注控制器状态不可用".to_string())?
+            .take();
+        if let Some(window) = app.get_webview_window("focus-controller") {
+            let _ = window.hide();
+        }
+        return Ok(true);
+    };
+    let revision = state.revision.fetch_add(1, Ordering::Relaxed) + 1;
+    payload.revision = revision;
+    state
+        .pending
+        .lock()
+        .map_err(|_| "专注控制器状态不可用".to_string())?
+        .replace(payload);
+    if app.get_webview_window("focus-controller").is_some() {
+        let _ = app.emit_to(
+            "focus-controller",
+            "focus-controller:refresh",
+            serde_json::json!({ "revision": revision }),
+        );
+    }
+    Ok(true)
+}
+
+#[tauri::command]
+fn open_focus_controller(app: tauri::AppHandle) -> Result<bool, String> {
+    let state = app.state::<FocusControllerState>();
+    let payload = state
+        .pending
+        .lock()
+        .map_err(|_| "专注控制器状态不可用".to_string())?
+        .clone()
+        .ok_or_else(|| "当前没有进行中的专注".to_string())?;
+    state.visible_requested.store(true, Ordering::Relaxed);
+    state.ready_revision.store(0, Ordering::Relaxed);
+
+    if let Some(window) = app.get_webview_window("focus-controller") {
+        let _ = window.set_always_on_top(payload.always_on_top);
+        let _ = app.emit_to(
+            "focus-controller",
+            "focus-controller:refresh",
+            serde_json::json!({ "revision": payload.revision }),
+        );
+        return Ok(true);
+    }
+
+    let window = WebviewWindowBuilder::new(
+        &app,
+        "focus-controller",
+        WebviewUrl::App("index.html".into()),
+    )
+    .title("易简清单 · 专注控制器")
+    .inner_size(390.0, 286.0)
+    .min_inner_size(390.0, 286.0)
+    .max_inner_size(390.0, 286.0)
+    .resizable(false)
+    .maximizable(false)
+    .minimizable(false)
+    .decorations(false)
+    .always_on_top(payload.always_on_top)
+    .skip_taskbar(true)
+    .shadow(true)
+    .center()
+    .visible(false)
+    .build()
+    .map_err(|error| format!("创建专注控制器失败: {error}"))?;
+    position_focus_controller_initially(&window);
+    Ok(true)
+}
+
+#[tauri::command]
+fn get_focus_controller_payload(
+    app: tauri::AppHandle,
+) -> Result<Option<FocusControllerPayload>, String> {
+    app.state::<FocusControllerState>()
+        .pending
+        .lock()
+        .map(|payload| payload.clone())
+        .map_err(|_| "专注控制器状态不可用".to_string())
+}
+
+#[tauri::command]
+fn focus_controller_ready(app: tauri::AppHandle, revision: u64) -> Result<bool, String> {
+    let state = app.state::<FocusControllerState>();
+    if !state.visible_requested.load(Ordering::Relaxed) {
+        return Ok(false);
+    }
+    let always_on_top = state
+        .pending
+        .lock()
+        .map_err(|_| "专注控制器状态不可用".to_string())?
+        .as_ref()
+        .filter(|payload| payload.revision == revision)
+        .map(|payload| payload.always_on_top);
+    let Some(always_on_top) = always_on_top else {
+        return Ok(false);
+    };
+    let window = app
+        .get_webview_window("focus-controller")
+        .ok_or_else(|| "专注控制器窗口不存在".to_string())?;
+    window
+        .set_always_on_top(always_on_top)
+        .map_err(|error| format!("设置专注控制器置顶状态失败: {error}"))?;
+    let was_visible = window.is_visible().unwrap_or(false);
+    window
+        .show()
+        .map_err(|error| format!("显示专注控制器失败: {error}"))?;
+    if !was_visible {
+        let _ = window.set_focus();
+    }
+    state.ready_revision.store(revision, Ordering::Relaxed);
+    let active_reminder = app
+        .state::<ReminderWindowCoordinator>()
+        .state
+        .lock()
+        .ok()
+        .and_then(|state| state.active);
+    if let Some(active_reminder) = active_reminder {
+        separate_reminder_from_focus_controller(&app, active_reminder.label());
+    }
+    Ok(true)
+}
+
+#[tauri::command]
+fn set_focus_controller_always_on_top(
+    app: tauri::AppHandle,
+    always_on_top: bool,
+) -> Result<bool, String> {
+    let state = app.state::<FocusControllerState>();
+    if let Ok(mut pending) = state.pending.lock() {
+        if let Some(payload) = pending.as_mut() {
+            payload.always_on_top = always_on_top;
+        }
+    }
+    let window = app
+        .get_webview_window("focus-controller")
+        .ok_or_else(|| "专注控制器窗口不存在".to_string())?;
+    window
+        .set_always_on_top(always_on_top)
+        .map_err(|error| format!("切换专注控制器置顶状态失败: {error}"))?;
+    let _ = app.emit_to(
+        "main",
+        "focus-controller:action",
+        serde_json::json!({
+            "action": "set-always-on-top",
+            "alwaysOnTop": always_on_top
+        }),
+    );
+    Ok(true)
+}
+
+#[tauri::command]
+fn handle_focus_controller_action(
+    app: tauri::AppHandle,
+    session_id: String,
+    action: String,
+) -> Result<bool, String> {
+    if !matches!(
+        action.as_str(),
+        "pause" | "resume" | "subtract-five" | "add-five" | "finish" | "close"
+    ) {
+        return Err("无效的专注控制器操作".to_string());
+    }
+    let state = app.state::<FocusControllerState>();
+    let matches_session = state
+        .pending
+        .lock()
+        .map_err(|_| "专注控制器状态不可用".to_string())?
+        .as_ref()
+        .is_some_and(|payload| payload.session_id == session_id);
+    if !matches_session {
+        return Ok(false);
+    }
+    if action == "close" {
+        state.visible_requested.store(false, Ordering::Relaxed);
+        if let Some(window) = app.get_webview_window("focus-controller") {
+            let _ = window.hide();
+        }
+        return Ok(true);
+    }
+    app.emit_to(
+        "main",
+        "focus-controller:action",
+        serde_json::json!({
+            "sessionId": session_id,
+            "action": action
+        }),
+    )
+    .map_err(|error| format!("发送专注控制器操作失败: {error}"))?;
+    Ok(true)
+}
+
+#[tauri::command]
+fn schedule_focus_completion(
+    app: tauri::AppHandle,
+    schedule: FocusCompletionSchedule,
+) -> Result<bool, String> {
+    if schedule.session_id.trim().is_empty() || schedule.due_at <= 0 {
+        return Err("专注提醒调度参数无效".to_string());
+    }
+    let scheduler = app.state::<FocusCompletionScheduler>();
+    let revision = scheduler.revision.fetch_add(1, Ordering::Relaxed) + 1;
+    *scheduler
+        .pending
+        .lock()
+        .map_err(|_| "专注提醒调度器不可用".to_string())? = Some(schedule.clone());
+
+    std::thread::spawn(move || loop {
+        let state = app.state::<FocusCompletionScheduler>();
+        if state.revision.load(Ordering::Relaxed) != revision {
+            return;
+        }
+        let now = unix_time_millis();
+        if schedule.due_at > now {
+            let remaining = (schedule.due_at - now) as u64;
+            std::thread::sleep(Duration::from_millis(remaining.min(1000)));
+            continue;
+        }
+
+        let should_deliver = state
+            .pending
+            .lock()
+            .ok()
+            .and_then(|mut pending| {
+                let matches = pending.as_ref().is_some_and(|item| {
+                    item.session_id == schedule.session_id && item.due_at == schedule.due_at
+                });
+                if matches {
+                    pending.take()
+                } else {
+                    None
+                }
+            })
+            .is_some();
+        if !should_deliver {
+            return;
+        }
+
+        let main_is_focused = main_window_is_focused(&app);
+        let delivery = if main_is_focused {
+            "in-app"
+        } else {
+            "background"
+        };
+        let _ = app.emit_to(
+            "main",
+            "focus-timer:elapsed",
+            serde_json::json!({
+                "sessionId": schedule.session_id,
+                "delivery": delivery
+            }),
+        );
+        if !main_is_focused && schedule.notification_enabled {
+            deliver_focus_reminder(app.clone(), schedule.clone());
+        }
+        return;
+    });
+    Ok(true)
+}
+
+#[tauri::command]
+fn schedule_rhythm_reminder(
+    app: tauri::AppHandle,
+    schedule: RhythmReminderSchedule,
+) -> Result<bool, String> {
+    if schedule.reminder_id.trim().is_empty() || schedule.due_at <= 0 {
+        return Err("节律提醒调度参数无效".to_string());
+    }
+    let scheduler = app.state::<RhythmReminderScheduler>();
+    let revision = scheduler.revision.fetch_add(1, Ordering::Relaxed) + 1;
+    *scheduler
+        .pending
+        .lock()
+        .map_err(|_| "节律提醒调度器不可用".to_string())? = Some(schedule.clone());
+
+    std::thread::spawn(move || loop {
+        let state = app.state::<RhythmReminderScheduler>();
+        if state.revision.load(Ordering::Relaxed) != revision {
+            return;
+        }
+        let now = unix_time_millis();
+        if schedule.due_at > now {
+            let remaining = (schedule.due_at - now) as u64;
+            std::thread::sleep(Duration::from_millis(remaining.min(1000)));
+            continue;
+        }
+
+        let should_deliver = state
+            .pending
+            .lock()
+            .ok()
+            .and_then(|mut pending| {
+                let matches = pending.as_ref().is_some_and(|item| {
+                    item.reminder_id == schedule.reminder_id && item.due_at == schedule.due_at
+                });
+                if matches {
+                    pending.take()
+                } else {
+                    None
+                }
+            })
+            .is_some();
+        if !should_deliver {
+            return;
+        }
+
+        let main_is_focused = main_window_is_focused(&app);
+        let delivery = if main_is_focused {
+            "in-app"
+        } else if schedule.notification_enabled {
+            "background"
+        } else {
+            "disabled"
+        };
+        let _ = app.emit_to(
+            "main",
+            "rhythm-timer:elapsed",
+            serde_json::json!({
+                "reminderId": schedule.reminder_id,
+                "dueAt": schedule.due_at,
+                "delivery": delivery
+            }),
+        );
+
+        if !main_is_focused && schedule.notification_enabled {
+            let payload = RhythmReminderPayload {
+                revision: 0,
+                reminder_id: schedule.reminder_id.clone(),
+                title: schedule.title.clone(),
+                message: schedule.message.clone(),
+                trigger_label: schedule.trigger_label.clone(),
+                sound_enabled: schedule.sound_enabled,
+            };
+            if let Err(error) = deliver_rhythm_reminder(app.clone(), payload.clone()) {
+                eprintln!("[RhythmReminder] {error}");
+                send_rhythm_system_notification(&payload);
+                let _ = app.emit_to(
+                    "main",
+                    "rhythm-reminder:action",
+                    serde_json::json!({
+                        "reminderId": schedule.reminder_id,
+                        "action": "dismiss"
+                    }),
+                );
+            }
+        }
+        return;
+    });
+    Ok(true)
+}
+
+#[tauri::command]
+fn cancel_rhythm_reminder(
+    app: tauri::AppHandle,
+    reminder_id: Option<String>,
+) -> Result<bool, String> {
+    let scheduler = app.state::<RhythmReminderScheduler>();
+    let mut pending = scheduler
+        .pending
+        .lock()
+        .map_err(|_| "节律提醒调度器不可用".to_string())?;
+    let should_cancel = match reminder_id.as_ref() {
+        None => true,
+        Some(reminder_id) => pending
+            .as_ref()
+            .is_some_and(|item| item.reminder_id == *reminder_id),
+    };
+    if should_cancel {
+        pending.take();
+        scheduler.revision.fetch_add(1, Ordering::Relaxed);
+    }
+    Ok(should_cancel)
+}
+
+fn focus_reminder_payload(
+    schedule: &FocusCompletionSchedule,
+    revision: u64,
+) -> FocusReminderPayload {
+    FocusReminderPayload {
+        revision,
+        session_id: schedule.session_id.clone(),
+        phase: schedule.phase.clone(),
+        task_title: schedule.task_title.clone(),
+        focused_seconds: schedule.focused_seconds,
+        break_seconds: schedule.break_seconds,
+        sound_enabled: schedule.sound_enabled,
+        always_on_top: schedule.always_on_top,
+    }
+}
+
+fn report_focus_reminder_failure(
+    app: &tauri::AppHandle,
+    schedule: &FocusCompletionSchedule,
+    popup_error: String,
+) {
+    if let Err(notification_error) = send_focus_system_notification(app, schedule) {
+        let _ = app.emit_to(
+            "main",
+            "focus-notification:error",
+            serde_json::json!({
+                "sessionId": schedule.session_id,
+                "message": format!("{popup_error}；{notification_error}")
+            }),
+        );
+    }
+}
+
+/// 后台完成时优先显示独立提醒窗口。只有窗口在限定时间内没有由前端主动
+/// 报告“已经渲染完成”，才回退到系统通知，避免空白窗口吞掉真正的提醒。
+fn deliver_focus_reminder(app: tauri::AppHandle, schedule: FocusCompletionSchedule) {
+    let state = app.state::<FocusReminderState>();
+    let revision = state.revision.fetch_add(1, Ordering::Relaxed) + 1;
+    state.ready_revision.store(0, Ordering::Relaxed);
+    let payload = focus_reminder_payload(&schedule, revision);
+    if let Ok(mut pending) = state.pending.lock() {
+        *pending = Some(payload);
+    } else {
+        report_focus_reminder_failure(&app, &schedule, "专注提醒窗口状态不可用".to_string());
+        return;
+    }
+
+    let window_result = if let Some(window) = app.get_webview_window("focus-reminder") {
+        let _ = window.hide();
+        let _ = window.set_always_on_top(schedule.always_on_top);
+        let _ = app.emit_to(
+            "focus-reminder",
+            "focus-reminder:refresh",
+            serde_json::json!({ "revision": revision }),
+        );
+        Ok(window)
+    } else {
+        WebviewWindowBuilder::new(&app, "focus-reminder", WebviewUrl::App("index.html".into()))
+            .title("易简清单 · 专注完成")
+            .inner_size(440.0, 560.0)
+            .min_inner_size(440.0, 560.0)
+            .max_inner_size(440.0, 560.0)
+            .resizable(false)
+            .maximizable(false)
+            .minimizable(false)
+            .decorations(false)
+            .always_on_top(schedule.always_on_top)
+            .skip_taskbar(true)
+            .shadow(true)
+            .center()
+            .visible(false)
+            .build()
+            .map_err(|error| format!("创建专注提醒窗口失败: {error}"))
+    };
+
+    if let Err(error) = window_result {
+        if let Ok(mut pending) = state.pending.lock() {
+            if pending
+                .as_ref()
+                .is_some_and(|item| item.revision == revision)
+            {
+                pending.take();
+            }
+        }
+        report_focus_reminder_failure(&app, &schedule, error);
+        return;
+    }
+
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(3000));
+        let state = app.state::<FocusReminderState>();
+        if state.ready_revision.load(Ordering::Relaxed) == revision {
+            return;
+        }
+        let should_fallback = state
+            .pending
+            .lock()
+            .ok()
+            .and_then(|mut pending| {
+                if pending
+                    .as_ref()
+                    .is_some_and(|item| item.revision == revision)
+                {
+                    pending.take()
+                } else {
+                    None
+                }
+            })
+            .is_some();
+        if !should_fallback {
+            return;
+        }
+        if let Some(window) = app.get_webview_window("focus-reminder") {
+            let _ = window.hide();
+        }
+        release_interruptive_reminder(&app, ReminderWindowKind::FocusCompletion);
+        report_focus_reminder_failure(&app, &schedule, "专注提醒窗口未能及时显示".to_string());
+    });
+}
+
+#[tauri::command]
+fn get_focus_reminder_payload(
+    app: tauri::AppHandle,
+) -> Result<Option<FocusReminderPayload>, String> {
+    app.state::<FocusReminderState>()
+        .pending
+        .lock()
+        .map(|pending| pending.clone())
+        .map_err(|_| "专注提醒窗口状态不可用".to_string())
+}
+
+#[tauri::command]
+fn focus_reminder_ready(app: tauri::AppHandle, revision: u64) -> Result<String, String> {
+    let state = app.state::<FocusReminderState>();
+    let matches = state
+        .pending
+        .lock()
+        .map_err(|_| "专注提醒窗口状态不可用".to_string())?
+        .as_ref()
+        .filter(|item| item.revision == revision)
+        .is_some();
+    if !matches {
+        return Ok("stale".to_string());
+    }
+    match request_interruptive_reminder(&app, ReminderWindowKind::FocusCompletion)? {
+        ReminderWindowDisposition::Queued => {
+            state.ready_revision.store(revision, Ordering::Relaxed);
+            Ok("queued".to_string())
+        }
+        ReminderWindowDisposition::ShowNow => {
+            if let Err(error) = show_coordinated_reminder(&app, ReminderWindowKind::FocusCompletion)
+            {
+                release_interruptive_reminder(&app, ReminderWindowKind::FocusCompletion);
+                return Err(error);
+            }
+            state.ready_revision.store(revision, Ordering::Relaxed);
+            Ok("shown".to_string())
+        }
+    }
+}
+
+#[tauri::command]
+fn handle_focus_reminder_action(
+    app: tauri::AppHandle,
+    revision: u64,
+    session_id: String,
+    action: String,
+) -> Result<bool, String> {
+    if !matches!(action.as_str(), "start-break" | "dismiss" | "open-app") {
+        return Err("无效的专注提醒操作".to_string());
+    }
+    let state = app.state::<FocusReminderState>();
+    let handled = state
+        .pending
+        .lock()
+        .map_err(|_| "专注提醒窗口状态不可用".to_string())?
+        .take_if(|item| item.revision == revision && item.session_id == session_id)
+        .is_some();
+    if !handled {
+        return Ok(false);
+    }
+    if let Some(window) = app.get_webview_window("focus-reminder") {
+        let _ = window.hide();
+    }
+    release_interruptive_reminder(&app, ReminderWindowKind::FocusCompletion);
+    if action == "open-app" {
+        show_main_window(&app);
+    }
+    app.emit_to(
+        "main",
+        "focus-reminder:action",
+        serde_json::json!({
+            "revision": revision,
+            "sessionId": session_id,
+            "action": action
+        }),
+    )
+    .map_err(|error| format!("发送专注提醒操作失败: {error}"))?;
+    Ok(true)
+}
+
+fn send_rhythm_system_notification(payload: &RhythmReminderPayload) {
+    #[cfg(target_os = "macos")]
+    {
+        let _ = send_macos_notification(
+            payload.title.clone(),
+            payload.message.clone(),
+            payload.sound_enabled,
+        );
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let mut notification = Notification::new();
+        notification.summary(&payload.title).body(&payload.message);
+        if payload.sound_enabled {
+            notification.sound_name("Default");
+        }
+        let _ = notification.show();
+    }
+}
+
+fn deliver_rhythm_reminder(
+    app: tauri::AppHandle,
+    mut payload: RhythmReminderPayload,
+) -> Result<(), String> {
+    let state = app.state::<RhythmReminderState>();
+    let revision = state.revision.fetch_add(1, Ordering::Relaxed) + 1;
+    state.ready_revision.store(0, Ordering::Relaxed);
+    payload.revision = revision;
+    state
+        .pending
+        .lock()
+        .map_err(|_| "节律提醒窗口状态不可用".to_string())?
+        .replace(payload);
+
+    let window_result = if let Some(window) = app.get_webview_window("rhythm-reminder") {
+        let _ = window.hide();
+        let _ = window.set_always_on_top(true);
+        let _ = app.emit_to(
+            "rhythm-reminder",
+            "rhythm-reminder:refresh",
+            serde_json::json!({ "revision": revision }),
+        );
+        Ok(window)
+    } else {
+        WebviewWindowBuilder::new(
+            &app,
+            "rhythm-reminder",
+            WebviewUrl::App("index.html".into()),
+        )
+        .title("易简清单 · 节律提醒")
+        .inner_size(430.0, 500.0)
+        .min_inner_size(430.0, 500.0)
+        .max_inner_size(430.0, 500.0)
+        .resizable(false)
+        .maximizable(false)
+        .minimizable(false)
+        .decorations(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .shadow(true)
+        .center()
+        .visible(false)
+        .build()
+        .map_err(|error| format!("创建节律提醒窗口失败: {error}"))
+    };
+
+    if let Err(error) = window_result {
+        if let Ok(mut pending) = state.pending.lock() {
+            if pending
+                .as_ref()
+                .is_some_and(|item| item.revision == revision)
+            {
+                pending.take();
+            }
+        }
+        return Err(error);
+    }
+
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(3000));
+        let state = app.state::<RhythmReminderState>();
+        if state.ready_revision.load(Ordering::Relaxed) == revision {
+            return;
+        }
+        let fallback_payload = state.pending.lock().ok().and_then(|mut pending| {
+            if pending
+                .as_ref()
+                .is_some_and(|item| item.revision == revision)
+            {
+                pending.take()
+            } else {
+                None
+            }
+        });
+        let Some(payload) = fallback_payload else {
+            return;
+        };
+        if let Some(window) = app.get_webview_window("rhythm-reminder") {
+            let _ = window.hide();
+        }
+        release_interruptive_reminder(&app, ReminderWindowKind::Rhythm);
+        send_rhythm_system_notification(&payload);
+        let _ = app.emit_to(
+            "main",
+            "rhythm-reminder:action",
+            serde_json::json!({ "reminderId": payload.reminder_id, "action": "dismiss" }),
+        );
+    });
+    Ok(())
+}
+
+#[tauri::command]
+fn present_rhythm_reminder(
+    app: tauri::AppHandle,
+    reminder_id: String,
+    title: String,
+    message: String,
+    trigger_label: String,
+    notification_enabled: bool,
+    sound_enabled: bool,
+) -> Result<String, String> {
+    if main_window_is_focused(&app) {
+        return Ok("in-app".to_string());
+    }
+    if !notification_enabled {
+        return Ok("disabled".to_string());
+    }
+    deliver_rhythm_reminder(
+        app,
+        RhythmReminderPayload {
+            revision: 0,
+            reminder_id,
+            title,
+            message,
+            trigger_label,
+            sound_enabled,
+        },
+    )?;
+    Ok("background".to_string())
+}
+
+#[tauri::command]
+fn get_rhythm_reminder_payload(
+    app: tauri::AppHandle,
+) -> Result<Option<RhythmReminderPayload>, String> {
+    app.state::<RhythmReminderState>()
+        .pending
+        .lock()
+        .map(|item| item.clone())
+        .map_err(|_| "节律提醒窗口状态不可用".to_string())
+}
+
+#[tauri::command]
+fn rhythm_reminder_ready(app: tauri::AppHandle, revision: u64) -> Result<String, String> {
+    let state = app.state::<RhythmReminderState>();
+    let matches = state
+        .pending
+        .lock()
+        .map_err(|_| "节律提醒窗口状态不可用".to_string())?
+        .as_ref()
+        .is_some_and(|item| item.revision == revision);
+    if !matches {
+        return Ok("stale".to_string());
+    }
+    match request_interruptive_reminder(&app, ReminderWindowKind::Rhythm)? {
+        ReminderWindowDisposition::Queued => {
+            state.ready_revision.store(revision, Ordering::Relaxed);
+            Ok("queued".to_string())
+        }
+        ReminderWindowDisposition::ShowNow => {
+            if let Err(error) = show_coordinated_reminder(&app, ReminderWindowKind::Rhythm) {
+                release_interruptive_reminder(&app, ReminderWindowKind::Rhythm);
+                return Err(error);
+            }
+            state.ready_revision.store(revision, Ordering::Relaxed);
+            Ok("shown".to_string())
+        }
+    }
+}
+
+#[tauri::command]
+fn handle_rhythm_reminder_action(
+    app: tauri::AppHandle,
+    revision: u64,
+    reminder_id: String,
+    action: String,
+) -> Result<bool, String> {
+    if !matches!(action.as_str(), "complete" | "snooze" | "skip" | "dismiss") {
+        return Err("无效的节律提醒操作".to_string());
+    }
+    let state = app.state::<RhythmReminderState>();
+    let handled = state
+        .pending
+        .lock()
+        .map_err(|_| "节律提醒窗口状态不可用".to_string())?
+        .take_if(|item| item.revision == revision && item.reminder_id == reminder_id)
+        .is_some();
+    if !handled {
+        return Ok(false);
+    }
+    if let Some(window) = app.get_webview_window("rhythm-reminder") {
+        let _ = window.hide();
+    }
+    release_interruptive_reminder(&app, ReminderWindowKind::Rhythm);
+    app.emit_to(
+        "main",
+        "rhythm-reminder:action",
+        serde_json::json!({ "reminderId": reminder_id, "action": action }),
+    )
+    .map_err(|error| format!("发送节律提醒操作失败: {error}"))?;
+    Ok(true)
+}
+
+#[tauri::command]
+fn cancel_focus_completion(
+    app: tauri::AppHandle,
+    session_id: Option<String>,
+) -> Result<bool, String> {
+    let scheduler = app.state::<FocusCompletionScheduler>();
+    let mut pending = scheduler
+        .pending
+        .lock()
+        .map_err(|_| "专注提醒调度器不可用".to_string())?;
+    let should_cancel = match session_id.as_ref() {
+        None => true,
+        Some(id) => pending.as_ref().is_some_and(|item| &item.session_id == id),
+    };
+    if should_cancel {
+        pending.take();
+        scheduler.revision.fetch_add(1, Ordering::Relaxed);
+    }
+    Ok(should_cancel)
+}
+
+#[tauri::command]
+fn request_focus_notification_permission() -> Result<bool, String> {
+    #[cfg(target_os = "macos")]
+    {
+        // notify-rust 会在后台线程触发 UNUserNotificationCenter 的系统断言，
+        // 导致进程直接退出。macOS 通知统一由 osascript 发送，不再调用该路径。
+        Ok(true)
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        Ok(true)
+    }
+}
+
+#[tauri::command]
+fn open_system_notification_settings() -> Result<bool, String> {
+    #[cfg(target_os = "macos")]
+    {
+        let legacy_pane = Path::new("/System/Library/PreferencePanes/Notifications.prefPane");
+        let target = if legacy_pane.exists() {
+            legacy_pane.to_string_lossy().into_owned()
+        } else {
+            "x-apple.systempreferences:com.apple.Notifications-Settings.extension?cn.duqimeng.simpletodo"
+                .to_string()
+        };
+        Command::new("open")
+            .arg(target)
+            .spawn()
+            .map_err(|err| format!("打开 macOS 通知设置失败: {err}"))?;
+        Ok(true)
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("cmd")
+            .args(["/C", "start", "", "ms-settings:notifications"])
+            .spawn()
+            .map_err(|err| format!("打开 Windows 通知设置失败: {err}"))?;
+        Ok(true)
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        Ok(false)
+    }
+}
+
+#[tauri::command]
+fn send_focus_completion_test_notification(
+    app: tauri::AppHandle,
+    sound_enabled: bool,
+    always_on_top: bool,
+) -> Result<bool, String> {
+    let schedule = FocusCompletionSchedule {
+        session_id: "focus-notification-test".to_string(),
+        due_at: unix_time_millis(),
+        phase: "focus".to_string(),
+        task_title: Some("测试专注任务".to_string()),
+        focused_seconds: 25 * 60,
+        break_seconds: Some(5 * 60),
+        notification_enabled: true,
+        sound_enabled,
+        always_on_top,
+    };
+    std::thread::spawn(move || deliver_focus_reminder(app, schedule));
+    Ok(true)
+}
+
+fn unix_time_millis() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+        .min(i64::MAX as u128) as i64
+}
+
+fn focus_notification_copy(schedule: &FocusCompletionSchedule) -> (String, String) {
+    if schedule.phase != "focus" {
+        return (
+            "易简清单 · 休息结束".to_string(),
+            "休息完成，可以回来选择下一轮专注了。".to_string(),
+        );
+    }
+    let minutes = (schedule.focused_seconds.max(60) + 30) / 60;
+    let task = schedule
+        .task_title
+        .as_deref()
+        .map(str::trim)
+        .filter(|title| !title.is_empty());
+    let mut body = match task {
+        Some(title) => format!("已专注 {minutes} 分钟：{title}"),
+        None => format!("已完成 {minutes} 分钟专注"),
+    };
+    if let Some(seconds) = schedule.break_seconds {
+        let break_minutes = (seconds.max(60) + 30) / 60;
+        body.push_str(&format!("。建议休息 {break_minutes} 分钟"));
+    }
+    ("易简清单 · 专注完成".to_string(), body)
+}
+
+fn send_focus_system_notification(
+    app: &tauri::AppHandle,
+    schedule: &FocusCompletionSchedule,
+) -> Result<(), String> {
+    let (title, body) = focus_notification_copy(schedule);
+
+    #[cfg(target_os = "windows")]
+    {
+        let mut notification = Notification::new();
+        notification
+            .app_id("cn.duqimeng.simpletodo")
+            .summary(&title)
+            .body(&body);
+        if schedule.sound_enabled {
+            notification.sound_name("Default");
+        }
+        let handle = notification
+            .show()
+            .map_err(|err| format!("发送 Windows 专注提醒失败: {err}"))?;
+        let app_handle = app.clone();
+        std::thread::spawn(move || {
+            let _ = handle.wait_for_response(move |response: &NotificationResponse| {
+                if matches!(
+                    response,
+                    NotificationResponse::Default | NotificationResponse::Action(_)
+                ) {
+                    show_main_window(&app_handle);
+                    let _ = app_handle.emit_to(
+                        "main",
+                        "focus-notification:open",
+                        serde_json::json!({ "source": "system" }),
+                    );
+                }
+            });
+        });
+        return Ok(());
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let _ = app;
+        send_macos_notification(title, body, schedule.sound_enabled).map(|_| ())
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        let mut notification = app.notification().builder().title(title).body(body);
+        if schedule.sound_enabled {
+            notification = notification.sound("Ping");
+        }
+        notification
+            .show()
+            .map_err(|err| format!("发送系统专注提醒失败: {err}"))
+    }
+}
+
+fn apple_script_string(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace(['\r', '\n'], " ")
+}
+
+#[tauri::command]
+fn send_macos_notification(
+    title: String,
+    body: String,
+    sound_enabled: bool,
+) -> Result<bool, String> {
+    #[cfg(target_os = "macos")]
+    {
+        let title = apple_script_string(&title);
+        let body = apple_script_string(&body);
+        let script = if sound_enabled {
+            format!("display notification \"{body}\" with title \"{title}\" sound name \"Ping\"")
+        } else {
+            format!("display notification \"{body}\" with title \"{title}\"")
+        };
+        let status = Command::new("/usr/bin/osascript")
+            .args(["-e", &script])
+            .status()
+            .map_err(|err| format!("调用 macOS 通知失败: {err}"))?;
+        if !status.success() {
+            return Err(format!("调用 macOS 通知失败，退出状态: {status}"));
+        }
+        return Ok(true);
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (title, body, sound_enabled);
+        Ok(false)
+    }
+}
+
+/// 返回系统最后一次键鼠输入距今的秒数。只读取系统汇总时间，不读取输入内容、
+/// 轨迹或前台应用名称；目前 Windows 使用原生 API，其他平台明确返回不支持。
+#[tauri::command]
+fn get_system_idle_seconds() -> Result<Option<u64>, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let mut info = LASTINPUTINFO {
+            cbSize: std::mem::size_of::<LASTINPUTINFO>() as u32,
+            dwTime: 0,
+        };
+        if unsafe { GetLastInputInfo(&mut info) } == 0 {
+            return Err("读取系统空闲时长失败".to_string());
+        }
+        let elapsed = unsafe { GetTickCount() }.wrapping_sub(info.dwTime);
+        return Ok(Some((elapsed / 1000) as u64));
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Ok(None)
+    }
+}
+
 fn app_data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    let dir = app
+    let production_dir = app
         .path()
         .app_data_dir()
         .map_err(|err| format!("获取应用数据目录失败: {err}"))?;
+    // `tauri dev` 使用独立目录，避免开发中的数据库迁移影响已安装的正式版本。
+    let dir = if cfg!(debug_assertions) {
+        production_dir.with_file_name("cn.duqimeng.simpletodo.dev")
+    } else {
+        production_dir
+    };
     fs::create_dir_all(&dir).map_err(|err| format!("创建应用数据目录失败: {err}"))?;
     Ok(dir)
 }
@@ -113,7 +1634,7 @@ fn db_file(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(app_data_dir(app)?.join("simpletodo.db"))
 }
 
-const DATABASE_SCHEMA_VERSION: i64 = 1;
+const DATABASE_SCHEMA_VERSION: i64 = 2;
 
 fn backup_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let dir = app_data_dir(app)?.join("backups");
@@ -562,11 +2083,7 @@ fn restore_data_backup(app: tauri::AppHandle, backup_id: String) -> Result<bool,
 }
 
 fn attachment_root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    let dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|err| format!("获取应用数据目录失败: {err}"))?
-        .join("attachments");
+    let dir = app_data_dir(app)?.join("attachments");
     fs::create_dir_all(&dir).map_err(|err| format!("创建附件目录失败: {err}"))?;
     Ok(dir)
 }
@@ -753,6 +2270,10 @@ fn init_database(conn: &mut Connection, from_version: i64) -> Result<(), String>
         );
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS clock_state (
+            id INTEGER PRIMARY KEY CHECK(id = 1),
             value TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS profile (
@@ -947,6 +2468,7 @@ fn save_state_to_db(conn: &mut Connection, data: &serde_json::Value) -> Result<(
         DELETE FROM subtasks;
         DELETE FROM view_orders;
         DELETE FROM settings;
+        DELETE FROM clock_state;
         DELETE FROM profile;
         DELETE FROM task_groups;
         DELETE FROM trash_lists;
@@ -1075,6 +2597,14 @@ fn save_state_to_db(conn: &mut Connection, data: &serde_json::Value) -> Result<(
             )
             .map_err(|err| format!("保存设置失败: {err}"))?;
         }
+    }
+
+    if let Some(clock) = data.get("clock") {
+        tx.execute(
+            "INSERT INTO clock_state(id, value) VALUES(1, ?1)",
+            params![clock.to_string()],
+        )
+        .map_err(|err| format!("保存时钟数据失败: {err}"))?;
     }
 
     if let Some(profile) = data.get("profile").and_then(|value| value.as_object()) {
@@ -1257,6 +2787,7 @@ fn load_state_from_db(
     let list_trash = query_list_trash(conn)?;
     let view_orders = query_view_orders(conn)?;
     let settings = query_settings(conn)?;
+    let clock = query_clock_state(conn)?;
     let task_groups = query_task_groups(conn)?;
     let profile = query_profile(conn)?;
 
@@ -1271,6 +2802,7 @@ fn load_state_from_db(
         "taskGroups": task_groups,
         "profile": profile,
         "settings": settings,
+        "clock": clock,
     }))
 }
 
@@ -1544,6 +3076,49 @@ fn query_settings(conn: &Connection) -> Result<serde_json::Value, String> {
         map.insert(key, value);
     }
     Ok(serde_json::Value::Object(map))
+}
+
+const RELEASE_PAGE_URL: &str = "https://github.com/DFreeMind/simple-to-do/releases/latest";
+
+#[tauri::command]
+fn open_release_page() -> Result<bool, String> {
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("rundll32.exe")
+            .args(["url.dll,FileProtocolHandler", RELEASE_PAGE_URL])
+            .spawn()
+            .map_err(|err| format!("打开下载页失败: {err}"))?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .arg(RELEASE_PAGE_URL)
+            .spawn()
+            .map_err(|err| format!("打开下载页失败: {err}"))?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        Command::new("xdg-open")
+            .arg(RELEASE_PAGE_URL)
+            .spawn()
+            .map_err(|err| format!("打开下载页失败: {err}"))?;
+    }
+    Ok(true)
+}
+
+fn query_clock_state(conn: &Connection) -> Result<serde_json::Value, String> {
+    let raw = conn
+        .query_row("SELECT value FROM clock_state WHERE id = 1", [], |row| {
+            row.get::<_, String>(0)
+        })
+        .optional()
+        .map_err(|err| format!("读取时钟数据失败: {err}"))?;
+    match raw {
+        Some(value) => {
+            serde_json::from_str(&value).map_err(|err| format!("时钟数据格式无效: {err}"))
+        }
+        None => Ok(serde_json::json!({})),
+    }
 }
 
 fn collect_rows<T>(
@@ -2498,6 +4073,46 @@ mod tests {
     }
 
     #[test]
+    fn focus_notification_copy_includes_task_and_break() {
+        let schedule = FocusCompletionSchedule {
+            session_id: "focus-1".to_string(),
+            due_at: 1,
+            phase: "focus".to_string(),
+            task_title: Some("整理发布说明".to_string()),
+            focused_seconds: 25 * 60,
+            break_seconds: Some(5 * 60),
+            notification_enabled: true,
+            sound_enabled: true,
+            always_on_top: true,
+        };
+
+        let (title, body) = focus_notification_copy(&schedule);
+        assert_eq!(title, "易简清单 · 专注完成");
+        assert_eq!(body, "已专注 25 分钟：整理发布说明。建议休息 5 分钟");
+        assert!(focus_reminder_payload(&schedule, 7).always_on_top);
+    }
+
+    #[test]
+    fn break_notification_copy_uses_recovery_message() {
+        let schedule = FocusCompletionSchedule {
+            session_id: "break-1".to_string(),
+            due_at: 1,
+            phase: "short-break".to_string(),
+            task_title: None,
+            focused_seconds: 5 * 60,
+            break_seconds: None,
+            notification_enabled: true,
+            sound_enabled: false,
+            always_on_top: false,
+        };
+
+        let (title, body) = focus_notification_copy(&schedule);
+        assert_eq!(title, "易简清单 · 休息结束");
+        assert_eq!(body, "休息完成，可以回来选择下一轮专注了。");
+        assert!(!focus_reminder_payload(&schedule, 8).always_on_top);
+    }
+
+    #[test]
     fn sqlite_backup_preserves_wal_data() {
         let root = test_root("backup-test");
         let source_path = root.join("source.db");
@@ -2567,6 +4182,12 @@ mod tests {
 fn main() {
     tauri::Builder::default()
         .manage(WindowCloseBehavior::default())
+        .manage(FocusCompletionScheduler::default())
+        .manage(RhythmReminderScheduler::default())
+        .manage(FocusControllerState::default())
+        .manage(ReminderWindowCoordinator::default())
+        .manage(FocusReminderState::default())
+        .manage(RhythmReminderState::default())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {
@@ -2615,6 +4236,7 @@ fn main() {
             list_data_backups,
             data_backup_location,
             open_data_backup_location,
+            open_release_page,
             open_data_backup,
             delete_data_backup,
             restore_data_backup,
@@ -2634,7 +4256,29 @@ fn main() {
             restore_quarantined_attachments,
             purge_quarantined_attachments,
             send_interactive_task_reminder,
-            set_window_close_behavior
+            schedule_focus_completion,
+            cancel_focus_completion,
+            sync_focus_controller,
+            open_focus_controller,
+            get_focus_controller_payload,
+            focus_controller_ready,
+            set_focus_controller_always_on_top,
+            handle_focus_controller_action,
+            schedule_rhythm_reminder,
+            cancel_rhythm_reminder,
+            request_focus_notification_permission,
+            open_system_notification_settings,
+            send_focus_completion_test_notification,
+            send_macos_notification,
+            get_focus_reminder_payload,
+            focus_reminder_ready,
+            handle_focus_reminder_action,
+            present_rhythm_reminder,
+            get_rhythm_reminder_payload,
+            rhythm_reminder_ready,
+            handle_rhythm_reminder_action,
+            set_window_close_behavior,
+            get_system_idle_seconds
         ])
         .build(tauri::generate_context!())
         .expect("初始化 Tauri 应用失败")
@@ -2645,7 +4289,60 @@ fn main() {
                 ..
             } = &_event
             {
-                if label == "main"
+                if label == "focus-reminder" {
+                    api.prevent_close();
+                    if let Some(window) = _app.get_webview_window("focus-reminder") {
+                        let _ = window.hide();
+                    }
+                    let payload = _app
+                        .state::<FocusReminderState>()
+                        .pending
+                        .lock()
+                        .ok()
+                        .and_then(|mut pending| pending.take());
+                    if let Some(payload) = payload {
+                        let _ = _app.emit_to(
+                            "main",
+                            "focus-reminder:action",
+                            serde_json::json!({
+                                "revision": payload.revision,
+                                "sessionId": payload.session_id,
+                                "action": "dismiss"
+                            }),
+                        );
+                    }
+                    release_interruptive_reminder(_app, ReminderWindowKind::FocusCompletion);
+                } else if label == "rhythm-reminder" {
+                    api.prevent_close();
+                    if let Some(window) = _app.get_webview_window("rhythm-reminder") {
+                        let _ = window.hide();
+                    }
+                    let payload = _app
+                        .state::<RhythmReminderState>()
+                        .pending
+                        .lock()
+                        .ok()
+                        .and_then(|mut pending| pending.take());
+                    if let Some(payload) = payload {
+                        let _ = _app.emit_to(
+                            "main",
+                            "rhythm-reminder:action",
+                            serde_json::json!({
+                                "reminderId": payload.reminder_id,
+                                "action": "dismiss"
+                            }),
+                        );
+                    }
+                    release_interruptive_reminder(_app, ReminderWindowKind::Rhythm);
+                } else if label == "focus-controller" {
+                    api.prevent_close();
+                    _app.state::<FocusControllerState>()
+                        .visible_requested
+                        .store(false, Ordering::Relaxed);
+                    if let Some(window) = _app.get_webview_window("focus-controller") {
+                        let _ = window.hide();
+                    }
+                } else if label == "main"
                     && _app
                         .state::<WindowCloseBehavior>()
                         .0
@@ -2674,11 +4371,7 @@ fn main() {
             // macOS 从 Dock 重新激活一个已隐藏窗口时会发出 Reopen；此前没有
             // 处理这个事件，导致只能通过菜单栏恢复主窗口。
             #[cfg(target_os = "macos")]
-            if let tauri::RunEvent::Reopen {
-                has_visible_windows: false,
-                ..
-            } = &_event
-            {
+            if let tauri::RunEvent::Reopen { .. } = &_event {
                 show_main_window(_app);
             }
         });

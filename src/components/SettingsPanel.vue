@@ -333,8 +333,8 @@
                   <span class="sound-label">
                     <Bell :size="18" class="sound-icon" />
                     <span>
-                      <strong>系统提醒通知</strong>
-                      <small>到点通过 Windows toast 或 macOS 通知中心提醒</small>
+                      <strong>任务与节律提醒</strong>
+                      <small>任务到期和节律提醒通过系统通知中心送达</small>
                     </span>
                   </span>
                   <input
@@ -345,8 +345,24 @@
                   <span class="switch-control" aria-hidden="true"></span>
                 </label>
 
-                <p v-if="!store.settings.reminderNotificationsEnabled" class="setting-summary">通知已关闭；重新开启后会保留当前的声音偏好。</p>
-                <div v-else class="sound-categories sound-categories--two">
+                <p v-if="!store.settings.reminderNotificationsEnabled && !store.settings.focusCompletionNotificationsEnabled" class="setting-summary">后台提醒已关闭；应用内的专注完成反馈仍会保留。</p>
+                <div class="sound-categories sound-categories--two">
+                  <label class="sound-item">
+                    <span class="sound-item-icon">
+                      <Timer :size="16" />
+                    </span>
+                    <span class="sound-item-content">
+                      <strong>专注完成提醒</strong>
+                      <small>后台时显示可拖动完成弹窗，失败则用系统通知兜底</small>
+                    </span>
+                    <input
+                      type="checkbox"
+                      :checked="store.settings.focusCompletionNotificationsEnabled"
+                      @change="store.updateSettings({ focusCompletionNotificationsEnabled: $event.target.checked })"
+                    />
+                    <span class="switch-control" aria-hidden="true"></span>
+                  </label>
+
                   <label class="sound-item">
                     <span class="sound-item-icon">
                       <Volume2 :size="16" />
@@ -369,6 +385,61 @@
                     <span>
                       <strong>发送测试提醒</strong>
                       <small>同时检查系统权限</small>
+                    </span>
+                  </button>
+
+                  <label class="sound-item">
+                    <span class="sound-item-icon">
+                      <Volume2 :size="16" />
+                    </span>
+                    <span class="sound-item-content">
+                      <strong>专注提醒声音</strong>
+                      <small>弹窗播放完成音，系统通知兜底时跟随系统</small>
+                    </span>
+                    <input
+                      type="checkbox"
+                      :checked="store.settings.focusCompletionSoundEnabled"
+                      :disabled="!store.settings.focusCompletionNotificationsEnabled"
+                      @change="store.updateSettings({ focusCompletionSoundEnabled: $event.target.checked })"
+                    />
+                    <span class="switch-control" aria-hidden="true"></span>
+                  </label>
+
+                  <label class="sound-item">
+                    <span class="sound-item-icon">
+                      <Pin :size="16" />
+                    </span>
+                    <span class="sound-item-content">
+                      <strong>提醒窗保持在最前面</strong>
+                      <small>默认置顶以免错过；仍可拖动位置，也可随时关闭</small>
+                    </span>
+                    <input
+                      type="checkbox"
+                      :checked="store.settings.focusReminderAlwaysOnTop"
+                      :disabled="!store.settings.focusCompletionNotificationsEnabled"
+                      @change="store.updateSettings({ focusReminderAlwaysOnTop: $event.target.checked })"
+                    />
+                    <span class="switch-control" aria-hidden="true"></span>
+                  </label>
+
+                  <button
+                    class="setting-action-card"
+                    type="button"
+                    :disabled="!store.settings.focusCompletionNotificationsEnabled"
+                    @click="store.testFocusCompletionNotification"
+                  >
+                    <Timer :size="16" />
+                    <span>
+                      <strong>测试专注完成提醒</strong>
+                      <small>预览后台完成弹窗与提醒声音</small>
+                    </span>
+                  </button>
+
+                  <button class="setting-action-card" type="button" @click="openNotificationSettings">
+                    <ExternalLink :size="16" />
+                    <span>
+                      <strong>打开系统通知设置</strong>
+                      <small>被系统关闭时在这里重新允许</small>
                     </span>
                   </button>
                 </div>
@@ -730,20 +801,20 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { Bell, Check, Compass, Database, Info, PanelTop, Palette, ShieldCheck, SlidersHorizontal, Trash2, X, Volume2, CheckSquare, Folder, Tag } from 'lucide-vue-next'
+import { Bell, Check, Compass, Database, Download, ExternalLink, Info, PanelTop, Palette, Pin, ShieldCheck, SlidersHorizontal, Timer, Trash2, X, Volume2, CheckSquare, Folder, Tag } from 'lucide-vue-next'
 import { check } from '@tauri-apps/plugin-updater'
 import { useTaskStore } from '@/stores/task'
-import { purgeQuarantinedAttachments, quarantineOrphanAttachments, readAttachment, readQuarantinedAttachment, restoreQuarantinedAttachments, scanStorageHealth } from '@/services/platform'
+import { openSystemNotificationSettings, purgeQuarantinedAttachments, quarantineOrphanAttachments, readAttachment, readQuarantinedAttachment, restoreQuarantinedAttachments, scanStorageHealth } from '@/services/platform'
 import ImageLightbox from './ImageLightbox.vue'
 import appIcon from '@/assets/app-icon.svg'
 
 const version = __APP_VERSION__
 
 const currentReleaseHighlights = [
-  '本机恢复点：创建、定位、恢复与删除恢复点，恢复前自动创建安全点。',
-  '重复任务、逾期处理、常用快捷键和发布前检查更完整。',
-  '优化每日引导、操作音效、任务拖动和窄列表的操作收纳。',
-  '个人空间新增数据与安全分区，头像选择和预览更顺畅。'
+  '新增时钟模块：番茄、深度专注与自由时长，完成后保留轻量奖励与回顾。',
+  '新增节律提醒：支持间隔、固定时刻和连续使用三种触发方式，并可直接暂停或微调本轮。',
+  '后台到期时提供原生置顶提醒窗；专注还可打开可置顶、可拖动的桌面控制器。',
+  '专注与节律回顾支持概览、筛选、分页、详情和单条删除，数据仍只保存在本机。'
 ]
 
 const releaseHistory = [
@@ -774,6 +845,11 @@ const updateState = ref(isDevelopment ? 'development' : 'idle')
 const availableUpdate = ref(null)
 const updateError = ref('')
 const updateProgress = ref({ downloaded: 0, total: 0 })
+
+async function openNotificationSettings() {
+  const opened = await openSystemNotificationSettings()
+  if (!opened) store.showNotice('当前平台无法直接打开通知设置', 'error')
+}
 
 const sections = [
   { id: 'appearance', label: '外观与布局', summary: '主题、密度与面板', icon: Palette },
@@ -812,7 +888,11 @@ const enabledSoundCount = computed(() => [
   store.settings.soundDragEnabled
 ].filter(Boolean).length)
 const soundSummary = computed(() => store.settings.soundEnabled ? `${enabledSoundCount.value}/4 已启用` : '已关闭')
-const reminderSummary = computed(() => store.settings.reminderNotificationsEnabled ? (store.settings.reminderSoundEnabled ? '通知和声音' : '仅通知') : '已关闭')
+const reminderSummary = computed(() => {
+  const enabled = Number(store.settings.reminderNotificationsEnabled) + Number(store.settings.focusCompletionNotificationsEnabled)
+  if (!enabled) return '已关闭'
+  return enabled === 2 ? '两类提醒已开启' : '一类提醒已开启'
+})
 const dailyGuidanceSummary = computed(() => {
   if (!store.settings.dailyGuidanceEnabled) return '已关闭'
   return ({ calm: '轻松', practical: '务实', encouraging: '鼓励' }[store.settings.dailyGuidanceStyle] || '务实')
