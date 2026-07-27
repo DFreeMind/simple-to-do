@@ -17,7 +17,7 @@ if (expectedVersion && expectedVersion !== packageJson.version) {
 for (const required of [
   'tagName: v__VERSION__',
   'releaseName: __VERSION__',
-  'releaseDraft: true',
+  'releaseDraft: false',
   'args: --bundles nsis',
   'updaterJsonPreferNsis: true',
   'releaseAssetNamePattern: simple-to-do_[version]_[arch][setup].[ext]'
