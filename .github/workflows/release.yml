@@ -45,7 +45,7 @@ jobs:
           tagName: v__VERSION__
           releaseName: __VERSION__
           releaseBody: ${{ inputs.release_notes }}
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           args: --bundles nsis
           updaterJsonPreferNsis: true
