@@ -41,10 +41,10 @@
       </div>
 
       <div v-if="reminder.phase === 'focus'" class="focus-reminder-insight">
-        <span class="focus-reminder-reward"><FocusRewardBadge :reward="reward" size="md" /></span>
+        <span class="focus-reminder-reward"><Sprout :size="28" /></span>
         <span>
-          <small>{{ breakAvailable ? '给注意力充充电' : '专注收获' }}</small>
-          <strong>{{ breakAvailable ? `休息 ${breakText}` : rewardName }}</strong>
+          <small>{{ breakAvailable ? '给注意力充充电' : '今日花成长' }}</small>
+          <strong>{{ breakAvailable ? `休息 ${breakText}` : `增加 ${durationParts.value} ${durationParts.unit}` }}</strong>
         </span>
         <Coffee v-if="breakAvailable" :size="19" />
       </div>
@@ -66,8 +66,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { listen } from '@tauri-apps/api/event'
-import { ArrowRight, Check, CircleCheck, Coffee, ListChecks, Sparkles, TimerReset, X } from 'lucide-vue-next'
-import FocusRewardBadge from './FocusRewardBadge.vue'
+import { ArrowRight, Check, CircleCheck, Coffee, ListChecks, Sparkles, Sprout, TimerReset, X } from 'lucide-vue-next'
 import NativeReminderWindowShell from './NativeReminderWindowShell.vue'
 import {
   getFocusReminderPayload,
@@ -90,21 +89,6 @@ const durationParts = computed(() => {
   if (minutes >= 60 && minutes % 60 === 0) return { value: minutes / 60, unit: '小时' }
   return { value: minutes, unit: '分钟' }
 })
-const reward = computed(() => {
-  const minutes = Math.floor((Number(reminder.value?.focusedSeconds) || 0) / 60)
-  if (minutes >= 90) return 'pumpkin'
-  if (minutes >= 45) return 'watermelon'
-  if (minutes >= 25) return 'tomato'
-  if (minutes >= 10) return 'strawberry'
-  return 'blueberry'
-})
-const rewardName = computed(() => ({
-  blueberry: '蓝莓',
-  strawberry: '草莓',
-  tomato: '番茄',
-  watermelon: '西瓜',
-  pumpkin: '南瓜'
-}[reward.value]))
 const breakText = computed(() => durationText(reminder.value?.breakSeconds))
 const headline = computed(() => {
   if (reminder.value?.phase !== 'focus') return '休息好了，准备回来吧'

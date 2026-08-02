@@ -1,0 +1,19 @@
+# Keep source and configuration files identical across Windows and macOS.
+* text=auto eol=lf
+
+# Windows command scripts require CRLF for cmd.exe compatibility.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Never apply line-ending conversion to binary assets.
+*.ico binary
+*.icns binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary

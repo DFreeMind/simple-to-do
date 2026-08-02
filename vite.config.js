@@ -16,6 +16,9 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version)
   },
+  optimizeDeps: {
+    exclude: ['phaser']
+  },
   publicDir: 'public',
   server: {
     port: 5173,

@@ -268,9 +268,9 @@
           <template v-if="store.pinnedTasks.length">
             <div class="pinned-section">
               <div class="task-group-header is-system pinned-header">
-                <div class="task-group-header__main">
-                  <button class="task-group-header__toggle" type="button" :title="pinnedVisible ? '折叠置顶' : '展开置顶'" @click="pinnedVisible = !pinnedVisible">
-                  <ChevronDown :size="16" :class="{ rotated: !pinnedVisible }" />
+                <div class="task-group-header__main" title="点击展开或收起置顶" @click="pinnedVisible = !pinnedVisible">
+                  <button class="task-group-header__toggle" type="button" :title="pinnedVisible ? '折叠置顶' : '展开置顶'" @click.stop="pinnedVisible = !pinnedVisible">
+                    <ChevronDown :size="16" :class="{ rotated: !pinnedVisible }" />
                   </button>
                   <span class="task-group-header__emoji">📌</span>
                   <span class="task-group-header__name">置顶</span>
@@ -306,9 +306,9 @@
           <template v-if="store.pinnedTasks.length">
             <div class="pinned-section">
               <div class="task-group-header is-system pinned-header">
-                <div class="task-group-header__main">
-                  <button class="task-group-header__toggle" type="button" :title="pinnedVisible ? '折叠置顶' : '展开置顶'" @click="pinnedVisible = !pinnedVisible">
-                  <ChevronDown :size="16" :class="{ rotated: !pinnedVisible }" />
+                <div class="task-group-header__main" title="点击展开或收起置顶" @click="pinnedVisible = !pinnedVisible">
+                  <button class="task-group-header__toggle" type="button" :title="pinnedVisible ? '折叠置顶' : '展开置顶'" @click.stop="pinnedVisible = !pinnedVisible">
+                    <ChevronDown :size="16" :class="{ rotated: !pinnedVisible }" />
                   </button>
                   <span class="task-group-header__emoji">📌</span>
                   <span class="task-group-header__name">置顶</span>
@@ -629,7 +629,6 @@ const listSwitcherOpen = ref(false)
 const listSummaryOpen = ref(false)
 const listSwitcherRef = ref(null)
 const pinnedVisible = ref(true)
-const groupCompletedVisibility = reactive({})
 const groupCollapseState = reactive({})
 const searchGroupCollapseState = reactive({})
 const contentRef = ref(null)
@@ -1109,21 +1108,28 @@ function getGroupCompletedVisibilityKey(groupId) {
 function isGroupCompletedVisible(groupId) {
   if (forceCompletedFilterVisibility.value) return true
   const key = getGroupCompletedVisibilityKey(groupId)
-  return groupCompletedVisibility[key] ?? store.settings.groupCompletedVisibleByDefault
+  return store.settings.groupCompletedVisibility[key] ?? store.settings.groupCompletedVisibleByDefault
 }
 
 function toggleGroupCompletedVisibility(groupId) {
   const key = getGroupCompletedVisibilityKey(groupId)
-  groupCompletedVisibility[key] = !isGroupCompletedVisible(groupId)
+  store.updateSettings({
+    groupCompletedVisibility: {
+      ...store.settings.groupCompletedVisibility,
+      [key]: !isGroupCompletedVisible(groupId)
+    }
+  })
 }
 
 function toggleAllGroupCompletedVisibility() {
   const nextVisible = !allGroupCompletedVisible.value
+  const visibility = { ...store.settings.groupCompletedVisibility }
   store.groupedTasks
     .filter(group => group.completedCount)
     .forEach(group => {
-      groupCompletedVisibility[getGroupCompletedVisibilityKey(group.id)] = nextVisible
+      visibility[getGroupCompletedVisibilityKey(group.id)] = nextVisible
     })
+  store.updateSettings({ groupCompletedVisibility: visibility })
 }
 
 function toggleGroupCollapse(groupId) {
@@ -1141,7 +1147,12 @@ function isGroupCollapsed(groupId) {
 
 const allGroupsExpanded = computed(() => {
   const allKeys = store.groupedTasks.map(g => g.id || '__ungrouped__')
-  return allKeys.length > 0 && allKeys.every(key => !isGroupCollapsed(key === '__ungrouped__' ? null : key))
+  const groupsAllExpanded = allKeys.length > 0 && allKeys.every(key => !isGroupCollapsed(key === '__ungrouped__' ? null : key))
+  // 没有普通分组时，只看置顶；有普通分组时，全部展开才视为"全展开"
+  if (store.pinnedTasks.length) {
+    return allKeys.length > 0 ? (groupsAllExpanded && pinnedVisible.value) : pinnedVisible.value
+  }
+  return groupsAllExpanded
 })
 
 function toggleAllGroups() {
@@ -1151,6 +1162,11 @@ function toggleAllGroups() {
     if (key === '__ungrouped__') groupCollapseState.__ungrouped__ = allExpanded
     else store.setTaskGroupCollapsed(key, allExpanded)
   })
+  // 同步置顶分组：全展开时折叠，全折叠时展开
+  // 注意：pinnedVisible 表示"显示"（true=展开），与 collapsed（true=折叠）语义相反
+  if (store.pinnedTasks.length) {
+    pinnedVisible.value = !allExpanded
+  }
 }
 
 const emptyTitle = computed(() => {

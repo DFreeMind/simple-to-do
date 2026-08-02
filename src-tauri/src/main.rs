@@ -624,7 +624,16 @@ fn open_focus_controller(app: tauri::AppHandle) -> Result<bool, String> {
     state.ready_revision.store(0, Ordering::Relaxed);
 
     if let Some(window) = app.get_webview_window("focus-controller") {
-        let _ = window.set_always_on_top(payload.always_on_top);
+        window
+            .set_always_on_top(payload.always_on_top)
+            .map_err(|error| format!("设置专注控制器置顶状态失败: {error}"))?;
+        position_focus_controller_initially(&window);
+        // 不依赖小窗 WebView 的前端回调来显示。Windows 上隐藏窗口的
+        // WebView 初始化可能比事件监听更晚，导致 refresh 事件丢失并一直不显示。
+        window
+            .show()
+            .map_err(|error| format!("显示专注控制器失败: {error}"))?;
+        let _ = window.set_focus();
         let _ = app.emit_to(
             "focus-controller",
             "focus-controller:refresh",
@@ -654,6 +663,12 @@ fn open_focus_controller(app: tauri::AppHandle) -> Result<bool, String> {
     .build()
     .map_err(|error| format!("创建专注控制器失败: {error}"))?;
     position_focus_controller_initially(&window);
+    // 原生窗口创建完成后立即显示，避免 Windows 因 WebView 初始化时序而
+    // 将控制器永久停留在 hidden 状态。
+    window
+        .show()
+        .map_err(|error| format!("显示专注控制器失败: {error}"))?;
+    let _ = window.set_focus();
     Ok(true)
 }
 

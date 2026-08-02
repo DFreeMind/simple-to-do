@@ -28,16 +28,29 @@
             <p id="focus-celebration-description" class="focus-celebration__duration">这一轮专注，已经安静地收进你的历程</p>
           </div>
 
-          <div v-if="celebration.taskTitle || celebration.reward" class="focus-celebration__summary">
+          <div v-if="celebration.taskTitle || celebration.gardenGrowth?.day" class="focus-celebration__summary">
             <div v-if="celebration.taskTitle" class="focus-celebration__task">
               <span><ListChecks :size="15" />本轮推进</span>
               <strong>{{ celebration.taskTitle }}</strong>
             </div>
 
-            <div v-if="celebration.reward" class="focus-celebration__reward">
-              <span class="focus-celebration__reward-icon"><FocusRewardBadge :reward="celebration.reward" size="md" /></span>
-              <span><small>专注收获</small><strong>{{ rewardName }}</strong></span>
+            <div v-if="celebration.gardenGrowth?.day" class="focus-celebration__reward focus-celebration__reward--plant">
+              <span class="focus-celebration__reward-icon"><FocusStageArtwork :species-id="celebration.gardenGrowth.day.speciesId" :stage="celebration.gardenGrowth.day.stage" motion="static" /></span>
+              <span><small>今日花成长</small><strong>{{ gardenStageName }}</strong></span>
             </div>
+          </div>
+
+          <div v-if="unlockedSpecies.length" class="focus-celebration__unlock" role="status">
+            <span class="focus-celebration__unlock-shine" aria-hidden="true"></span>
+            <span class="focus-celebration__unlock-plant" aria-hidden="true">
+              <FocusStageArtwork :species-id="unlockedSpecies[0].id" stage="bloom" motion="static" />
+            </span>
+            <span class="focus-celebration__unlock-copy">
+              <small>新花种解锁</small>
+              <strong>{{ unlockedSpecies.map(item => item.name).join('、') }}</strong>
+              <span>已收进花种图鉴</span>
+            </span>
+            <span class="focus-celebration__unlock-stamp" aria-hidden="true">已收藏</span>
           </div>
 
           <p v-if="celebration.pendingBreak" class="focus-celebration__tip">
@@ -57,10 +70,11 @@
 </template>
 
 <script setup>
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, ref, watch } from 'vue'
 import { Check, CircleCheck, Coffee, ListChecks, Sparkles, X } from 'lucide-vue-next'
-import FocusRewardBadge from './FocusRewardBadge.vue'
+import { FOCUS_GARDEN_SPECIES, FOCUS_GARDEN_STAGES } from '@/utils/focusGarden.mjs'
 
+const FocusStageArtwork = defineAsyncComponent(() => import('./FocusStageArtwork.vue'))
 const props = defineProps({
   celebration: { type: Object, default: null }
 })
@@ -69,9 +83,11 @@ const emit = defineEmits(['dismiss', 'start-break'])
 const primaryAction = ref(null)
 const dialogCard = ref(null)
 
-const rewardName = computed(() => ({
-  blueberry: '蓝莓', strawberry: '草莓', tomato: '番茄', watermelon: '西瓜', pumpkin: '南瓜'
-}[props.celebration?.reward] || '蓝莓'))
+const gardenStageName = computed(() => FOCUS_GARDEN_STAGES.find(item => item.id === props.celebration?.gardenGrowth?.day?.stage)?.name || '正在生长')
+const unlockedSpecies = computed(() => {
+  const ids = new Set(props.celebration?.gardenGrowth?.unlockedSpeciesIds || [])
+  return FOCUS_GARDEN_SPECIES.filter(item => ids.has(item.id))
+})
 
 const durationParts = computed(() => {
   const minutes = Math.max(1, Math.round((Number(props.celebration?.elapsedSeconds) || 0) / 60))

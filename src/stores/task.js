@@ -54,6 +54,18 @@ import {
 import { migrateData, validateData, createBackup, getCurrentVersion } from '@/utils/migrator'
 import { matchesTaskSearch, normalizeSearchQuery } from '@/utils/search'
 import { getCompletionMessage } from '@/utils/dailyMessages'
+import {
+  FOCUS_GARDEN_ACHIEVEMENTS,
+  FOCUS_GARDEN_SPECIES,
+  createDefaultFocusGarden,
+  focusGardenTotals as calculateFocusGardenTotals,
+  gardenStageFor,
+  localGardenDateKey,
+  normalizeFocusGarden,
+  recordFocusGardenGrowth,
+  unlockedFocusGardenSpecies,
+  updateFocusGardenPreference
+} from '@/utils/focusGarden.mjs'
 
 const SYSTEM_VIEW_IDS = ['today', 'inbox', 'planned', 'important', 'completed', 'trash', 'search']
 const READONLY_VIEWS = ['planned', 'completed', 'trash']
@@ -88,6 +100,7 @@ const DEFAULT_SETTINGS = {
   completedVisible: true,
   groupCompletedDisplayMode: 'in-group',
   groupCompletedVisibleByDefault: true,
+  groupCompletedVisibility: {},
   showCompletionDuration: true,
   trashRetentionDays: 30,
   soundEnabled: true,
@@ -157,6 +170,7 @@ const DEFAULT_CLOCK = {
   pendingBreak: null,
   cycleFocusCount: 0,
   rhythm: DEFAULT_RHYTHM,
+  garden: createDefaultFocusGarden(),
   history: []
 }
 
@@ -327,6 +341,49 @@ export const useTaskStore = defineStore('task', () => {
   const activeFocusSession = computed(() => clock.value.activeSession)
   const focusPendingBreak = computed(() => clock.value.pendingBreak)
   const rhythmReminders = computed(() => clock.value.rhythm.reminders)
+  const focusGarden = computed(() => clock.value.garden)
+  const focusGardenTotals = computed(() => calculateFocusGardenTotals(clock.value.garden))
+  const focusGardenToday = computed(() => {
+    const today = localGardenDateKey()
+    const saved = clock.value.garden.days.find(day => day.date === today)
+    const goalMinutes = saved?.goalMinutes || clock.value.garden.dailyGoalMinutes
+    const growthMinutes = saved?.growthMinutes || 0
+    return saved || {
+      date: today,
+      speciesId: clock.value.garden.selectedSpeciesId,
+      goalMinutes,
+      goalAdjustments: 0,
+      growthMinutes,
+      stage: gardenStageFor(growthMinutes, goalMinutes).id,
+      finalizedAt: null
+    }
+  })
+  const focusGardenSpecies = computed(() => {
+    const unlockedIds = new Set(unlockedFocusGardenSpecies(clock.value.garden).map(item => item.id))
+    const usedMinutes = new Map()
+    const bloomCounts = new Map()
+    clock.value.garden.days.forEach(day => {
+      usedMinutes.set(day.speciesId, (usedMinutes.get(day.speciesId) || 0) + day.growthMinutes)
+      if (gardenStageFor(day.growthMinutes, day.goalMinutes).id === 'bloom') {
+        bloomCounts.set(day.speciesId, (bloomCounts.get(day.speciesId) || 0) + 1)
+      }
+    })
+    return FOCUS_GARDEN_SPECIES.map(species => ({
+      ...species,
+      unlocked: unlockedIds.has(species.id),
+      growthMinutes: usedMinutes.get(species.id) || 0,
+      bloomCount: bloomCounts.get(species.id) || 0
+    }))
+  })
+  const focusGardenAchievements = computed(() => {
+    const unlockedById = new Map(clock.value.garden.achievements.map(item => [item.id, item]))
+    const totals = focusGardenTotals.value
+    return FOCUS_GARDEN_ACHIEVEMENTS.map(item => ({
+      ...item,
+      unlockedAt: unlockedById.get(item.id)?.unlockedAt || null,
+      progress: Math.min(item.target, Number(totals[item.metric] || 0))
+    }))
+  })
   const pendingRhythmReminder = computed(() => rhythmReminders.value
     .filter(reminder => reminder.enabled && reminder.pendingSince)
     .sort((a, b) => new Date(a.pendingSince).getTime() - new Date(b.pendingSince).getTime())[0] || null)
@@ -697,8 +754,26 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   function setClockView(view) {
-    if (!['focus', 'rhythm', 'history'].includes(view)) return
+    if (!['focus', 'rhythm', 'history', 'achievement'].includes(view)) return
     updateSettings({ clockView: view, activeModule: 'clock' })
+  }
+
+  function updateFocusGardenSettings(updates = {}) {
+    const previousSpeciesId = clock.value.garden.selectedSpeciesId
+    const today = localGardenDateKey()
+    const previousDay = clock.value.garden.days.find(day => day.date === today)
+    const previousGoalMinutes = previousDay?.goalMinutes || clock.value.garden.dailyGoalMinutes
+    clock.value.garden = updateFocusGardenPreference(clock.value.garden, updates)
+    if (updates.speciesId && clock.value.garden.nextSpeciesId === updates.speciesId) {
+      showNotice('已设为明日种植', 'success')
+    } else if (updates.speciesId && clock.value.garden.selectedSpeciesId !== previousSpeciesId) {
+      showNotice('今日花种已更换', 'success')
+    } else if (updates.dailyGoalMinutes !== undefined) {
+      const currentDay = clock.value.garden.days.find(day => day.date === today)
+      const currentGoalMinutes = currentDay?.goalMinutes || clock.value.garden.dailyGoalMinutes
+      if (currentGoalMinutes !== previousGoalMinutes) showNotice(`今日目标已设为 ${currentGoalMinutes} 分钟`, 'success')
+      else if (previousDay?.growthMinutes > 0 && previousDay.goalAdjustments >= 1) showNotice('今日目标已修正一次，明日可重新设置', 'info')
+    }
   }
 
   function previewSound(name) {
@@ -1746,6 +1821,7 @@ export const useTaskStore = defineStore('task', () => {
     const history = Array.isArray(rawClock?.history)
       ? rawClock.history.map(item => normalizeFocusHistory(item, profiles)).filter(Boolean).slice(0, MAX_FOCUS_HISTORY)
       : []
+    const garden = normalizeFocusGarden(rawClock?.garden)
     return {
       profiles,
       focusSettings,
@@ -1753,6 +1829,7 @@ export const useTaskStore = defineStore('task', () => {
       pendingBreak,
       cycleFocusCount: Math.max(0, Math.min(focusSettings.focusesBeforeLongBreak - 1, Math.floor(Number(rawClock?.cycleFocusCount) || 0))),
       rhythm,
+      garden,
       history
     }
   }
@@ -1942,7 +2019,7 @@ export const useTaskStore = defineStore('task', () => {
       elapsedSeconds: Math.max(0, Math.min(8 * 60 * 60, Math.round(Number(rawHistory.elapsedSeconds) || 0))),
       phase: ['focus', 'short-break', 'long-break'].includes(rawHistory.phase) ? rawHistory.phase : 'focus',
       result: ['completed', 'abandoned', 'interrupted'].includes(rawHistory.result) ? rawHistory.result : 'completed',
-      reward: rawHistory.reward === 'sesame' ? 'blueberry' : (['blueberry', 'strawberry', 'tomato', 'watermelon', 'pumpkin'].includes(rawHistory.reward) ? rawHistory.reward : (rawHistory.phase === 'focus' && rawHistory.result === 'completed' ? getFocusReward(rawHistory.elapsedSeconds) : null)),
+      reward: rawHistory.reward === 'sesame' ? 'blueberry' : (['blueberry', 'strawberry', 'tomato', 'watermelon', 'pumpkin'].includes(rawHistory.reward) ? rawHistory.reward : null),
       note: String(rawHistory.note || '').trim().slice(0, 240),
       timeline: normalizeFocusTimeline(rawHistory.timeline)
     }
@@ -1981,15 +2058,6 @@ export const useTaskStore = defineStore('task', () => {
     if (session.status !== 'running' || !session.startedAt) return base
     const live = Math.floor((now - new Date(session.startedAt).getTime()) / 1000)
     return base + Math.max(0, live)
-  }
-
-  function getFocusReward(elapsedSeconds) {
-    const minutes = Math.floor(Math.max(0, Number(elapsedSeconds) || 0) / 60)
-    if (minutes >= 90) return 'pumpkin'
-    if (minutes >= 45) return 'watermelon'
-    if (minutes >= 25) return 'tomato'
-    if (minutes >= 10) return 'strawberry'
-    return 'blueberry'
   }
 
   function getFocusSessionDuration(session) {
@@ -2245,7 +2313,7 @@ export const useTaskStore = defineStore('task', () => {
       ...(session.timeline || []),
       { type: 'finished', at: finishedAt, result: normalizedResult, pausedSeconds }
     ].slice(-200)
-    const reward = session.phase === 'focus' && normalizedResult === 'completed' ? getFocusReward(elapsedSeconds) : null
+    const reward = null
     const taskTitle = session.taskId
       ? tasks.value.find(task => !task.deleted && task.id === session.taskId)?.title || ''
       : ''
@@ -2264,6 +2332,16 @@ export const useTaskStore = defineStore('task', () => {
       timeline
     })
     clock.value.history = clock.value.history.slice(0, MAX_FOCUS_HISTORY)
+    let gardenGrowth = null
+    if (session.phase === 'focus' && normalizedResult === 'completed') {
+      const recorded = recordFocusGardenGrowth(clock.value.garden, { elapsedSeconds, finishedAt })
+      clock.value.garden = recorded.garden
+      gardenGrowth = {
+        day: clock.value.garden.days.find(day => day.date === localGardenDateKey(finishedAt)) || null,
+        unlockedAchievementIds: recorded.unlockedAchievementIds,
+        unlockedSpeciesIds: recorded.unlockedSpeciesIds
+      }
+    }
     void cancelFocusCompletion(session.id)
     nativeFocusScheduleActive = false
     clock.value.activeSession = null
@@ -2282,16 +2360,23 @@ export const useTaskStore = defineStore('task', () => {
     focusClockNow.value = Date.now()
     syncFocusTimer()
     if (session.phase === 'focus' && result === 'completed') {
-      focusCelebration.value = {
-        id: genId(),
-        sessionId: session.id,
-        reward,
-        elapsedSeconds,
-        taskTitle: session.taskId
-          ? tasks.value.find(task => !task.deleted && task.id === session.taskId)?.title || null
-          : null,
-        pendingBreak: Boolean(clock.value.pendingBreak),
-        breakSeconds: clock.value.pendingBreak?.durationSeconds || null
+      // native 端 dueAt 触发时已根据主窗口焦点区分 'in-app' / 'background'
+      // 'background' 时 native 已发出系统通知和 reminder window，前端不再显示 celebration 避免双弹
+      // 'in-app' 或 null（手动完成）时显示应用内 celebration
+      const shouldShowInAppCelebration = options.delivery !== 'background'
+      if (shouldShowInAppCelebration) {
+        focusCelebration.value = {
+          id: genId(),
+          sessionId: session.id,
+          reward,
+          gardenGrowth,
+          elapsedSeconds,
+          taskTitle: session.taskId
+            ? tasks.value.find(task => !task.deleted && task.id === session.taskId)?.title || null
+            : null,
+          pendingBreak: Boolean(clock.value.pendingBreak),
+          breakSeconds: clock.value.pendingBreak?.durationSeconds || null
+        }
       }
     }
     const message = session.phase !== 'focus' && result === 'completed'
@@ -2301,8 +2386,8 @@ export const useTaskStore = defineStore('task', () => {
     return true
   }
 
-  function completeFocusSessionFromNative(sessionId) {
-    return finishFocus('completed', '', { sessionId })
+  function completeFocusSessionFromNative(sessionId, delivery = null) {
+    return finishFocus('completed', '', { sessionId, delivery })
   }
 
   function dismissFocusCelebration() {
@@ -2313,6 +2398,7 @@ export const useTaskStore = defineStore('task', () => {
     const index = clock.value.history.findIndex(item => item.id === historyId)
     if (index < 0) return false
     clock.value.history.splice(index, 1)
+    recalculateTodayGarden()
     showNotice('专注记录已删除', 'info')
     return true
   }
@@ -2322,6 +2408,7 @@ export const useTaskStore = defineStore('task', () => {
     if (!Number.isFinite(end)) return false
     const originalLength = clock.value.history.length
     clock.value.history = clock.value.history.filter(item => new Date(item.finishedAt).getTime() > end)
+    recalculateTodayGarden()
     if (clock.value.history.length !== originalLength) showNotice('已清理选定时间范围内的专注记录', 'info')
     return true
   }
@@ -2330,8 +2417,34 @@ export const useTaskStore = defineStore('task', () => {
     const day = localDateKey(dateValue)
     const originalLength = clock.value.history.length
     clock.value.history = clock.value.history.filter(item => localDateKey(item.finishedAt) !== day)
+    if (day === localDateKey()) recalculateTodayGarden()
     if (clock.value.history.length !== originalLength) showNotice('已清理当天专注记录', 'info')
     return true
+  }
+
+  function recalculateTodayGarden() {
+    const today = localGardenDateKey()
+    const index = clock.value.garden.days.findIndex(day => day.date === today)
+    if (index < 0) return
+    const startedAt = new Date(clock.value.garden.startedAt).getTime()
+    const growthMinutes = clock.value.history
+      .filter(item => (
+        item.phase === 'focus' &&
+        item.result === 'completed' &&
+        localGardenDateKey(item.finishedAt) === today &&
+        new Date(item.finishedAt).getTime() >= startedAt
+      ))
+      .reduce((sum, item) => sum + Math.floor(item.elapsedSeconds / 60), 0)
+    if (!growthMinutes) {
+      clock.value.garden.days.splice(index, 1)
+      return
+    }
+    const day = clock.value.garden.days[index]
+    clock.value.garden.days.splice(index, 1, {
+      ...day,
+      growthMinutes,
+      stage: gardenStageFor(growthMinutes, day.goalMinutes).id
+    })
   }
 
   function syncRhythmTimer() {
@@ -2960,7 +3073,7 @@ export const useTaskStore = defineStore('task', () => {
       ...rawSettings,
       theme,
       activeModule,
-      clockView: ['focus', 'rhythm', 'history'].includes(rawSettings.clockView) ? rawSettings.clockView : DEFAULT_SETTINGS.clockView,
+      clockView: ['focus', 'rhythm', 'history', 'achievement'].includes(rawSettings.clockView) ? rawSettings.clockView : DEFAULT_SETTINGS.clockView,
       themeBackgrounds: rawSettings.themeBackgrounds === true,
       density,
       startView,
@@ -2972,6 +3085,9 @@ export const useTaskStore = defineStore('task', () => {
         ? rawSettings.groupCompletedDisplayMode
         : DEFAULT_SETTINGS.groupCompletedDisplayMode,
       groupCompletedVisibleByDefault: rawSettings.groupCompletedVisibleByDefault !== false,
+      groupCompletedVisibility: rawSettings.groupCompletedVisibility && typeof rawSettings.groupCompletedVisibility === 'object' && !Array.isArray(rawSettings.groupCompletedVisibility)
+        ? rawSettings.groupCompletedVisibility
+        : {},
       showCompletionDuration: rawSettings.showCompletionDuration !== false,
       trashRetentionDays,
       soundEnabled,
@@ -3189,6 +3305,11 @@ export const useTaskStore = defineStore('task', () => {
     focusProfiles,
     activeFocusSession,
     focusPendingBreak,
+    focusGarden,
+    focusGardenToday,
+    focusGardenTotals,
+    focusGardenSpecies,
+    focusGardenAchievements,
     rhythmReminders,
     pendingRhythmReminder,
     rhythmPaused,
@@ -3275,6 +3396,7 @@ export const useTaskStore = defineStore('task', () => {
     adjustFocusDuration,
     updateFocusSettings,
     updateFocusProfile,
+    updateFocusGardenSettings,
     startPendingBreak,
     skipPendingBreak,
     addRhythmReminder,

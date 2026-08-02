@@ -91,7 +91,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { AlarmClock, Bell, CalendarCheck, ChartNoAxesColumnIncreasing, CheckCircle2, Compass, Folder, HardDrive, Inbox, ListChecks, PanelLeft, Search, Settings, Star, Timer, Trash2 } from 'lucide-vue-next'
+import { AlarmClock, Bell, CalendarCheck, ChartNoAxesColumnIncreasing, CheckCircle2, Compass, Folder, HardDrive, Inbox, ListChecks, PanelLeft, Search, Settings, Star, Timer, Trash2, Trophy } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import { readProfileAvatar } from '@/services/platform'
 import ProfilePanel from './ProfilePanel.vue'
@@ -112,7 +112,8 @@ const taskQuickViews = [
 const clockQuickViews = [
   { id: 'focus', label: '专注工作台', icon: Timer },
   { id: 'rhythm', label: '节律提醒', icon: Bell },
-  { id: 'history', label: '专注回顾', icon: ChartNoAxesColumnIncreasing }
+  { id: 'history', label: '专注回顾', icon: ChartNoAxesColumnIncreasing },
+  { id: 'achievement', label: '专注成就', icon: Trophy }
 ]
 const isCurrentViewList = computed(() => store.lists.some(list => list.id === store.currentView))
 const builtInAvatarModules = import.meta.glob('@/assets/avatars/*.png', { eager: true, import: 'default' })

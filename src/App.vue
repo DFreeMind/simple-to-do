@@ -155,7 +155,7 @@ let shellResizeObserver
 function handleFocusElapsed(event) {
   const sessionId = event.payload?.sessionId
   if (!sessionId) return
-  store.completeFocusSessionFromNative(sessionId)
+  store.completeFocusSessionFromNative(sessionId, event.payload?.delivery)
 }
 
 function openFocusCompletion() {

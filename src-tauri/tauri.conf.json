@@ -12,11 +12,31 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "易简清单",
         "width": 1200,
         "height": 800,
         "minWidth": 900,
         "minHeight": 720
+      },
+      {
+        "label": "focus-controller",
+        "title": "易简清单 · 专注控制器",
+        "url": "index.html",
+        "width": 390,
+        "height": 286,
+        "minWidth": 390,
+        "minHeight": 286,
+        "maxWidth": 390,
+        "maxHeight": 286,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": true,
+        "visible": false
       }
     ],
     "security": {

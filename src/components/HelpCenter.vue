@@ -93,7 +93,7 @@
 
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
-import { BookOpenCheck, Calendar, Compass, Database, Keyboard, Maximize2, Rocket, Search, Settings, Sparkles, Wrench, X } from 'lucide-vue-next'
+import { BookOpenCheck, Calendar, Compass, Database, Keyboard, Maximize2, Rocket, Search, Settings, Sparkles, Timer, Wrench, X } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 
 const store = useTaskStore()
@@ -166,7 +166,7 @@ const documents = [
       { title: '当前不包含的功能', paragraphs: ['当前版本是本地个人任务管理工具：'], items: [
         '不需要账号，数据保存在本机',
         '暂不提供云同步、多人协作、团队成员和在线连接',
-        '时钟模块当前仅提供独立入口和导航结构；番茄计时、定时提醒与记录功能仍在规划中',
+        '时钟模块包含专注工作台、节律提醒、专注回顾和专注成就；所有记录与成长数据都保存在本机',
         '不包含完整日历、习惯或四象限管理'
       ], tip: '个人空间中的“连接与协作”是预留入口，目前不会改变本地任务数据。' }
     ]
@@ -319,6 +319,26 @@ const documents = [
     ]
   },
   {
+    id: 'focus-guide', category: '使用手册', title: '专注与花田', summary: '用今日成长保持专注，用长期花田回顾积累。', icon: Timer,
+    sections: [
+      { title: '专注工作台关注今天', paragraphs: ['进入“时钟 → 专注工作台”，选择专注方式和可选任务后即可开始。工作台只展示当前计时、今日花朵和今日目标，避免长期统计干扰当下。'], items: [
+        '番茄专注适合短冲刺，深度专注适合完整工作块，自由计时不设上限',
+        '完成的有效专注分钟会让今日植物自然经历种子、破土、舒叶、花苞、初绽和盛放',
+        '中断记录保留在专注回顾中，但不会增加花朵成长'
+      ], tip: '每日目标是成长节奏，不是惩罚线；超出目标的专注仍会计入长期累计。' },
+      { title: '专注成就是独立模块', paragraphs: ['“专注成就”与工作台、节律提醒和专注回顾平级，用于承接长期反馈：'], items: [
+        '花田总览：按月和按年查看每天留下的花，空白日保持留白，不做连续打卡惩罚',
+        '花种图鉴：在互动舞台回放六个自然阶段，并按晨光、微风、暮色浏览 12 种花；当天尚未成长时可立即换花，已有成长后改为次日生效',
+        '成长徽章：记录首次、累计、深度和多样性里程碑；实际培养 6 种与全部 12 种花还有收藏徽章'
+      ] },
+      { title: '成长数据如何计算', paragraphs: ['花田从升级到当前版本后开始记录，不把过去的果实奖励自动折算为花朵。新完成记录不再生成果实，旧记录中的果实仍可在专注成就里查看。'], items: [
+        '只有完成状态的专注阶段按实际整分钟计入成长',
+        '花种按累计有效专注分钟逐步解锁；首次跨过门槛会在专注完成时出现收藏提示',
+        '历史日会归档成长期花田；删除今天的专注记录会同步重算今日成长'
+      ], tip: '开启系统“减少动态效果”后，植物与解锁演出会自动改用静态结果。' }
+    ]
+  },
+  {
     id: 'shortcuts', category: '使用手册', title: '快捷键', summary: '提高操作效率的快捷键。', icon: Keyboard,
     sections: [
       { title: '当前可用快捷键', paragraphs: ['以下快捷键已在应用中提供：'], items: [
@@ -412,7 +432,9 @@ const documents = [
     id: 'updates', category: '更新说明', title: '版本更新', summary: '查看最新的功能改进。', icon: Wrench,
     sections: [
       { title: '当前版本 v0.4.1', paragraphs: ['本版本聚焦本地数据安全、日常整理和桌面端体验：'], items: [
-        '新增时钟模块：支持番茄、深度专注、自由时长、休息阶段与完成奖励',
+        '调整专注工作台：突出当前计时、今日植物和今日目标，减少长期信息干扰',
+        '新增独立专注成就模块：提供年度与月度花田、花种六阶段图鉴和成长徽章',
+        '完成专注会推动植物自然成长；旧果实奖励只做兼容展示，不再继续生成',
         '新增节律提醒：支持按间隔、固定时刻和连续使用触发，并提供本轮暂停与 ±5 分钟调整',
         '后台到期时显示原生置顶提醒窗；专注可打开可拖动、可置顶的桌面控制器',
         '新增专注与节律回顾：可查看趋势、筛选记录、展开详情和管理历史',

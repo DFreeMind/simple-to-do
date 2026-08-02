@@ -5,6 +5,8 @@ src-tauri/target/
 src-tauri/gen/
 .claude/
 .playwright-mcp/
+.playwright-cli/
+output/playwright/
 
 .env
 .env.*
