@@ -17,9 +17,14 @@
           </div>
         </div>
         <span class="rich-editor__toolbar-divider"></span>
+        <button class="rich-editor__tool" type="button" title="撤销 (⌘/Ctrl+Z)" aria-label="撤销" @mousedown.prevent @click="editor?.chain().focus().undo().run()"><Undo2 :size="15" /></button>
+        <button class="rich-editor__tool" type="button" title="重做 (⌘/Ctrl+Shift+Z)" aria-label="重做" @mousedown.prevent @click="editor?.chain().focus().redo().run()"><Redo2 :size="15" /></button>
+        <span class="rich-editor__toolbar-divider"></span>
         <button class="rich-editor__tool" :class="{ active: isActive('bold') }" type="button" title="加粗 (⌘/Ctrl+B)" aria-label="加粗" @mousedown.prevent @click="toggleMark('bold')"><Bold :size="15" /></button>
         <button class="rich-editor__tool" :class="{ active: isActive('italic') }" type="button" title="斜体 (⌘/Ctrl+I)" aria-label="斜体" @mousedown.prevent @click="toggleMark('italic')"><Italic :size="15" /></button>
         <button class="rich-editor__tool" :class="{ active: isActive('strike') }" type="button" title="删除线" aria-label="删除线" @mousedown.prevent @click="toggleMark('strike')"><Strikethrough :size="15" /></button>
+        <button class="rich-editor__tool" :class="{ active: isActive('highlight') }" type="button" title="高亮" aria-label="高亮" @mousedown.prevent @click="toggleMark('highlight')"><Highlighter :size="15" /></button>
+        <button class="rich-editor__tool" :class="{ active: isActive('code') }" type="button" title="行内代码" aria-label="行内代码" @mousedown.prevent @click="toggleMark('code')"><Code2 :size="15" /></button>
         <button class="rich-editor__tool" :class="{ active: isActive('link') }" type="button" title="添加链接" aria-label="添加链接" @mousedown.prevent @click="openLinkPopover"><Link :size="15" /></button>
         <span class="rich-editor__toolbar-divider"></span>
         <button class="rich-editor__tool" :class="{ active: isActive('bulletList') }" type="button" title="无序列表" aria-label="无序列表" @mousedown.prevent @click="toggleList('bulletList')"><List :size="15" /></button>
@@ -33,6 +38,13 @@
           <div v-if="moreMenuOpen" class="rich-editor__more-menu" role="menu">
             <button type="button" role="menuitem" @mousedown.prevent @click="insertBlockquote"><Quote :size="15" /> 引用</button>
             <button type="button" role="menuitem" @mousedown.prevent @click="insertHorizontalRule"><Minus :size="15" /> 分割线</button>
+            <button type="button" role="menuitem" @mousedown.prevent @click="toggleMark('underline')"><Underline :size="15" /> 下划线</button>
+            <button type="button" role="menuitem" @mousedown.prevent @click="toggleCodeBlock"><Code2 :size="15" /> 代码块</button>
+            <button type="button" role="menuitem" @mousedown.prevent @click="insertTable"><Table2 :size="15" /> 表格</button>
+            <button type="button" role="menuitem" @mousedown.prevent @click="insertDetails"><ChevronRight :size="15" /> 折叠块</button>
+            <button type="button" role="menuitem" @mousedown.prevent @click="taskReferenceOpen = true; moreMenuOpen = false"><ListTodo :size="15" /> 任务引用</button>
+            <button type="button" role="menuitem" @mousedown.prevent @click="setTextAlign('center')"><AlignCenter :size="15" /> 居中对齐</button>
+            <button type="button" role="menuitem" @mousedown.prevent @click="setTextAlign('left')"><AlignLeft :size="15" /> 左对齐</button>
           </div>
         </div>
 
@@ -41,8 +53,14 @@
           <button type="submit">应用</button>
           <button v-if="isActive('link')" type="button" title="移除链接" aria-label="移除链接" @click="removeLink"><Link2Off :size="14" /></button>
         </form>
+        <div v-if="taskReferenceOpen" class="rich-editor__task-reference">
+          <input v-model.trim="taskReferenceQuery" type="search" placeholder="搜索并引用任务" aria-label="搜索任务" />
+          <button v-for="task in taskReferenceCandidates" :key="task.id" type="button" @mousedown.prevent @click="insertTaskReference(task)"><ListTodo :size="14" />{{ task.title }}</button>
+          <small v-if="!taskReferenceCandidates.length">没有匹配任务</small>
+        </div>
       </div>
       <editor-content :editor="editor" class="editor-content" @click="onEditorContentClick" />
+      <footer class="rich-editor__status"><span>{{ editorStats.characters }} 字 · {{ editorStats.words }} 词</span><span>{{ editorStats.readingMinutes }} 分钟阅读</span></footer>
     </template>
     <input ref="fileInput" type="file" accept="image/*" multiple class="hidden-file-input" @change="onFileSelected" />
   </div>
@@ -58,7 +76,7 @@
 </template>
 
 <script setup>
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { EditorContent, useEditor } from '@tiptap/vue-3'
 import { Extension } from '@tiptap/core'
 import Suggestion from '@tiptap/suggestion'
@@ -69,9 +87,15 @@ import Placeholder from '@tiptap/extension-placeholder'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import HorizontalRule from '@tiptap/extension-horizontal-rule'
-import { Bold, ChevronDown, ImagePlus, Italic, Link, Link2Off, List, ListChecks, ListOrdered, Maximize2, Minimize2, Minus, MoreHorizontal, PenLine, Quote, Strikethrough, Type, X } from 'lucide-vue-next'
+import Highlight from '@tiptap/extension-highlight'
+import UnderlineExtension from '@tiptap/extension-underline'
+import TextAlign from '@tiptap/extension-text-align'
+import { Details, DetailsContent, DetailsSummary } from '@tiptap/extension-details'
+import { TableKit } from '@tiptap/extension-table'
+import { AlignCenter, AlignLeft, Bold, ChevronDown, ChevronRight, Code2, Highlighter, ImagePlus, Italic, Link, Link2Off, List, ListChecks, ListOrdered, ListTodo, Maximize2, Minimize2, Minus, MoreHorizontal, PenLine, Quote, Redo2, Strikethrough, Table2, Type, Underline, Undo2, X } from 'lucide-vue-next'
 import { importImageData, readImage, resolveHtmlImages, selectImage } from '@/services/platform'
 import ImageLightbox from './ImageLightbox.vue'
+import { useTaskStore } from '@/stores/task'
 
 const AttachmentImage = Image.extend({
   addAttributes() {
@@ -99,6 +123,8 @@ const linkPopoverOpen = ref(false)
 const linkUrl = ref('')
 const linkInput = ref(null)
 const linkSelection = ref(null)
+const taskReferenceOpen = ref(false)
+const taskReferenceQuery = ref('')
 const fileInput = ref(null)
 const editorVersion = ref(0)
 const lightboxVisible = ref(false)
@@ -110,6 +136,18 @@ const blockItems = [
   { value: 'heading-2', label: '标题 2', badge: 'H2' },
   { value: 'heading-3', label: '标题 3', badge: 'H3' },
 ]
+const taskStore = useTaskStore()
+const taskReferenceCandidates = computed(() => {
+  const query = taskReferenceQuery.value.toLocaleLowerCase()
+  return taskStore.activeTasks.filter(task => task.id !== taskStore.selectedTaskId && task.title.toLocaleLowerCase().includes(query)).slice(0, 6)
+})
+const editorStats = computed(() => {
+  editorVersion.value
+  const text = editor.value?.getText({ blockSeparator: ' ' }).trim() || ''
+  const characters = text.length
+  const words = text ? text.split(/\s+/).length : 0
+  return { characters, words, readingMinutes: Math.max(1, Math.ceil(words / 300)) }
+})
 
 function touchEditor() {
   editorVersion.value += 1
@@ -145,6 +183,12 @@ function collectEditorImageUrls() {
 }
 
 function onEditorContentClick(e) {
+  const taskLink = e.target.closest('a[href^="task://"]')
+  if (taskLink) {
+    e.preventDefault()
+    taskStore.selectTask(taskLink.getAttribute('href').slice('task://'.length))
+    return
+  }
   const img = e.target.closest('img')
   if (!img || !img.src) return
   const urls = collectEditorImageUrls()
@@ -300,6 +344,16 @@ function insertHorizontalRule() {
   moreMenuOpen.value = false
 }
 
+function toggleCodeBlock() { editor.value?.chain().focus().toggleCodeBlock().run(); moreMenuOpen.value = false }
+function insertTable() { editor.value?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(); moreMenuOpen.value = false }
+function insertDetails() { editor.value?.chain().focus().setDetails().run(); moreMenuOpen.value = false }
+function setTextAlign(alignment) { editor.value?.chain().focus().setTextAlign(alignment).run(); moreMenuOpen.value = false }
+function insertTaskReference(task) {
+  editor.value?.chain().focus().insertContent(`<a href="task://${task.id}">🔗 ${task.title}</a>`).run()
+  taskReferenceOpen.value = false
+  taskReferenceQuery.value = ''
+}
+
 function openLinkPopover() {
   if (!editor.value) return
   linkSelection.value = editor.value.state.selection
@@ -319,6 +373,7 @@ function closeTransientMenus(event) {
   if (!target.closest('.rich-editor__block-wrap')) blockMenuOpen.value = false
   if (!target.closest('.rich-editor__more-wrap')) moreMenuOpen.value = false
   if (!target.closest('.rich-editor__link-popover')) linkPopoverOpen.value = false
+  if (!target.closest('.rich-editor__task-reference')) taskReferenceOpen.value = false
 }
 
 function normalizeUrl(value) {
@@ -353,6 +408,9 @@ const slashItems = [
   { title: '待办列表', description: '创建可勾选事项', badge: '[]', keywords: '待办 checklist task', action: () => editor.value?.chain().focus().toggleTaskList().run() },
   { title: '引用', description: '突出一段引用内容', badge: '"', keywords: '引用 quote', action: insertBlockquote },
   { title: '分割线', description: '分隔不同内容', badge: '—', keywords: '分割线 divider', action: insertHorizontalRule },
+  { title: '代码块', description: '插入多行代码或命令', badge: '</>', keywords: '代码 code command', action: toggleCodeBlock },
+  { title: '表格', description: '插入 3 × 3 表格', badge: '▦', keywords: '表格 table', action: insertTable },
+  { title: '折叠块', description: '插入可展开的详情内容', badge: '›', keywords: '折叠 详情 details', action: insertDetails },
   { title: '图片', description: '从本机插入图片', badge: '▧', keywords: '图片 image upload', action: chooseImage },
 ]
 
@@ -444,7 +502,14 @@ const editor = useEditor({
   extensions: [
     StarterKit.configure({ heading: { levels: [1, 2, 3] }, horizontalRule: false, link: false }),
     AttachmentImage.configure({ inline: true, allowBase64: true }),
-    LinkExtension.configure({ openOnClick: false, HTMLAttributes: { rel: 'noopener noreferrer', target: '_blank' } }),
+    LinkExtension.configure({ openOnClick: false, autolink: true, linkOnPaste: true, HTMLAttributes: { rel: 'noopener noreferrer', target: '_blank' } }),
+    Highlight.configure({ multicolor: true }),
+    UnderlineExtension,
+    TextAlign.configure({ types: ['heading', 'paragraph'] }),
+    Details,
+    DetailsSummary,
+    DetailsContent,
+    TableKit.configure({ table: { resizable: true } }),
     Placeholder.configure({ placeholder: props.placeholder }),
     TaskList,
     TaskItem.configure({ nested: true }),
