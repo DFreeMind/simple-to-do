@@ -616,27 +616,41 @@
 
             <div class="settings-block settings-block--maintenance storage-manager">
               <div class="settings-block__title">
-                <h4>存储清理</h4>
-                <span>维护操作 · {{ storageSummary }}</span>
+                <h4>空间管理</h4>
+                <span>{{ storageSummary }}</span>
               </div>
-              <p class="storage-manager__hint">扫描只检查本机附件。备注图片、任务附件和回收站中的引用都会保留，不会自动删除。</p>
+              <p class="storage-manager__hint">扫描只读取本机数据，不会自动删除。任务、备注图片及回收站中的有效引用都会保留。</p>
               <div class="storage-manager__toolbar">
-                <span><strong>本机附件</strong><small>查看未引用附件、失效引用和清理站</small></span>
-                <button class="small-btn" type="button" :disabled="storageLoading" @click="scanStorage">{{ storageLoading ? '扫描中…' : '扫描' }}</button>
+                <span><strong>查看本机空间</strong><small>统计数据、附件、头像、恢复点与可释放空间</small></span>
+                <button class="small-btn" type="button" :disabled="storageLoading" @click="scanStorage">{{ storageLoading ? '正在扫描…' : storageReport ? '重新扫描' : '开始扫描' }}</button>
               </div>
 
               <template v-if="storageReport">
-                <div class="storage-stats">
-                  <span>附件 {{ formatBytes(storageReport.attachmentBytes) }}</span>
-                  <span>可清理 {{ formatBytes(storageReport.orphanBytes) }}</span>
-                  <span>清理站 {{ formatBytes(storageReport.quarantinedBytes) }}</span>
+                <div class="storage-overview" aria-live="polite">
+                  <div class="storage-overview__total">
+                    <span class="storage-overview__icon"><Database :size="20" /></span>
+                    <span><small>应用已占用</small><strong>{{ formatBytes(storageReport.totalBytes) }}</strong><em>本机数据总计</em></span>
+                  </div>
+                  <div class="storage-overview__reclaim">
+                    <span><strong>可释放 {{ formatBytes(reclaimableBytes) }}</strong><small>{{ storageReport.orphanAttachments.length }} 项未引用附件 · 先移入清理站再决定是否删除</small></span>
+                    <button v-if="storageReport.orphanAttachments.length" class="text-btn" type="button" :disabled="storageAction" @click="quarantineAll">整理附件</button>
+                  </div>
+                </div>
+
+                <div class="storage-breakdown" aria-label="本机空间分类">
+                  <div v-for="category in storageCategories" :key="category.id" class="storage-breakdown__item" :class="{ 'is-reclaimable': category.reclaimable }">
+                    <span class="storage-breakdown__icon"><component :is="category.icon" :size="16" /></span>
+                    <span><strong>{{ category.label }}</strong><small>{{ category.description }}</small></span>
+                    <b>{{ formatBytes(category.bytes) }}</b>
+                  </div>
                 </div>
 
                 <div v-if="storageReport.orphanAttachments.length" class="storage-result">
                   <div class="storage-result__head">
-                    <span><strong>未引用附件</strong><small>{{ storageReport.orphanAttachments.length }} 项 · {{ formatBytes(storageReport.orphanBytes) }}</small></span>
+                    <span><strong>待处理附件</strong><small>{{ storageReport.orphanAttachments.length }} 项 · {{ formatBytes(storageReport.orphanBytes) }} · {{ orphanTypeSummary }}</small></span>
                     <span class="storage-result__actions"><button v-if="storageReport.orphanAttachments.length > inlineLimit" class="text-btn" type="button" @click="openStorageBrowser('orphan')">查看全部</button><button class="small-btn" type="button" :disabled="storageAction" @click="quarantineAll">移入清理站</button></span>
                   </div>
+                  <p class="storage-manager__hint storage-result__note">这些文件没有被当前任务、备注或回收站引用。移入清理站后仍可恢复，不会直接删除。</p>
                   <section v-for="group in inlineOrphanGroups" :key="group.id" class="storage-type-group">
                     <p v-if="orphanGroups.length > 1" class="storage-type-group__title">{{ group.label }} · {{ group.items.length }} 项</p>
                     <div class="storage-item-list">
@@ -649,10 +663,10 @@
                     </div>
                   </section>
                 </div>
-                <p v-else class="storage-manager__empty">没有发现未引用附件。</p>
+                <p v-else class="storage-manager__empty">附件引用状态正常，暂时没有可整理的附件。</p>
 
                 <div v-if="storageReport.missingReferences.length" class="storage-warning">
-                  发现 {{ storageReport.missingReferences.length }} 个失效引用：原数据仍保留，暂不会自动移除。
+                  发现 {{ storageReport.missingReferences.length }} 个失效引用：相关文件可能已被手动移走。原任务数据会保留，扫描不会自动修改它。
                 </div>
 
                 <div v-if="storageReport.quarantinedAttachments.length" class="storage-result storage-result--quarantine">
@@ -786,26 +800,29 @@
       </section>
     </div>
   </Teleport>
-  <Teleport to="body">
-    <div v-if="pendingPurgeIds.length" class="storage-delete-dialog-layer" role="presentation">
-      <button class="storage-delete-dialog-layer__scrim" type="button" aria-label="取消永久删除" @click="pendingPurgeIds = []"></button>
-      <section class="storage-delete-dialog" role="alertdialog" aria-modal="true" aria-labelledby="storage-delete-title" @keydown.esc.stop="pendingPurgeIds = []">
-        <span class="storage-delete-dialog__icon"><Trash2 :size="22" /></span>
-        <div><h2 id="storage-delete-title">永久删除 {{ pendingPurgeIds.length }} 项文件？</h2><p>文件将从本机彻底移除，且无法恢复。</p></div>
-        <div class="storage-delete-dialog__targets"><strong>将删除</strong><ul><li v-for="item in purgeTargets" :key="item.id"><span>{{ item.name }}</span><small>{{ item.relativePath }}</small></li></ul><small v-if="pendingPurgeIds.length > purgeTargets.length">另有 {{ pendingPurgeIds.length - purgeTargets.length }} 项文件</small></div>
-        <footer><button class="small-btn" type="button" @click="pendingPurgeIds = []">取消</button><button class="small-btn danger" type="button" :disabled="storageAction" @click="confirmPurge">永久删除</button></footer>
-      </section>
-    </div>
-  </Teleport>
+  <ConfirmDialog
+    :visible="pendingPurgeIds.length > 0"
+    title="确认永久删除？"
+    :message="`将从本机删除 ${pendingPurgeIds.length} 项文件，共 ${formatBytes(purgeBytes)}。删除后无法恢复。`"
+    tag="清理站"
+    :details="purgeDetails"
+    :confirm-text="storageAction ? '正在删除…' : `永久删除 ${pendingPurgeIds.length} 项`"
+    cancel-text="暂不删除"
+    type="danger"
+    :z-index="3400"
+    @confirm="confirmPurge"
+    @cancel="pendingPurgeIds = []"
+  />
 </template>
 
 <script setup>
 import { computed, ref } from 'vue'
-import { Bell, Check, Compass, Database, Download, ExternalLink, Info, PanelTop, Palette, Pin, ShieldCheck, SlidersHorizontal, Timer, Trash2, X, Volume2, CheckSquare, Folder, Tag } from 'lucide-vue-next'
+import { Bell, Check, Compass, Database, Download, ExternalLink, File, HardDrive, Image, Info, PanelTop, Palette, Pin, ShieldCheck, SlidersHorizontal, Timer, Trash2, UserRound, X, Volume2, CheckSquare, Folder, Tag } from 'lucide-vue-next'
 import { check } from '@tauri-apps/plugin-updater'
 import { useTaskStore } from '@/stores/task'
 import { openSystemNotificationSettings, purgeQuarantinedAttachments, quarantineOrphanAttachments, readAttachment, readQuarantinedAttachment, restoreQuarantinedAttachments, scanStorageHealth } from '@/services/platform'
 import ImageLightbox from './ImageLightbox.vue'
+import ConfirmDialog from './ConfirmDialog.vue'
 import appIcon from '@/assets/app-icon.svg'
 
 const version = __APP_VERSION__
@@ -897,7 +914,30 @@ const dailyGuidanceSummary = computed(() => {
   if (!store.settings.dailyGuidanceEnabled) return '已关闭'
   return ({ calm: '轻松', practical: '务实', encouraging: '鼓励' }[store.settings.dailyGuidanceStyle] || '务实')
 })
-const storageSummary = computed(() => storageReport.value ? `${storageReport.value.orphanAttachments.length} 项可清理` : '按需扫描')
+const storageSummary = computed(() => storageReport.value ? `已扫描 · ${formatBytes(storageReport.value.totalBytes)}` : '按需扫描')
+const reclaimableBytes = computed(() => (storageReport.value?.orphanBytes || 0) + (storageReport.value?.quarantinedBytes || 0))
+const orphanTypeSummary = computed(() => {
+  const report = storageReport.value
+  if (!report) return ''
+  const parts = []
+  if (report.orphanImageBytes) parts.push(`图片 ${formatBytes(report.orphanImageBytes)}`)
+  if (report.orphanFileBytes) parts.push(`文件 ${formatBytes(report.orphanFileBytes)}`)
+  return parts.join(' · ')
+})
+const storageCategories = computed(() => {
+  const report = storageReport.value
+  if (!report) return []
+  return [
+    { id: 'database', label: '任务数据', description: '任务、清单与设置', bytes: report.databaseBytes, icon: Database },
+    { id: 'images', label: '已用图片', description: '被任务或备注引用', bytes: report.referencedImageBytes, icon: Image },
+    { id: 'files', label: '已用文件', description: '被任务引用的非图片附件', bytes: report.referencedFileBytes, icon: File },
+    { id: 'orphan', label: '待处理附件', description: '未被引用，可移入清理站', bytes: report.orphanBytes, icon: Trash2, reclaimable: true },
+    { id: 'quarantine', label: '清理站', description: '已暂存，可恢复或永久删除', bytes: report.quarantinedBytes, icon: Trash2, reclaimable: true },
+    { id: 'profile', label: '个人资料', description: '头像等本机资料', bytes: report.profileBytes, icon: UserRound },
+    { id: 'backup', label: '本机恢复点', description: '数据恢复快照', bytes: report.backupBytes, icon: ShieldCheck },
+    { id: 'other', label: '其他应用数据', description: '应用运行所需文件', bytes: report.otherBytes, icon: HardDrive }
+  ].filter(item => item.bytes > 0)
+})
 const updateStatusText = computed(() => ({
   development: '开发环境',
   idle: '手动检查',
@@ -966,6 +1006,12 @@ const browserItems = computed(() => {
 const browserPageCount = computed(() => Math.max(1, Math.ceil(browserItems.value.length / browserPageSize)))
 const browserPageItems = computed(() => browserItems.value.slice(storageBrowserPage.value * browserPageSize, (storageBrowserPage.value + 1) * browserPageSize))
 const purgeTargets = computed(() => (storageReport.value?.quarantinedAttachments || []).filter(item => pendingPurgeIds.value.includes(item.id)).slice(0, 3))
+const purgeBytes = computed(() => (storageReport.value?.quarantinedAttachments || []).filter(item => pendingPurgeIds.value.includes(item.id)).reduce((total, item) => total + item.sizeBytes, 0))
+const purgeDetails = computed(() => [
+  { label: '文件数量', value: `${pendingPurgeIds.value.length} 项`, type: 'danger' },
+  { label: '可释放空间', value: formatBytes(purgeBytes.value), type: 'info' },
+  { label: '文件示例', value: purgeTargets.value.map(item => item.name).join('、') || '无', type: 'default' }
+])
 
 function groupAttachments(items) {
   const images = items.filter(item => item.isImage)
@@ -1065,7 +1111,7 @@ function quarantineItem(item) { return runStorageAction(() => quarantineOrphanAt
 function restoreAll() { return runStorageAction(() => restoreQuarantinedAttachments(storageReport.value.quarantinedAttachments.map(item => item.id)), '已恢复') }
 function restoreItem(item) { return runStorageAction(() => restoreQuarantinedAttachments([item.id]), '已恢复') }
 function requestPurge(items) { pendingPurgeIds.value = items.map(item => item.id) }
-function confirmPurge() { return runStorageAction(() => purgeQuarantinedAttachments(pendingPurgeIds.value), '已永久删除') }
+function confirmPurge() { if (storageAction.value || !pendingPurgeIds.value.length) return; return runStorageAction(() => purgeQuarantinedAttachments(pendingPurgeIds.value), '已永久删除') }
 function openPreview(item) {
   const images = (storageReport.value?.orphanAttachments || []).filter(candidate => candidate.isImage).map(candidate => previews.value[candidate.relativePath]).filter(Boolean)
   previewIndex.value = images.indexOf(previews.value[item.relativePath])

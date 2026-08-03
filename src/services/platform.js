@@ -215,7 +215,7 @@ export async function readProfileAvatar(relativePath) {
 
 export async function scanStorageHealth() {
   if (isTauri()) return invoke('scan_storage_health')
-  return { supported: false, orphanAttachments: [], quarantinedAttachments: [] }
+  return { supported: false, totalBytes: 0, attachmentBytes: 0, orphanAttachments: [], quarantinedAttachments: [] }
 }
 
 export async function quarantineOrphanAttachments(relativePaths) {

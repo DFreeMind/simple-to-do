@@ -3536,12 +3536,24 @@ struct StorageItem {
 #[serde(rename_all = "camelCase")]
 struct StorageHealth {
     supported: bool,
+    total_bytes: u64,
+    database_bytes: u64,
     attachment_bytes: u64,
+    referenced_attachment_bytes: u64,
+    referenced_image_bytes: u64,
+    referenced_file_bytes: u64,
     orphan_bytes: u64,
+    orphan_image_bytes: u64,
+    orphan_file_bytes: u64,
     orphan_attachments: Vec<StorageItem>,
     missing_references: Vec<String>,
     quarantined_attachments: Vec<StorageItem>,
     quarantined_bytes: u64,
+    quarantined_image_bytes: u64,
+    quarantined_file_bytes: u64,
+    profile_bytes: u64,
+    backup_bytes: u64,
+    other_bytes: u64,
 }
 
 #[derive(Serialize)]
@@ -3679,6 +3691,9 @@ fn scan_storage_health(app: tauri::AppHandle) -> Result<StorageHealth, String> {
     let mut files = Vec::new();
     collect_files(&attachment_root, &mut files)?;
     let mut attachment_bytes = 0;
+    let mut referenced_attachment_bytes = 0;
+    let mut referenced_image_bytes = 0;
+    let mut referenced_file_bytes = 0;
     let mut orphan_attachments = Vec::new();
     let mut present = HashSet::new();
     for path in files {
@@ -3690,6 +3705,13 @@ fn scan_storage_health(app: tauri::AppHandle) -> Result<StorageHealth, String> {
                 id: item.relative_path.clone(),
                 ..item
             });
+        } else {
+            referenced_attachment_bytes += item.size_bytes;
+            if item.is_image {
+                referenced_image_bytes += item.size_bytes;
+            } else {
+                referenced_file_bytes += item.size_bytes;
+            }
         }
     }
     let missing_references = referenced
@@ -3700,24 +3722,67 @@ fn scan_storage_health(app: tauri::AppHandle) -> Result<StorageHealth, String> {
     let mut cleanup_files = Vec::new();
     collect_files(&cleanup_root, &mut cleanup_files)?;
     let mut quarantined_bytes = 0;
+    let mut quarantined_image_bytes = 0;
+    let mut quarantined_file_bytes = 0;
     let mut quarantined_attachments = Vec::new();
     for path in cleanup_files {
         let item = storage_item(&cleanup_root, &path, String::new())?;
         quarantined_bytes += item.size_bytes;
+        if item.is_image {
+            quarantined_image_bytes += item.size_bytes;
+        } else {
+            quarantined_file_bytes += item.size_bytes;
+        }
         quarantined_attachments.push(StorageItem {
             id: item.relative_path.clone(),
             ..item
         });
     }
+    orphan_attachments.sort_by(|left, right| right.size_bytes.cmp(&left.size_bytes));
+    quarantined_attachments.sort_by(|left, right| right.size_bytes.cmp(&left.size_bytes));
     let orphan_bytes = orphan_attachments.iter().map(|item| item.size_bytes).sum();
+    let orphan_image_bytes = orphan_attachments
+        .iter()
+        .filter(|item| item.is_image)
+        .map(|item| item.size_bytes)
+        .sum();
+    let orphan_file_bytes = orphan_bytes - orphan_image_bytes;
+    let data_dir = app_data_dir(&app)?;
+    let database = db_file(&app)?;
+    let database_bytes = [
+        database.clone(),
+        PathBuf::from(format!("{}-wal", database.to_string_lossy())),
+        PathBuf::from(format!("{}-shm", database.to_string_lossy())),
+    ]
+    .iter()
+    .filter_map(|path| fs::metadata(path).ok())
+    .map(|metadata| metadata.len())
+    .sum();
+    let profile_bytes = directory_size(&data_dir.join("profile"))?;
+    let backup_bytes = directory_size(&backup_dir(&app)?)?;
+    let total_bytes = directory_size(&data_dir)?;
+    let known_bytes =
+        database_bytes + attachment_bytes + quarantined_bytes + profile_bytes + backup_bytes;
     Ok(StorageHealth {
         supported: true,
+        total_bytes,
+        database_bytes,
         attachment_bytes,
+        referenced_attachment_bytes,
+        referenced_image_bytes,
+        referenced_file_bytes,
         orphan_bytes,
+        orphan_image_bytes,
+        orphan_file_bytes,
         orphan_attachments,
         missing_references,
         quarantined_attachments,
         quarantined_bytes,
+        quarantined_image_bytes,
+        quarantined_file_bytes,
+        profile_bytes,
+        backup_bytes,
+        other_bytes: total_bytes.saturating_sub(known_bytes),
     })
 }
 
