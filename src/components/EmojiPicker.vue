@@ -14,7 +14,7 @@
             <circle cx="11" cy="11" r="8"></circle>
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
-          <input v-model="searchQuery" type="search" placeholder="搜索分类，如 DevOps、工作、自然..." class="emoji-search-input" />
+          <input v-model="searchQuery" type="search" placeholder="搜索图标或分类，如会议、猫、咖啡..." class="emoji-search-input" />
           <button v-if="searchQuery" class="search-clear" type="button" aria-label="清除搜索" @click="searchQuery = ''">×</button>
         </div>
       </div>
@@ -48,7 +48,8 @@
                 type="button"
                 class="emoji-item"
                 :class="{ 'is-selected': modelValue === emoji }"
-                :title="emojiLabel(emoji, category.label)"
+                :title="emojiLabel(emoji)"
+                :aria-label="emojiLabel(emoji)"
                 @click="selectEmoji(emoji)"
               >
                 {{ emoji }}
@@ -59,7 +60,7 @@
         <div v-else class="emoji-empty-state">
           <span>🔎</span>
           <strong>未找到匹配的分类</strong>
-          <small>试试“DevOps”、“工作”或“自然”</small>
+          <small>试试“会议”、“猫”或“咖啡”</small>
         </div>
       </div>
 
@@ -96,7 +97,7 @@ const categoryRefs = ref({})
 const recentEmojis = ref([])
 const RECENT_EMOJIS_KEY = 'simple-to-do.recent-group-emojis'
 
-const baseEmojiCategories = [
+const baseEmojiCategoriesRaw = [
   {
     id: 'devops', icon: '⚙️', shortLabel: 'DevOps', label: 'DevOps 与工程',
     keywords: ['devops', '开发', '工程', '部署', '运维', '云', '代码', 'ci', 'cd', 'docker', 'k8s'],
@@ -105,7 +106,7 @@ const baseEmojiCategories = [
   {
     id: 'work', icon: '💼', shortLabel: '工作', label: '工作与规划',
     keywords: ['工作', '项目', '计划', '会议', '学习', '办公'],
-    emojis: ['💼', '📁', '📂', '🗂️', '🗃️', '📝', '📋', '📌', '📍', '📅', '🗓️', '⏰', '⌛', '🎯', '📚', '📖', '📓', '📔', '✏️', '🖊️', '🖋️', '📎', '📐', '📏', '✂️', '📞', '☎️', '📧', '📨', '💬', '🗣️', '🤝', '🧠', '💡', '🏢', '🏠', '👥', '🧑‍🤝‍🧑', '🧑‍🏫', '🧑‍💼', '📢', '📣', '🔖', '📑']
+    emojis: ['💼', '📁', '📂', '🗂️', '🗃️', '📝', '📋', '📌', '📍', '📅', '🗓️', '⏰', '⌛', '🎯', '📚', '📖', '📓', '📔', '✏️', '🖊️', '🖋️', '📎', '📐', '📏', '✂️', '📞', '☎️', '📧', '📨', '💬', '🗣️', '🤝', '🧠', '💡', '🏢', '🏠', '👥', '🧑‍🤝‍🧑', '🧑‍🏫', '🧑‍💼', '📢', '📣', '🔖', '📑', '🧾', '🗒️', '📇', '📬', '📮', '🕘', '🧮', '🪧']
   },
   {
     id: 'faces', icon: '😀', shortLabel: '表情', label: '表情与心情',
@@ -120,27 +121,27 @@ const baseEmojiCategories = [
   {
     id: 'nature', icon: '🌿', shortLabel: '自然', label: '自然与天气',
     keywords: ['自然', '天气', '植物', '户外'],
-    emojis: ['🌿', '🌱', '🍀', '🌸', '🌻', '🌹', '🌳', '🌲', '🌴', '🌵', '🍂', '🌈', '☀️', '🌤️', '☁️', '🌧️', '⛈️', '❄️', '🌙', '⭐', '🌊', '🔥']
+    emojis: ['🌿', '🌱', '🪴', '🍀', '🌸', '🌺', '🌻', '🌹', '🌷', '🪻', '🌳', '🌲', '🌴', '🌵', '🍂', '🍁', '🌈', '☀️', '🌤️', '☁️', '🌧️', '⛈️', '❄️', '🌙', '⭐', '🌊', '🔥', '🌋', '🏕️', '🏞️', '🪨', '🐚']
   },
   {
     id: 'activities', icon: '🎨', shortLabel: '活动', label: '活动与兴趣',
     keywords: ['活动', '运动', '游戏', '娱乐', '音乐'],
-    emojis: ['🎨', '🎮', '🎲', '🧩', '🎵', '🎧', '🎬', '📷', '⚽', '🏀', '🎾', '🏃', '🚴', '🧘', '🎯', '🏆', '🥇', '🎉', '🎊', '🎁']
+    emojis: ['🎨', '🎮', '🕹️', '🎲', '🧩', '🎵', '🎸', '🎹', '🥁', '🎤', '🎧', '🎬', '🎭', '📷', '🎥', '⚽', '🏀', '🏈', '⚾', '🎾', '🏸', '🏃', '🚴', '🏊', '🧘', '🎯', '🏆', '🥇', '🎉', '🎊', '🎁']
   },
   {
     id: 'animals', icon: '🐶', shortLabel: '动物', label: '动物',
     keywords: ['动物', '宠物'],
-    emojis: ['🐶', '🐱', '🐭', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐧', '🦉', '🐝', '🦋', '🐳', '🐬']
+    emojis: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐧', '🦉', '🐝', '🦋', '🐳', '🐬', '🐟', '🐢', '🦄', '🐴', '🐔', '🦆', '🦅', '🐙', '🦖', '🦕', '🐞']
   },
   {
     id: 'food', icon: '🍜', shortLabel: '食物', label: '食物与生活',
     keywords: ['食物', '生活', '咖啡', '餐饮'],
-    emojis: ['☕', '🍵', '🧋', '🍎', '🍓', '🍉', '🥑', '🍞', '🍔', '🍕', '🍣', '🍜', '🍰', '🍪', '🍺', '🍷', '🛒', '🏡']
+    emojis: ['☕', '🍵', '🧋', '🥤', '🍎', '🍓', '🍉', '🍇', '🍊', '🍋', '🍌', '🥑', '🥦', '🍞', '🥐', '🍔', '🍕', '🍣', '🍜', '🍚', '🍛', '🍰', '🍪', '🍫', '🍺', '🍷', '🛒', '🏡']
   },
   {
     id: 'travel', icon: '✈️', shortLabel: '出行', label: '出行与地点',
     keywords: ['出行', '交通', '旅行', '地点'],
-    emojis: ['✈️', '🚀', '🚗', '🚕', '🚆', '🚇', '🚲', '🛵', '🚢', '🗺️', '🧭', '🏖️', '🏔️', '🏙️', '🏠', '🏥', '🏫', '🏬']
+    emojis: ['✈️', '🚀', '🚗', '🚕', '🚌', '🚙', '🚓', '🚚', '🚆', '🚇', '🚲', '🛵', '🚢', '🗺️', '🧭', '🏖️', '🏔️', '🏙️', '🏠', '🏥', '🏫', '🏬', '🏨', '⛽', '🅿️']
   },
   {
     id: 'people', icon: '🧑', shortLabel: '人物', label: '人物与关系',
@@ -156,14 +157,45 @@ const baseEmojiCategories = [
     id: 'flags', icon: '🚩', shortLabel: '旗帜', label: '旗帜与优先级',
     keywords: ['旗帜', '优先级', '国家', '标记'],
     emojis: ['🚩', '🏳️', '🏴', '🏁', '🎌', '🇨🇳', '🇺🇸', '🇯🇵', '🇬🇧', '🇫🇷', '🇩🇪', '🇰🇷', '🇸🇬', '🇦🇺', '🇨🇦', '🇮🇹', '🇪🇸', '🇧🇷', '🔴', '🟠', '🟡', '🟢', '🔵', '🟣']
+  },
+  {
+    id: 'health', icon: '💚', shortLabel: '健康', label: '健康与自我照顾',
+    keywords: ['健康', '运动', '医疗', '睡眠', '健身', '饮食', '心理'],
+    emojis: ['💚', '❤️', '💤', '🛌', '🧘', '🏋️', '🏃', '🚶', '🚴', '🥗', '💧', '🩺', '💊', '🩹', '🧴', '🪥', '🧼', '🛁', '🧖', '🧠', '🫀', '🦷', '👓', '😷']
+  },
+  {
+    id: 'home', icon: '🏠', shortLabel: '居家', label: '居家与日常',
+    keywords: ['居家', '家庭', '家务', '日常', '购物', '清洁'],
+    emojis: ['🏠', '🛋️', '🛏️', '🚪', '🪑', '🪟', '🧺', '🧽', '🗑️', '🪠', '🚿', '🧸', '📺', '📻', '🪜', '🧱', '🧊', '🧦', '🧳', '🪤', '🪹', '🪴']
+  },
+  {
+    id: 'finance', icon: '💰', shortLabel: '财务', label: '财务与消费',
+    keywords: ['财务', '金钱', '账单', '预算', '理财', '消费', '工资'],
+    emojis: ['💰', '💳', '💵', '💴', '💶', '💷', '🪙', '🏦', '💸', '💱', '💹', '💲', '🏧', '📒', '🧾', '🛍️', '💎', '🤲', '🪪', '🧮']
+  },
+  {
+    id: 'communication', icon: '💬', shortLabel: '沟通', label: '沟通与社交',
+    keywords: ['沟通', '消息', '电话', '邮件', '社交', '联系', '聊天'],
+    emojis: ['💬', '🗨️', '🗯️', '📲', '📳', '📴', '📵', '📶', '📠', '🛜', '👋', '🙏', '🤲', '🫶', '🤙', '🫡', '🤳', '📸', '📝', '🗒️']
   }
 ]
+
+function uniqueEmojiCategories(categories, excludedEmojis = new Set()) {
+  const usedEmojis = new Set(excludedEmojis)
+  return categories.map(category => ({
+    ...category,
+    emojis: category.emojis.filter(emoji => !usedEmojis.has(emoji) && usedEmojis.add(emoji))
+  })).filter(category => category.emojis.length)
+}
+
+const baseEmojiCategories = uniqueEmojiCategories(baseEmojiCategoriesRaw)
+const emojiMetadata = ref({})
 
 const emojiCategories = computed(() => {
   const recentCategory = recentEmojis.value.length
     ? [{ id: 'recent', icon: '🕘', shortLabel: '最近', label: '最近使用', keywords: ['最近', '常用'], emojis: recentEmojis.value }]
     : []
-  return [...recentCategory, ...baseEmojiCategories]
+  return [...recentCategory, ...uniqueEmojiCategories(baseEmojiCategories, new Set(recentEmojis.value))]
 })
 
 const tabCategories = computed(() => {
@@ -174,9 +206,15 @@ const tabCategories = computed(() => {
 const filteredCategories = computed(() => {
   const query = searchQuery.value.trim().toLowerCase()
   if (!query) return emojiCategories.value
-  return emojiCategories.value.filter(category =>
-    `${category.label} ${category.shortLabel} ${category.keywords.join(' ')} ${category.emojis.join(' ')}`.toLowerCase().includes(query)
-  )
+  return emojiCategories.value
+    .map(category => {
+      const categoryMatches = `${category.label} ${category.shortLabel} ${category.keywords.join(' ')}`.toLowerCase().includes(query)
+      const emojis = categoryMatches
+        ? category.emojis
+        : category.emojis.filter(emoji => emojiSearchText(emoji).includes(query))
+      return { ...category, emojis }
+    })
+    .filter(category => category.emojis.length)
 })
 
 const pickerStyle = computed(() => {
@@ -228,8 +266,39 @@ const emojiLabels = {
   '🛡️': '安全防护', '🔒': '权限控制', '🔐': '密钥与加密', '🔑': '访问密钥', '🚨': '告警事故', '🐛': '缺陷修复', '🪲': '问题追踪', '✅': '验证通过', '☑️': '待办完成', '♻️': '重构优化', '🧹': '清理维护', '🧯': '应急处理', '🔄': '持续集成', '🔃': '同步更新', '⏱️': '耗时监控', '📤': '发布上线', '📥': '拉取更新'
 }
 
-function emojiLabel(emoji, categoryLabel) {
-  return emojiLabels[emoji] || `${categoryLabel}图标`
+const emojiSearchKeywords = {
+  '📅': '日历 日期 日程 会议', '🗓️': '日历 日期 周计划 月计划', '⏰': '闹钟 提醒 时间', '📝': '笔记 记录 写作', '📋': '清单 待办 检查', '🎯': '目标 计划', '📚': '学习 书籍 阅读', '📞': '电话 联系 客户', '📧': '邮件 邮箱', '💬': '消息 聊天 沟通',
+  '🐶': '狗 狗狗 宠物', '🐱': '猫 猫咪 宠物', '🐼': '熊猫', '🐰': '兔子 宠物', '🐸': '青蛙', '🐧': '企鹅', '🦋': '蝴蝶', '🐳': '鲸鱼 海洋',
+  '☕': '咖啡 饮品 休息', '🍵': '茶 喝茶 饮品', '🧋': '奶茶 饮品', '🍜': '面条 吃饭 餐饮', '🍔': '汉堡 快餐', '🍕': '披萨', '🍣': '寿司', '🍰': '蛋糕 甜品 生日', '🛒': '购物 买菜 超市',
+  '✈️': '飞机 出差 旅行', '🚗': '汽车 开车 出行', '🚆': '火车 高铁 通勤', '🚲': '自行车 骑行', '🚢': '轮船 邮轮', '🗺️': '地图 地点 导航', '🏥': '医院 看病 医疗', '🏫': '学校 上学',
+  '💤': '睡眠 睡觉 休息', '🏋️': '健身 力量训练', '🏃': '跑步 运动', '🧘': '冥想 瑜伽 放松', '💧': '喝水 饮水', '💊': '药物 吃药 医疗', '🩺': '医生 体检 医疗',
+  '💰': '钱 金钱 财务 理财', '💳': '银行卡 信用卡 支付', '🧾': '账单 发票 报销', '🏦': '银行', '📈': '增长 投资 股票',
+  '🏠': '家 居家 家庭', '🧹': '打扫 清洁 家务', '🧺': '洗衣 家务', '🗑️': '垃圾 清理', '🔑': '钥匙 门锁',
+  '🎵': '音乐 听歌', '🎮': '游戏 娱乐', '🎬': '电影 追剧', '📷': '拍照 摄影', '⚽': '足球 运动', '🏀': '篮球 运动', '🎨': '绘画 艺术 创作',
+  '🌿': '植物 自然 绿色', '🌸': '花朵 春天', '☀️': '太阳 晴天 天气', '🌧️': '下雨 雨天 天气', '🌙': '月亮 夜晚 睡眠', '🔥': '火焰 热门 紧急'
+}
+
+function normalizeEmoji(emoji) {
+  return emoji.replace(/\uFE0F/g, '')
+}
+
+function emojiMetadataFor(emoji) {
+  return emojiMetadata.value[emoji] || emojiMetadata.value[normalizeEmoji(emoji)]
+}
+
+function emojiSearchText(emoji) {
+  const metadata = emojiMetadataFor(emoji)
+  return `${emoji} ${emojiLabels[emoji] || ''} ${emojiSearchKeywords[emoji] || ''} ${metadata?.annotation || ''} ${(metadata?.tags || []).join(' ')}`.toLowerCase()
+}
+
+function emojiLabel(emoji) {
+  return emojiMetadataFor(emoji)?.annotation || emojiLabels[emoji] || 'Emoji 图标'
+}
+
+async function loadEmojiMetadata() {
+  const module = await import('emoji-picker-element-data/zh/cldr/data.json')
+  const metadataByEmoji = Object.fromEntries(module.default.map(item => [item.emoji, item]))
+  emojiMetadata.value = metadataByEmoji
 }
 
 function saveRecentEmojis() {
@@ -245,12 +314,17 @@ function rememberEmoji(emoji) {
   saveRecentEmojis()
 }
 
-onMounted(() => {
+onMounted(async () => {
   try {
     const saved = JSON.parse(localStorage.getItem(RECENT_EMOJIS_KEY) || '[]')
     if (Array.isArray(saved)) recentEmojis.value = saved.filter(item => typeof item === 'string').slice(0, 24)
   } catch (_) {
     recentEmojis.value = []
+  }
+  try {
+    await loadEmojiMetadata()
+  } catch (_) {
+    // 中文元数据加载失败时保留内置名称和搜索关键词。
   }
 })
 
