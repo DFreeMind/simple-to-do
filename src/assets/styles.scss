@@ -1574,9 +1574,9 @@ body.is-resizing {
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: 68px minmax(0, 1fr);
+  grid-template-columns: 52px minmax(0, 1fr);
   align-items: center;
-  gap: 11px;
+  gap: 10px;
   width: min(100%, 350px);
   min-height: 76px;
   margin: -2px auto 0;
@@ -1589,8 +1589,8 @@ body.is-resizing {
 }
 .clock-stage__garden-art {
   display: grid;
-  width: 68px;
-  height: 68px;
+  width: 52px;
+  height: 65px;
   place-items: end center;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--accent) 13%, transparent);
@@ -1598,8 +1598,8 @@ body.is-resizing {
   background: color-mix(in srgb, var(--accent-soft) 75%, #fff);
 }
 .clock-stage__garden-art .focus-stage-artwork {
-  width: 68px;
-  height: 68px;
+  width: 52px;
+  height: 65px;
   margin: 0;
 }
 .clock-stage__garden-art .focus-stage-artwork__light { opacity: .36; }

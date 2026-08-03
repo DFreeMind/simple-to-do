@@ -52,7 +52,7 @@
             </div>
             <div class="clock-stage__garden-copy">
               <div class="clock-stage__garden-heading">
-                <span><Leaf :size="12" /> 今日花</span>
+                <span><Leaf :size="12" /> 今日花 · {{ gardenSpeciesName }}</span>
                 <strong>{{ gardenStageName }}</strong>
               </div>
               <p><b>{{ gardenToday.growthMinutes }} / {{ gardenToday.goalMinutes }}</b> 分钟 · 专注会让它继续长大</p>
@@ -337,7 +337,7 @@
         <section class="clock-side-card clock-side-card--stats">
           <header><span class="clock-side-card__icon"><BarChart3 :size="19" /></span><span class="clock-side-card__heading"><h2>今日状态</h2><small>当前投入与今日成长</small></span><button class="clock-side-card__history-link" type="button" @click="store.setClockView('history')">回顾 <ChevronDown :size="14" /></button></header>
           <div class="clock-today clock-today--garden">
-            <div><span>今日有效专注</span><strong>{{ gardenToday.growthMinutes }} / {{ gardenToday.goalMinutes }} 分钟</strong><small>{{ gardenStageName }} · {{ todayCompletedCount }} 次完成</small></div>
+            <div><span>今日有效专注</span><strong>{{ gardenToday.growthMinutes }} / {{ gardenToday.goalMinutes }} 分钟</strong><small>{{ gardenSpeciesName }} · {{ gardenStageName }} · {{ todayCompletedCount }} 次完成</small></div>
             <FocusStageArtwork :species-id="gardenToday.speciesId" :stage="gardenToday.stage" motion="static" />
           </div>
           <div class="clock-garden-progress" role="progressbar" :aria-valuenow="gardenProgress" aria-valuemin="0" aria-valuemax="100"><i :style="{ width: `${gardenProgress}%` }" /></div>
@@ -384,7 +384,7 @@ import { openFocusController } from '@/services/platform'
 import RhythmWorkspace from './RhythmWorkspace.vue'
 import FocusHistoryWorkspace from './FocusHistoryWorkspace.vue'
 import FocusAchievementWorkspace from './FocusAchievementWorkspace.vue'
-import { FOCUS_GARDEN_STAGES } from '@/utils/focusGarden.mjs'
+import { FOCUS_GARDEN_SPECIES, FOCUS_GARDEN_STAGES } from '@/utils/focusGarden.mjs'
 
 const FocusStageArtwork = defineAsyncComponent(() => import('./FocusStageArtwork.vue'))
 const store = useTaskStore()
@@ -407,6 +407,7 @@ let visualClockFrame = null
 const activeSession = computed(() => store.activeFocusSession)
 const pendingBreak = computed(() => store.focusPendingBreak)
 const gardenToday = computed(() => store.focusGardenToday)
+const gardenSpeciesName = computed(() => FOCUS_GARDEN_SPECIES.find(item => item.id === gardenToday.value.speciesId)?.name || '小雏菊')
 const gardenStageName = computed(() => FOCUS_GARDEN_STAGES.find(item => item.id === gardenToday.value.stage)?.name || '种子')
 const gardenStageIndex = computed(() => Math.max(0, FOCUS_GARDEN_STAGES.findIndex(item => item.id === gardenToday.value.stage)))
 const gardenProgress = computed(() => Math.min(100, Math.round((gardenToday.value.growthMinutes / gardenToday.value.goalMinutes) * 100)))
