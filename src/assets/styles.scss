@@ -1771,9 +1771,11 @@ body.is-resizing {
 
 /* 节律中心：先选择想保留的节奏，再按需展开规则，避免把高频入口做成设置表格。 */
 .rhythm-workspace {
-  display: block;
+  display: grid;
   width: 100%;
   min-height: 0;
+  align-content: start;
+  justify-items: stretch;
   padding: 18px;
   overflow: auto;
   background:
@@ -1784,6 +1786,7 @@ body.is-resizing {
 .rhythm-shell {
   width: min(100%, 1000px);
   margin: 0 auto;
+  align-self: start;
 }
 
 .rhythm-header {
@@ -1933,7 +1936,7 @@ body.is-resizing {
 .rhythm-dashboard {
   display: grid;
   grid-template-columns: minmax(0, 1.12fr) minmax(360px, .88fr);
-  align-items: stretch;
+  align-items: start;
   gap: 12px;
 }
 
@@ -1964,15 +1967,7 @@ body.is-resizing {
 .rhythm-now--count-3 { --rhythm-dial-size: 108px; --rhythm-card-height: 108px; }
 
 .rhythm-now::after {
-  position: absolute;
-  top: -95px;
-  right: -90px;
-  width: 240px;
-  height: 240px;
-  border: 1px dashed var(--accent-20-fallback);
-  border-radius: 50%;
-  content: '';
-  pointer-events: none;
+  display: none;
 }
 
 .rhythm-now > header {
@@ -2026,32 +2021,19 @@ body.is-resizing {
   font-size: 10px;
 }
 
-.rhythm-now__legend {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 12px 0 0;
-  color: var(--text-muted);
-  font-size: 10px;
-  line-height: 1.45;
-}
-
-.rhythm-now__legend svg { flex: 0 0 auto; color: var(--accent-strong); }
-
 .rhythm-timeline {
   position: relative;
   z-index: var(--z-base);
   display: grid;
+  min-width: 0;
   gap: 9px;
   margin-top: 15px;
 }
 
 .rhythm-now--count-1 .rhythm-timeline { flex: 1; min-height: 0; }
-.rhythm-now--count-1 .rhythm-timeline-card { min-height: 0; height: 100%; grid-template-columns: 206px minmax(0, 1fr); gap: 22px; padding: 26px; }
-.rhythm-now--count-1 { --rhythm-dial-size: 206px; }
-.rhythm-now--count-1 .rhythm-timeline-card__content { align-content: center; gap: 14px; }
+.rhythm-now--count-1 .rhythm-timeline-card { min-height: 0; grid-template-columns: 182px minmax(0, 1fr); gap: 22px; padding: 22px; }
+.rhythm-now--count-1 { --rhythm-dial-size: 182px; }
+.rhythm-now--count-1 .rhythm-timeline-card__content { align-content: center; gap: 12px; }
 .rhythm-now--count-1 .rhythm-timeline-card__title { gap: 10px; }
 .rhythm-now--count-1 .rhythm-timeline-card__title > span { width: 38px; height: 38px; border-radius: 11px; }
 .rhythm-now--count-1 .rhythm-timeline-card__title > span svg { width: 21px; height: 21px; }
@@ -2067,13 +2049,14 @@ body.is-resizing {
   display: grid;
   grid-template-columns: var(--rhythm-dial-size) minmax(0, 1fr);
   align-items: center;
+  min-width: 0;
   gap: 14px;
   min-height: var(--rhythm-card-height);
   padding: 10px 13px 10px 10px;
   border: 1px solid var(--divider-soft);
   border-radius: 15px;
   background: var(--surface-90-fallback);
-  box-shadow: 0 3px 8px rgba(35, 83, 74, .035);
+  box-shadow: none;
   transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
 }
 
@@ -2099,16 +2082,16 @@ body.is-resizing {
   place-items: center;
   padding: 0;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, .98) 0 57%, transparent 57.5%);
+  background: var(--surface);
   color: var(--text);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .9), 0 12px 25px color-mix(in srgb, var(--rhythm-tone) 9%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rhythm-tone) 14%, var(--divider-soft));
 }
 
-.rhythm-timeline-card__dial::before { position: absolute; z-index: 0; inset: -6px; border: 1px solid color-mix(in srgb, var(--rhythm-tone) 18%, transparent); border-radius: 50%; content: ''; }
-.rhythm-timeline-card__dial::after { position: absolute; z-index: 0; inset: 13px; border: 1px dashed color-mix(in srgb, var(--rhythm-tone) 17%, transparent); border-radius: 50%; content: ''; }
+.rhythm-timeline-card__dial::before,
+.rhythm-timeline-card__dial::after { display: none; }
 .rhythm-timeline-card__ring { position: absolute; inset: 0; width: 100%; height: 100%; }
-.rhythm-timeline-card__track, .rhythm-timeline-card__progress { fill: none; stroke-width: 5; }
-.rhythm-timeline-card__track { stroke: color-mix(in srgb, var(--rhythm-tone) 13%, transparent); }
+.rhythm-timeline-card__track, .rhythm-timeline-card__progress { fill: none; stroke-width: 7; }
+.rhythm-timeline-card__track { stroke: color-mix(in srgb, var(--rhythm-tone) 11%, var(--divider-soft)); }
 .rhythm-timeline-card__progress { stroke: var(--rhythm-tone); stroke-linecap: round; transition: stroke-dashoffset .8s linear; will-change: stroke-dashoffset; }
 .rhythm-timeline-card__fixed-mark { fill: none; stroke: var(--rhythm-tone); stroke-linecap: round; stroke-width: 3; }
 
@@ -2117,7 +2100,7 @@ body.is-resizing {
   z-index: 1;
   display: grid;
   justify-items: center;
-  gap: 3px;
+  gap: 5px;
   max-width: 94px;
   text-align: center;
 }
@@ -2134,34 +2117,30 @@ body.is-resizing {
 
 .rhythm-timeline-card__due-icon small { color: var(--rhythm-tone); font-size: 11px; font-weight: 720; }
 
-.rhythm-timeline-card__dial-content strong { max-width: 100%; overflow: hidden; color: var(--text); font-family: ui-rounded, "SF Pro Rounded", "Microsoft YaHei", sans-serif; font-size: 31px; font-weight: 730; font-variant-numeric: tabular-nums; letter-spacing: -.065em; text-overflow: ellipsis; white-space: nowrap; }
+.rhythm-timeline-card__dial-content strong { max-width: 100%; overflow: hidden; color: var(--text); font-family: ui-rounded, "SF Pro Rounded", "Microsoft YaHei", sans-serif; font-size: 36px; font-weight: 730; font-variant-numeric: tabular-nums; letter-spacing: -.065em; text-overflow: ellipsis; white-space: nowrap; }
+.rhythm-timeline-card__dial-content strong.is-status { font-size: 25px; letter-spacing: -.04em; }
 .rhythm-timeline-card__dial-content small { color: var(--text-muted); font-size: 10px; line-height: 1.3; }
-.rhythm-timeline-card__dial-content .rhythm-timeline-card__dial-label { color: var(--rhythm-tone); font-size: 10px; font-weight: 700; }
+.rhythm-timeline-card__dial-content .rhythm-timeline-card__dial-label { color: var(--rhythm-tone); font-size: 10px; font-weight: 720; }
 
-.rhythm-timeline-card__content { display: grid; min-width: 0; align-content: center; gap: 6px; }
+.rhythm-timeline-card__content { display: grid; min-width: 0; align-content: center; gap: 8px; }
 .rhythm-timeline-card__content > header { display: flex; align-items: center; justify-content: space-between; gap: 9px; }
 .rhythm-timeline-card__title { display: inline-flex; align-items: center; min-width: 0; gap: 7px; }
 .rhythm-timeline-card__title > span { display: grid; width: 27px; height: 27px; flex: 0 0 auto; place-items: center; border-radius: 8px; background: var(--rhythm-tone-soft); color: var(--rhythm-tone); }
 .rhythm-timeline-card__title strong { overflow: hidden; color: var(--text); font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
 .rhythm-timeline-card__content > header > button { display: inline-flex; min-height: 28px; flex: 0 0 auto; align-items: center; gap: 4px; padding: 0 8px; border: 1px solid var(--divider-soft); border-radius: 8px; background: var(--surface); color: var(--text-muted); font-size: 9px; font-weight: 650; }
 .rhythm-timeline-card__content > header > button:hover { border-color: var(--rhythm-tone); color: var(--rhythm-tone); }
-.rhythm-timeline-card__headline { margin: 0; color: var(--text-muted); font-size: 11px; line-height: 1.45; }
-.rhythm-timeline-card__meta { display: flex; flex-wrap: wrap; gap: 5px 8px; }
-.rhythm-timeline-card__meta span { display: inline-flex; min-width: 0; align-items: center; gap: 4px; color: var(--text-muted); font-size: 9px; line-height: 1.3; }
-.rhythm-timeline-card__meta span:nth-child(2) { color: var(--rhythm-tone); font-weight: 680; }
+.rhythm-timeline-card__content > header > .rhythm-timeline-card__pause { width: 30px; min-height: 30px; padding: 0; justify-content: center; border-color: color-mix(in srgb, var(--rhythm-tone) 24%, var(--divider-soft)); color: var(--rhythm-tone); }
+.rhythm-timeline-card__meta { display: grid; gap: 5px; }
+.rhythm-timeline-card__meta span { display: inline-flex; min-width: 0; align-items: center; gap: 5px; color: var(--text-muted); font-size: 10px; line-height: 1.35; }
+.rhythm-timeline-card__meta span:first-child { color: var(--rhythm-tone); font-weight: 680; }
 .rhythm-timeline-card__meta svg { flex: 0 0 auto; color: var(--rhythm-tone); }
 
-.rhythm-timeline-card__controls { display: grid; gap: 7px; margin-top: 5px; padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--rhythm-tone) 16%, var(--divider-soft)); }
-.rhythm-timeline-card__controls-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.rhythm-timeline-card__controls-heading > span { color: var(--text-muted); font-size: 10px; font-weight: 680; }
-.rhythm-timeline-card__controls-heading > strong { overflow: hidden; color: var(--rhythm-tone); font-size: 10px; font-weight: 700; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
-.rhythm-timeline-card__controls-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-.rhythm-timeline-card__controls-actions button { display: inline-flex; min-width: 0; min-height: 34px; align-items: center; justify-content: center; gap: 4px; padding: 0 8px; border: 1px solid var(--divider-soft); border-radius: 9px; background: var(--surface); color: var(--text-muted); font-size: 10px; font-weight: 680; transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast); }
+.rhythm-timeline-card__controls { margin-top: 2px; }
+.rhythm-timeline-card__controls-actions { display: flex; gap: 6px; }
+.rhythm-timeline-card__controls-actions button { display: inline-flex; width: 36px; min-width: 36px; min-height: 30px; align-items: center; justify-content: center; padding: 0; border: 1px solid var(--divider-soft); border-radius: 8px; background: var(--surface); color: var(--text-muted); font-size: 10px; font-weight: 720; font-variant-numeric: tabular-nums; transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast); }
 .rhythm-timeline-card__controls-actions button:hover { border-color: var(--rhythm-tone); background: var(--rhythm-tone-soft); color: var(--rhythm-tone); }
 .rhythm-timeline-card__controls-actions .rhythm-action-primary { border-color: var(--rhythm-tone); background: var(--rhythm-tone); color: #fff; }
 .rhythm-timeline-card__controls-actions .rhythm-action-primary:hover { border-color: var(--rhythm-tone); background: var(--rhythm-tone); color: #fff; filter: brightness(.96); }
-.rhythm-timeline-card__controls-actions.is-single-action { grid-template-columns: minmax(0, 1fr); }
-
 .rhythm-timeline-card__actions { grid-column: 2; display: flex; flex-wrap: wrap; gap: 5px; margin-top: -3px; }
 .rhythm-timeline-card__actions button { min-height: 27px; padding: 0 8px; border: 1px solid var(--divider-soft); border-radius: 7px; background: var(--surface); color: var(--text-muted); font-size: 9px; font-weight: 650; }
 .rhythm-timeline-card__actions .rhythm-action-primary { display: inline-flex; align-items: center; gap: 4px; border-color: var(--rhythm-tone); background: var(--rhythm-tone); color: #fff; }
@@ -2175,14 +2154,11 @@ body.is-resizing {
 .rhythm-now--count-3 .rhythm-timeline-card__dial-content strong { font-size: 21px; }
 .rhythm-now--count-3 .rhythm-timeline-card__dial-content small { font-size: 8px; }
 .rhythm-now--count-3 .rhythm-timeline-card__content { gap: 4px; }
-.rhythm-now--count-3 .rhythm-timeline-card__content > p { display: none; }
 .rhythm-now--count-3 .rhythm-timeline-card__title strong { font-size: 12px; }
 .rhythm-now--count-3 .rhythm-timeline-card__title > span { width: 24px; height: 24px; }
 .rhythm-now--count-3 .rhythm-timeline-card__meta { gap: 3px 6px; }
 .rhythm-now--count-3 .rhythm-timeline-card__meta span { font-size: 8px; }
-.rhythm-now--count-3 .rhythm-timeline-card__headline { font-size: 9px; }
-.rhythm-now--count-3 .rhythm-timeline-card__controls { gap: 5px; margin-top: 2px; padding-top: 7px; }
-.rhythm-now--count-3 .rhythm-timeline-card__controls-heading > span, .rhythm-now--count-3 .rhythm-timeline-card__controls-heading > strong { font-size: 8px; }
+.rhythm-now--count-3 .rhythm-timeline-card__controls { margin-top: 1px; }
 .rhythm-now--count-3 .rhythm-timeline-card__controls-actions { gap: 4px; }
 .rhythm-now--count-3 .rhythm-timeline-card__controls-actions button { min-height: 27px; padding: 0 5px; font-size: 8px; }
 
@@ -2686,14 +2662,6 @@ body.is-resizing {
   margin-bottom: 14px;
 }
 
-.rhythm-library > header > div > p:last-child {
-  max-width: 285px;
-  margin: 5px 0 0;
-  color: var(--text-muted);
-  font-size: 10px;
-  line-height: 1.45;
-}
-
 .rhythm-library h2 {
   margin: 0;
   color: var(--text);
@@ -2717,7 +2685,7 @@ body.is-resizing {
   --rhythm-tone-soft: var(--accent-soft);
   position: relative;
   min-width: 0;
-  min-height: 104px;
+  min-height: 78px;
   border: 1px solid var(--divider-soft);
   border-radius: 14px;
   background: var(--surface);
@@ -2748,8 +2716,8 @@ body.is-resizing {
   align-items: center;
   gap: 9px;
   width: 100%;
-  min-height: 102px;
-  padding: 11px 30px 11px 11px;
+  min-height: 76px;
+  padding: 10px 36px 10px 11px;
   border-radius: inherit;
   background: transparent;
   color: var(--text);
@@ -2781,22 +2749,10 @@ body.is-resizing {
 }
 
 .rhythm-preset__copy small {
-  display: -webkit-box;
   overflow: hidden;
   color: var(--text-muted);
   font-size: 9px;
-  line-height: 1.45;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.rhythm-preset__copy em {
-  overflow: hidden;
-  color: var(--rhythm-tone);
-  font-size: 9px;
-  font-style: normal;
-  font-weight: 650;
-  line-height: 1.35;
+  line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2949,7 +2905,7 @@ body.is-resizing {
   display: grid;
   width: 38px;
   height: 38px;
-  margin-left: 0;
+  margin-left: auto;
   place-items: center;
   border: 1px solid var(--accent, #2f8f86);
   border-radius: 11px;
@@ -2988,6 +2944,11 @@ body.is-resizing {
 .rhythm-editor-form > section:last-child { border-bottom: 0; }
 .rhythm-editor-sheet__body h3 { margin: 0; color: var(--text, #17211f); font-size: 14px; }
 .rhythm-editor-section__eyebrow { margin: 0 0 3px; color: var(--accent-strong, #1f6f68); font-size: 10px; font-weight: 700; letter-spacing: .06em; }
+.rhythm-editor-section__heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.rhythm-copy-randomize { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 4px; min-height: 28px; padding: 0 8px; border: 1px solid var(--accent-24-fallback, rgba(47, 143, 134, .24)); border-radius: 8px; background: var(--accent-soft, #e5f5f2); color: var(--accent-strong, #1f6f68); font-size: 10px; font-weight: 700; }
+.rhythm-copy-randomize:hover { border-color: var(--accent, #2f8f86); background: color-mix(in srgb, var(--accent-soft, #e5f5f2) 72%, #fff); }
+.rhythm-copy-randomize:focus-visible { outline: 0; box-shadow: 0 0 0 3px var(--accent-12-fallback, rgba(47, 143, 134, .12)); }
+.rhythm-copy-help { margin: -3px 0 1px; color: var(--text-subtle, #8c9996); font-size: 10px; line-height: 1.45; }
 
 .rhythm-trigger-picker {
   display: grid;
@@ -3235,6 +3196,20 @@ body.is-resizing {
   outline-offset: 2px;
 }
 
+@media (max-width: 1100px) {
+  .rhythm-dashboard { grid-template-columns: minmax(0, 1.14fr) minmax(300px, .86fr); }
+  .rhythm-library .rhythm-preset-grid { grid-template-columns: 1fr; }
+  .rhythm-now--count-1 { --rhythm-dial-size: 108px; --rhythm-card-height: 108px; }
+  .rhythm-now--count-1 .rhythm-timeline-card { grid-template-columns: 108px minmax(0, 1fr); gap: 12px; padding: 12px; }
+  .rhythm-now--count-1 .rhythm-timeline-card__title { gap: 7px; }
+  .rhythm-now--count-1 .rhythm-timeline-card__title > span { width: 30px; height: 30px; border-radius: 9px; }
+  .rhythm-now--count-1 .rhythm-timeline-card__title > span svg { width: 17px; height: 17px; }
+  .rhythm-now--count-1 .rhythm-timeline-card__title strong { font-size: 16px; }
+  .rhythm-now--count-1 .rhythm-timeline-card__content { gap: 8px; }
+  .rhythm-now--count-1 .rhythm-timeline-card__meta { gap: 6px; }
+  .rhythm-now--count-1 .rhythm-timeline-card__meta span { font-size: 11px; }
+}
+
 @media (max-width: 960px) {
   .rhythm-dashboard {
     grid-template-columns: 1fr;
@@ -3247,7 +3222,9 @@ body.is-resizing {
   .rhythm-preset-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
 
+@media (max-width: 960px) {
   .rhythm-editor-sheet__body {
     grid-template-columns: 1fr;
     overflow: auto;
@@ -3263,6 +3240,9 @@ body.is-resizing {
   .rhythm-dashboard { display: block; }
   .rhythm-library { margin-top: 10px; }
   .rhythm-timeline-card { grid-template-columns: 96px minmax(0, 1fr); gap: 10px; min-height: 104px; padding: 8px; }
+  .rhythm-now--count-1 { --rhythm-dial-size: 96px; --rhythm-card-height: 104px; }
+  .rhythm-now--count-1 .rhythm-timeline-card { grid-template-columns: 96px minmax(0, 1fr); gap: 10px; padding: 8px; }
+  .rhythm-now--count-1 .rhythm-timeline-card__title strong { font-size: 14px; }
   .rhythm-timeline-card__dial { width: 96px; height: 96px; }
   .rhythm-timeline-card__dial-content strong { font-size: 18px; }
   .rhythm-timeline-card__content > p { white-space: normal; }

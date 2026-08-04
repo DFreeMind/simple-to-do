@@ -60,21 +60,18 @@ struct ReminderWindowCoordinator {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum ReminderWindowKind {
     FocusCompletion,
-    Rhythm,
 }
 
 impl ReminderWindowKind {
     fn label(self) -> &'static str {
         match self {
             Self::FocusCompletion => "focus-reminder",
-            Self::Rhythm => "rhythm-reminder",
         }
     }
 
     fn priority(self) -> u8 {
         match self {
             Self::FocusCompletion => 200,
-            Self::Rhythm => 100,
         }
     }
 }
@@ -92,7 +89,6 @@ struct FocusReminderState {
 
 struct RhythmReminderState {
     revision: AtomicU64,
-    ready_revision: AtomicU64,
     pending: Mutex<Option<RhythmReminderPayload>>,
 }
 
@@ -150,7 +146,6 @@ impl Default for RhythmReminderState {
     fn default() -> Self {
         Self {
             revision: AtomicU64::new(0),
-            ready_revision: AtomicU64::new(0),
             pending: Mutex::new(None),
         }
     }
@@ -275,6 +270,53 @@ fn send_interactive_task_reminder(
     #[cfg(not(target_os = "windows"))]
     {
         let _ = (app, task_id, title, body);
+        Ok(false)
+    }
+}
+
+/// 节律提醒与任务提醒保持相同的处理闭环：系统通知只负责把用户带回应用，
+/// 提醒本身保留为前端的待处理项，避免通知失败或关闭后被误判为已处理。
+fn send_interactive_rhythm_reminder(
+    app: tauri::AppHandle,
+    reminder_id: String,
+    title: String,
+    body: String,
+    sound_enabled: bool,
+) -> Result<bool, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let mut notification = Notification::new();
+        notification
+            .app_id("cn.duqimeng.simpletodo")
+            .summary(&title)
+            .body(&body);
+        if sound_enabled {
+            notification.sound_name("Default");
+        }
+        let handle = notification
+            .show()
+            .map_err(|err| format!("发送 Windows 节律提醒失败: {err}"))?;
+
+        std::thread::spawn(move || {
+            let _ = handle.wait_for_response(move |response: &NotificationResponse| {
+                if matches!(
+                    response,
+                    NotificationResponse::Default | NotificationResponse::Action(_)
+                ) {
+                    show_main_window(&app);
+                    let _ = app.emit(
+                        "rhythm-reminder:open",
+                        serde_json::json!({ "reminderId": reminder_id }),
+                    );
+                }
+            });
+        });
+        return Ok(true);
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (app, reminder_id, title, body, sound_enabled);
         Ok(false)
     }
 }
@@ -472,10 +514,6 @@ fn show_coordinated_reminder(
         window
             .set_always_on_top(always_on_top)
             .map_err(|error| format!("设置专注提醒窗口置顶状态失败: {error}"))?;
-    } else {
-        window
-            .set_always_on_top(true)
-            .map_err(|error| format!("设置节律提醒窗口置顶状态失败: {error}"))?;
     }
     separate_reminder_from_focus_controller(app, label);
     window
@@ -506,24 +544,6 @@ fn fallback_queued_reminder(app: &tauri::AppHandle, kind: ReminderWindowKind, po
                 always_on_top: payload.always_on_top,
             };
             report_focus_reminder_failure(app, &schedule, popup_error);
-        }
-    } else {
-        let payload = app
-            .state::<RhythmReminderState>()
-            .pending
-            .lock()
-            .ok()
-            .and_then(|mut pending| pending.take());
-        if let Some(payload) = payload {
-            send_rhythm_system_notification(&payload);
-            let _ = app.emit_to(
-                "main",
-                "rhythm-reminder:action",
-                serde_json::json!({
-                    "reminderId": payload.reminder_id,
-                    "action": "dismiss"
-                }),
-            );
         }
     }
 }
@@ -927,25 +947,31 @@ fn schedule_rhythm_reminder(
         );
 
         if !main_is_focused && schedule.notification_enabled {
-            let payload = RhythmReminderPayload {
-                revision: 0,
-                reminder_id: schedule.reminder_id.clone(),
-                title: schedule.title.clone(),
-                message: schedule.message.clone(),
-                trigger_label: schedule.trigger_label.clone(),
-                sound_enabled: schedule.sound_enabled,
-            };
-            if let Err(error) = deliver_rhythm_reminder(app.clone(), payload.clone()) {
+            if let Err(error) = show_global_rhythm_reminder(
+                app.clone(),
+                schedule.reminder_id.clone(),
+                schedule.title.clone(),
+                schedule.message.clone(),
+                schedule.trigger_label.clone(),
+                schedule.sound_enabled,
+            ) {
                 eprintln!("[RhythmReminder] {error}");
-                send_rhythm_system_notification(&payload);
-                let _ = app.emit_to(
-                    "main",
-                    "rhythm-reminder:action",
-                    serde_json::json!({
-                        "reminderId": schedule.reminder_id,
-                        "action": "dismiss"
-                    }),
+                let payload = RhythmReminderPayload {
+                    revision: 0,
+                    reminder_id: schedule.reminder_id.clone(),
+                    title: schedule.title.clone(),
+                    message: schedule.message.clone(),
+                    trigger_label: schedule.trigger_label.clone(),
+                    sound_enabled: schedule.sound_enabled,
+                };
+                let _ = send_interactive_rhythm_reminder(
+                    app.clone(),
+                    payload.reminder_id.clone(),
+                    payload.title.clone(),
+                    payload.message.clone(),
+                    payload.sound_enabled,
                 );
+                send_rhythm_system_notification(&payload);
             }
         }
         return;
@@ -1197,29 +1223,57 @@ fn send_rhythm_system_notification(payload: &RhythmReminderPayload) {
     }
 }
 
-fn deliver_rhythm_reminder(
+#[tauri::command]
+fn present_rhythm_reminder(
     app: tauri::AppHandle,
-    mut payload: RhythmReminderPayload,
+    reminder_id: String,
+    title: String,
+    message: String,
+    trigger_label: String,
+    notification_enabled: bool,
+    sound_enabled: bool,
+) -> Result<String, String> {
+    if main_window_is_focused(&app) {
+        return Ok("in-app".to_string());
+    }
+    if !notification_enabled {
+        return Ok("disabled".to_string());
+    }
+    show_global_rhythm_reminder(
+        app,
+        reminder_id,
+        title,
+        message,
+        trigger_label,
+        sound_enabled,
+    )?;
+    Ok("background".to_string())
+}
+
+fn show_global_rhythm_reminder(
+    app: tauri::AppHandle,
+    reminder_id: String,
+    title: String,
+    message: String,
+    trigger_label: String,
+    sound_enabled: bool,
 ) -> Result<(), String> {
     let state = app.state::<RhythmReminderState>();
     let revision = state.revision.fetch_add(1, Ordering::Relaxed) + 1;
-    state.ready_revision.store(0, Ordering::Relaxed);
-    payload.revision = revision;
     state
         .pending
         .lock()
         .map_err(|_| "节律提醒窗口状态不可用".to_string())?
-        .replace(payload);
-
-    let window_result = if let Some(window) = app.get_webview_window("rhythm-reminder") {
-        let _ = window.hide();
-        let _ = window.set_always_on_top(true);
-        let _ = app.emit_to(
-            "rhythm-reminder",
-            "rhythm-reminder:refresh",
-            serde_json::json!({ "revision": revision }),
-        );
-        Ok(window)
+        .replace(RhythmReminderPayload {
+            revision,
+            reminder_id,
+            title,
+            message,
+            trigger_label,
+            sound_enabled,
+        });
+    let window = if let Some(window) = app.get_webview_window("rhythm-reminder") {
+        window
     } else {
         WebviewWindowBuilder::new(
             &app,
@@ -1240,82 +1294,13 @@ fn deliver_rhythm_reminder(
         .center()
         .visible(false)
         .build()
-        .map_err(|error| format!("创建节律提醒窗口失败: {error}"))
+        .map_err(|error| format!("创建节律提醒窗口失败: {error}"))?
     };
-
-    if let Err(error) = window_result {
-        if let Ok(mut pending) = state.pending.lock() {
-            if pending
-                .as_ref()
-                .is_some_and(|item| item.revision == revision)
-            {
-                pending.take();
-            }
-        }
-        return Err(error);
-    }
-
-    std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_millis(3000));
-        let state = app.state::<RhythmReminderState>();
-        if state.ready_revision.load(Ordering::Relaxed) == revision {
-            return;
-        }
-        let fallback_payload = state.pending.lock().ok().and_then(|mut pending| {
-            if pending
-                .as_ref()
-                .is_some_and(|item| item.revision == revision)
-            {
-                pending.take()
-            } else {
-                None
-            }
-        });
-        let Some(payload) = fallback_payload else {
-            return;
-        };
-        if let Some(window) = app.get_webview_window("rhythm-reminder") {
-            let _ = window.hide();
-        }
-        release_interruptive_reminder(&app, ReminderWindowKind::Rhythm);
-        send_rhythm_system_notification(&payload);
-        let _ = app.emit_to(
-            "main",
-            "rhythm-reminder:action",
-            serde_json::json!({ "reminderId": payload.reminder_id, "action": "dismiss" }),
-        );
-    });
+    window
+        .show()
+        .map_err(|error| format!("显示节律提醒窗口失败: {error}"))?;
+    let _ = window.set_focus();
     Ok(())
-}
-
-#[tauri::command]
-fn present_rhythm_reminder(
-    app: tauri::AppHandle,
-    reminder_id: String,
-    title: String,
-    message: String,
-    trigger_label: String,
-    notification_enabled: bool,
-    sound_enabled: bool,
-) -> Result<String, String> {
-    if main_window_is_focused(&app) {
-        return Ok("in-app".to_string());
-    }
-    if !notification_enabled {
-        return Ok("disabled".to_string());
-    }
-    deliver_rhythm_reminder(
-        app,
-        RhythmReminderPayload {
-            revision: 0,
-            reminder_id,
-            title,
-            message,
-            trigger_label,
-            sound_enabled,
-        },
-    )?;
-    Ok("background".to_string())
 }
 
 #[tauri::command]
@@ -1330,64 +1315,34 @@ fn get_rhythm_reminder_payload(
 }
 
 #[tauri::command]
-fn rhythm_reminder_ready(app: tauri::AppHandle, revision: u64) -> Result<String, String> {
-    let state = app.state::<RhythmReminderState>();
-    let matches = state
-        .pending
-        .lock()
-        .map_err(|_| "节律提醒窗口状态不可用".to_string())?
-        .as_ref()
-        .is_some_and(|item| item.revision == revision);
-    if !matches {
-        return Ok("stale".to_string());
-    }
-    match request_interruptive_reminder(&app, ReminderWindowKind::Rhythm)? {
-        ReminderWindowDisposition::Queued => {
-            state.ready_revision.store(revision, Ordering::Relaxed);
-            Ok("queued".to_string())
-        }
-        ReminderWindowDisposition::ShowNow => {
-            if let Err(error) = show_coordinated_reminder(&app, ReminderWindowKind::Rhythm) {
-                release_interruptive_reminder(&app, ReminderWindowKind::Rhythm);
-                return Err(error);
-            }
-            state.ready_revision.store(revision, Ordering::Relaxed);
-            Ok("shown".to_string())
-        }
-    }
-}
-
-#[tauri::command]
 fn handle_rhythm_reminder_action(
     app: tauri::AppHandle,
     revision: u64,
     reminder_id: String,
     action: String,
 ) -> Result<bool, String> {
-    if !matches!(action.as_str(), "complete" | "snooze" | "skip" | "dismiss") {
+    if !matches!(action.as_str(), "complete" | "snooze" | "skip" | "hide") {
         return Err("无效的节律提醒操作".to_string());
     }
-    let state = app.state::<RhythmReminderState>();
-    let handled = state
+    let handled = app
+        .state::<RhythmReminderState>()
         .pending
         .lock()
         .map_err(|_| "节律提醒窗口状态不可用".to_string())?
         .take_if(|item| item.revision == revision && item.reminder_id == reminder_id)
         .is_some();
-    if !handled {
-        return Ok(false);
-    }
     if let Some(window) = app.get_webview_window("rhythm-reminder") {
         let _ = window.hide();
     }
-    release_interruptive_reminder(&app, ReminderWindowKind::Rhythm);
-    app.emit_to(
-        "main",
-        "rhythm-reminder:action",
-        serde_json::json!({ "reminderId": reminder_id, "action": action }),
-    )
-    .map_err(|error| format!("发送节律提醒操作失败: {error}"))?;
-    Ok(true)
+    if handled && action != "hide" {
+        app.emit_to(
+            "main",
+            "rhythm-reminder:action",
+            serde_json::json!({ "reminderId": reminder_id, "action": action }),
+        )
+        .map_err(|error| format!("发送节律提醒操作失败: {error}"))?;
+    }
+    Ok(handled)
 }
 
 #[tauri::command]
@@ -4355,7 +4310,6 @@ fn main() {
             handle_focus_reminder_action,
             present_rhythm_reminder,
             get_rhythm_reminder_payload,
-            rhythm_reminder_ready,
             handle_rhythm_reminder_action,
             set_window_close_behavior,
             get_system_idle_seconds
@@ -4392,28 +4346,6 @@ fn main() {
                         );
                     }
                     release_interruptive_reminder(_app, ReminderWindowKind::FocusCompletion);
-                } else if label == "rhythm-reminder" {
-                    api.prevent_close();
-                    if let Some(window) = _app.get_webview_window("rhythm-reminder") {
-                        let _ = window.hide();
-                    }
-                    let payload = _app
-                        .state::<RhythmReminderState>()
-                        .pending
-                        .lock()
-                        .ok()
-                        .and_then(|mut pending| pending.take());
-                    if let Some(payload) = payload {
-                        let _ = _app.emit_to(
-                            "main",
-                            "rhythm-reminder:action",
-                            serde_json::json!({
-                                "reminderId": payload.reminder_id,
-                                "action": "dismiss"
-                            }),
-                        );
-                    }
-                    release_interruptive_reminder(_app, ReminderWindowKind::Rhythm);
                 } else if label == "focus-controller" {
                     api.prevent_close();
                     _app.state::<FocusControllerState>()

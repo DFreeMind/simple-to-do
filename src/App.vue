@@ -118,9 +118,7 @@ const store = useTaskStore()
 const isFocusReminderWindow = typeof window !== 'undefined'
   && Boolean(window.__TAURI_INTERNALS__)
   && getCurrentWebviewWindow().label === 'focus-reminder'
-const isRhythmReminderWindow = typeof window !== 'undefined'
-  && Boolean(window.__TAURI_INTERNALS__)
-  && getCurrentWebviewWindow().label === 'rhythm-reminder'
+const isRhythmReminderWindow = typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__) && getCurrentWebviewWindow().label === 'rhythm-reminder'
 const isFocusControllerWindow = typeof window !== 'undefined'
   && Boolean(window.__TAURI_INTERNALS__)
   && getCurrentWebviewWindow().label === 'focus-controller'
@@ -149,6 +147,7 @@ let unlistenFocusNotificationOpen
 let unlistenFocusNotificationError
 let unlistenFocusControllerAction
 let unlistenRhythmElapsed
+let unlistenRhythmReminderOpen
 let unlistenRhythmReminderAction
 let shellResizeObserver
 
@@ -171,18 +170,19 @@ function handleFocusReminderAction(event) {
   if (action === 'open-app') store.setClockView('focus')
 }
 
-function handleRhythmReminderAction(event) {
-  const { reminderId, action } = event.payload || {}
-  if (!reminderId) return
-  store.handleRhythmReminderWindowAction(reminderId, action)
-  if (action !== 'dismiss') store.setClockView('rhythm')
-}
-
 function handleRhythmElapsed(event) {
   const reminderId = event.payload?.reminderId
   if (!reminderId) return
   store.handleRhythmElapsedFromNative(reminderId, event.payload?.dueAt)
 }
+
+function openRhythmReminder(event) {
+  const reminderId = event.payload?.reminderId
+  const reminder = store.rhythmReminders.find(item => item.id === reminderId && item.enabled && item.pendingSince)
+  if (!reminder) return
+  store.setClockView('rhythm')
+}
+function handleRhythmReminderAction(event) { const { reminderId, action } = event.payload || {}; if (!reminderId) return; store[action === 'complete' ? 'completeRhythmReminder' : action === 'snooze' ? 'snoozeRhythmReminder' : 'skipRhythmReminderToday']?.(reminderId, action === 'snooze' ? 5 : undefined); store.setClockView('rhythm') }
 
 function handleFocusControllerAction(event) {
   const { action, sessionId, alwaysOnTop } = event.payload || {}
@@ -373,9 +373,10 @@ onMounted(async () => {
     listen('focus-notification:error', reportFocusNotificationError)
       .then(unlisten => { unlistenFocusNotificationError = unlisten })
       .catch(error => console.warn('[App] 注册专注通知错误事件失败:', error))
-    listen('rhythm-reminder:action', handleRhythmReminderAction)
-      .then(unlisten => { unlistenRhythmReminderAction = unlisten })
-      .catch(error => console.warn('[App] 注册节律提醒操作失败:', error))
+    listen('rhythm-reminder:open', openRhythmReminder)
+      .then(unlisten => { unlistenRhythmReminderOpen = unlisten })
+      .catch(error => console.warn('[App] 注册节律通知点击事件失败:', error))
+    listen('rhythm-reminder:action', handleRhythmReminderAction).then(unlisten => { unlistenRhythmReminderAction = unlisten })
     listen('rhythm-timer:elapsed', handleRhythmElapsed)
       .then(unlisten => { unlistenRhythmElapsed = unlisten })
       .catch(error => console.warn('[App] 注册节律到时事件失败:', error))
@@ -394,6 +395,7 @@ onBeforeUnmount(() => {
   unlistenFocusNotificationError?.()
   unlistenFocusControllerAction?.()
   unlistenRhythmElapsed?.()
+  unlistenRhythmReminderOpen?.()
   unlistenRhythmReminderAction?.()
   shellResizeObserver?.disconnect()
 })

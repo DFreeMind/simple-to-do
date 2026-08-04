@@ -513,11 +513,6 @@ export async function getRhythmReminderPayload() {
   return invoke('get_rhythm_reminder_payload')
 }
 
-export async function markRhythmReminderReady(revision) {
-  if (!isTauri()) return false
-  return invoke('rhythm_reminder_ready', { revision })
-}
-
 export async function handleRhythmReminderAction(reminder, action) {
   if (!isTauri() || !reminder?.reminderId) return false
   return invoke('handle_rhythm_reminder_action', { revision: reminder.revision, reminderId: reminder.reminderId, action })
