@@ -431,6 +431,7 @@ const tasks = [
   task('test-3', '带附件的任务：确认图片预览区域', {
     listId: 'inbox',
     tags: ['附件'],
+    // attachments + descriptionHtml 由 buildDemoData() 末尾注入；保持字段与 demo-data.json 一致
     createdAt: daysAgo(4, 18)
   }),
 
@@ -453,6 +454,28 @@ const data = {
   listTrash: [],
   taskGroups,
   viewOrders: {},
+  clock: {
+    profiles: [],
+    focusSettings: {
+      defaultProfileId: 'pomodoro',
+      autoStartBreak: false,
+      autoStartFocus: false,
+      globalMute: false,
+      notificationCenterEnabled: true,
+      focusCompleteNotificationEnabled: true
+    },
+    activeSession: null,
+    pendingBreak: null,
+    cycleFocusCount: 0,
+    rhythm: {
+      reminders: [],
+      enabled: true,
+      pauseDuringFocus: true,
+      globalQuietHours: { start: '22:00', end: '08:00' }
+    },
+    garden: {},
+    history: []
+  },
   settings: {
     theme: 'mint',
     themeBackgrounds: true,
@@ -489,6 +512,21 @@ const data = {
 
 // 确保非删除任务的 deleted 字段为 false
 data.tasks = data.tasks.map(item => item.deleted ? item : { ...item, deleted: false, deletedAt: null })
+
+// 给 test-3 注入图片附件 + 富文本引用，演示图片预览
+{
+  const atts = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'tmp', 'demo-attachments.json'), 'utf8'))
+  const descriptionHtml = `<p>这是任务里插入的附件图片，点击可在大图模式预览：</p>
+<img src="${atts[0].url}" alt="附件示例 1" data-attachment-src="attachments/demo/preview-1.png" style="max-width: 100%; border-radius: 12px;" />
+<p>多张图片可左右切换查看：</p>
+<img src="${atts[1].url}" alt="附件示例 2" data-attachment-src="attachments/demo/preview-2.png" style="max-width: 100%; border-radius: 12px;" />
+<p>图片附件保存在应用数据目录，扫描后可在"个人空间 → 空间管理"中查看引用情况。</p>`
+  const test3 = data.tasks.find(t => t.id === 'test-3')
+  if (test3) {
+    test3.descriptionHtml = descriptionHtml
+    test3.attachments = atts
+  }
+}
 
 // 写入文件
 const dataFile = path.join(process.cwd(), 'demo-data.json')
