@@ -1382,7 +1382,7 @@ body.is-resizing {
   min-height: 640px;
   align-content: start;
   gap: 13px;
-  padding: 26px 28px 0;
+  padding: 26px 28px 22px;
   overflow: hidden;
   border-color: color-mix(in srgb, var(--accent) 21%, var(--divider-soft));
   border-radius: 28px;
@@ -1550,6 +1550,19 @@ body.is-resizing {
   color: color-mix(in srgb, var(--text-muted) 88%, var(--text));
   font-size: 12px;
 }
+.clock-stage__cycle-context,
+.clock-stage__break-context {
+  position: relative;
+  z-index: 2;
+  width: min(100%, 350px);
+  text-align: left;
+}
+.clock-stage__cycle-context { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 4px; color: var(--text-muted); font-size: 11px; }
+.clock-stage__cycle-context strong { color: var(--accent-strong); font-size: 11px; }
+.clock-stage__break-context { display: grid; gap: 3px; padding: 11px 13px; border: 1px solid rgba(87, 136, 189, .22); border-radius: 13px; background: rgba(255, 255, 255, .67); }
+.clock-stage__break-context span { color: #527394; font-size: 10px; font-weight: 750; letter-spacing: .05em; }
+.clock-stage__break-context strong { overflow: hidden; color: var(--text); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.clock-stage__break-context small { color: var(--text-muted); font-size: 10.5px; }
 .clock-button {
   cursor: pointer;
   transition: color .2s ease, background .2s ease, border-color .2s ease, box-shadow .2s ease, transform .2s ease;
@@ -1569,7 +1582,13 @@ body.is-resizing {
     0 13px 25px color-mix(in srgb, var(--accent) 30%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, .28);
 }
-.clock-stage__actions { max-width: 570px; }
+.clock-button--complete { border-color: color-mix(in srgb, var(--accent) 32%, var(--divider-soft)); color: var(--accent-strong); }
+.clock-button--end { margin-left: 4px; padding: 0 10px; border: 1px solid color-mix(in srgb, #c65f58 30%, var(--divider-soft)); border-radius: 9px; background: color-mix(in srgb, #c65f58 7%, var(--surface)); color: #ad514b; font: inherit; font-size: 11px; cursor: pointer; }
+.clock-button--end:hover { border-color: #c65f58; background: color-mix(in srgb, #c65f58 13%, var(--surface)); color: #913f39; }
+.clock-stage__actions { max-width: 450px; margin-top: 10px; gap: 6px; }
+.clock-stage__adjustments { display: inline-flex; overflow: hidden; border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--divider-soft)); border-radius: 10px; }
+.clock-stage__adjustments .clock-button--adjust { min-height: 36px; padding: 0 7px; border: 0; border-radius: 0; font-size: 11px; }
+.clock-stage__adjustments .clock-button--adjust + .clock-button--adjust { border-left: 1px solid color-mix(in srgb, var(--accent) 20%, var(--divider-soft)); }
 .clock-stage__garden-companion {
   position: relative;
   z-index: 2;
@@ -1626,7 +1645,7 @@ body.is-resizing {
     0 14px 34px rgba(31, 80, 72, .07),
     inset 0 1px 0 rgba(255, 255, 255, .9);
 }
-.clock-side-card--modes {
+.clock-side-card--plan {
   background:
     radial-gradient(circle at 100% 0, color-mix(in srgb, var(--accent-soft) 85%, transparent), transparent 44%),
     var(--surface);
@@ -1659,6 +1678,35 @@ body.is-resizing {
   height: 7px;
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent);
 }
+.clock-plan-section { display: grid; gap: 8px; }
+.clock-plan-section + .clock-plan-section { padding-top: 12px; border-top: 1px solid var(--divider-soft); }
+.clock-plan-section__label { display: flex; align-items: baseline; gap: 6px; color: var(--text); font-size: 12px; font-weight: 700; }
+.clock-plan-section__label small { color: var(--text-muted); font-size: 10.5px; font-weight: 500; }
+.clock-plan-current { display: grid; gap: 10px; }
+.clock-plan-current > div { display: grid; gap: 3px; padding: 9px 10px; border: 1px solid color-mix(in srgb, var(--accent) 12%, var(--divider-soft)); border-radius: 10px; background: color-mix(in srgb, var(--accent-soft) 45%, #fff); }
+.clock-plan-current span { color: var(--text-muted); font-size: 10.5px; }
+.clock-plan-current strong { overflow: hidden; color: var(--text); font-size: 13px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+.clock-plan-current__task > div { display: grid; grid-template-columns: 8px minmax(0, 1fr); align-items: center; gap: 7px; min-width: 0; }
+.clock-plan-current__task strong { white-space: normal; overflow-wrap: anywhere; }
+.clock-plan-current__task small { display: block; margin-top: 3px; color: var(--text-muted); font-size: 10.5px; }
+.clock-plan-current__task label { display: block; margin-top: 8px; }
+.clock-plan-current__task select { width: 100%; min-height: 34px; padding: 0 28px 0 10px; border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--divider-soft)); border-radius: 8px; background: var(--surface); color: var(--accent-strong); font: inherit; font-size: 11.5px; font-weight: 650; cursor: pointer; }
+.clock-end-confirm { position: fixed; z-index: 1000; inset: 0; display: grid; place-items: center; padding: 24px; }
+.clock-end-confirm__scrim { position: absolute; inset: 0; width: 100%; background: rgba(20, 31, 39, .30); backdrop-filter: blur(4px); }
+.clock-end-confirm__card { position: relative; display: grid; justify-items: center; width: min(100%, 360px); padding: 28px 28px 24px; border: 1px solid color-mix(in srgb, #c65f58 22%, var(--divider-soft)); border-radius: 22px; background: linear-gradient(155deg, #fff, color-mix(in srgb, #fff 88%, #fff1ef)); box-shadow: 0 24px 64px rgba(35, 47, 54, .24); text-align: center; }
+.clock-end-confirm__close { position: absolute; top: 12px; right: 12px; display: grid; width: 30px; height: 30px; place-items: center; border: 0; border-radius: 9px; background: transparent; color: var(--text-muted); cursor: pointer; }
+.clock-end-confirm__close:hover { background: var(--surface-muted); color: var(--text); }
+.clock-end-confirm__icon { display: grid; width: 43px; height: 43px; place-items: center; border-radius: 14px; background: color-mix(in srgb, #c65f58 12%, #fff); color: #b4524b; }
+.clock-end-confirm__card > p { margin: 13px 0 5px; color: #b4524b; font-size: 11px; font-weight: 750; letter-spacing: .08em; }
+.clock-end-confirm__card h2 { margin: 0; color: var(--text); font-size: 20px; letter-spacing: -.035em; }
+.clock-end-confirm__card > span:last-of-type { margin-top: 8px; color: var(--text-muted); font-size: 12px; line-height: 1.55; }
+.clock-end-confirm__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; margin-top: 22px; }
+.clock-end-confirm__actions button { min-height: 40px; border: 1px solid var(--divider-soft); border-radius: 11px; background: var(--surface-muted); color: var(--text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.clock-end-confirm__actions button:last-child { border-color: #bd5c55; background: #bd5c55; color: #fff; }
+.clock-end-confirm-enter-active, .clock-end-confirm-leave-active { transition: opacity .18s ease; }
+.clock-end-confirm-enter-active .clock-end-confirm__card, .clock-end-confirm-leave-active .clock-end-confirm__card { transition: transform .2s ease, opacity .2s ease; }
+.clock-end-confirm-enter-from, .clock-end-confirm-leave-to { opacity: 0; }
+.clock-end-confirm-enter-from .clock-end-confirm__card, .clock-end-confirm-leave-to .clock-end-confirm__card { transform: translateY(10px) scale(.97); opacity: 0; }
 .clock-task-picker__trigger {
   min-height: 60px;
   border-radius: 12px;
@@ -1671,14 +1719,10 @@ body.is-resizing {
     var(--surface);
 }
 .clock-today--garden {
-  min-height: 74px;
-  padding: 3px 7px 0 0;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 60px;
+  padding: 3px 0 0;
   border-radius: 12px;
-}
-.clock-today--garden .focus-plant {
-  width: 94px;
-  margin: -19px 0 -20px;
-  filter: drop-shadow(0 5px 5px rgba(52, 92, 60, .11));
 }
 .clock-garden-progress { height: 7px; padding: 1px; background: color-mix(in srgb, var(--accent) 10%, var(--surface-muted)); }
 .clock-garden-progress i { min-width: 0; }
@@ -1715,7 +1759,7 @@ body.is-resizing {
 }
 @media (max-width: 620px) {
   .clock-home { padding: 12px; }
-  .clock-stage { min-height: 600px; padding: 22px 16px 0; border-radius: 22px; }
+  .clock-stage { min-height: 600px; padding: 22px 16px 18px; border-radius: 22px; }
   .clock-stage__intro h1 { font-size: 21px; }
   .clock-stage__intro p { max-width: 280px; }
   .clock-stage__dial { width: min(100%, 300px); }
@@ -7518,6 +7562,14 @@ body.is-resizing {
     font-weight: 700;
   }
 }
+.focus-break-settings { overflow: hidden; border: 1px solid var(--divider-soft); border-radius: var(--radius-md); background: var(--surface); }
+.focus-break-setting { display: grid; grid-template-columns: minmax(0, 1fr) 112px; align-items: center; gap: 16px; min-height: 56px; padding: 9px 12px; }
+.focus-break-setting + .focus-break-setting { border-top: 1px solid var(--divider-soft); }
+.focus-break-setting > span { min-width: 0; }
+.focus-break-setting strong, .focus-break-setting small { display: block; }
+.focus-break-setting strong { color: var(--text); font-size: 13px; }
+.focus-break-setting small { margin-top: 2px; color: var(--text-muted); font-size: 11px; }
+.focus-break-setting select { width: 100%; min-width: 0; }
 
 .theme-grid {
   display: grid;
@@ -10778,9 +10830,49 @@ body.is-resizing {
 /* 明确但不抢主操作：取消关联使用实体次级按钮，而不是弱文本链接。 */
 .clock-task-picker__selection-clear { min-height: 36px; padding: 0 11px; border: 1px solid #b9d5ce; border-radius: 8px; background: #eef7f4; color: #176d61; font-size: 12px; font-weight: 650; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7); transition: border-color .16s ease, background .16s ease, color .16s ease; }.clock-task-picker__selection-clear:hover { border-color: #7ebcad; background: #ddf0eb; color: #0f594e; }.clock-task-picker__selection-clear:focus-visible { outline: 3px solid rgba(30, 137, 119, .23); outline-offset: 2px; }
 
+/* 专注任务选择器：将选择动作收束为单列扫读，清单树只负责缩小范围。 */
+.clock-task-picker__panel { width: min(1040px, calc(100% - 40px)); height: min(660px, calc(100vh - 48px)); }
+.clock-task-picker__body { grid-template-columns: 208px minmax(0, 1fr); gap: 20px; padding: 0 20px 2px; }
+.clock-task-picker__sidebar { padding: 7px 6px; border: 1px solid #e7efec; border-radius: 10px; background: #fafcfb; }
+.clock-task-picker__tasks { display: grid; grid-template-columns: minmax(0, 1fr) !important; grid-auto-rows: min-content; align-content: start; gap: 6px; padding: 2px 4px 16px 0; }
+.clock-task-picker__tasks.is-searching { display: grid; grid-template-columns: minmax(0, 1fr) !important; }
+.clock-task-picker__tasks-header { position: sticky; top: 0; display: flex; min-height: 48px; align-items: center; margin: 0; padding: 7px 4px 9px; background: #fff; }
+.clock-task-picker__tasks-title { color: #203a34; font-size: 13px; font-weight: 700; }
+.clock-task-picker__scope-tabs { display: inline-flex; gap: 3px; margin-left: auto; padding: 3px; border-radius: 8px; background: #f1f6f4; }
+.clock-task-picker__scope-tabs button { min-height: 27px; padding: 0 9px; border: 0; border-radius: 6px; background: transparent; color: #71817d; font: inherit; font-size: 11px; font-weight: 650; cursor: pointer; transition: color .16s ease, background .16s ease, box-shadow .16s ease; }
+.clock-task-picker__scope-tabs button:hover { color: #245c51; }.clock-task-picker__scope-tabs button.active { background: #fff; box-shadow: 0 1px 4px rgba(34, 69, 61, .12); color: #176d61; }.clock-task-picker__scope-tabs button:focus-visible, .clock-task-picker__task:focus-visible { outline: 3px solid rgba(30, 137, 119, .22); outline-offset: 2px; }
+.clock-task-picker__task, .clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task { display: grid; width: 100%; height: auto !important; min-height: 78px !important; margin: 0; padding: 11px 13px; grid-template-columns: 36px minmax(0, 1fr) 26px !important; gap: 11px; overflow: visible !important; border: 1px solid #e3ece9; border-left: 3px solid var(--task-list-color, var(--accent)); border-radius: 10px; background: #fff; box-shadow: none; transform: none; }
+.clock-task-picker__task::before, .clock-task-picker__task::after, .clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task::before, .clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task::after { display: none !important; }
+.clock-task-picker__task:hover, .clock-task-picker__task.focused, .clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task:hover { border-color: #a9d6ca; border-left-color: var(--task-list-color, var(--accent)); background: #f7fbfa; box-shadow: 0 3px 10px rgba(35, 94, 81, .06); transform: none; }
+.clock-task-picker__task.active, .clock-task-picker__task.active.important, .clock-task-picker__task.active.pinned, .clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task.active { border-color: #83c9b9; border-left-color: #157766; background: #eef9f6; box-shadow: inset 0 0 0 1px rgba(43, 145, 124, .05); }
+.clock-task-picker__task-icon, .clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task-icon { width: 36px; height: 36px; border-radius: 10px; background: color-mix(in srgb, var(--task-list-color, var(--accent)) 13%, #fff); }
+.clock-task-picker__task > span:nth-child(2), .clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task > span:nth-child(2) { display: grid; min-width: 0; grid-template-rows: auto auto !important; align-content: center; gap: 4px; }
+.clock-task-picker__task strong, .clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task strong { display: -webkit-box !important; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; color: #20352f; font-size: 14px; font-weight: 650; line-height: 1.42; text-overflow: clip; white-space: normal !important; }
+.clock-task-picker__task-meta { display: flex !important; flex-wrap: wrap !important; gap: 4px 7px; overflow: visible !important; white-space: normal !important; }.clock-task-picker__task-meta > span { max-width: 190px; min-width: 0; }.clock-task-picker__task-meta > span:not(:first-child) { padding: 2px 5px; background: #f2f6f5; }.clock-task-picker__recommendation { color: #176d61; background: #e5f5f0 !important; }
+.clock-task-picker__task-tags { display: flex; width: 26px; min-width: 26px; align-items: center; justify-content: flex-end; padding: 0; color: #147462; }.clock-task-picker__empty { margin: 28px 4px; padding: 18px; border: 1px dashed #cbded8; border-radius: 10px; background: #fafcfb; color: #69807a; text-align: center; }
+@media (max-width: 720px) { .clock-task-picker__panel { width: calc(100% - 20px); height: calc(100vh - 20px); }.clock-task-picker__body { grid-template-columns: 146px minmax(0, 1fr); gap: 12px; padding: 0 14px 2px; }.clock-task-picker__task { min-height: 82px; padding: 10px; grid-template-columns: 30px minmax(0, 1fr) 20px; gap: 8px; }.clock-task-picker__task-icon { width: 30px; height: 30px; border-radius: 8px; }.clock-task-picker__task strong { font-size: 12.5px; }.clock-task-picker__task-meta > span { max-width: 110px; }.clock-task-picker__scope-tabs button { padding: 0 6px; } }
+
 /* 列表视图用两列任务卡填充可用空间；分组与搜索仍保持线性阅读。 */
 .clock-task-picker__tasks:not(.is-grouped):not(.is-searching) { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: min-content; align-content: start; gap: 10px; padding: 2px 10px 18px 16px; }.clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__tasks-header { grid-column: 1 / -1; margin-bottom: 0; }.clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task { width: 100%; height: 88px; min-height: 88px; margin: 0; padding: 12px; border-color: #e7efec; background: linear-gradient(145deg, #fff, #f9fbfa); box-shadow: 0 1px 2px rgba(36, 64, 57, .025); }.clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task:hover, .clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task.focused { border-color: #a9d6ca; background: #f4faf8; box-shadow: 0 5px 14px rgba(31, 103, 88, .07); }.clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task.active, .clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task.active.important, .clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task.active.pinned { border-color: #82c7b7; background: linear-gradient(145deg, #f0faf7, #e5f5f0); box-shadow: 0 5px 15px rgba(28, 113, 95, .09); }.clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task-icon { width: 38px; height: 38px; border-radius: 11px; }.clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task > span:nth-child(2) { grid-template-rows: 22px 18px; }.clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task strong { font-size: 13.5px; }.clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task-tags { align-self: start; padding-top: 3px; }.clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task::before { top: 12px; bottom: 12px; }
 @media (max-width: 820px) { .clock-task-picker__tasks:not(.is-grouped):not(.is-searching) { grid-template-columns: 1fr; gap: 5px; padding-right: 4px; }.clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task { height: 76px; min-height: 76px; } }
+
+/* 专注选择器的滚动标题与信息行：标题不遮挡内容，颜色只承担来源识别。 */
+.clock-task-picker__tasks { position: relative; isolation: isolate; }
+.clock-task-picker__tasks-header { z-index: 10 !important; border-bottom: 1px solid #e5ece9; box-shadow: 0 5px 10px rgba(41, 78, 70, .05); }
+.clock-task-picker__view-toggle { flex: 0 0 auto; margin-left: 8px; padding: 2px; border: 1px solid #dfe9e5; border-radius: 8px; background: #fff; }
+.clock-task-picker__view-toggle button { min-height: 27px; padding: 0 8px; font-size: 11px; }.clock-task-picker__view-toggle button.active { background: #e7f4f0; color: #176d61; box-shadow: none; }
+.clock-task-picker__task, .clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task { position: relative; z-index: 0; border: 1px solid #e3ebe8 !important; border-left: 1px solid #e3ebe8 !important; background: #fff !important; box-shadow: none !important; }
+.clock-task-picker__task:hover, .clock-task-picker__task.focused, .clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task:hover { border-color: #b9d9d0 !important; background: #f8fbfa !important; box-shadow: 0 2px 7px rgba(33, 84, 72, .05) !important; }
+.clock-task-picker__task.active, .clock-task-picker__task.active.important, .clock-task-picker__task.active.pinned, .clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task.active { border-color: #79bcae !important; border-left-color: #2d9a86 !important; background: #f0faf7 !important; box-shadow: inset 0 0 0 1px rgba(45, 154, 134, .08) !important; }
+.clock-task-picker__task-icon, .clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task-icon { background: #f1f5f4 !important; }.clock-task-picker__task-icon .clock-task-picker__list-dot { box-shadow: none; }
+.clock-task-picker__tasks-group { position: sticky; z-index: 2; top: 48px; margin: 12px 0 4px; padding: 7px 8px; border: 1px solid #e8efec; border-radius: 8px; background: #f7faf9; color: #40534e; }.clock-task-picker__tasks-group:first-of-type { margin-top: 8px; }.clock-task-picker__tasks-group small { color: #7a8985; }
+.clock-task-picker__task-meta > span:not(:first-child) { color: #61746e; background: #f3f6f5 !important; }.clock-task-picker__task-meta > span.overdue { color: #b95750 !important; background: #fff2f0 !important; }.clock-task-picker__task-meta > span:has(svg[data-lucide="flag"]) { color: #9a6b2c; background: #fff8ec !important; }.clock-task-picker__task-meta > span:has(svg[data-lucide="pin"]), .clock-task-picker__task-meta > span:has(svg[data-lucide="star"]) { color: #2f7568; background: #edf7f4 !important; }.clock-task-picker__task-status { color: #6d817b; background: #f3f6f5 !important; }
+@media (max-width: 720px) { .clock-task-picker__scope-tabs button { padding: 0 5px; }.clock-task-picker__view-toggle { margin-left: 4px; }.clock-task-picker__view-toggle button { padding: 0 5px; font-size: 0; }.clock-task-picker__view-toggle button svg { width: 14px; height: 14px; } }
+
+/* 分组视图沿用任务页的可展开分组卡：先选择组，再选择其中的任务。 */
+.clock-task-picker__tasks.is-grouped { gap: 10px; padding-bottom: 18px; }
+.clock-task-picker__group-card { display: grid; grid-template-columns: 18px auto minmax(0, 1fr) auto; align-items: center; gap: 9px; min-height: 54px; width: 100%; padding: 0 13px; border: 1px solid #e1eae6; border-left: 4px solid var(--group-accent, var(--accent)); border-radius: 10px; background: #fff; color: color-mix(in srgb, var(--group-accent, var(--text)) 78%, #253b35); font: inherit; text-align: left; cursor: pointer; transition: background .16s ease, border-color .16s ease; }.clock-task-picker__group-card:hover { border-color: color-mix(in srgb, var(--group-accent, var(--accent)) 38%, #dce8e4); background: color-mix(in srgb, var(--group-accent, var(--accent)) 4%, #fff); }.clock-task-picker__group-card:focus-visible { outline: 3px solid color-mix(in srgb, var(--group-accent, var(--accent)) 24%, transparent); outline-offset: 2px; }.clock-task-picker__group-card > svg { color: var(--group-accent, var(--accent)); transition: transform .16s ease; }.clock-task-picker__group-card > svg.expanded { transform: rotate(90deg); }.clock-task-picker__group-card-emoji { font-size: 17px; line-height: 1; }.clock-task-picker__group-card .clock-task-picker__tasks-group-dot { width: 11px; height: 11px; background: var(--group-accent, var(--accent)); }.clock-task-picker__group-card strong { overflow: hidden; font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }.clock-task-picker__group-card small { padding: 3px 7px; border-radius: 999px; background: color-mix(in srgb, var(--group-accent, var(--accent)) 9%, #fff); color: var(--group-accent, var(--accent)); font-size: 10px; font-weight: 650; white-space: nowrap; }.clock-task-picker__group-tasks { display: grid; gap: 5px; margin: -3px 0 1px 17px; padding: 7px 0 2px 13px; border-left: 1px solid #dbe8e3; }.clock-task-picker__group-tasks .clock-task-picker__task { min-height: 70px !important; }
+@media (max-width: 720px) { .clock-task-picker__group-card { grid-template-columns: 16px auto minmax(0, 1fr); gap: 7px; min-height: 50px; padding: 0 9px; }.clock-task-picker__group-card small { display: none; }.clock-task-picker__group-tasks { margin-left: 11px; padding-left: 9px; } }
 
 /* 列表任务卡使用清单色作为识别线索，信息区无内容时也保留待处理状态。 */
 .clock-task-picker__task-status { color: #82918d; }.clock-task-picker__task-status i { width: 5px; height: 5px; border-radius: 50%; background: #9eaea9; }.clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task { overflow: hidden; border-left: 3px solid var(--task-list-color, var(--accent)); background: linear-gradient(135deg, color-mix(in srgb, var(--task-list-color, var(--accent)) 8%, #fff), #fff 58%); }.clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task::after { content: ''; position: absolute; top: -30px; right: -22px; width: 100px; height: 100px; border: 16px solid color-mix(in srgb, var(--task-list-color, var(--accent)) 10%, transparent); border-radius: 50%; pointer-events: none; }.clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task::before { left: 0; width: 3px; background: var(--task-list-color, var(--accent)); }.clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task-icon { position: relative; z-index: 1; background: color-mix(in srgb, var(--task-list-color, var(--accent)) 14%, #fff); }.clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task:hover { transform: translateY(-1px); }.clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task.active { border-left-color: #167466; background: linear-gradient(135deg, #e4f6f1, #f8fffd 62%); }.clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task.active::after { border-color: rgba(42, 157, 135, .12); }.clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task.active::before { background: #167466; }.clock-task-picker__tasks:not(.is-grouped):not(.is-searching) .clock-task-picker__task-meta > span:first-child { color: color-mix(in srgb, var(--task-list-color, var(--accent)) 72%, #30443f); }

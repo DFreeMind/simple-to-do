@@ -35,6 +35,17 @@
             </div>
           </div>
 
+          <section v-if="isPomodoroCycle" class="clock-stage__cycle-context" aria-label="番茄节奏进度">
+            <span>第 {{ currentPomodoroRound }} / {{ focusSettings.focusesBeforeLongBreak }} 轮</span>
+            <strong>本轮后{{ nextBreakLabel }}</strong>
+          </section>
+
+          <section v-if="activeSession?.phase !== 'focus' && (activeSession || pendingBreak)" class="clock-stage__break-context" aria-label="休息安排">
+            <span>{{ activeSession ? '本次休息结束后' : '下一步安排' }}</span>
+            <strong>{{ nextFocusTaskTitle === '不关联任务' ? '回到下一轮专注' : `继续「${nextFocusTaskTitle}」` }}</strong>
+            <small>{{ activeSession ? `还剩 ${formattedTime}，先离开屏幕一会儿。` : `先休息 ${durationText(pendingBreak.durationSeconds)}，恢复后再继续。` }}</small>
+          </section>
+
           <Teleport to=".app">
             <div v-if="freeDurationEditing" class="clock-free-time__overlay" @click.self="freeDurationEditing = false">
               <div class="clock-free-time__editor" role="dialog" aria-label="设定本次倒计时" @click.stop>
@@ -44,6 +55,22 @@
                 <div><button class="clock-free-time__confirm" type="button" @click="confirmFreeDuration">使用此时长</button><button type="button" @click="freeDurationEditing = false">取消</button></div>
               </div>
             </div>
+          </Teleport>
+
+          <Teleport to="body">
+            <Transition name="clock-end-confirm">
+              <div v-if="endConfirmOpen" class="clock-end-confirm" role="dialog" aria-modal="true" aria-labelledby="clock-end-confirm-title" @keydown.esc.stop="endConfirmOpen = false">
+                <button class="clock-end-confirm__scrim" type="button" aria-label="取消提前结束" @click="endConfirmOpen = false" />
+                <section class="clock-end-confirm__card">
+                  <button class="clock-end-confirm__close" type="button" aria-label="关闭" @click="endConfirmOpen = false"><X :size="17" /></button>
+                  <span class="clock-end-confirm__icon"><Pause :size="20" /></span>
+                  <p>提前结束</p>
+                  <h2 id="clock-end-confirm-title">要结束这一轮专注吗？</h2>
+                  <span>本轮会记录为未完成，不会计入今日花成长。</span>
+                  <div class="clock-end-confirm__actions"><button type="button" @click="endConfirmOpen = false">继续专注</button><button type="button" @click="confirmEndFocus">确认结束</button></div>
+                </section>
+              </div>
+            </Transition>
           </Teleport>
 
           <section class="clock-stage__garden-companion" aria-label="今日花成长">
@@ -73,9 +100,9 @@
           <div v-if="activeSession" class="clock-stage__actions">
             <button v-if="activeSession.status === 'running'" class="clock-button clock-button--primary" type="button" @click="store.pauseFocus"><Pause :size="18" fill="currentColor" />暂停专注</button>
             <button v-else class="clock-button clock-button--primary" type="button" @click="store.resumeFocus"><Play :size="18" fill="currentColor" />继续</button>
-            <button class="clock-button clock-button--secondary" type="button" @click="finish(activeSession.phase === 'focus' ? 'completed' : 'completed')"><Check :size="18" />{{ activeSession.phase === 'focus' ? '完成本轮' : '完成休息' }}</button>
-            <template v-if="canAdjustTime"><button class="clock-button clock-button--adjust" type="button" @click.stop="adjustTime(-5)"><Minus :size="16" />缩短 5 分钟</button><button class="clock-button clock-button--adjust" type="button" @click.stop="adjustTime(5)"><Plus :size="16" />延长 5 分钟</button></template>
-            <button v-if="activeSession.phase === 'focus'" class="clock-button clock-button--quiet" type="button" @click="finish('abandoned')">结束</button>
+            <button class="clock-button clock-button--secondary clock-button--complete" type="button" @click="finish('completed')"><Check :size="18" />{{ activeSession.phase === 'focus' ? '完成本轮' : '完成休息' }}</button>
+            <span v-if="canAdjustTime" class="clock-stage__adjustments"><button class="clock-button clock-button--adjust" type="button" @click.stop="adjustTime(-5)"><Minus :size="15" />5 分</button><button class="clock-button clock-button--adjust" type="button" @click.stop="adjustTime(5)"><Plus :size="15" />5 分</button></span>
+            <button v-if="activeSession.phase === 'focus'" class="clock-button clock-button--end" type="button" @click="requestEndFocus">提前结束</button>
           </div>
           <div v-else-if="pendingBreak" class="clock-stage__actions">
             <button class="clock-button clock-button--primary" type="button" @click="store.startPendingBreak"><Coffee :size="18" />开始{{ pendingBreak.phase === 'long-break' ? '长休息' : '短休息' }}</button>
@@ -85,23 +112,19 @@
       </section>
 
       <aside class="clock-side" aria-label="本次专注设置">
-        <section class="clock-side-card clock-side-card--modes">
-          <header><span class="clock-side-card__icon"><Target :size="19" /></span><h2>专注方式</h2></header>
+        <section class="clock-side-card clock-side-card--plan">
+          <header><span class="clock-side-card__icon"><Target :size="19" /></span><span class="clock-side-card__heading"><h2>本次计划</h2><small>选好节奏和要推进的事，再开始</small></span></header>
           <template v-if="!activeSession && !pendingBreak">
-            <div class="clock-mode-picker">
-              <button v-for="profile in primaryFocusProfiles" :key="profile.id" type="button" :class="{ active: selectedProfileId === profile.id }" @click="selectedProfileId = profile.id">
-                <component :is="profile.id === 'pomodoro' ? Timer : profile.id === 'deep-work' ? Focus : Clock3" :size="24" /><strong>{{ profile.name }}</strong><small>{{ profile.id === 'free-focus' ? '不设上限' : durationText(profile.durationSeconds) }}</small>
-              </button>
+            <div class="clock-plan-section">
+              <span class="clock-plan-section__label">专注方式</span>
+              <div class="clock-mode-picker">
+                <button v-for="profile in primaryFocusProfiles" :key="profile.id" type="button" :class="{ active: selectedProfileId === profile.id }" @click="selectedProfileId = profile.id">
+                  <component :is="profile.id === 'pomodoro' ? Timer : profile.id === 'deep-work' ? Focus : Clock3" :size="24" /><strong>{{ profile.name }}</strong><small>{{ profile.id === 'free-focus' ? '不设上限' : durationText(profile.durationSeconds) }}</small>
+                </button>
+              </div>
             </div>
-          </template>
-          <p v-else class="clock-side-card__current-mode">{{ currentProfile?.name || '专注中' }} · {{ durationText(activeSession?.durationSeconds) }}</p>
-        </section>
-
-        <section class="clock-side-card">
-          <header><span class="clock-side-card__icon"><ListChecks :size="19" /></span><h2>本次专注</h2></header>
-          <template v-if="!activeSession && !pendingBreak">
-            <div ref="taskPicker" class="clock-task-picker">
-              <span class="clock-task-picker__label">这段时间要推进什么？</span>
+            <div ref="taskPicker" class="clock-task-picker clock-plan-section">
+              <span class="clock-plan-section__label">关联任务 <small>可跳过</small></span>
               <button class="clock-task-picker__trigger" type="button" :aria-expanded="taskPickerOpen" @click="toggleTaskPicker">
                 <span class="clock-task-picker__trigger-icon" :class="{ 'is-empty': !selectedTask }">
                   <ListTodo v-if="!selectedTask" :size="20" />
@@ -133,7 +156,6 @@
                               v-model="taskSearchQuery"
                               type="text"
                               placeholder="搜索任务…"
-                              @keydown="onPickerKeydown"
                             />
                             <kbd v-if="!taskSearchQuery" class="clock-task-picker__search-hint">/</kbd>
                           </div>
@@ -143,10 +165,10 @@
 
                       <div class="clock-task-picker__body">
                         <nav class="clock-task-picker__sidebar" aria-label="清单导航">
-                          <button type="button" :class="['clock-task-picker__nav-item', { active: sidebarId === 'all' }]" @click="selectSidebar('all')">
+                          <button type="button" :class="['clock-task-picker__nav-item', { active: pickerScope === 'all' }]" @click="selectPickerScope('all')">
                             <LayoutGrid :size="14" /><span>全部</span><small>{{ openTasks.length }}</small>
                           </button>
-                          <button type="button" :class="['clock-task-picker__nav-item', { active: sidebarId === 'recent' }]" @click="selectSidebar('recent')">
+                          <button type="button" :class="['clock-task-picker__nav-item', { active: pickerScope === 'recent' }]" @click="selectPickerScope('recent')">
                             <History :size="14" /><span>最近使用</span><small>{{ recentTaskCount }}</small>
                           </button>
                           <p class="clock-task-picker__nav-label">我的清单</p>
@@ -167,7 +189,7 @@
                                   v-for="list in group.lists"
                                   :key="list.id"
                                   type="button"
-                                  :class="['clock-task-picker__nav-item', 'clock-task-picker__nav-item--list', { active: sidebarId === list.id }]"
+                                  :class="['clock-task-picker__nav-item', 'clock-task-picker__nav-item--list', { active: pickerScope === 'list' && sidebarId === list.id }]"
                                   @click="selectSidebar(list.id)"
                                 >
                                   <span class="clock-task-picker__list-dot" :style="{ background: list.color }" />
@@ -179,7 +201,7 @@
                           </div>
                         </nav>
 
-                        <div class="clock-task-picker__tasks" :class="{ 'is-grouped': useGroupedView, 'is-searching': taskSearchQuery.trim() }">
+                        <div class="clock-task-picker__tasks" :class="{ 'is-searching': taskSearchQuery.trim(), 'is-grouped': viewMode === 'group' && !taskSearchQuery.trim() }">
                           <template v-if="taskSearchQuery.trim()">
                             <p class="clock-task-picker__tasks-header">搜索结果 · {{ searchResults.length }} 项</p>
                             <button
@@ -207,95 +229,80 @@
 
                           <template v-else>
                             <div class="clock-task-picker__tasks-header">
-                              <span class="clock-task-picker__tasks-title">{{ sidebarTitle }} · {{ sidebarTasks.length }} 项</span>
-                              <div v-if="canToggleView" class="clock-task-picker__view-toggle" role="tablist">
-                                <button type="button" :class="{ active: viewMode === 'list' }" :aria-pressed="viewMode === 'list'" @click="viewMode = 'list'">
-                                  <AlignLeft :size="13" />列表
-                                </button>
-                                <button type="button" :class="{ active: viewMode === 'group' }" :aria-pressed="viewMode === 'group'" @click="viewMode = 'group'">
-                                  <LayoutGrid :size="13" />分组
-                                </button>
+                              <span class="clock-task-picker__tasks-title">{{ pickerTitle }} · {{ pickerTasks.length }} 项</span>
+                              <div class="clock-task-picker__scope-tabs" role="tablist" aria-label="任务范围">
+                                <button type="button" :class="{ active: pickerScope === 'suggested' }" :aria-selected="pickerScope === 'suggested'" @click="selectPickerScope('suggested')">建议</button>
+                                <button type="button" :class="{ active: pickerScope === 'recent' }" :aria-selected="pickerScope === 'recent'" @click="selectPickerScope('recent')">最近</button>
+                                <button type="button" :class="{ active: pickerScope === 'due' }" :aria-selected="pickerScope === 'due'" @click="selectPickerScope('due')">今天</button>
+                              </div>
+                              <div class="clock-task-picker__view-toggle" role="tablist" aria-label="任务展示方式">
+                                <button type="button" :class="{ active: viewMode === 'list' }" :aria-selected="viewMode === 'list'" @click="viewMode = 'list'"><AlignLeft :size="13" />列表</button>
+                                <button type="button" :class="{ active: viewMode === 'group' }" :aria-selected="viewMode === 'group'" @click="viewMode = 'group'"><LayoutGrid :size="13" />分组</button>
                               </div>
                             </div>
 
-                            <template v-if="useGroupedView">
-                              <template v-for="(group, gIndex) in groupedTasks" :key="group.id">
-                                <div
-                                  class="clock-task-picker__tasks-group"
-                                  :class="[group.isUngrouped ? 'clock-task-picker__tasks-group--ungrouped' : `task-group--color-${group.color}`]"
-                                >
-                                  <span class="clock-task-picker__tasks-group-emoji" v-if="group.emoji">{{ group.emoji }}</span>
+                            <template v-if="viewMode === 'group'">
+                              <template v-for="group in groupedPickerTasks" :key="group.id">
+                                <button type="button" class="clock-task-picker__group-card" :style="{ '--group-accent': group.color }" :aria-expanded="isPickerGroupExpanded(group.id)" @click="togglePickerGroup(group.id)">
+                                  <ChevronRight :size="16" :class="{ expanded: isPickerGroupExpanded(group.id) }" />
+                                  <span v-if="group.emoji" class="clock-task-picker__group-card-emoji">{{ group.emoji }}</span>
                                   <span v-else class="clock-task-picker__tasks-group-dot" />
-                                  <span class="clock-task-picker__tasks-group-name">{{ group.name }}</span>
-                                  <small>{{ group.tasks.length }} 项</small>
-                                </div>
-                                <button
-                                  v-for="(task, tIndex) in group.tasks"
-                                  :key="task.id"
-                                  type="button"
-                                  :class="['clock-task-picker__task', `task-group--color-${groupColorOf(task)}`, { active: selectedTaskId === task.id, focused: flatGroupedIndex(gIndex, tIndex) === keyboardIndex, pinned: task.pinned, important: task.important }]"
-                                  :style="{ '--task-list-color': listColorOf(task.listId) }"
-                                  @click="chooseTask(task.id)"
-                                  @mouseenter="keyboardIndex = flatGroupedIndex(gIndex, tIndex)"
-                                >
-                                  <span class="clock-task-picker__task-icon">
-                                    <span class="clock-task-picker__list-dot" />
-                                  </span>
-                                  <span>
-                                    <strong>{{ task.title }}</strong>
-                                    <small class="clock-task-picker__task-meta">
-                                      <span><i class="clock-task-picker__list-dot" :style="{ background: listColorOf(task.listId) }" />{{ listNameOf(task.listId) }}</span>
-                                      <span v-if="task.dueDate" :class="{ overdue: isOverdue(task.dueDate) }"><Calendar :size="11" />{{ formatDueLabel(task.dueDate) }}</span>
-                                      <span v-if="task.priority"><Flag :size="10" />{{ priorityLabel(task.priority) }}</span>
-                                      <span v-if="task.important"><Star :size="10" />重要</span>
-                                      <span v-if="task.pinned"><Pin :size="10" />置顶</span>
-                                      <span v-for="(tag, tagIndex) in task.tags.slice(0, 2)" :key="`${tag}-${tagIndex}`" class="clock-task-picker__task-label"><Tag :size="10" />{{ tag }}</span>
-                                      <span v-if="!task.dueDate && !task.priority && !task.important && !task.pinned && !task.tags.length" class="clock-task-picker__task-status"><i />待处理</span>
-                                    </small>
-                                  </span>
-                                  <span class="clock-task-picker__task-tags">
-                                    <Pin v-if="task.pinned" :size="13" class="clock-task-picker__task-tag clock-task-picker__task-tag--pinned" />
-                                    <Star v-if="task.important" :size="13" class="clock-task-picker__task-tag clock-task-picker__task-tag--important" />
-                                    <Check v-if="selectedTaskId === task.id" :size="16" class="clock-task-picker__task-tag clock-task-picker__task-tag--check" />
-                                  </span>
+                                  <strong>{{ group.name }}</strong>
+                                  <small>{{ group.tasks.length }} 项待处理</small>
                                 </button>
+                                <div v-show="isPickerGroupExpanded(group.id)" class="clock-task-picker__group-tasks">
+                                  <button
+                                    v-for="(task, index) in group.tasks"
+                                    :key="task.id"
+                                    type="button"
+                                    :class="['clock-task-picker__task', { active: selectedTaskId === task.id, focused: index === keyboardIndex }]"
+                                    :style="{ '--task-list-color': listColorOf(task.listId) }"
+                                    @click="chooseTask(task.id)"
+                                    @mouseenter="keyboardIndex = index"
+                                  >
+                                    <span class="clock-task-picker__task-icon"><span class="clock-task-picker__list-dot" :style="{ background: listColorOf(task.listId) }" /></span>
+                                    <span>
+                                      <strong>{{ task.title }}</strong>
+                                      <small class="clock-task-picker__task-meta">
+                                        <span><i class="clock-task-picker__list-dot" :style="{ background: listColorOf(task.listId) }" />{{ listNameOf(task.listId) }}</span>
+                                        <span v-if="task.dueDate" :class="{ overdue: isOverdue(task.dueDate) }"><Calendar :size="11" />{{ formatDueLabel(task.dueDate) }}</span>
+                                        <span v-if="task.priority"><Flag :size="10" />{{ priorityLabel(task.priority) }}</span>
+                                        <span v-if="task.pinned"><Pin :size="10" />置顶</span><span v-else-if="task.important"><Star :size="10" />重要</span>
+                                        <span v-else-if="task.recommendation" class="clock-task-picker__recommendation">{{ task.recommendation }}</span><span v-else class="clock-task-picker__task-status"><i />待处理</span>
+                                      </small>
+                                    </span>
+                                    <span class="clock-task-picker__task-tags"><Check v-if="selectedTaskId === task.id" :size="18" class="clock-task-picker__task-tag clock-task-picker__task-tag--check" /></span>
+                                  </button>
+                                </div>
                               </template>
                             </template>
 
                             <template v-else>
                               <button
-                                v-for="(task, index) in sidebarTasks"
+                                v-for="(task, index) in pickerTasks"
                                 :key="task.id"
                                 type="button"
-                                :class="['clock-task-picker__task', { active: selectedTaskId === task.id, focused: index === keyboardIndex, pinned: task.pinned, important: task.important }]"
+                                :class="['clock-task-picker__task', { active: selectedTaskId === task.id, focused: index === keyboardIndex }]"
                                 :style="{ '--task-list-color': listColorOf(task.listId) }"
                                 @click="chooseTask(task.id)"
                                 @mouseenter="keyboardIndex = index"
                               >
-                                <span class="clock-task-picker__task-icon">
-                                  <span class="clock-task-picker__list-dot" :style="{ background: listColorOf(task.listId) }" />
+                                <span class="clock-task-picker__task-icon"><span class="clock-task-picker__list-dot" :style="{ background: listColorOf(task.listId) }" /></span>
+                                <span>
+                                  <strong>{{ task.title }}</strong>
+                                  <small class="clock-task-picker__task-meta">
+                                    <span><i class="clock-task-picker__list-dot" :style="{ background: listColorOf(task.listId) }" />{{ listNameOf(task.listId) }}</span>
+                                    <span v-if="task.dueDate" :class="{ overdue: isOverdue(task.dueDate) }"><Calendar :size="11" />{{ formatDueLabel(task.dueDate) }}</span>
+                                    <span v-if="task.priority"><Flag :size="10" />{{ priorityLabel(task.priority) }}</span>
+                                    <span v-if="task.pinned"><Pin :size="10" />置顶</span><span v-else-if="task.important"><Star :size="10" />重要</span>
+                                    <span v-else-if="task.recommendation" class="clock-task-picker__recommendation">{{ task.recommendation }}</span><span v-else class="clock-task-picker__task-status"><i />待处理</span>
+                                  </small>
                                 </span>
-                                  <span>
-                                    <strong>{{ task.title }}</strong>
-                                    <small class="clock-task-picker__task-meta">
-                                      <span v-if="showListName(task)"><i class="clock-task-picker__list-dot" :style="{ background: listColorOf(task.listId) }" />{{ listNameOf(task.listId) }}</span>
-                                      <span v-if="task.dueDate" :class="{ overdue: isOverdue(task.dueDate) }"><Calendar :size="11" />{{ formatDueLabel(task.dueDate) }}</span>
-                                      <span v-if="task.priority"><Flag :size="10" />{{ priorityLabel(task.priority) }}</span>
-                                      <span v-if="task.important"><Star :size="10" />重要</span>
-                                      <span v-if="task.pinned"><Pin :size="10" />置顶</span>
-                                      <span v-for="(tag, tagIndex) in task.tags.slice(0, 2)" :key="`${tag}-${tagIndex}`" class="clock-task-picker__task-label"><Tag :size="10" />{{ tag }}</span>
-                                      <span v-if="!task.dueDate && !task.priority && !task.important && !task.pinned && !task.tags.length" class="clock-task-picker__task-status"><i />待处理</span>
-                                    </small>
-                                </span>
-                                <span class="clock-task-picker__task-tags">
-                                  <Pin v-if="task.pinned" :size="13" class="clock-task-picker__task-tag clock-task-picker__task-tag--pinned" />
-                                  <Star v-if="task.important" :size="13" class="clock-task-picker__task-tag clock-task-picker__task-tag--important" />
-                                  <Check v-if="selectedTaskId === task.id" :size="16" class="clock-task-picker__task-tag clock-task-picker__task-tag--check" />
-                                </span>
+                                <span class="clock-task-picker__task-tags"><Check v-if="selectedTaskId === task.id" :size="18" class="clock-task-picker__task-tag clock-task-picker__task-tag--check" /></span>
                               </button>
                             </template>
 
-                            <p v-if="!sidebarTasks.length" class="clock-task-picker__empty">{{ sidebarEmptyText }}</p>
+                            <p v-if="!(viewMode === 'group' ? groupedPickerTasks.length : pickerTasks.length)" class="clock-task-picker__empty">{{ pickerEmptyText }}</p>
                           </template>
                         </div>
                       </div>
@@ -329,7 +336,19 @@
             </div>
           </template>
           <template v-else>
-            <p class="clock-setup__task">{{ currentTaskTitle }}</p>
+            <div class="clock-plan-current">
+              <div><span>当前节奏</span><strong>{{ currentPlanMode }}</strong></div>
+              <div v-if="activeSession?.phase === 'focus'" class="clock-plan-current__task">
+                <span>正在推进</span>
+                <div>
+                  <i class="clock-task-picker__list-dot" :style="{ background: currentTask ? listColorOf(currentTask.listId) : 'var(--accent)' }" />
+                  <strong :title="currentTaskTitle">{{ currentTaskTitle }}</strong>
+                </div>
+                <small>{{ currentTask ? listNameOf(currentTask.listId) : '暂不关联任务' }}</small>
+                <label><span class="sr-only">更换当前专注任务</span><select :value="activeSession.taskId || ''" @change="changeCurrentTask"><option value="">暂不关联任务</option><option v-for="task in openTasks" :key="task.id" :value="task.id">{{ task.title }} · {{ listNameOf(task.listId) }}</option></select></label>
+              </div>
+              <div v-else><span>关联任务</span><strong>{{ nextFocusTaskTitle }}</strong></div>
+            </div>
             <label v-if="activeSession?.phase === 'focus'" class="clock-task-picker"><span>结束备注（可选）</span><input v-model="finishNote" maxlength="240" placeholder="例如：已完成初稿" /></label>
           </template>
         </section>
@@ -338,10 +357,9 @@
           <header><span class="clock-side-card__icon"><BarChart3 :size="19" /></span><span class="clock-side-card__heading"><h2>今日状态</h2><small>当前投入与今日成长</small></span><button class="clock-side-card__history-link" type="button" @click="store.setClockView('history')">回顾 <ChevronDown :size="14" /></button></header>
           <div class="clock-today clock-today--garden">
             <div><span>今日有效专注</span><strong>{{ gardenToday.growthMinutes }} / {{ gardenToday.goalMinutes }} 分钟</strong><small>{{ gardenSpeciesName }} · {{ gardenStageName }} · {{ todayCompletedCount }} 次完成</small></div>
-            <FocusStageArtwork :species-id="gardenToday.speciesId" :stage="gardenToday.stage" motion="static" />
           </div>
           <div class="clock-garden-progress" role="progressbar" :aria-valuenow="gardenProgress" aria-valuemin="0" aria-valuemax="100"><i :style="{ width: `${gardenProgress}%` }" /></div>
-          <div class="clock-stat-grid"><div><span>今日总计</span><strong>{{ durationText(todaySeconds) }}</strong></div><div><span>完成轮次</span><strong>{{ todayCompletedCount }} 轮</strong></div><div><span>中断</span><strong>{{ todayInterruptedCount }} 次</strong></div></div>
+          <div class="clock-stat-grid"><div><span>有效专注</span><strong>{{ durationText(todayEffectiveSeconds) }}</strong></div><div><span>完成轮次</span><strong>{{ todayCompletedCount }} 轮</strong></div><div><span>{{ goalRemainingMinutes ? '距目标' : '今日目标' }}</span><strong>{{ goalRemainingMinutes ? `还差 ${goalRemainingMinutes} 分钟` : '已达成' }}</strong></div></div>
           <label class="clock-garden-goal">
             <span class="clock-garden-goal__copy">
               <span>今日目标
@@ -378,7 +396,7 @@
 
 <script setup>
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { AlignLeft, BarChart3, Calendar, Check, ChevronDown, ChevronRight, CircleHelp, Clock3, Coffee, Flag, Folder, Focus, History, LayoutGrid, Leaf, ListChecks, ListTodo, Minus, Pause, PictureInPicture2, Pin, Play, Plus, Search, Sparkles, Star, Tag, Target, Timer, X } from 'lucide-vue-next'
+import { AlignLeft, BarChart3, Calendar, Check, ChevronDown, ChevronRight, CircleHelp, Clock3, Coffee, Flag, Folder, Focus, History, LayoutGrid, Leaf, ListTodo, Minus, Pause, PictureInPicture2, Pin, Play, Plus, Search, Sparkles, Star, Target, Timer, X } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import { openFocusController } from '@/services/platform'
 import RhythmWorkspace from './RhythmWorkspace.vue'
@@ -394,11 +412,14 @@ const freeDurationMinutes = ref(15)
 const freeDurationEditing = ref(false)
 const freeDurationEditor = ref(null)
 const finishNote = ref('')
+const endConfirmOpen = ref(false)
 const taskPicker = ref(null)
 const taskPickerOpen = ref(false)
 const taskSearchQuery = ref('')
 const sidebarId = ref('all')
+const pickerScope = ref('suggested')
 const viewMode = ref('list')
+const expandedPickerGroupIds = ref(new Set())
 const keyboardIndex = ref(0)
 const taskSearchInput = ref(null)
 const collapsedListGroupKeys = ref(new Set())
@@ -426,6 +447,7 @@ const decorateTask = (task) => ({ ...task, listName: store.lists.find(list => li
 const currentTaskTitle = computed(() => openTasks.value.find(task => task.id === activeSession.value?.taskId)?.title || '不关联任务')
 const selectedTaskTitle = computed(() => openTasks.value.find(task => task.id === selectedTaskId.value)?.title || '不关联任务')
 const selectedTask = computed(() => openTasks.value.find(task => task.id === selectedTaskId.value) || null)
+const currentTask = computed(() => openTasks.value.find(task => task.id === activeSession.value?.taskId) || null)
 const currentList = computed(() => store.currentList)
 const recentLists = computed(() => {
   const seen = new Set()
@@ -447,6 +469,90 @@ const recentTaskCount = computed(() => {
   const listIds = new Set(recentLists.value.map(list => list.id))
   return openTasks.value.filter(task => listIds.has(task.listId)).length
 })
+const recentTasks = computed(() => {
+  const seen = new Set()
+  const result = []
+  for (const item of (store.focusHistory || [])) {
+    const task = item.taskId ? openTasks.value.find(entry => entry.id === item.taskId) : null
+    if (!task || seen.has(task.id)) continue
+    seen.add(task.id)
+    result.push({ ...decorateTask(task), recommendation: '最近专注' })
+    if (result.length >= 6) break
+  }
+  return result
+})
+const dueSoonTasks = computed(() => openTasks.value
+  .filter(task => task.dueDate && startOfDayLocal(new Date(task.dueDate)) <= startOfDayLocal(new Date()))
+  .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
+  .map(task => ({ ...decorateTask(task), recommendation: isOverdue(task.dueDate) ? '已逾期' : '今天到期' })))
+const allPickerTasks = computed(() => openTasks.value
+  .slice()
+  .sort((a, b) => (Number(b.pinned) - Number(a.pinned)) || (Number(b.important) - Number(a.important)) || (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+  .map(task => ({ ...decorateTask(task), recommendation: '' })))
+const suggestedTasks = computed(() => {
+  const result = []
+  const seen = new Set()
+  const add = (task) => {
+    if (!task || seen.has(task.id) || result.length >= 6) return
+    seen.add(task.id)
+    result.push(task)
+  }
+  recentTasks.value.forEach(add)
+  dueSoonTasks.value.forEach(add)
+  openTasks.value
+    .filter(task => task.pinned || task.important)
+    .sort((a, b) => (Number(b.pinned) - Number(a.pinned)) || (Number(b.important) - Number(a.important)) || (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+    .forEach(task => add({ ...decorateTask(task), recommendation: task.pinned ? '已置顶' : '重要任务' }))
+  allPickerTasks.value.forEach(task => add({ ...task, recommendation: '待处理' }))
+  return result
+})
+const pickerTasks = computed(() => {
+  if (pickerScope.value === 'suggested') return suggestedTasks.value
+  if (pickerScope.value === 'recent') return recentTasks.value
+  if (pickerScope.value === 'due') return dueSoonTasks.value
+  if (pickerScope.value === 'list') {
+    return openTasks.value
+      .filter(task => task.listId === sidebarId.value)
+      .sort((a, b) => (Number(b.pinned) - Number(a.pinned)) || (Number(b.important) - Number(a.important)) || (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+      .map(task => ({ ...decorateTask(task), recommendation: '' }))
+  }
+  return allPickerTasks.value
+})
+const pickerTitle = computed(() => ({
+  suggested: '建议专注',
+  recent: '最近专注',
+  due: '今天需要推进',
+  list: store.lists.find(list => list.id === sidebarId.value)?.name || '清单任务',
+  all: '全部任务'
+}[pickerScope.value] || '全部任务'))
+const pickerEmptyText = computed(() => ({
+  suggested: '暂时没有推荐任务，去“全部任务”挑一项吧',
+  recent: '还没有专注记录，去“全部任务”挑一项吧',
+  due: '今天没有到期任务',
+  list: '这个清单下还没有待处理任务',
+  all: '还没有待处理任务'
+}[pickerScope.value] || '还没有待处理任务'))
+const groupedPickerTasks = computed(() => {
+  if (pickerScope.value === 'list') {
+    const taskGroups = (store.taskGroups || [])
+      .filter(group => group.listId === sidebarId.value)
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+      .map(group => ({ id: group.id, name: group.name, emoji: group.emoji || '', color: group.color || '#7f9b94', tasks: pickerTasks.value.filter(task => task.taskGroupId === group.id) }))
+      .filter(group => group.tasks.length)
+    const ungrouped = pickerTasks.value.filter(task => !task.taskGroupId)
+    if (ungrouped.length) taskGroups.push({ id: '__ungrouped__', name: '未分组', emoji: '', color: '#9aa8a4', tasks: ungrouped })
+    return taskGroups
+  }
+
+  const groups = new Map()
+  pickerTasks.value.forEach(task => {
+    if (!groups.has(task.listId)) {
+      groups.set(task.listId, { id: task.listId, name: listNameOf(task.listId), emoji: '', color: listColorOf(task.listId), tasks: [] })
+    }
+    groups.get(task.listId).tasks.push(task)
+  })
+  return [...groups.values()]
+})
 const listGroups = computed(() => {
   const taskCountByList = new Map()
   openTasks.value.forEach(task => { taskCountByList.set(task.listId, (taskCountByList.get(task.listId) || 0) + 1) })
@@ -465,85 +571,6 @@ const listGroups = computed(() => {
   if (ungrouped.length) result.push({ key: '__ungrouped', name: '', lists: ungrouped })
   return result
 })
-const sidebarTasks = computed(() => {
-  if (sidebarId.value === 'all') {
-    return openTasks.value
-      .slice()
-      .sort((a, b) => (Number(b.pinned) - Number(a.pinned)) || (Number(b.important) - Number(a.important)) || (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-      .map(decorateTask)
-  }
-  if (sidebarId.value === 'recent') {
-    const listIds = new Set(recentLists.value.map(list => list.id))
-    return openTasks.value
-      .filter(task => listIds.has(task.listId))
-      .sort((a, b) => (Number(b.pinned) - Number(a.pinned)) || (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-      .map(decorateTask)
-  }
-  return openTasks.value
-    .filter(task => task.listId === sidebarId.value)
-    .sort((a, b) => (Number(b.pinned) - Number(a.pinned)) || (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-    .map(decorateTask)
-})
-const sidebarTitle = computed(() => {
-  if (sidebarId.value === 'all') return '全部任务'
-  if (sidebarId.value === 'recent') return '最近使用'
-  return store.lists.find(list => list.id === sidebarId.value)?.name || '清单'
-})
-const sidebarEmptyText = computed(() => {
-  if (sidebarId.value === 'recent') return '最近还没有专注过任务，去「全部」挑一个吧'
-  return '这个清单下还没有任务'
-})
-const heroSubtitle = computed(() => {
-  if (taskSearchQuery.value.trim()) return `搜索「${taskSearchQuery.value.trim()}」的结果`
-  if (selectedTask.value) return `当前已选：${selectedTask.value.title}`
-  return '从左侧分组浏览，或直接搜索'
-})
-const groupedTasks = computed(() => {
-  if (sidebarId.value === 'all' || sidebarId.value === 'recent') {
-    const tasksByList = new Map()
-    sidebarTasks.value.forEach(task => {
-      if (!tasksByList.has(task.listId)) tasksByList.set(task.listId, [])
-      tasksByList.get(task.listId).push(task)
-    })
-    return [...tasksByList.entries()].map(([listId, tasks]) => ({
-      id: `list:${listId}`,
-      name: listNameOf(listId),
-      emoji: '',
-      color: 'auto',
-      customColor: '',
-      tasks,
-      isUngrouped: false
-    }))
-  }
-  const listId = sidebarId.value
-  const listTasks = openTasks.value.filter(task => task.listId === listId)
-  const groups = store.taskGroups
-    .filter(group => group.listId === listId)
-    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-  const result = groups.map(group => {
-    const tasks = listTasks
-      .filter(task => task.taskGroupId === group.id)
-      .sort((a, b) => (Number(b.pinned) - Number(a.pinned)) || (Number(b.important) - Number(a.important)) || (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-      .map(decorateTask)
-    return { ...group, tasks }
-  })
-  const ungroupedTasks = listTasks
-    .filter(task => !task.taskGroupId)
-    .sort((a, b) => (Number(b.pinned) - Number(a.pinned)) || (Number(b.important) - Number(a.important)) || (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-    .map(decorateTask)
-  if (ungroupedTasks.length) {
-    result.push({ id: '__ungrouped__', name: '未分组', emoji: '', color: 'auto', customColor: '', tasks: ungroupedTasks, isUngrouped: true })
-  }
-  return result.filter(group => group.tasks.length)
-})
-const groupedTasksTotal = computed(() => groupedTasks.value.reduce((sum, group) => sum + group.tasks.length, 0))
-const canToggleView = computed(() => Boolean(sidebarId.value))
-const useGroupedView = computed(() => canToggleView.value && viewMode.value === 'group')
-function flatGroupedIndex(gIndex, tIndex) {
-  let i = 0
-  for (let g = 0; g < gIndex; g++) i += groupedTasks.value[g].tasks.length
-  return i + tIndex
-}
 function formatDueLabel(date) {
   if (!date) return ''
   const today = new Date()
@@ -619,9 +646,31 @@ const todayHistory = computed(() => store.focusHistory.filter(item => new Date(i
 const todaySeconds = computed(() => todayHistory.value.filter(item => item.phase === 'focus').reduce((total, item) => total + item.elapsedSeconds, 0))
 const todayCompletedCount = computed(() => todayHistory.value.filter(item => item.phase === 'focus' && item.result === 'completed').length)
 const todayInterruptedCount = computed(() => todayHistory.value.filter(item => item.phase === 'focus' && item.result !== 'completed').length)
+const todayEffectiveSeconds = computed(() => todayHistory.value
+  .filter(item => item.phase === 'focus' && item.result === 'completed')
+  .reduce((total, item) => total + item.elapsedSeconds, 0) + (activeSession.value?.phase === 'focus' ? store.focusElapsedSeconds : 0))
+const goalRemainingMinutes = computed(() => Math.max(0, gardenToday.value.goalMinutes - gardenToday.value.growthMinutes))
+const focusSettings = computed(() => store.clock.focusSettings)
+const isPomodoroCycle = computed(() => activeSession.value?.phase === 'focus' && activeSession.value.profileId === 'pomodoro')
+const currentPomodoroRound = computed(() => Math.min(focusSettings.value.focusesBeforeLongBreak, store.clock.cycleFocusCount + 1))
+const nextBreakLabel = computed(() => currentPomodoroRound.value >= focusSettings.value.focusesBeforeLongBreak
+  ? `长休息 ${durationText(focusSettings.value.longBreakSeconds)}`
+  : `短休息 ${durationText(focusSettings.value.shortBreakSeconds)}`)
+const nextFocusTaskTitle = computed(() => selectedTask.value?.title || currentTask.value?.title || '不关联任务')
+const currentPlanMode = computed(() => {
+  if (activeSession.value) return `${currentProfile.value?.name || '专注中'} · ${durationText(activeSession.value.durationSeconds)}`
+  if (pendingBreak.value) return `${pendingBreak.value.phase === 'long-break' ? '长休息' : '短休息'} · ${durationText(pendingBreak.value.durationSeconds)}`
+  return selectedProfile.value?.name || '准备开始'
+})
 function setGardenGoal(event) { store.updateFocusGardenSettings({ dailyGoalMinutes: Number(event.target.value) }) }
 function start() { store.startFocus(selectedProfile.value?.id, selectedTaskId.value, selectedProfileId.value === 'free-focus' ? selectedDurationSeconds.value : undefined) }
 function finish(result) { store.finishFocus(result, finishNote.value); finishNote.value = '' }
+function changeCurrentTask(event) { store.updateFocusTask(event.target.value || null) }
+function requestEndFocus() { endConfirmOpen.value = true }
+function confirmEndFocus() {
+  endConfirmOpen.value = false
+  finish('abandoned')
+}
 function adjustTime(minutes) { return store.adjustFocusDuration(minutes * 60) }
 async function openDesktopController() {
   try {
@@ -645,18 +694,33 @@ function toggleTaskPicker() {
   taskPickerOpen.value = !taskPickerOpen.value
   if (taskPickerOpen.value) {
     taskSearchQuery.value = ''
-    sidebarId.value = 'all'
-    viewMode.value = 'list'
+    pickerScope.value = 'suggested'
     keyboardIndex.value = 0
     nextTick(() => taskSearchInput.value?.focus())
   }
 }
-function selectSidebar(id) {
-  sidebarId.value = id
+function selectPickerScope(scope) {
+  pickerScope.value = scope
+  expandedPickerGroupIds.value = new Set()
   taskSearchQuery.value = ''
-  viewMode.value = id === 'all' || id === 'recent' ? 'list' : 'group'
   keyboardIndex.value = 0
   nextTick(() => taskSearchInput.value?.focus())
+}
+function selectSidebar(id) {
+  sidebarId.value = id
+  pickerScope.value = 'list'
+  viewMode.value = 'group'
+  expandedPickerGroupIds.value = new Set()
+  taskSearchQuery.value = ''
+  keyboardIndex.value = 0
+  nextTick(() => taskSearchInput.value?.focus())
+}
+function isPickerGroupExpanded(id) { return expandedPickerGroupIds.value.has(id) }
+function togglePickerGroup(id) {
+  const next = new Set(expandedPickerGroupIds.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  expandedPickerGroupIds.value = next
 }
 function isListGroupCollapsed(key) { return collapsedListGroupKeys.value.has(key) }
 function toggleListGroup(key) {
@@ -683,45 +747,6 @@ function confirmAndStart() {
 }
 function listNameOf(listId) { return store.lists.find(list => list.id === listId)?.name || '收集箱' }
 function listColorOf(listId) { return store.lists.find(list => list.id === listId)?.color || '#9aa3b7' }
-function groupColorOf(task) {
-  if (!task.taskGroupId) return 'auto'
-  const group = store.taskGroups.find(g => g.id === task.taskGroupId)
-  return group?.color || 'auto'
-}
-function showListName(task) { return sidebarId.value === 'all' || sidebarId.value === 'recent' }
-function onPickerKeydown(event) {
-  const items = taskSearchQuery.value.trim()
-    ? searchResults.value
-    : (useGroupedView.value
-        ? groupedTasks.value.flatMap(group => group.tasks)
-        : sidebarTasks.value)
-  if (!items.length) {
-    if (event.key === 'Escape') { event.preventDefault(); taskPickerOpen.value = false }
-    return
-  }
-  if (event.key === 'ArrowDown') {
-    event.preventDefault()
-    keyboardIndex.value = (keyboardIndex.value + 1) % items.length
-    scrollFocusedIntoView()
-  } else if (event.key === 'ArrowUp') {
-    event.preventDefault()
-    keyboardIndex.value = (keyboardIndex.value - 1 + items.length) % items.length
-    scrollFocusedIntoView()
-  } else if (event.key === 'Enter') {
-    event.preventDefault()
-    if (taskSearchQuery.value.trim()) handleSearchHit(items[keyboardIndex.value])
-    else chooseTask(items[keyboardIndex.value].id)
-  } else if (event.key === 'Escape') {
-    event.preventDefault()
-    taskPickerOpen.value = false
-  }
-}
-function scrollFocusedIntoView() {
-  nextTick(() => {
-    const target = taskPicker.value?.querySelector('.clock-task-picker__task.focused, .clock-task-picker__task.is-focused')
-    if (target && typeof target.scrollIntoView === 'function') target.scrollIntoView({ block: 'nearest' })
-  })
-}
 watch(taskSearchQuery, () => { keyboardIndex.value = 0 })
 watch(sidebarId, () => { keyboardIndex.value = 0 })
 function formatClock(seconds) { const value = Math.max(0, Math.floor(seconds || 0)); return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}` }

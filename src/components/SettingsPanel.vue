@@ -204,6 +204,22 @@
             </div>
           </section>
 
+          <section v-else-if="activeSection === 'focus'" class="settings-section">
+            <div class="settings-section__head settings-section__head--accent">
+              <span class="settings-section__icon"><Timer :size="20" /></span>
+              <div><h3>专注与休息</h3><p>设置番茄节奏，以及每轮完成后的休息安排。</p></div>
+            </div>
+            <div class="settings-block">
+              <div class="settings-block__title"><h4>番茄轮次</h4><span>每 {{ store.clock.focusSettings.focusesBeforeLongBreak }} 轮长休息</span></div>
+              <label class="setting-select-card"><span class="setting-select-card__icon"><Timer :size="17" /></span><span class="setting-select-card__copy"><strong>完成几轮后长休息</strong><small>每完成一轮专注先短休息；达到设定轮数后改为一次长休息，并重新从第 1 轮开始。</small></span><select :value="store.clock.focusSettings.focusesBeforeLongBreak" @change="store.updateFocusSettings({ focusesBeforeLongBreak: Number($event.target.value) })"><option v-for="count in [2, 3, 4, 5, 6, 8]" :key="count" :value="count">{{ count }} 轮</option></select></label>
+            </div>
+            <div class="settings-block">
+              <div class="settings-block__title"><h4>休息时长</h4><span>{{ Math.round(store.clock.focusSettings.shortBreakSeconds / 60) }} / {{ Math.round(store.clock.focusSettings.longBreakSeconds / 60) }} 分钟</span></div>
+              <div class="focus-break-settings"><label class="focus-break-setting"><span><strong>短休息</strong><small>普通轮次结束后</small></span><select :value="store.clock.focusSettings.shortBreakSeconds / 60" @change="store.updateFocusSettings({ shortBreakSeconds: Number($event.target.value) * 60 })"><option v-for="minutes in [3, 5, 10, 15]" :key="minutes" :value="minutes">{{ minutes }} 分钟</option></select></label><label class="focus-break-setting"><span><strong>长休息</strong><small>完成一个轮次周期后</small></span><select :value="store.clock.focusSettings.longBreakSeconds / 60" @change="store.updateFocusSettings({ longBreakSeconds: Number($event.target.value) * 60 })"><option v-for="minutes in [10, 15, 20, 30]" :key="minutes" :value="minutes">{{ minutes }} 分钟</option></select></label></div>
+            </div>
+            <div class="settings-block"><label class="switch-row"><span><strong>自动开始休息</strong><small>完成专注后立即开始对应的短休息或长休息。</small></span><input type="checkbox" :checked="store.clock.focusSettings.autoStartBreaks" @change="store.updateFocusSettings({ autoStartBreaks: $event.target.checked })" /><span class="switch-control" aria-hidden="true"></span></label></div>
+          </section>
+
           <section v-else-if="activeSection === 'app-behavior'" class="settings-section">
             <div class="settings-section__head settings-section__head--accent">
               <span class="settings-section__icon"><SlidersHorizontal :size="20" /></span>
@@ -871,6 +887,7 @@ async function openNotificationSettings() {
 const sections = [
   { id: 'appearance', label: '外观与布局', summary: '主题、密度与面板', icon: Palette },
   { id: 'task-display', label: '任务与清单', summary: '完成项与分组显示', icon: CheckSquare },
+  { id: 'focus', label: '专注与休息', summary: '番茄轮次与休息', icon: Timer },
   { id: 'app-behavior', label: '应用行为', summary: '启动、提示与窗口', icon: SlidersHorizontal },
   { id: 'notifications', label: '通知与反馈', summary: '提醒、权限与声音', icon: Bell },
   { id: 'about', label: '关于与更新', summary: '版本、指南与更新', icon: Info }

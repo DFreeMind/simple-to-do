@@ -11,7 +11,7 @@
 - 不回滚用户或其他工具产生的无关变更。
 - 每完成一个稳定功能并验证通过后提交一次，commit 使用中文。
 - 提交粒度按功能划分，避免把文档、运行时迁移、业务功能修复混在一个提交里。
-- 代码变更后至少运行 `npm run build`；涉及 Tauri 时还要运行 `npm run tauri build` 或说明无法运行的原因。
+- 代码变更后不主动执行 `npm run build`、`npm run tauri build` 或安装包构建；改动交付前应完成静态检查、相关单元或局部交互验证，并确保构建前阶段无报错。最终功能与打包验证由用户自行执行，除非用户在当次明确要求构建。
 
 ## GitHub 发布规范
 - GitHub Release 由 agent 发布时，Release title 必须只使用应用版本号，与 `src-tauri/tauri.conf.json` 中的 `version` 完全一致，例如 `0.2.2`；不要加入“发布”“更新”等前缀。
