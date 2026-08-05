@@ -114,6 +114,7 @@ const DEFAULT_SETTINGS = {
   focusCompletionSoundEnabled: true,
   focusReminderAlwaysOnTop: true,
   focusControllerAlwaysOnTop: true,
+  focusControllerStyle: 'orbit',
   windowCloseBehavior: 'hide',
   dailyGuidanceEnabled: true,
   dailyGuidanceStyle: 'practical'
@@ -740,7 +741,7 @@ export const useTaskStore = defineStore('task', () => {
       syncNativeFocusCompletion()
       if (updates.focusCompletionNotificationsEnabled === false) showNotice('专注完成后台提醒已关闭', 'info')
     }
-    if ('focusControllerAlwaysOnTop' in updates) syncNativeFocusController()
+    if ('focusControllerAlwaysOnTop' in updates || 'focusControllerStyle' in updates) syncNativeFocusController()
     if ('windowCloseBehavior' in updates) {
       setWindowCloseBehavior(settings.value.windowCloseBehavior)
         .catch(error => console.warn('[Store] 同步窗口关闭方式失败:', error))
@@ -2120,10 +2121,12 @@ export const useTaskStore = defineStore('task', () => {
       status: session.status,
       phase: session.phase || 'focus',
       taskTitle,
+      durationSeconds: duration === null ? null : Math.max(0, Math.round(duration)),
       remainingSeconds: duration === null ? null : Math.max(0, Math.round(duration - elapsedSeconds)),
       elapsedSeconds: Math.max(0, Math.round(elapsedSeconds)),
       syncedAt: Date.now(),
-      alwaysOnTop: settings.value.focusControllerAlwaysOnTop !== false
+      alwaysOnTop: settings.value.focusControllerAlwaysOnTop !== false,
+      style: settings.value.focusControllerStyle
     })
   }
 
@@ -3099,6 +3102,9 @@ export const useTaskStore = defineStore('task', () => {
     const focusCompletionSoundEnabled = rawSettings.focusCompletionSoundEnabled !== false
     const focusReminderAlwaysOnTop = rawSettings.focusReminderAlwaysOnTop !== false
     const focusControllerAlwaysOnTop = rawSettings.focusControllerAlwaysOnTop !== false
+    const focusControllerStyle = ['orbit', 'island', 'classic'].includes(rawSettings.focusControllerStyle)
+      ? rawSettings.focusControllerStyle
+      : DEFAULT_SETTINGS.focusControllerStyle
     const windowCloseBehavior = ['hide', 'quit'].includes(rawSettings.windowCloseBehavior)
       ? rawSettings.windowCloseBehavior
       : DEFAULT_SETTINGS.windowCloseBehavior
@@ -3139,6 +3145,7 @@ export const useTaskStore = defineStore('task', () => {
       focusCompletionSoundEnabled,
       focusReminderAlwaysOnTop,
       focusControllerAlwaysOnTop,
+      focusControllerStyle,
       windowCloseBehavior,
       dailyGuidanceEnabled,
       dailyGuidanceStyle

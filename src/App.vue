@@ -185,9 +185,13 @@ function openRhythmReminder(event) {
 function handleRhythmReminderAction(event) { const { reminderId, action } = event.payload || {}; if (!reminderId) return; store[action === 'complete' ? 'completeRhythmReminder' : action === 'snooze' ? 'snoozeRhythmReminder' : 'skipRhythmReminderToday']?.(reminderId, action === 'snooze' ? 5 : undefined); store.setClockView('rhythm') }
 
 function handleFocusControllerAction(event) {
-  const { action, sessionId, alwaysOnTop } = event.payload || {}
+  const { action, sessionId, alwaysOnTop, style } = event.payload || {}
   if (action === 'set-always-on-top') {
     store.updateSettings({ focusControllerAlwaysOnTop: alwaysOnTop !== false })
+    return
+  }
+  if (action === 'set-style') {
+    store.updateSettings({ focusControllerStyle: style })
     return
   }
   if (!sessionId || store.activeFocusSession?.id !== sessionId) return

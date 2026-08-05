@@ -405,6 +405,16 @@ export async function setFocusControllerAlwaysOnTop(alwaysOnTop) {
   return invoke('set_focus_controller_always_on_top', { alwaysOnTop })
 }
 
+export async function setFocusControllerStyle(style) {
+  if (!isTauri()) return false
+  return invoke('set_focus_controller_style', { style })
+}
+
+export async function setFocusControllerIslandExpanded(expanded) {
+  if (!isTauri()) return false
+  return invoke('set_focus_controller_island_expanded', { expanded })
+}
+
 export async function handleFocusControllerAction(controller, action) {
   if (!isTauri() || !controller?.sessionId) return false
   return invoke('handle_focus_controller_action', {

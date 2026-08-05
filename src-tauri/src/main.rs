@@ -50,6 +50,7 @@ struct FocusControllerState {
     revision: AtomicU64,
     ready_revision: AtomicU64,
     visible_requested: AtomicBool,
+    island_expanded: AtomicBool,
     pending: Mutex<Option<FocusControllerPayload>>,
 }
 
@@ -116,6 +117,7 @@ impl Default for FocusControllerState {
             revision: AtomicU64::new(0),
             ready_revision: AtomicU64::new(0),
             visible_requested: AtomicBool::new(false),
+            island_expanded: AtomicBool::new(false),
             pending: Mutex::new(None),
         }
     }
@@ -209,10 +211,12 @@ struct FocusControllerPayload {
     status: String,
     phase: String,
     task_title: Option<String>,
+    duration_seconds: Option<u64>,
     remaining_seconds: Option<u64>,
     elapsed_seconds: u64,
     synced_at: i64,
     always_on_top: bool,
+    style: String,
 }
 
 impl Default for WindowCloseBehavior {
@@ -494,6 +498,66 @@ fn position_focus_controller_initially(window: &tauri::WebviewWindow) {
     let _ = window.set_position(tauri::PhysicalPosition::new(x as i32, y as i32));
 }
 
+fn focus_controller_size(style: &str, island_expanded: bool) -> tauri::LogicalSize<f64> {
+    match style {
+        // 轨道表盘采用紧凑桌面挂件尺寸，完整矢量表盘保证缩放后仍保持清晰。
+        "orbit" => tauri::LogicalSize::new(256.0, 256.0),
+        "island" if island_expanded => tauri::LogicalSize::new(430.0, 156.0),
+        "island" => tauri::LogicalSize::new(390.0, 86.0),
+        _ => tauri::LogicalSize::new(390.0, 286.0),
+    }
+}
+
+fn normalize_focus_controller_style(style: &str) -> &'static str {
+    match style {
+        "orbit" => "orbit",
+        "island" => "island",
+        _ => "classic",
+    }
+}
+
+fn apply_focus_controller_geometry(
+    window: &tauri::WebviewWindow,
+    style: &str,
+    island_expanded: bool,
+    preserve_right_edge: bool,
+) -> Result<(), String> {
+    let size = focus_controller_size(style, island_expanded);
+    let previous_position = window.outer_position().ok();
+    let previous_size = window.outer_size().ok();
+    let scale_factor = window.scale_factor().unwrap_or(1.0);
+
+    let _ = window.set_min_size(None::<tauri::Size>);
+    let _ = window.set_max_size(None::<tauri::Size>);
+    window
+        .set_size(size)
+        .map_err(|error| format!("调整专注控制器尺寸失败: {error}"))?;
+    let _ = window.set_min_size(Some(size));
+    let _ = window.set_max_size(Some(size));
+
+    if preserve_right_edge {
+        if let (Some(position), Some(previous_size)) = (previous_position, previous_size) {
+            let next_width = (size.width * scale_factor).round() as i64;
+            let previous_right = i64::from(position.x) + i64::from(previous_size.width);
+            let mut x = previous_right - next_width;
+            let mut y = i64::from(position.y);
+            if let Some(monitor) = window.current_monitor().ok().flatten() {
+                let monitor_position = monitor.position();
+                let monitor_size = monitor.size();
+                let left = i64::from(monitor_position.x);
+                let top = i64::from(monitor_position.y);
+                let right = left + i64::from(monitor_size.width);
+                let bottom = top + i64::from(monitor_size.height);
+                let next_height = (size.height * scale_factor).round() as i64;
+                x = x.clamp(left, (right - next_width).max(left));
+                y = y.clamp(top, (bottom - next_height).max(top));
+            }
+            let _ = window.set_position(tauri::PhysicalPosition::new(x as i32, y as i32));
+        }
+    }
+    Ok(())
+}
+
 fn show_coordinated_reminder(
     app: &tauri::AppHandle,
     kind: ReminderWindowKind,
@@ -604,6 +668,7 @@ fn sync_focus_controller(
     let Some(mut payload) = payload else {
         state.visible_requested.store(false, Ordering::Relaxed);
         state.ready_revision.store(0, Ordering::Relaxed);
+        state.island_expanded.store(false, Ordering::Relaxed);
         state
             .pending
             .lock()
@@ -616,12 +681,19 @@ fn sync_focus_controller(
     };
     let revision = state.revision.fetch_add(1, Ordering::Relaxed) + 1;
     payload.revision = revision;
+    payload.style = normalize_focus_controller_style(&payload.style).to_string();
+    let style = payload.style.clone();
+    if style != "island" {
+        state.island_expanded.store(false, Ordering::Relaxed);
+    }
+    let island_expanded = state.island_expanded.load(Ordering::Relaxed);
     state
         .pending
         .lock()
         .map_err(|_| "专注控制器状态不可用".to_string())?
         .replace(payload);
-    if app.get_webview_window("focus-controller").is_some() {
+    if let Some(window) = app.get_webview_window("focus-controller") {
+        let _ = apply_focus_controller_geometry(&window, &style, island_expanded, true);
         let _ = app.emit_to(
             "focus-controller",
             "focus-controller:refresh",
@@ -642,11 +714,13 @@ fn open_focus_controller(app: tauri::AppHandle) -> Result<bool, String> {
         .ok_or_else(|| "当前没有进行中的专注".to_string())?;
     state.visible_requested.store(true, Ordering::Relaxed);
     state.ready_revision.store(0, Ordering::Relaxed);
+    state.island_expanded.store(false, Ordering::Relaxed);
 
     if let Some(window) = app.get_webview_window("focus-controller") {
         window
             .set_always_on_top(payload.always_on_top)
             .map_err(|error| format!("设置专注控制器置顶状态失败: {error}"))?;
+        apply_focus_controller_geometry(&window, &payload.style, false, false)?;
         position_focus_controller_initially(&window);
         // 不依赖小窗 WebView 的前端回调来显示。Windows 上隐藏窗口的
         // WebView 初始化可能比事件监听更晚，导致 refresh 事件丢失并一直不显示。
@@ -675,13 +749,15 @@ fn open_focus_controller(app: tauri::AppHandle) -> Result<bool, String> {
     .maximizable(false)
     .minimizable(false)
     .decorations(false)
+    .transparent(true)
     .always_on_top(payload.always_on_top)
     .skip_taskbar(true)
-    .shadow(true)
+    .shadow(false)
     .center()
     .visible(false)
     .build()
     .map_err(|error| format!("创建专注控制器失败: {error}"))?;
+    apply_focus_controller_geometry(&window, &payload.style, false, false)?;
     position_focus_controller_initially(&window);
     // 原生窗口创建完成后立即显示，避免 Windows 因 WebView 初始化时序而
     // 将控制器永久停留在 hidden 状态。
@@ -709,22 +785,24 @@ fn focus_controller_ready(app: tauri::AppHandle, revision: u64) -> Result<bool, 
     if !state.visible_requested.load(Ordering::Relaxed) {
         return Ok(false);
     }
-    let always_on_top = state
+    let presentation = state
         .pending
         .lock()
         .map_err(|_| "专注控制器状态不可用".to_string())?
         .as_ref()
         .filter(|payload| payload.revision == revision)
-        .map(|payload| payload.always_on_top);
-    let Some(always_on_top) = always_on_top else {
+        .map(|payload| (payload.always_on_top, payload.style.clone()));
+    let Some((always_on_top, style)) = presentation else {
         return Ok(false);
     };
+    let island_expanded = state.island_expanded.load(Ordering::Relaxed);
     let window = app
         .get_webview_window("focus-controller")
         .ok_or_else(|| "专注控制器窗口不存在".to_string())?;
     window
         .set_always_on_top(always_on_top)
         .map_err(|error| format!("设置专注控制器置顶状态失败: {error}"))?;
+    apply_focus_controller_geometry(&window, &style, island_expanded, true)?;
     let was_visible = window.is_visible().unwrap_or(false);
     window
         .show()
@@ -770,6 +848,52 @@ fn set_focus_controller_always_on_top(
             "alwaysOnTop": always_on_top
         }),
     );
+    Ok(true)
+}
+
+#[tauri::command]
+fn set_focus_controller_style(app: tauri::AppHandle, style: String) -> Result<bool, String> {
+    let style = normalize_focus_controller_style(&style).to_string();
+    let state = app.state::<FocusControllerState>();
+    state.island_expanded.store(false, Ordering::Relaxed);
+    if let Ok(mut pending) = state.pending.lock() {
+        if let Some(payload) = pending.as_mut() {
+            payload.style = style.clone();
+        }
+    }
+    let window = app
+        .get_webview_window("focus-controller")
+        .ok_or_else(|| "专注控制器窗口不存在".to_string())?;
+    apply_focus_controller_geometry(&window, &style, false, true)?;
+    let _ = app.emit_to(
+        "main",
+        "focus-controller:action",
+        serde_json::json!({ "action": "set-style", "style": style }),
+    );
+    Ok(true)
+}
+
+#[tauri::command]
+fn set_focus_controller_island_expanded(
+    app: tauri::AppHandle,
+    expanded: bool,
+) -> Result<bool, String> {
+    let state = app.state::<FocusControllerState>();
+    let style = state
+        .pending
+        .lock()
+        .map_err(|_| "专注控制器状态不可用".to_string())?
+        .as_ref()
+        .map(|payload| payload.style.clone())
+        .unwrap_or_else(|| "classic".to_string());
+    if style != "island" {
+        return Ok(false);
+    }
+    let window = app
+        .get_webview_window("focus-controller")
+        .ok_or_else(|| "专注控制器窗口不存在".to_string())?;
+    apply_focus_controller_geometry(&window, &style, expanded, true)?;
+    state.island_expanded.store(expanded, Ordering::Relaxed);
     Ok(true)
 }
 
@@ -4299,6 +4423,8 @@ fn main() {
             get_focus_controller_payload,
             focus_controller_ready,
             set_focus_controller_always_on_top,
+            set_focus_controller_style,
+            set_focus_controller_island_expanded,
             handle_focus_controller_action,
             schedule_rhythm_reminder,
             cancel_rhythm_reminder,

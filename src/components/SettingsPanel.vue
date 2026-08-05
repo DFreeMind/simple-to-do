@@ -210,6 +210,30 @@
               <div><h3>专注与休息</h3><p>设置番茄节奏，以及每轮完成后的休息安排。</p></div>
             </div>
             <div class="settings-block">
+              <div class="settings-block__title"><h4>桌面专注控制器</h4><span>{{ focusControllerStyleLabel }}</span></div>
+              <div class="focus-controller-style-grid" role="radiogroup" aria-label="桌面专注控制器形态">
+                <button
+                  v-for="style in focusControllerStyles"
+                  :key="style.id"
+                  class="focus-controller-style-card"
+                  :class="[`focus-controller-style-card--${style.id}`, { active: store.settings.focusControllerStyle === style.id }]"
+                  type="button"
+                  role="radio"
+                  :aria-checked="store.settings.focusControllerStyle === style.id"
+                  @click="store.updateSettings({ focusControllerStyle: style.id })"
+                >
+                  <span class="focus-controller-style-card__preview" aria-hidden="true"><i></i><b></b><em></em></span>
+                  <span><strong>{{ style.label }}</strong><small>{{ style.description }}</small></span>
+                  <Check v-if="store.settings.focusControllerStyle === style.id" :size="15" />
+                </button>
+              </div>
+              <label class="switch-row focus-controller-top-setting">
+                <span><Pin :size="17" /><span><strong>控制器保持在最前面</strong><small>独立于专注完成提醒；仍可在控制器内随时切换。</small></span></span>
+                <input type="checkbox" :checked="store.settings.focusControllerAlwaysOnTop" @change="store.updateSettings({ focusControllerAlwaysOnTop: $event.target.checked })" />
+                <span class="switch-control" aria-hidden="true"></span>
+              </label>
+            </div>
+            <div class="settings-block">
               <div class="settings-block__title"><h4>番茄轮次</h4><span>每 {{ store.clock.focusSettings.focusesBeforeLongBreak }} 轮长休息</span></div>
               <label class="setting-select-card"><span class="setting-select-card__icon"><Timer :size="17" /></span><span class="setting-select-card__copy"><strong>完成几轮后长休息</strong><small>每完成一轮专注先短休息；达到设定轮数后改为一次长休息，并重新从第 1 轮开始。</small></span><select :value="store.clock.focusSettings.focusesBeforeLongBreak" @change="store.updateFocusSettings({ focusesBeforeLongBreak: Number($event.target.value) })"><option v-for="count in [2, 3, 4, 5, 6, 8]" :key="count" :value="count">{{ count }} 轮</option></select></label>
             </div>
@@ -846,7 +870,7 @@ const version = __APP_VERSION__
 const currentReleaseHighlights = [
   '新增时钟模块：番茄、深度专注与自由时长，完成后保留轻量奖励与回顾。',
   '新增节律提醒：支持间隔、固定时刻和连续使用三种触发方式，并可直接暂停或微调本轮。',
-  '后台到期时提供原生置顶提醒窗；专注还可打开可置顶、可拖动的桌面控制器。',
+  '后台到期时提供原生置顶提醒窗；专注还可打开轨道表盘、专注岛或经典卡片桌面控制器。',
   '专注与节律回顾支持概览、筛选、分页、详情和单条删除，数据仍只保存在本机。'
 ]
 
@@ -900,6 +924,12 @@ const themes = [
   { id: 'graphite', label: '石墨', description: '克制低调', swatch: 'linear-gradient(135deg, #475569 0%, #9aa7b8 58%, #f7f9fc 100%)' }
 ]
 
+const focusControllerStyles = [
+  { id: 'orbit', label: '轨道表盘', description: '圆形进度，专注感更强' },
+  { id: 'island', label: '专注岛', description: '紧凑常驻，按需展开' },
+  { id: 'classic', label: '经典卡片', description: '所有操作始终可见' }
+]
+
 const startViewLabels = {
   today: '今日',
   inbox: '收集箱',
@@ -908,6 +938,7 @@ const startViewLabels = {
 }
 
 const currentThemeLabel = computed(() => themes.find((theme) => theme.id === store.settings.theme)?.label || '青绿')
+const focusControllerStyleLabel = computed(() => focusControllerStyles.find((style) => style.id === store.settings.focusControllerStyle)?.label || '轨道表盘')
 const startViewLabel = computed(() => startViewLabels[store.settings.startView] || '今日')
 const enabledInterfaceCount = computed(() => Number(!store.settings.sidebarCollapsed) + Number(store.settings.detailOpen))
 const completedDisplaySummary = computed(() => {

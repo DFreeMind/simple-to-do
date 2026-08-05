@@ -7542,6 +7542,52 @@ body.is-resizing {
     font-weight: 700;
   }
 }
+
+.focus-controller-style-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.focus-controller-style-card {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--divider-soft);
+  border-radius: 12px;
+  background: var(--surface);
+  text-align: left;
+  transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+}
+.focus-controller-style-card:hover { border-color: var(--accent-34-fallback); background: var(--accent-tint); }
+.focus-controller-style-card.active { border-color: var(--accent); background: var(--accent-tint); box-shadow: 0 0 0 2px var(--accent-12-fallback); }
+.focus-controller-style-card > span:nth-child(2) { display: grid; min-width: 0; gap: 2px; }
+.focus-controller-style-card strong { color: var(--text); font-size: 12px; }
+.focus-controller-style-card small { overflow: hidden; color: var(--text-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.focus-controller-style-card > svg { position: absolute; top: 8px; right: 8px; color: var(--accent-strong); }
+.focus-controller-style-card:focus-visible { outline: 3px solid var(--accent-20-fallback); outline-offset: 2px; }
+.focus-controller-style-card__preview { position: relative; display: grid; height: 46px; place-items: center; border-radius: 9px; background: var(--surface-muted); }
+.focus-controller-style-card__preview i,
+.focus-controller-style-card__preview b,
+.focus-controller-style-card__preview em { position: absolute; display: block; margin: 0; font-style: normal; }
+.focus-controller-style-card--orbit .focus-controller-style-card__preview i { width: 34px; height: 34px; border: 3px solid var(--accent-soft); border-top-color: var(--accent); border-right-color: var(--accent); border-radius: 50%; transform: rotate(-28deg); }
+.focus-controller-style-card--orbit .focus-controller-style-card__preview b { width: 16px; height: 3px; border-radius: 2px; background: var(--text); }
+.focus-controller-style-card--island .focus-controller-style-card__preview i { width: 72px; height: 25px; border: 1px solid var(--divider-soft); border-radius: 10px; background: var(--surface); box-shadow: 0 4px 10px var(--text-7-fallback); }
+.focus-controller-style-card--island .focus-controller-style-card__preview b { left: calc(50% - 27px); width: 17px; height: 17px; border: 3px solid var(--accent-soft); border-top-color: var(--accent); border-radius: 50%; }
+.focus-controller-style-card--island .focus-controller-style-card__preview em { left: calc(50% - 3px); width: 23px; height: 3px; border-radius: 2px; background: var(--text); }
+.focus-controller-style-card--classic .focus-controller-style-card__preview i { width: 72px; height: 36px; border: 1px solid var(--divider-soft); border-radius: 6px; background: var(--surface); box-shadow: 0 4px 10px var(--text-7-fallback); }
+.focus-controller-style-card--classic .focus-controller-style-card__preview b { top: 11px; width: 70px; height: 1px; background: var(--divider-soft); }
+.focus-controller-style-card--classic .focus-controller-style-card__preview em { bottom: 8px; width: 40px; height: 5px; border-radius: 3px; background: var(--accent); }
+.focus-controller-top-setting { margin-top: 2px; }
+.focus-controller-top-setting > span:first-child { display: inline-flex; align-items: center; gap: 10px; }
+.focus-controller-top-setting > span:first-child > svg { color: var(--accent-strong); }
+
+@media (max-width: 780px) {
+  .focus-controller-style-grid { grid-template-columns: 1fr; }
+  .focus-controller-style-card { grid-template-columns: 92px minmax(0, 1fr); align-items: center; }
+}
 .focus-break-settings { overflow: hidden; border: 1px solid var(--divider-soft); border-radius: var(--radius-md); background: var(--surface); }
 .focus-break-setting { display: grid; grid-template-columns: minmax(0, 1fr) 112px; align-items: center; gap: 16px; min-height: 56px; padding: 9px 12px; }
 .focus-break-setting + .focus-break-setting { border-top: 1px solid var(--divider-soft); }

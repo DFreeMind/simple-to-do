@@ -1,5 +1,5 @@
 /** 前端状态结构迁移。数据库表结构迁移由 Rust 侧负责。 */
-const CURRENT_VERSION = 13
+const CURRENT_VERSION = 14
 const TASK_GROUP_COLOR_IDS = ['auto', 'accent', 'blue', 'violet', 'amber', 'rose', 'green', 'cyan', 'coral', 'indigo', 'teal', 'brick', 'custom']
 
 export class MigrationError extends Error {
@@ -22,7 +22,8 @@ const migrations = {
   9: migrateV9ToV10,
   10: migrateV10ToV11,
   11: migrateV11ToV12,
-  12: migrateV12ToV13
+  12: migrateV12ToV13,
+  13: migrateV13ToV14
 }
 
 export function migrateData(data) {
@@ -230,6 +231,21 @@ function migrateV12ToV13(data) {
   }
 }
 
+function migrateV13ToV14(data) {
+  const settings = data.settings && typeof data.settings === 'object' && !Array.isArray(data.settings)
+    ? data.settings
+    : {}
+  return {
+    ...data,
+    settings: {
+      ...settings,
+      focusControllerStyle: ['orbit', 'island', 'classic'].includes(settings.focusControllerStyle)
+        ? settings.focusControllerStyle
+        : 'classic'
+    }
+  }
+}
+
 export function validateData(data) {
   const errors = []
   if (!data || typeof data !== 'object' || Array.isArray(data)) return { valid: false, errors: ['数据不是有效的对象'] }
@@ -270,4 +286,4 @@ export function createBackup(data) {
 }
 
 export function getCurrentVersion() { return CURRENT_VERSION }
-export function getSupportedVersions() { return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] }
+export function getSupportedVersions() { return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] }
