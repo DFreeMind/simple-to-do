@@ -1523,6 +1523,7 @@ fn send_focus_system_notification(
     }
 }
 
+#[cfg(target_os = "macos")]
 fn apple_script_string(value: &str) -> String {
     value
         .replace('\\', "\\\\")
