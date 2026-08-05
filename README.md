@@ -10,7 +10,7 @@
 
 [下载最新版本](https://github.com/DFreeMind/simple-to-do/releases/latest) · [查看功能](#核心功能) · [开发文档](#开发)
 
-![易简清单今日视图：清单、任务、计划与搜索](public/screenshots/rich-editor.webp)
+![易简清单今日视图：清单、任务、计划与重要分组](public/screenshots/today-view.webp)
 
 ## 为什么是易简清单
 
@@ -37,7 +37,7 @@
 ### 把复杂任务拆成能开始的下一步
 
 <p align="center">
-  <img src="public/screenshots/subtasks.webp" alt="任务详情：子任务进度、日期、优先级、清单、标签与富文本备注" width="960" />
+  <img src="public/screenshots/subtask-panel.webp" alt="子任务列表：进度条、勾选、拖动排序" width="960" />
 </p>
 
 任务详情将子任务进度、日期与提醒、优先级、任务清单、标签和富文本备注放在同一处；完成一个子任务，整体进度会随之更新。
@@ -58,6 +58,15 @@
 </p>
 
 可以分别控制系统通知、提醒时机和操作音效；数据默认仅保存在本机，并能创建恢复点，在误操作后恢复到可信状态。
+
+### 专注与花田，让长期投入可见
+
+<p align="center">
+  <img src="public/screenshots/focus-workspace.webp" alt="专注工作台：今日花（小雏菊·种子）、今日目标与 3 个内置专注方式" width="49%" />
+  <img src="public/screenshots/focus-achievement.webp" alt="专注成就：花田总览、花种图鉴与成长徽章" width="49%" />
+</p>
+
+时钟模块把专注计时、节律提醒、回顾和成就放在同一处：今日花按专注分钟自然成长，长期投入会逐步解锁 12 种花和成长徽章；所有记录与成长数据保存在本机，不依赖外部账号。
 
 ## 快捷键
 
