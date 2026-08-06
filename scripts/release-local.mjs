@@ -45,13 +45,20 @@ if (!fs.existsSync(notesFile)) {
   process.exit(1)
 }
 
+function resolveCmd(cmd) {
+  // Windows 下 npm 实际是 npm.cmd，Node 的 execFileSync 需要显式扩展名
+  if (process.platform === 'win32' && cmd === 'npm') return 'npm.cmd'
+  return cmd
+}
+
 function run(cmd, argsList, options = {}) {
-  console.log(`\n$ ${cmd} ${argsList.join(' ')}`)
-  execFileSync(cmd, argsList, { stdio: 'inherit', cwd: root, ...options })
+  const resolved = resolveCmd(cmd)
+  console.log(`\n$ ${resolved} ${argsList.join(' ')}`)
+  execFileSync(resolved, argsList, { stdio: 'inherit', cwd: root, ...options })
 }
 
 function runCapture(cmd, argsList) {
-  return execFileSync(cmd, argsList, { encoding: 'utf8', cwd: root }).trim()
+  return execFileSync(resolveCmd(cmd), argsList, { encoding: 'utf8', cwd: root }).trim()
 }
 
 const tag = `v${version}`
