@@ -126,23 +126,42 @@ async function main() {
   verifyKeyId(sigStaged)
   console.log(`签名校验通过: keyid=403511B997506DCC`)
 
-  // latest.json（tauri 生成于 bundle/nsis）
-  const latestSource = findBundleFile('latest.json')
-  if (!latestSource) throw new Error('未找到 latest.json（tauri 构建产物）')
+  // latest.json：tauri 本地构建只生成 exe + sig，不生成/不覆盖 latest.json
+  // （bundle/nsis/latest.json 是旧版本残留，不能使用）。这里手动构造：
+  // version/notes 取本次发布，signature 从 exe.sig 读取，url 先指向 GitHub
+  // 资产，第 6 步 sync-update-source.mjs 会改写为自建服务器 /releases/ 路径。
   const latestStaged = path.join(staging, 'latest.json')
-  fs.copyFileSync(latestSource, latestStaged)
-  const latestBuf = fs.readFileSync(latestStaged)
-  if (hasBom(latestBuf)) {
-    console.log('构建产物 latest.json 带 BOM，先清理再上传')
-    fs.writeFileSync(latestStaged, latestBuf.subarray(3))
+  const sigContent = fs.readFileSync(sigStaged, 'utf8').trim()
+  const notes = fs.readFileSync(notesFile, 'utf8').trim()
+  const latestJson = {
+    version,
+    notes,
+    pub_date: new Date().toISOString(),
+    platforms: {
+      'windows-x86_64': {
+        signature: sigContent,
+        url: `https://github.com/${repo}/releases/download/${tag}/${assetBase}.exe`
+      },
+      'windows-x86_64-nsis': {
+        signature: sigContent,
+        url: `https://github.com/${repo}/releases/download/${tag}/${assetBase}.exe`
+      }
+    }
   }
-  const stagedLatest = JSON.parse(fs.readFileSync(latestStaged, 'utf8'))
-  console.log(`latest.json 就绪: version=${stagedLatest.version}, platforms=${Object.keys(stagedLatest.platforms || {}).length}`)
+  fs.writeFileSync(latestStaged, JSON.stringify(latestJson, null, 2) + '\n')
+  console.log(`latest.json 已构造: version=${latestJson.version}, platforms=${Object.keys(latestJson.platforms).length}（手动构造，不依赖 tauri 残留文件）`)
 
   // 4. 创建/更新 GitHub Release 并上传 Windows 资产
   console.log('\n--- 4/7 GitHub Release ---')
-  const existing = runCapture('gh', ['release', 'view', tag, '--json', 'id'])
-  if (existing && !existing.startsWith('gh:')) {
+  // gh release view 对不存在的 release 会以 exit 1 报错，不能直接抛；try/catch 判断存在性
+  let releaseExists = false
+  try {
+    const out = runCapture('gh', ['release', 'view', tag, '--json', 'id'])
+    releaseExists = !!(out && !out.startsWith('gh:'))
+  } catch {
+    releaseExists = false
+  }
+  if (releaseExists) {
     console.log(`Release ${tag} 已存在，更新 notes 与资产`)
     run('gh', ['release', 'edit', tag, '--notes-file', notesFile])
     run('gh', ['release', 'upload', tag, exeStaged, sigStaged, latestStaged, '--clobber'])
