@@ -1,28 +1,34 @@
 <template>
   <div class="time-picker-compact" @click.stop>
-    <div class="tpc-shortcut-row">
-      <span class="tpc-row-label">常用</span>
-      <div class="tpc-presets" aria-label="常用时间">
-        <button type="button" class="tpc-time" :class="{ active: !draftTime }" @click="clear">不设置</button>
-        <button v-for="time in presetTimes" :key="time" type="button" class="tpc-time" :class="{ active: draftTime === time }" @click="setTime(time)">{{ time }}</button>
-      </div>
+    <div v-if="showHeading" class="tpc-heading">
+      <span><Clock3 :size="15" /> 时间</span>
+      <strong>{{ draftTime || '未设具体时间' }}</strong>
+    </div>
+
+    <div class="tpc-presets" aria-label="快捷选择任务时间">
+      <button v-for="time in presetTimes" :key="time" type="button" class="tpc-time" :class="{ active: draftTime === time }" @click="setTime(time)">{{ time }}</button>
     </div>
 
     <div class="tpc-custom-row">
-      <label for="custom-task-time">自定义时间</label>
+      <label for="custom-task-time">自定义</label>
       <input
         id="custom-task-time"
         v-model="customTime"
         class="tpc-custom-input"
-        type="time"
-        step="60"
-        aria-label="自定义时间，格式为 09:30"
+        type="text"
+        inputmode="numeric"
+        maxlength="5"
+        placeholder="09:30"
+        aria-describedby="custom-task-time-hint"
         @blur="commitCustomTime"
         @keydown.enter.prevent="commitCustomTime"
+        @keydown.esc.prevent="resetCustomTime"
       />
-      <div class="tpc-stepper" aria-label="微调时间">
-        <button type="button" title="减少 15 分钟" aria-label="减少 15 分钟" @click="adjustTime(-15)">−15</button>
-        <button type="button" title="增加 15 分钟" aria-label="增加 15 分钟" @click="adjustTime(15)">+15</button>
+      <span id="custom-task-time-hint" class="sr-only">可输入 930 或 09:30；使用减号和加号按钮每次微调 15 分钟</span>
+      <button v-if="draftTime" class="tpc-clear" type="button" @click="clear">清除</button>
+      <div class="tpc-stepper" aria-label="按十五分钟微调时间">
+        <button type="button" title="减少 15 分钟" aria-label="减少 15 分钟" @click="adjustTime(-15)"><Minus :size="14" /></button>
+        <button type="button" title="增加 15 分钟" aria-label="增加 15 分钟" @click="adjustTime(15)"><Plus :size="14" /></button>
       </div>
     </div>
   </div>
@@ -30,13 +36,15 @@
 
 <script setup>
 import { ref, watch } from 'vue'
+import { Clock3, Minus, Plus } from 'lucide-vue-next'
 
 const props = defineProps({
-  modelValue: { type: String, default: '' }
+  modelValue: { type: String, default: '' },
+  showHeading: { type: Boolean, default: true }
 })
 
 const emit = defineEmits(['update:modelValue', 'clear'])
-const presetTimes = ['09:00', '14:00', '18:00', '20:00']
+const presetTimes = ['08:00', '09:00', '10:00', '12:00', '14:00', '18:00', '20:00']
 const draftTime = ref(props.modelValue || '')
 const customTime = ref(props.modelValue || '')
 
@@ -96,6 +104,10 @@ function commitCustomTime() {
   setTime(normalized)
 }
 
+function resetCustomTime() {
+  customTime.value = draftTime.value
+}
+
 function adjustTime(delta) {
   const base = parseTime(customTime.value) || draftTime.value || '09:00'
   const [hour, minute] = base.split(':').map(Number)
@@ -112,72 +124,95 @@ watch(() => props.modelValue, (newVal) => {
 <style scoped>
 .time-picker-compact {
   display: grid;
-  gap: 8px;
-  padding: 2px 0;
+  gap: 7px;
 }
 
-.tpc-shortcut-row,
-.tpc-custom-row {
-  display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
+.tpc-heading {
+  display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 10px;
 }
 
-.tpc-row-label,
-.tpc-custom-row label {
+.tpc-heading > span,
+.tpc-heading strong {
   display: inline-flex;
   align-items: center;
-  min-height: 30px;
-  padding-left: 2px;
-  color: var(--text-muted);
-  font-size: 11px;
+  gap: 5px;
+  min-height: 22px;
+  font-size: 12px;
   font-weight: 700;
 }
 
+.tpc-heading > span { color: var(--text); }
+.tpc-heading > span svg { color: var(--accent-strong); }
+.tpc-heading strong { padding: 3px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-strong); font-size: 11px; font-variant-numeric: tabular-nums; }
+
 .tpc-presets {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 4px;
-  padding: 2px;
-  border: 1px solid var(--divider-soft);
-  border-radius: 8px;
-  background: var(--surface);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
 }
 
 .tpc-time {
   min-width: 0;
-  min-height: 29px;
-  padding: 0 2px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
+  min-height: 32px;
+  padding: 0 4px;
+  border: 1px solid var(--divider-soft);
+  border-radius: 8px;
+  background: var(--surface);
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 650;
   white-space: nowrap;
+  transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .tpc-time:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--divider-soft));
   background: var(--accent-soft);
   color: var(--accent-strong);
 }
 
 .tpc-time.active {
-  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
-  background: var(--accent-soft);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent);
   color: var(--accent-strong);
 }
 
 .tpc-custom-row {
-  grid-template-columns: 68px minmax(72px, 1fr) auto;
-  min-height: 38px;
-  padding: 3px 4px 3px 8px;
-  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
-  border-radius: 9px;
+  display: grid;
+  grid-template-columns: 54px minmax(72px, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 3px 4px 3px 9px;
+  border: 1px solid var(--divider-soft);
+  border-radius: 10px;
   background: var(--surface);
   box-shadow: 0 2px 5px rgba(15, 23, 42, 0.04);
+}
+
+.tpc-custom-row label {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.tpc-clear {
+  padding: 0 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.tpc-clear:hover { color: var(--accent-strong); }
+
+.tpc-clear:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 52%, transparent);
+  outline-offset: 2px;
 }
 
 .tpc-custom-row:focus-within {
@@ -198,13 +233,7 @@ watch(() => props.modelValue, (newVal) => {
   font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.03em;
-  text-align: right;
-}
-
-.tpc-custom-input::-webkit-calendar-picker-indicator {
-  margin-left: 3px;
-  cursor: pointer;
-  opacity: 0.62;
+  text-align: left;
 }
 
 .tpc-custom-input::placeholder {
@@ -224,8 +253,10 @@ watch(() => props.modelValue, (newVal) => {
 }
 
 .tpc-stepper button {
-  min-width: 29px;
-  height: 24px;
+  display: grid;
+  width: 30px;
+  height: 28px;
+  place-items: center;
   padding: 0;
   border-radius: 4px;
   background: transparent;
@@ -235,7 +266,14 @@ watch(() => props.modelValue, (newVal) => {
 }
 
 .tpc-stepper button:hover {
-  background: var(--accent-soft);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.tpc-stepper button:focus-visible,
+.tpc-time:focus-visible,
+.tpc-custom-input:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 52%, transparent);
+  outline-offset: 2px;
 }
 
 </style>

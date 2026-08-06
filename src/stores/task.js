@@ -114,6 +114,7 @@ const DEFAULT_SETTINGS = {
   focusCompletionSoundEnabled: true,
   focusReminderAlwaysOnTop: true,
   focusControllerAlwaysOnTop: true,
+  focusControllerStyle: 'orbit',
   windowCloseBehavior: 'hide',
   dailyGuidanceEnabled: true,
   dailyGuidanceStyle: 'practical'
@@ -740,7 +741,7 @@ export const useTaskStore = defineStore('task', () => {
       syncNativeFocusCompletion()
       if (updates.focusCompletionNotificationsEnabled === false) showNotice('专注完成后台提醒已关闭', 'info')
     }
-    if ('focusControllerAlwaysOnTop' in updates) syncNativeFocusController()
+    if ('focusControllerAlwaysOnTop' in updates || 'focusControllerStyle' in updates) syncNativeFocusController()
     if ('windowCloseBehavior' in updates) {
       setWindowCloseBehavior(settings.value.windowCloseBehavior)
         .catch(error => console.warn('[Store] 同步窗口关闭方式失败:', error))
@@ -1932,6 +1933,10 @@ export const useTaskStore = defineStore('task', () => {
       lastCompletedAt: isValidIsoDate(rawReminder?.lastCompletedAt) ? rawReminder.lastCompletedAt : null,
       lastNotifiedAt: isValidIsoDate(rawReminder?.lastNotifiedAt) ? rawReminder.lastNotifiedAt : null,
       snoozedUntil: isValidIsoDate(rawReminder?.snoozedUntil) ? rawReminder.snoozedUntil : null,
+      pausedIndividually: Boolean(rawReminder?.pausedIndividually),
+      roundAdjustmentSeconds: triggerType === 'active-duration'
+        ? Math.max(-8 * 60 * 60, Math.min(8 * 60 * 60, Math.round(Number(rawReminder?.roundAdjustmentSeconds) || 0)))
+        : 0,
       pausedRemainingSeconds: triggerType === 'interval'
         ? Math.max(0, Math.min(24 * 60 * 60, Math.round(Number(rawReminder?.pausedRemainingSeconds) || 0))) || null
         : null,
@@ -2116,10 +2121,12 @@ export const useTaskStore = defineStore('task', () => {
       status: session.status,
       phase: session.phase || 'focus',
       taskTitle,
+      durationSeconds: duration === null ? null : Math.max(0, Math.round(duration)),
       remainingSeconds: duration === null ? null : Math.max(0, Math.round(duration - elapsedSeconds)),
       elapsedSeconds: Math.max(0, Math.round(elapsedSeconds)),
       syncedAt: Date.now(),
-      alwaysOnTop: settings.value.focusControllerAlwaysOnTop !== false
+      alwaysOnTop: settings.value.focusControllerAlwaysOnTop !== false,
+      style: settings.value.focusControllerStyle
     })
   }
 
@@ -2476,12 +2483,8 @@ export const useTaskStore = defineStore('task', () => {
     }
     markRhythmReminderElapsed(dueReminder.id)
     void presentRhythmReminder(dueReminder, settings.value)
-      .then(delivery => {
-        if (delivery === 'disabled') dismissRhythmReminder(dueReminder.id)
-      })
       .catch(async () => {
         await sendRhythmReminderNotification(dueReminder, settings.value)
-        dismissRhythmReminder(dueReminder.id)
       })
   }
 
@@ -2536,7 +2539,7 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   function getNativeRhythmDueAt(reminder, now = Date.now()) {
-    if (!reminder?.enabled || reminder.pendingSince || reminder.triggerType === 'active-duration') return null
+    if (!reminder?.enabled || reminder.pausedIndividually || reminder.pendingSince || reminder.triggerType === 'active-duration') return null
     const snoozedAt = reminder.snoozedUntil ? new Date(reminder.snoozedUntil).getTime() : 0
     if (reminder.triggerType === 'fixed-time') {
       if (snoozedAt > now) return getNextEligibleRhythmTime(reminder, snoozedAt)
@@ -2597,7 +2600,7 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   function isRhythmReminderDue(reminder) {
-    if (!reminder?.enabled || rhythmPaused.value) return false
+    if (!reminder?.enabled || reminder.pausedIndividually || rhythmPaused.value) return false
     const now = new Date(rhythmClockNow.value)
     const today = localDateKey(now)
     const manuallyRunning = Boolean(reminder.manualCycleStartedAt) && reminder.triggerType !== 'fixed-time'
@@ -2606,7 +2609,7 @@ export const useTaskStore = defineStore('task', () => {
     const snoozedAt = reminder.snoozedUntil ? new Date(reminder.snoozedUntil).getTime() : 0
     if (snoozedAt > now.getTime()) return false
     if (reminder.triggerType === 'active-duration') {
-      return reminder.activitySeconds >= reminder.intervalSeconds
+      return reminder.activitySeconds >= rhythmRoundIntervalSeconds(reminder)
     }
     if (reminder.triggerType === 'fixed-time') {
       const dueAt = timeToday(reminder.time, now).getTime()
@@ -2626,7 +2629,7 @@ export const useTaskStore = defineStore('task', () => {
   function updateActiveRhythmReminders(idleSeconds) {
     const now = new Date(rhythmClockNow.value)
     for (const reminder of rhythmReminders.value) {
-      if (!reminder.enabled || reminder.triggerType !== 'active-duration') continue
+      if (!reminder.enabled || reminder.pausedIndividually || reminder.triggerType !== 'active-duration') continue
       const lastSample = reminder.lastActivitySampleAt ? new Date(reminder.lastActivitySampleAt).getTime() : rhythmClockNow.value
       const elapsed = Math.max(0, Math.min(60, Math.floor((rhythmClockNow.value - lastSample) / 1000)))
       reminder.lastActivitySampleAt = nowIso()
@@ -2777,6 +2780,7 @@ export const useTaskStore = defineStore('task', () => {
     reminder.pendingSince = null
     reminder.lastResolvedAt = nowIso()
     reminder.manualCycleStartedAt = null
+    reminder.roundAdjustmentSeconds = 0
     if (reminder.triggerType === 'interval') {
       reminder.cycleStartedAt = nowIso()
       reminder.nextDueAt = new Date(Date.now() + reminder.intervalSeconds * 1000).toISOString()
@@ -2808,6 +2812,7 @@ export const useTaskStore = defineStore('task', () => {
     reminder.pendingSince = null
     reminder.lastResolvedAt = nowIso()
     reminder.manualCycleStartedAt = null
+    reminder.roundAdjustmentSeconds = 0
     if (reminder.triggerType === 'interval') {
       reminder.cycleStartedAt = nowIso()
       reminder.nextDueAt = new Date(Date.now() + reminder.intervalSeconds * 1000).toISOString()
@@ -2824,6 +2829,7 @@ export const useTaskStore = defineStore('task', () => {
     reminder.snoozedUntil = null
     reminder.lastResolvedAt = nowIso()
     reminder.manualCycleStartedAt = null
+    reminder.roundAdjustmentSeconds = 0
     if (reminder.triggerType === 'interval') {
       reminder.cycleStartedAt = nowIso()
       reminder.nextDueAt = new Date(Date.now() + reminder.intervalSeconds * 1000).toISOString()
@@ -2839,7 +2845,7 @@ export const useTaskStore = defineStore('task', () => {
   function pauseRhythmReminders() {
     const now = Date.now()
     for (const reminder of rhythmReminders.value) {
-      if (!reminder.enabled || reminder.pendingSince) continue
+      if (!reminder.enabled || reminder.pausedIndividually || reminder.pendingSince) continue
       if (reminder.triggerType === 'interval') {
         const dueAt = new Date(reminder.nextDueAt || 0).getTime()
         reminder.pausedRemainingSeconds = Math.max(1, Math.ceil(((Number.isFinite(dueAt) ? dueAt : now) - now) / 1000))
@@ -2858,7 +2864,7 @@ export const useTaskStore = defineStore('task', () => {
     clock.value.rhythm.pausedManually = false
     const now = Date.now()
     for (const reminder of rhythmReminders.value) {
-      if (!reminder.enabled) continue
+      if (!reminder.enabled || reminder.pausedIndividually) continue
       if (reminder.triggerType === 'interval' && !reminder.pendingSince) {
         const remainingSeconds = Math.max(1, Number(reminder.pausedRemainingSeconds) || Number(reminder.intervalSeconds) || 60)
         reminder.nextDueAt = new Date(now + remainingSeconds * 1000).toISOString()
@@ -2873,13 +2879,20 @@ export const useTaskStore = defineStore('task', () => {
   function adjustRhythmReminderTiming(reminderId, minutes = 5) {
     const reminder = clock.value.rhythm.reminders.find(item => item.id === reminderId)
     const adjustment = Math.round(Number(minutes) || 0)
-    if (!reminder || !reminder.enabled || rhythmPaused.value || !adjustment || reminder.triggerType === 'fixed-time') return false
+    if (!reminder || !reminder.enabled || !adjustment || reminder.triggerType === 'fixed-time') return false
 
     if (reminder.triggerType === 'active-duration') {
-      const target = Math.max(0, Math.min(Math.max(1, Number(reminder.intervalSeconds) || 1) - 1, (Number(reminder.activitySeconds) || 0) - adjustment * 60))
-      reminder.activitySeconds = target
-      reminder.lastActivitySampleAt = nowIso()
+      const nextTarget = Math.max(60, Math.min(8 * 60 * 60, rhythmRoundIntervalSeconds(reminder) + adjustment * 60))
+      reminder.roundAdjustmentSeconds = nextTarget - (Number(reminder.intervalSeconds) || 60)
+      if (!reminder.pausedIndividually && !rhythmPaused.value) reminder.lastActivitySampleAt = nowIso()
     } else {
+      if (reminder.pausedIndividually || rhythmPaused.value) {
+        const currentRemaining = Math.max(60, Number(reminder.pausedRemainingSeconds) || Number(reminder.intervalSeconds) || 60)
+        reminder.pausedRemainingSeconds = Math.max(60, Math.min(24 * 60 * 60, currentRemaining + adjustment * 60))
+        showNotice(`${reminder.title}本轮已${adjustment > 0 ? '延后' : '提前'} ${Math.abs(adjustment)} 分钟`, 'success')
+        syncRhythmTimer()
+        return true
+      }
       const currentDueAt = new Date(reminder.nextDueAt || 0).getTime() || Date.now() + (Number(reminder.intervalSeconds) || 60) * 1000
       const nextDueAt = Math.max(Date.now() + 60 * 1000, currentDueAt + adjustment * 60 * 1000)
       reminder.nextDueAt = new Date(nextDueAt).toISOString()
@@ -2894,6 +2907,41 @@ export const useTaskStore = defineStore('task', () => {
     return true
   }
 
+  function rhythmRoundIntervalSeconds(reminder) {
+    return Math.max(60, Math.min(8 * 60 * 60, (Number(reminder?.intervalSeconds) || 60) + (Number(reminder?.roundAdjustmentSeconds) || 0)))
+  }
+
+  function pauseRhythmReminder(reminderId) {
+    const reminder = clock.value.rhythm.reminders.find(item => item.id === reminderId)
+    if (!reminder || !reminder.enabled || reminder.pausedIndividually || reminder.pendingSince) return false
+    const now = Date.now()
+    if (reminder.triggerType === 'interval') {
+      const dueAt = new Date(reminder.nextDueAt || 0).getTime()
+      reminder.pausedRemainingSeconds = Math.max(1, Math.ceil(((Number.isFinite(dueAt) ? dueAt : now) - now) / 1000))
+    }
+    if (reminder.triggerType === 'active-duration') reminder.lastActivitySampleAt = nowIso()
+    reminder.pausedIndividually = true
+    syncRhythmTimer()
+    return true
+  }
+
+  function resumeRhythmReminder(reminderId) {
+    const reminder = clock.value.rhythm.reminders.find(item => item.id === reminderId)
+    if (!reminder || !reminder.enabled || !reminder.pausedIndividually) return false
+    const now = Date.now()
+    if (reminder.triggerType === 'interval') {
+      const remainingSeconds = Math.max(1, Number(reminder.pausedRemainingSeconds) || Number(reminder.intervalSeconds) || 60)
+      reminder.nextDueAt = new Date(now + remainingSeconds * 1000).toISOString()
+      reminder.cycleStartedAt = new Date(now - Math.max(0, (Number(reminder.intervalSeconds) || remainingSeconds) - remainingSeconds) * 1000).toISOString()
+    }
+    if (reminder.triggerType === 'active-duration') reminder.lastActivitySampleAt = nowIso()
+    if (reminder.triggerType === 'fixed-time') reminder.lastNotifiedAt = nowIso()
+    reminder.pausedRemainingSeconds = null
+    reminder.pausedIndividually = false
+    syncRhythmTimer()
+    return true
+  }
+
   function startRhythmReminderNow(reminderId) {
     const reminder = clock.value.rhythm.reminders.find(item => item.id === reminderId)
     if (!reminder || !reminder.enabled || reminder.triggerType === 'fixed-time') return false
@@ -2902,6 +2950,7 @@ export const useTaskStore = defineStore('task', () => {
     reminder.pendingSince = null
     reminder.lastResolvedAt = nowIso()
     reminder.manualCycleStartedAt = nowIso()
+    reminder.roundAdjustmentSeconds = 0
     if (reminder.triggerType === 'interval') {
       reminder.cycleStartedAt = nowIso()
       reminder.nextDueAt = new Date(Date.now() + reminder.intervalSeconds * 1000).toISOString()
@@ -2912,14 +2961,6 @@ export const useTaskStore = defineStore('task', () => {
     showNotice(`${reminder.title}已从现在开始重新计时`, 'success')
     syncRhythmTimer()
     return true
-  }
-
-  function handleRhythmReminderWindowAction(reminderId, action) {
-    if (action === 'complete') return completeRhythmReminder(reminderId)
-    if (action === 'snooze') return snoozeRhythmReminder(reminderId, 5)
-    if (action === 'skip') return skipRhythmReminderToday(reminderId)
-    if (action === 'dismiss') return dismissRhythmReminder(reminderId)
-    return false
   }
 
   function deleteRhythmHistory(historyId) {
@@ -3061,6 +3102,9 @@ export const useTaskStore = defineStore('task', () => {
     const focusCompletionSoundEnabled = rawSettings.focusCompletionSoundEnabled !== false
     const focusReminderAlwaysOnTop = rawSettings.focusReminderAlwaysOnTop !== false
     const focusControllerAlwaysOnTop = rawSettings.focusControllerAlwaysOnTop !== false
+    const focusControllerStyle = ['orbit', 'island', 'classic'].includes(rawSettings.focusControllerStyle)
+      ? rawSettings.focusControllerStyle
+      : DEFAULT_SETTINGS.focusControllerStyle
     const windowCloseBehavior = ['hide', 'quit'].includes(rawSettings.windowCloseBehavior)
       ? rawSettings.windowCloseBehavior
       : DEFAULT_SETTINGS.windowCloseBehavior
@@ -3101,6 +3145,7 @@ export const useTaskStore = defineStore('task', () => {
       focusCompletionSoundEnabled,
       focusReminderAlwaysOnTop,
       focusControllerAlwaysOnTop,
+      focusControllerStyle,
       windowCloseBehavior,
       dailyGuidanceEnabled,
       dailyGuidanceStyle
@@ -3409,11 +3454,12 @@ export const useTaskStore = defineStore('task', () => {
     dismissRhythmReminder,
     pauseRhythmReminders,
     resumeRhythmReminders,
+    pauseRhythmReminder,
+    resumeRhythmReminder,
     adjustRhythmReminderTiming,
     startRhythmReminderNow,
     deleteRhythmHistory,
     handleRhythmElapsedFromNative,
-    handleRhythmReminderWindowAction,
     finishFocus,
     completeFocusSessionFromNative,
     deleteFocusHistory,

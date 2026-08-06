@@ -50,6 +50,7 @@ struct FocusControllerState {
     revision: AtomicU64,
     ready_revision: AtomicU64,
     visible_requested: AtomicBool,
+    island_expanded: AtomicBool,
     pending: Mutex<Option<FocusControllerPayload>>,
 }
 
@@ -60,21 +61,18 @@ struct ReminderWindowCoordinator {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum ReminderWindowKind {
     FocusCompletion,
-    Rhythm,
 }
 
 impl ReminderWindowKind {
     fn label(self) -> &'static str {
         match self {
             Self::FocusCompletion => "focus-reminder",
-            Self::Rhythm => "rhythm-reminder",
         }
     }
 
     fn priority(self) -> u8 {
         match self {
             Self::FocusCompletion => 200,
-            Self::Rhythm => 100,
         }
     }
 }
@@ -92,7 +90,6 @@ struct FocusReminderState {
 
 struct RhythmReminderState {
     revision: AtomicU64,
-    ready_revision: AtomicU64,
     pending: Mutex<Option<RhythmReminderPayload>>,
 }
 
@@ -120,6 +117,7 @@ impl Default for FocusControllerState {
             revision: AtomicU64::new(0),
             ready_revision: AtomicU64::new(0),
             visible_requested: AtomicBool::new(false),
+            island_expanded: AtomicBool::new(false),
             pending: Mutex::new(None),
         }
     }
@@ -150,7 +148,6 @@ impl Default for RhythmReminderState {
     fn default() -> Self {
         Self {
             revision: AtomicU64::new(0),
-            ready_revision: AtomicU64::new(0),
             pending: Mutex::new(None),
         }
     }
@@ -214,10 +211,12 @@ struct FocusControllerPayload {
     status: String,
     phase: String,
     task_title: Option<String>,
+    duration_seconds: Option<u64>,
     remaining_seconds: Option<u64>,
     elapsed_seconds: u64,
     synced_at: i64,
     always_on_top: bool,
+    style: String,
 }
 
 impl Default for WindowCloseBehavior {
@@ -275,6 +274,53 @@ fn send_interactive_task_reminder(
     #[cfg(not(target_os = "windows"))]
     {
         let _ = (app, task_id, title, body);
+        Ok(false)
+    }
+}
+
+/// 节律提醒与任务提醒保持相同的处理闭环：系统通知只负责把用户带回应用，
+/// 提醒本身保留为前端的待处理项，避免通知失败或关闭后被误判为已处理。
+fn send_interactive_rhythm_reminder(
+    app: tauri::AppHandle,
+    reminder_id: String,
+    title: String,
+    body: String,
+    sound_enabled: bool,
+) -> Result<bool, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let mut notification = Notification::new();
+        notification
+            .app_id("cn.duqimeng.simpletodo")
+            .summary(&title)
+            .body(&body);
+        if sound_enabled {
+            notification.sound_name("Default");
+        }
+        let handle = notification
+            .show()
+            .map_err(|err| format!("发送 Windows 节律提醒失败: {err}"))?;
+
+        std::thread::spawn(move || {
+            let _ = handle.wait_for_response(move |response: &NotificationResponse| {
+                if matches!(
+                    response,
+                    NotificationResponse::Default | NotificationResponse::Action(_)
+                ) {
+                    show_main_window(&app);
+                    let _ = app.emit(
+                        "rhythm-reminder:open",
+                        serde_json::json!({ "reminderId": reminder_id }),
+                    );
+                }
+            });
+        });
+        return Ok(true);
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (app, reminder_id, title, body, sound_enabled);
         Ok(false)
     }
 }
@@ -452,6 +498,66 @@ fn position_focus_controller_initially(window: &tauri::WebviewWindow) {
     let _ = window.set_position(tauri::PhysicalPosition::new(x as i32, y as i32));
 }
 
+fn focus_controller_size(style: &str, island_expanded: bool) -> tauri::LogicalSize<f64> {
+    match style {
+        // 轨道表盘采用紧凑桌面挂件尺寸，完整矢量表盘保证缩放后仍保持清晰。
+        "orbit" => tauri::LogicalSize::new(256.0, 256.0),
+        "island" if island_expanded => tauri::LogicalSize::new(430.0, 156.0),
+        "island" => tauri::LogicalSize::new(390.0, 86.0),
+        _ => tauri::LogicalSize::new(390.0, 286.0),
+    }
+}
+
+fn normalize_focus_controller_style(style: &str) -> &'static str {
+    match style {
+        "orbit" => "orbit",
+        "island" => "island",
+        _ => "classic",
+    }
+}
+
+fn apply_focus_controller_geometry(
+    window: &tauri::WebviewWindow,
+    style: &str,
+    island_expanded: bool,
+    preserve_right_edge: bool,
+) -> Result<(), String> {
+    let size = focus_controller_size(style, island_expanded);
+    let previous_position = window.outer_position().ok();
+    let previous_size = window.outer_size().ok();
+    let scale_factor = window.scale_factor().unwrap_or(1.0);
+
+    let _ = window.set_min_size(None::<tauri::Size>);
+    let _ = window.set_max_size(None::<tauri::Size>);
+    window
+        .set_size(size)
+        .map_err(|error| format!("调整专注控制器尺寸失败: {error}"))?;
+    let _ = window.set_min_size(Some(size));
+    let _ = window.set_max_size(Some(size));
+
+    if preserve_right_edge {
+        if let (Some(position), Some(previous_size)) = (previous_position, previous_size) {
+            let next_width = (size.width * scale_factor).round() as i64;
+            let previous_right = i64::from(position.x) + i64::from(previous_size.width);
+            let mut x = previous_right - next_width;
+            let mut y = i64::from(position.y);
+            if let Some(monitor) = window.current_monitor().ok().flatten() {
+                let monitor_position = monitor.position();
+                let monitor_size = monitor.size();
+                let left = i64::from(monitor_position.x);
+                let top = i64::from(monitor_position.y);
+                let right = left + i64::from(monitor_size.width);
+                let bottom = top + i64::from(monitor_size.height);
+                let next_height = (size.height * scale_factor).round() as i64;
+                x = x.clamp(left, (right - next_width).max(left));
+                y = y.clamp(top, (bottom - next_height).max(top));
+            }
+            let _ = window.set_position(tauri::PhysicalPosition::new(x as i32, y as i32));
+        }
+    }
+    Ok(())
+}
+
 fn show_coordinated_reminder(
     app: &tauri::AppHandle,
     kind: ReminderWindowKind,
@@ -472,10 +578,6 @@ fn show_coordinated_reminder(
         window
             .set_always_on_top(always_on_top)
             .map_err(|error| format!("设置专注提醒窗口置顶状态失败: {error}"))?;
-    } else {
-        window
-            .set_always_on_top(true)
-            .map_err(|error| format!("设置节律提醒窗口置顶状态失败: {error}"))?;
     }
     separate_reminder_from_focus_controller(app, label);
     window
@@ -506,24 +608,6 @@ fn fallback_queued_reminder(app: &tauri::AppHandle, kind: ReminderWindowKind, po
                 always_on_top: payload.always_on_top,
             };
             report_focus_reminder_failure(app, &schedule, popup_error);
-        }
-    } else {
-        let payload = app
-            .state::<RhythmReminderState>()
-            .pending
-            .lock()
-            .ok()
-            .and_then(|mut pending| pending.take());
-        if let Some(payload) = payload {
-            send_rhythm_system_notification(&payload);
-            let _ = app.emit_to(
-                "main",
-                "rhythm-reminder:action",
-                serde_json::json!({
-                    "reminderId": payload.reminder_id,
-                    "action": "dismiss"
-                }),
-            );
         }
     }
 }
@@ -584,6 +668,7 @@ fn sync_focus_controller(
     let Some(mut payload) = payload else {
         state.visible_requested.store(false, Ordering::Relaxed);
         state.ready_revision.store(0, Ordering::Relaxed);
+        state.island_expanded.store(false, Ordering::Relaxed);
         state
             .pending
             .lock()
@@ -596,12 +681,19 @@ fn sync_focus_controller(
     };
     let revision = state.revision.fetch_add(1, Ordering::Relaxed) + 1;
     payload.revision = revision;
+    payload.style = normalize_focus_controller_style(&payload.style).to_string();
+    let style = payload.style.clone();
+    if style != "island" {
+        state.island_expanded.store(false, Ordering::Relaxed);
+    }
+    let island_expanded = state.island_expanded.load(Ordering::Relaxed);
     state
         .pending
         .lock()
         .map_err(|_| "专注控制器状态不可用".to_string())?
         .replace(payload);
-    if app.get_webview_window("focus-controller").is_some() {
+    if let Some(window) = app.get_webview_window("focus-controller") {
+        let _ = apply_focus_controller_geometry(&window, &style, island_expanded, true);
         let _ = app.emit_to(
             "focus-controller",
             "focus-controller:refresh",
@@ -622,11 +714,13 @@ fn open_focus_controller(app: tauri::AppHandle) -> Result<bool, String> {
         .ok_or_else(|| "当前没有进行中的专注".to_string())?;
     state.visible_requested.store(true, Ordering::Relaxed);
     state.ready_revision.store(0, Ordering::Relaxed);
+    state.island_expanded.store(false, Ordering::Relaxed);
 
     if let Some(window) = app.get_webview_window("focus-controller") {
         window
             .set_always_on_top(payload.always_on_top)
             .map_err(|error| format!("设置专注控制器置顶状态失败: {error}"))?;
+        apply_focus_controller_geometry(&window, &payload.style, false, false)?;
         position_focus_controller_initially(&window);
         // 不依赖小窗 WebView 的前端回调来显示。Windows 上隐藏窗口的
         // WebView 初始化可能比事件监听更晚，导致 refresh 事件丢失并一直不显示。
@@ -655,13 +749,15 @@ fn open_focus_controller(app: tauri::AppHandle) -> Result<bool, String> {
     .maximizable(false)
     .minimizable(false)
     .decorations(false)
+    .transparent(true)
     .always_on_top(payload.always_on_top)
     .skip_taskbar(true)
-    .shadow(true)
+    .shadow(false)
     .center()
     .visible(false)
     .build()
     .map_err(|error| format!("创建专注控制器失败: {error}"))?;
+    apply_focus_controller_geometry(&window, &payload.style, false, false)?;
     position_focus_controller_initially(&window);
     // 原生窗口创建完成后立即显示，避免 Windows 因 WebView 初始化时序而
     // 将控制器永久停留在 hidden 状态。
@@ -689,22 +785,24 @@ fn focus_controller_ready(app: tauri::AppHandle, revision: u64) -> Result<bool, 
     if !state.visible_requested.load(Ordering::Relaxed) {
         return Ok(false);
     }
-    let always_on_top = state
+    let presentation = state
         .pending
         .lock()
         .map_err(|_| "专注控制器状态不可用".to_string())?
         .as_ref()
         .filter(|payload| payload.revision == revision)
-        .map(|payload| payload.always_on_top);
-    let Some(always_on_top) = always_on_top else {
+        .map(|payload| (payload.always_on_top, payload.style.clone()));
+    let Some((always_on_top, style)) = presentation else {
         return Ok(false);
     };
+    let island_expanded = state.island_expanded.load(Ordering::Relaxed);
     let window = app
         .get_webview_window("focus-controller")
         .ok_or_else(|| "专注控制器窗口不存在".to_string())?;
     window
         .set_always_on_top(always_on_top)
         .map_err(|error| format!("设置专注控制器置顶状态失败: {error}"))?;
+    apply_focus_controller_geometry(&window, &style, island_expanded, true)?;
     let was_visible = window.is_visible().unwrap_or(false);
     window
         .show()
@@ -750,6 +848,52 @@ fn set_focus_controller_always_on_top(
             "alwaysOnTop": always_on_top
         }),
     );
+    Ok(true)
+}
+
+#[tauri::command]
+fn set_focus_controller_style(app: tauri::AppHandle, style: String) -> Result<bool, String> {
+    let style = normalize_focus_controller_style(&style).to_string();
+    let state = app.state::<FocusControllerState>();
+    state.island_expanded.store(false, Ordering::Relaxed);
+    if let Ok(mut pending) = state.pending.lock() {
+        if let Some(payload) = pending.as_mut() {
+            payload.style = style.clone();
+        }
+    }
+    let window = app
+        .get_webview_window("focus-controller")
+        .ok_or_else(|| "专注控制器窗口不存在".to_string())?;
+    apply_focus_controller_geometry(&window, &style, false, true)?;
+    let _ = app.emit_to(
+        "main",
+        "focus-controller:action",
+        serde_json::json!({ "action": "set-style", "style": style }),
+    );
+    Ok(true)
+}
+
+#[tauri::command]
+fn set_focus_controller_island_expanded(
+    app: tauri::AppHandle,
+    expanded: bool,
+) -> Result<bool, String> {
+    let state = app.state::<FocusControllerState>();
+    let style = state
+        .pending
+        .lock()
+        .map_err(|_| "专注控制器状态不可用".to_string())?
+        .as_ref()
+        .map(|payload| payload.style.clone())
+        .unwrap_or_else(|| "classic".to_string());
+    if style != "island" {
+        return Ok(false);
+    }
+    let window = app
+        .get_webview_window("focus-controller")
+        .ok_or_else(|| "专注控制器窗口不存在".to_string())?;
+    apply_focus_controller_geometry(&window, &style, expanded, true)?;
+    state.island_expanded.store(expanded, Ordering::Relaxed);
     Ok(true)
 }
 
@@ -927,25 +1071,31 @@ fn schedule_rhythm_reminder(
         );
 
         if !main_is_focused && schedule.notification_enabled {
-            let payload = RhythmReminderPayload {
-                revision: 0,
-                reminder_id: schedule.reminder_id.clone(),
-                title: schedule.title.clone(),
-                message: schedule.message.clone(),
-                trigger_label: schedule.trigger_label.clone(),
-                sound_enabled: schedule.sound_enabled,
-            };
-            if let Err(error) = deliver_rhythm_reminder(app.clone(), payload.clone()) {
+            if let Err(error) = show_global_rhythm_reminder(
+                app.clone(),
+                schedule.reminder_id.clone(),
+                schedule.title.clone(),
+                schedule.message.clone(),
+                schedule.trigger_label.clone(),
+                schedule.sound_enabled,
+            ) {
                 eprintln!("[RhythmReminder] {error}");
-                send_rhythm_system_notification(&payload);
-                let _ = app.emit_to(
-                    "main",
-                    "rhythm-reminder:action",
-                    serde_json::json!({
-                        "reminderId": schedule.reminder_id,
-                        "action": "dismiss"
-                    }),
+                let payload = RhythmReminderPayload {
+                    revision: 0,
+                    reminder_id: schedule.reminder_id.clone(),
+                    title: schedule.title.clone(),
+                    message: schedule.message.clone(),
+                    trigger_label: schedule.trigger_label.clone(),
+                    sound_enabled: schedule.sound_enabled,
+                };
+                let _ = send_interactive_rhythm_reminder(
+                    app.clone(),
+                    payload.reminder_id.clone(),
+                    payload.title.clone(),
+                    payload.message.clone(),
+                    payload.sound_enabled,
                 );
+                send_rhythm_system_notification(&payload);
             }
         }
         return;
@@ -1197,29 +1347,57 @@ fn send_rhythm_system_notification(payload: &RhythmReminderPayload) {
     }
 }
 
-fn deliver_rhythm_reminder(
+#[tauri::command]
+fn present_rhythm_reminder(
     app: tauri::AppHandle,
-    mut payload: RhythmReminderPayload,
+    reminder_id: String,
+    title: String,
+    message: String,
+    trigger_label: String,
+    notification_enabled: bool,
+    sound_enabled: bool,
+) -> Result<String, String> {
+    if main_window_is_focused(&app) {
+        return Ok("in-app".to_string());
+    }
+    if !notification_enabled {
+        return Ok("disabled".to_string());
+    }
+    show_global_rhythm_reminder(
+        app,
+        reminder_id,
+        title,
+        message,
+        trigger_label,
+        sound_enabled,
+    )?;
+    Ok("background".to_string())
+}
+
+fn show_global_rhythm_reminder(
+    app: tauri::AppHandle,
+    reminder_id: String,
+    title: String,
+    message: String,
+    trigger_label: String,
+    sound_enabled: bool,
 ) -> Result<(), String> {
     let state = app.state::<RhythmReminderState>();
     let revision = state.revision.fetch_add(1, Ordering::Relaxed) + 1;
-    state.ready_revision.store(0, Ordering::Relaxed);
-    payload.revision = revision;
     state
         .pending
         .lock()
         .map_err(|_| "节律提醒窗口状态不可用".to_string())?
-        .replace(payload);
-
-    let window_result = if let Some(window) = app.get_webview_window("rhythm-reminder") {
-        let _ = window.hide();
-        let _ = window.set_always_on_top(true);
-        let _ = app.emit_to(
-            "rhythm-reminder",
-            "rhythm-reminder:refresh",
-            serde_json::json!({ "revision": revision }),
-        );
-        Ok(window)
+        .replace(RhythmReminderPayload {
+            revision,
+            reminder_id,
+            title,
+            message,
+            trigger_label,
+            sound_enabled,
+        });
+    let window = if let Some(window) = app.get_webview_window("rhythm-reminder") {
+        window
     } else {
         WebviewWindowBuilder::new(
             &app,
@@ -1240,82 +1418,13 @@ fn deliver_rhythm_reminder(
         .center()
         .visible(false)
         .build()
-        .map_err(|error| format!("创建节律提醒窗口失败: {error}"))
+        .map_err(|error| format!("创建节律提醒窗口失败: {error}"))?
     };
-
-    if let Err(error) = window_result {
-        if let Ok(mut pending) = state.pending.lock() {
-            if pending
-                .as_ref()
-                .is_some_and(|item| item.revision == revision)
-            {
-                pending.take();
-            }
-        }
-        return Err(error);
-    }
-
-    std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_millis(3000));
-        let state = app.state::<RhythmReminderState>();
-        if state.ready_revision.load(Ordering::Relaxed) == revision {
-            return;
-        }
-        let fallback_payload = state.pending.lock().ok().and_then(|mut pending| {
-            if pending
-                .as_ref()
-                .is_some_and(|item| item.revision == revision)
-            {
-                pending.take()
-            } else {
-                None
-            }
-        });
-        let Some(payload) = fallback_payload else {
-            return;
-        };
-        if let Some(window) = app.get_webview_window("rhythm-reminder") {
-            let _ = window.hide();
-        }
-        release_interruptive_reminder(&app, ReminderWindowKind::Rhythm);
-        send_rhythm_system_notification(&payload);
-        let _ = app.emit_to(
-            "main",
-            "rhythm-reminder:action",
-            serde_json::json!({ "reminderId": payload.reminder_id, "action": "dismiss" }),
-        );
-    });
+    window
+        .show()
+        .map_err(|error| format!("显示节律提醒窗口失败: {error}"))?;
+    let _ = window.set_focus();
     Ok(())
-}
-
-#[tauri::command]
-fn present_rhythm_reminder(
-    app: tauri::AppHandle,
-    reminder_id: String,
-    title: String,
-    message: String,
-    trigger_label: String,
-    notification_enabled: bool,
-    sound_enabled: bool,
-) -> Result<String, String> {
-    if main_window_is_focused(&app) {
-        return Ok("in-app".to_string());
-    }
-    if !notification_enabled {
-        return Ok("disabled".to_string());
-    }
-    deliver_rhythm_reminder(
-        app,
-        RhythmReminderPayload {
-            revision: 0,
-            reminder_id,
-            title,
-            message,
-            trigger_label,
-            sound_enabled,
-        },
-    )?;
-    Ok("background".to_string())
 }
 
 #[tauri::command]
@@ -1330,64 +1439,34 @@ fn get_rhythm_reminder_payload(
 }
 
 #[tauri::command]
-fn rhythm_reminder_ready(app: tauri::AppHandle, revision: u64) -> Result<String, String> {
-    let state = app.state::<RhythmReminderState>();
-    let matches = state
-        .pending
-        .lock()
-        .map_err(|_| "节律提醒窗口状态不可用".to_string())?
-        .as_ref()
-        .is_some_and(|item| item.revision == revision);
-    if !matches {
-        return Ok("stale".to_string());
-    }
-    match request_interruptive_reminder(&app, ReminderWindowKind::Rhythm)? {
-        ReminderWindowDisposition::Queued => {
-            state.ready_revision.store(revision, Ordering::Relaxed);
-            Ok("queued".to_string())
-        }
-        ReminderWindowDisposition::ShowNow => {
-            if let Err(error) = show_coordinated_reminder(&app, ReminderWindowKind::Rhythm) {
-                release_interruptive_reminder(&app, ReminderWindowKind::Rhythm);
-                return Err(error);
-            }
-            state.ready_revision.store(revision, Ordering::Relaxed);
-            Ok("shown".to_string())
-        }
-    }
-}
-
-#[tauri::command]
 fn handle_rhythm_reminder_action(
     app: tauri::AppHandle,
     revision: u64,
     reminder_id: String,
     action: String,
 ) -> Result<bool, String> {
-    if !matches!(action.as_str(), "complete" | "snooze" | "skip" | "dismiss") {
+    if !matches!(action.as_str(), "complete" | "snooze" | "skip" | "hide") {
         return Err("无效的节律提醒操作".to_string());
     }
-    let state = app.state::<RhythmReminderState>();
-    let handled = state
+    let handled = app
+        .state::<RhythmReminderState>()
         .pending
         .lock()
         .map_err(|_| "节律提醒窗口状态不可用".to_string())?
         .take_if(|item| item.revision == revision && item.reminder_id == reminder_id)
         .is_some();
-    if !handled {
-        return Ok(false);
-    }
     if let Some(window) = app.get_webview_window("rhythm-reminder") {
         let _ = window.hide();
     }
-    release_interruptive_reminder(&app, ReminderWindowKind::Rhythm);
-    app.emit_to(
-        "main",
-        "rhythm-reminder:action",
-        serde_json::json!({ "reminderId": reminder_id, "action": action }),
-    )
-    .map_err(|error| format!("发送节律提醒操作失败: {error}"))?;
-    Ok(true)
+    if handled && action != "hide" {
+        app.emit_to(
+            "main",
+            "rhythm-reminder:action",
+            serde_json::json!({ "reminderId": reminder_id, "action": action }),
+        )
+        .map_err(|error| format!("发送节律提醒操作失败: {error}"))?;
+    }
+    Ok(handled)
 }
 
 #[tauri::command]
@@ -1568,6 +1647,7 @@ fn send_focus_system_notification(
     }
 }
 
+#[cfg(target_os = "macos")]
 fn apple_script_string(value: &str) -> String {
     value
         .replace('\\', "\\\\")
@@ -3536,12 +3616,24 @@ struct StorageItem {
 #[serde(rename_all = "camelCase")]
 struct StorageHealth {
     supported: bool,
+    total_bytes: u64,
+    database_bytes: u64,
     attachment_bytes: u64,
+    referenced_attachment_bytes: u64,
+    referenced_image_bytes: u64,
+    referenced_file_bytes: u64,
     orphan_bytes: u64,
+    orphan_image_bytes: u64,
+    orphan_file_bytes: u64,
     orphan_attachments: Vec<StorageItem>,
     missing_references: Vec<String>,
     quarantined_attachments: Vec<StorageItem>,
     quarantined_bytes: u64,
+    quarantined_image_bytes: u64,
+    quarantined_file_bytes: u64,
+    profile_bytes: u64,
+    backup_bytes: u64,
+    other_bytes: u64,
 }
 
 #[derive(Serialize)]
@@ -3679,6 +3771,9 @@ fn scan_storage_health(app: tauri::AppHandle) -> Result<StorageHealth, String> {
     let mut files = Vec::new();
     collect_files(&attachment_root, &mut files)?;
     let mut attachment_bytes = 0;
+    let mut referenced_attachment_bytes = 0;
+    let mut referenced_image_bytes = 0;
+    let mut referenced_file_bytes = 0;
     let mut orphan_attachments = Vec::new();
     let mut present = HashSet::new();
     for path in files {
@@ -3690,6 +3785,13 @@ fn scan_storage_health(app: tauri::AppHandle) -> Result<StorageHealth, String> {
                 id: item.relative_path.clone(),
                 ..item
             });
+        } else {
+            referenced_attachment_bytes += item.size_bytes;
+            if item.is_image {
+                referenced_image_bytes += item.size_bytes;
+            } else {
+                referenced_file_bytes += item.size_bytes;
+            }
         }
     }
     let missing_references = referenced
@@ -3700,24 +3802,67 @@ fn scan_storage_health(app: tauri::AppHandle) -> Result<StorageHealth, String> {
     let mut cleanup_files = Vec::new();
     collect_files(&cleanup_root, &mut cleanup_files)?;
     let mut quarantined_bytes = 0;
+    let mut quarantined_image_bytes = 0;
+    let mut quarantined_file_bytes = 0;
     let mut quarantined_attachments = Vec::new();
     for path in cleanup_files {
         let item = storage_item(&cleanup_root, &path, String::new())?;
         quarantined_bytes += item.size_bytes;
+        if item.is_image {
+            quarantined_image_bytes += item.size_bytes;
+        } else {
+            quarantined_file_bytes += item.size_bytes;
+        }
         quarantined_attachments.push(StorageItem {
             id: item.relative_path.clone(),
             ..item
         });
     }
+    orphan_attachments.sort_by(|left, right| right.size_bytes.cmp(&left.size_bytes));
+    quarantined_attachments.sort_by(|left, right| right.size_bytes.cmp(&left.size_bytes));
     let orphan_bytes = orphan_attachments.iter().map(|item| item.size_bytes).sum();
+    let orphan_image_bytes = orphan_attachments
+        .iter()
+        .filter(|item| item.is_image)
+        .map(|item| item.size_bytes)
+        .sum();
+    let orphan_file_bytes = orphan_bytes - orphan_image_bytes;
+    let data_dir = app_data_dir(&app)?;
+    let database = db_file(&app)?;
+    let database_bytes = [
+        database.clone(),
+        PathBuf::from(format!("{}-wal", database.to_string_lossy())),
+        PathBuf::from(format!("{}-shm", database.to_string_lossy())),
+    ]
+    .iter()
+    .filter_map(|path| fs::metadata(path).ok())
+    .map(|metadata| metadata.len())
+    .sum();
+    let profile_bytes = directory_size(&data_dir.join("profile"))?;
+    let backup_bytes = directory_size(&backup_dir(&app)?)?;
+    let total_bytes = directory_size(&data_dir)?;
+    let known_bytes =
+        database_bytes + attachment_bytes + quarantined_bytes + profile_bytes + backup_bytes;
     Ok(StorageHealth {
         supported: true,
+        total_bytes,
+        database_bytes,
         attachment_bytes,
+        referenced_attachment_bytes,
+        referenced_image_bytes,
+        referenced_file_bytes,
         orphan_bytes,
+        orphan_image_bytes,
+        orphan_file_bytes,
         orphan_attachments,
         missing_references,
         quarantined_attachments,
         quarantined_bytes,
+        quarantined_image_bytes,
+        quarantined_file_bytes,
+        profile_bytes,
+        backup_bytes,
+        other_bytes: total_bytes.saturating_sub(known_bytes),
     })
 }
 
@@ -4278,6 +4423,8 @@ fn main() {
             get_focus_controller_payload,
             focus_controller_ready,
             set_focus_controller_always_on_top,
+            set_focus_controller_style,
+            set_focus_controller_island_expanded,
             handle_focus_controller_action,
             schedule_rhythm_reminder,
             cancel_rhythm_reminder,
@@ -4290,7 +4437,6 @@ fn main() {
             handle_focus_reminder_action,
             present_rhythm_reminder,
             get_rhythm_reminder_payload,
-            rhythm_reminder_ready,
             handle_rhythm_reminder_action,
             set_window_close_behavior,
             get_system_idle_seconds
@@ -4327,28 +4473,6 @@ fn main() {
                         );
                     }
                     release_interruptive_reminder(_app, ReminderWindowKind::FocusCompletion);
-                } else if label == "rhythm-reminder" {
-                    api.prevent_close();
-                    if let Some(window) = _app.get_webview_window("rhythm-reminder") {
-                        let _ = window.hide();
-                    }
-                    let payload = _app
-                        .state::<RhythmReminderState>()
-                        .pending
-                        .lock()
-                        .ok()
-                        .and_then(|mut pending| pending.take());
-                    if let Some(payload) = payload {
-                        let _ = _app.emit_to(
-                            "main",
-                            "rhythm-reminder:action",
-                            serde_json::json!({
-                                "reminderId": payload.reminder_id,
-                                "action": "dismiss"
-                            }),
-                        );
-                    }
-                    release_interruptive_reminder(_app, ReminderWindowKind::Rhythm);
                 } else if label == "focus-controller" {
                     api.prevent_close();
                     _app.state::<FocusControllerState>()
@@ -4369,9 +4493,9 @@ fn main() {
                     }
                 }
 
-                // macOS 的原生习惯是关闭窗口但保留应用。用户选择“直接退出”
-                // 时才显式结束进程，保持两个选项在两端语义一致。
-                #[cfg(target_os = "macos")]
+                // 托盘图标会继续持有应用进程，因此“直接退出”不能只让主窗口
+                // 自然关闭；需要在所有平台显式结束进程，避免 Windows 仍留在
+                // 通知区域，同时保持 macOS 上两个选项的语义一致。
                 if label == "main"
                     && !_app
                         .state::<WindowCloseBehavior>()

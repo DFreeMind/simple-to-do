@@ -15,20 +15,18 @@
             <header>
               <span class="rhythm-section-label"><span></span>当前运行的节律</span>
               <div class="rhythm-now__toolbar">
-                <span class="rhythm-running-count" :class="{ paused: store.rhythmPaused }"><i></i>{{ store.rhythmPaused ? '已暂停' : `${enabledReminders.length} / ${store.rhythmActiveLimit} 项运行中` }}</span>
+                <span class="rhythm-running-count" :class="{ paused: store.rhythmPaused }"><i></i>{{ store.rhythmPaused ? '已暂停' : `${runningReminderCount} / ${store.rhythmActiveLimit} 项运行中` }}</span>
                 <button v-if="store.rhythmPaused" class="rhythm-control-btn rhythm-control-btn--primary" type="button" @click="store.resumeRhythmReminders"><Play :size="15" fill="currentColor" />继续</button>
                 <button v-else class="rhythm-control-btn" type="button" @click="pauseAll"><Pause :size="15" />暂停</button>
               </div>
             </header>
-
-            <p class="rhythm-now__legend"><TimerReset :size="14" />按间隔会倒计时；连续使用会累计；固定时刻直接显示时间。</p>
 
             <div class="rhythm-timeline" aria-label="正在运行的提醒计时盘">
               <article
                 v-for="item in reminderTimings"
                 :key="item.reminder.id"
                 class="rhythm-timeline-card"
-                :class="[{ due: item.state === 'due', paused: store.rhythmPaused }, toneClass(item.reminder)]"
+                :class="[{ due: item.state === 'due', paused: store.rhythmPaused || item.state === 'paused' }, toneClass(item.reminder)]"
               >
                 <div class="rhythm-timeline-card__dial" role="img" :aria-label="`${item.reminder.title}，${timingLabel(item)} ${timingValue(item)}`">
                   <svg class="rhythm-timeline-card__ring" viewBox="0 0 220 220" aria-hidden="true">
@@ -43,7 +41,7 @@
                   </span>
                   <span v-else class="rhythm-timeline-card__dial-content">
                     <small class="rhythm-timeline-card__dial-label">{{ timingDialLabel(item) }}</small>
-                    <strong>{{ timingDialPrimary(item) }}</strong>
+                    <strong :class="{ 'is-status': store.rhythmPaused || item.reminder.pausedIndividually }">{{ timingDialPrimary(item) }}</strong>
                     <small>{{ timingDialSecondary(item) }}</small>
                   </span>
                 </div>
@@ -51,30 +49,16 @@
                 <div class="rhythm-timeline-card__content">
                   <header>
                     <span class="rhythm-timeline-card__title"><span><component :is="reminderIcon(item.reminder)" :size="16" /></span><strong>{{ item.reminder.title }}</strong></span>
+                    <button v-if="item.state !== 'due'" class="rhythm-timeline-card__pause" type="button" :aria-label="item.state === 'paused' ? `继续${item.reminder.title}` : `暂停${item.reminder.title}`" @click="toggleReminderPause(item.reminder)"><Play v-if="item.state === 'paused'" :size="14" fill="currentColor" /><Pause v-else :size="14" /></button>
                   </header>
-                  <p class="rhythm-timeline-card__headline">{{ timingHeadline(item) }}</p>
                   <div class="rhythm-timeline-card__meta">
-                    <span><TimerReset :size="14" />{{ triggerLabel(item.reminder) }}</span>
-                    <span><Clock3 :size="14" />{{ compactTiming(item) }}</span>
+                    <span><TimerReset :size="14" />{{ timingHeadline(item) }}</span>
                     <span><CalendarDays :size="14" />{{ weekdaySummary(item.reminder.weekdays) }} · {{ item.reminder.workStart }}–{{ item.reminder.workEnd }}</span>
                   </div>
-                  <section v-if="item.state !== 'due'" class="rhythm-timeline-card__controls" :class="{ paused: store.rhythmPaused }" :aria-label="`${item.reminder.title}本轮控制`">
-                    <div class="rhythm-timeline-card__controls-heading">
-                      <span>本轮控制</span>
-                      <strong>{{ cardControlSummary(item) }}</strong>
-                    </div>
-                    <div class="rhythm-timeline-card__controls-actions" :class="{ 'is-single-action': store.rhythmPaused || !supportsQuickAdjustment(item) }">
-                      <template v-if="store.rhythmPaused">
-                        <button class="rhythm-action-primary" type="button" @click="store.resumeRhythmReminders"><Play :size="15" fill="currentColor" />继续</button>
-                      </template>
-                      <template v-else-if="supportsQuickAdjustment(item)">
-                        <button type="button" :aria-label="`${item.reminder.title}本轮提前 5 分钟`" @click="adjustCurrentRound(item, -5)"><Minus :size="15" />5</button>
-                        <button class="rhythm-action-primary" type="button" @click="pauseAll"><Pause :size="15" />暂停</button>
-                        <button type="button" :aria-label="`${item.reminder.title}本轮延后 5 分钟`" @click="adjustCurrentRound(item, 5)"><Plus :size="15" />5</button>
-                      </template>
-                      <template v-else>
-                        <button class="rhythm-action-primary" type="button" @click="pauseAll"><Pause :size="15" />暂停</button>
-                      </template>
+                  <section v-if="item.state !== 'due' && supportsQuickAdjustment(item)" class="rhythm-timeline-card__controls" :aria-label="`${item.reminder.title}本轮时间调整`">
+                    <div class="rhythm-timeline-card__controls-actions">
+                      <button type="button" :aria-label="`${item.reminder.title}本轮提前 5 分钟`" @click="adjustCurrentRound(item, -5)">−5</button>
+                      <button type="button" :aria-label="`${item.reminder.title}本轮延后 5 分钟`" @click="adjustCurrentRound(item, 5)">+5</button>
                     </div>
                   </section>
                 </div>
@@ -104,9 +88,7 @@
         <section class="rhythm-library" aria-labelledby="rhythm-library-title">
           <header>
             <div>
-              <p class="eyebrow">从这里开始</p>
-              <h2 id="rhythm-library-title">六个常用节律</h2>
-              <p>先保留最需要的 1–3 项；频率和运行时间之后都能调整。</p>
+              <h2 id="rhythm-library-title">常用节律</h2>
             </div>
             <span>最多同时开启 {{ store.rhythmActiveLimit }} 项</span>
           </header>
@@ -128,8 +110,7 @@
                 <span class="rhythm-preset__icon"><component :is="reminderIcon(reminder)" :size="21" :stroke-width="1.8" /></span>
                 <span class="rhythm-preset__copy">
                   <strong>{{ reminder.title }}</strong>
-                  <small>{{ isUnavailable(reminder) ? '当前系统暂不支持' : presetPurpose(reminder) }}</small>
-                  <em>{{ isUnavailable(reminder) ? '需要系统活跃状态支持' : cardStatus(reminder) }}</em>
+                  <small>{{ isUnavailable(reminder) ? '当前系统暂不支持' : reminder.enabled ? cardStatus(reminder) : triggerLabel(reminder) }}</small>
                 </span>
                 <span class="rhythm-preset__switch" aria-hidden="true"><i></i></span>
               </button>
@@ -229,7 +210,11 @@
                   </section>
 
                   <section class="rhythm-editor-section rhythm-editor-sheet__message">
-                    <div><p class="rhythm-editor-section__eyebrow">提醒文案</p><h3>出现时对你说</h3></div>
+                    <div class="rhythm-editor-section__heading">
+                      <div><p class="rhythm-editor-section__eyebrow">提醒文案</p><h3>出现时对你说</h3></div>
+                      <button class="rhythm-copy-randomize" type="button" @click="randomizeReminderCopy"><Sparkles :size="14" />换一条</button>
+                    </div>
+                    <p class="rhythm-copy-help">标题保持不变；可直接修改正文，或从{{ rhythmCopyOptionCount }}条同类内置文案中随机选一条。</p>
                     <label class="rhythm-setting-field">
                       <span>标题</span>
                       <input :value="editingReminder.title" maxlength="32" @change="updateEditing({ title: $event.target.value })" />
@@ -315,7 +300,6 @@ import {
   Eye,
   Leaf,
   MonitorUp,
-  Minus,
   Pause,
   Play,
   Plus,
@@ -328,6 +312,7 @@ import {
 } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import { getRhythmCopyCategory, getRhythmCopyOptions, pickRhythmCopy } from '@/utils/rhythmCopy'
 
 const store = useTaskStore()
 const now = ref(Date.now())
@@ -341,6 +326,7 @@ const deleteConfirmOpen = ref(false)
 const customIntervalEnabled = ref(false)
 const customIntervalValue = ref(60)
 const customIntervalUnit = ref('minutes')
+const recentCopyKeys = ref({})
 let clockTimer
 
 const builtInIds = new Set(['eyes', 'hydration', 'sedentary', 'shoulders', 'breathe', 'wrap-up'])
@@ -356,6 +342,7 @@ const visibleReminders = computed(() => store.rhythmReminders)
 const builtInReminders = computed(() => visibleReminders.value.filter(isBuiltIn))
 const customReminders = computed(() => visibleReminders.value.filter(reminder => !isBuiltIn(reminder)))
 const enabledReminders = computed(() => visibleReminders.value.filter(item => item.enabled && !isUnavailable(item)))
+const runningReminderCount = computed(() => enabledReminders.value.filter(item => !item.pausedIndividually).length)
 const editingReminder = computed(() => editingDraft.value)
 const editorDirty = computed(() => Boolean(editingDraft.value) && (isNewReminder.value || JSON.stringify(editingDraft.value) !== JSON.stringify(editingOriginal.value)))
 const editorSchedule = computed(() => editingReminder.value ? triggerLabel(editingReminder.value) : '')
@@ -365,6 +352,7 @@ const editorScheduleLabel = computed(() => customIntervalEnabled.value && editin
 const editorSummary = computed(() => editingReminder.value
   ? `${editorScheduleLabel.value} · ${weekdaySummary(editingReminder.value.weekdays)} · ${editingReminder.value.workStart}–${editingReminder.value.workEnd}`
   : '')
+const rhythmCopyOptionCount = computed(() => editingReminder.value ? getRhythmCopyOptions(editingReminder.value).length : 0)
 const editorNextReminderText = computed(() => {
   const reminder = editingReminder.value
   if (!reminder?.enabled) return '未启用'
@@ -393,8 +381,9 @@ const selectedTrigger = computed(() => availableTriggers.value.find(item => item
 const selectedTriggerDetail = computed(() => selectedTrigger.value?.detail || '')
 const reminderTimings = computed(() => enabledReminders.value.map((reminder) => {
   const dueAt = getNextReminderAt(reminder)
-  return { reminder, dueAt, state: reminder.pendingSince || dueAt <= now.value ? 'due' : 'running' }
+  return { reminder, dueAt, state: reminder.pausedIndividually ? 'paused' : (reminder.pendingSince || dueAt <= now.value ? 'due' : 'running') }
 }).sort((a, b) => {
+  if (a.state === 'paused' || b.state === 'paused') return a.state === b.state ? 0 : (a.state === 'paused' ? 1 : -1)
   if (a.state !== b.state) return a.state === 'due' ? -1 : 1
   return a.dueAt - b.dueAt
 }))
@@ -472,7 +461,7 @@ function getNextReminderAt(reminder) {
   if (reminder.pendingSince) return now.value
   if (reminder.snoozedUntil) return alignToSchedule(reminder, new Date(reminder.snoozedUntil).getTime())
   if (reminder.triggerType === 'active-duration') {
-    const dueAt = now.value + Math.max(0, reminder.intervalSeconds - (Number(reminder.activitySeconds) || 0)) * 1000
+    const dueAt = now.value + Math.max(0, roundDurationSeconds(reminder) - (Number(reminder.activitySeconds) || 0)) * 1000
     return alignToSchedule(reminder, dueAt)
   }
   if (reminder.triggerType === 'fixed-time') {
@@ -615,8 +604,9 @@ function timingKind(reminder) {
 
 function timingDialLabel(item) {
   if (store.rhythmPaused) return '已暂停'
+  if (item.reminder.pausedIndividually) return '已暂停'
   if (item.state === 'due') return '现在需要处理'
-  if (item.reminder.triggerType === 'active-duration') return '连续使用'
+  if (item.reminder.triggerType === 'active-duration') return '距提醒'
   if (item.reminder.triggerType === 'fixed-time') return '下一次提醒'
   if (!isWithinSchedule(item.reminder)) return '下一工作时段'
   return '倒计时'
@@ -625,18 +615,22 @@ function timingDialLabel(item) {
 function timingDialPrimary(item) {
   const { reminder, state, dueAt } = item
   if (store.rhythmPaused) return '暂停中'
+  if (reminder.pausedIndividually) return '暂停中'
   if (state === 'due') return '该休息了'
-  if (reminder.triggerType === 'active-duration') return formatCompactDuration(Number(reminder.activitySeconds) || 0)
+  if (reminder.triggerType === 'active-duration') return formatDialCountdown(Math.max(0, roundDurationSeconds(reminder) - (Number(reminder.activitySeconds) || 0)))
   if (reminder.triggerType === 'fixed-time') return reminder.time
   if (!isWithinSchedule(reminder)) return dialScheduleDay(dueAt)
-  return formatCountdown(Math.max(0, Math.ceil((dueAt - now.value) / 1000)))
+  return formatDialCountdown(Math.max(0, Math.ceil((dueAt - now.value) / 1000)))
 }
 
 function timingDialSecondary(item) {
   const { reminder, state, dueAt } = item
-  if (store.rhythmPaused) return '继续后保留当前进度'
+  const remaining = reminder.triggerType === 'active-duration'
+    ? Math.max(0, roundDurationSeconds(reminder) - (Number(reminder.activitySeconds) || 0))
+    : reminder.pausedRemainingSeconds
+  if (store.rhythmPaused || reminder.pausedIndividually) return `剩余 ${formatRemaining(remaining)}`
   if (state === 'due') return '处理后开始新一轮'
-  if (reminder.triggerType === 'active-duration') return `目标 ${formatRemaining(reminder.intervalSeconds)}`
+  if (reminder.triggerType === 'active-duration') return `已连续使用 ${formatRemaining(Number(reminder.activitySeconds) || 0)}`
   if (reminder.triggerType === 'fixed-time') return weekdaySummary(reminder.weekdays)
   if (!isWithinSchedule(reminder)) return formatClock(dueAt)
   return '后提醒'
@@ -677,7 +671,7 @@ function timingValue(item) {
   if (state === 'due') return '该停一下了'
   if (reminder.snoozedUntil && new Date(reminder.snoozedUntil).getTime() > now.value) return formatClock(new Date(reminder.snoozedUntil).getTime())
   if (reminder.skippedDate === localDateKey()) return '今天不再提醒'
-  if (reminder.triggerType === 'active-duration') return `${formatRemaining(Number(reminder.activitySeconds) || 0)} / ${formatRemaining(reminder.intervalSeconds)}`
+  if (reminder.triggerType === 'active-duration') return `还需 ${formatRemaining(Math.max(0, roundDurationSeconds(reminder) - (Number(reminder.activitySeconds) || 0)))}，本轮结束后提醒`
   if (reminder.triggerType === 'fixed-time' || !isWithinSchedule(reminder)) return formatCalendarTime(dueAt)
   return formatCountdown(Math.max(0, Math.ceil((dueAt - now.value) / 1000)))
 }
@@ -691,19 +685,10 @@ function timingDetail(item) {
   return `下次 ${formatClock(dueAt)} · 每 ${intervalLabel(reminder.intervalSeconds / 60)}`
 }
 
-function compactTiming(item) {
-  const { reminder, dueAt, state } = item
-  if (store.rhythmPaused) return '等待继续'
-  if (state === 'due') return '现在处理后开始下一轮'
-  if (reminder.triggerType === 'active-duration') return `目标 ${formatRemaining(reminder.intervalSeconds)}`
-  if (reminder.triggerType === 'fixed-time') return `下次 ${formatCalendarTime(dueAt)}`
-  if (!isWithinSchedule(reminder)) return `下次 ${formatCalendarTime(dueAt)}`
-  return `下次 ${formatClock(dueAt)}`
-}
-
 function timingHeadline(item) {
   const { reminder, state } = item
   if (store.rhythmPaused) return '提醒已暂停，继续后会从当前进度接着运行'
+  if (reminder.pausedIndividually) return '本轮已暂停，继续后会从当前进度接着运行'
   if (state === 'due') return '现在该给自己一点调整时间了'
   if (reminder.triggerType === 'active-duration') return `已累计 ${formatRemaining(Number(reminder.activitySeconds) || 0)}，达到 ${formatRemaining(reminder.intervalSeconds)} 后提醒`
   if (reminder.triggerType === 'fixed-time') return `会在 ${formatCalendarTime(item.dueAt)} 提醒`
@@ -713,6 +698,7 @@ function timingHeadline(item) {
 
 function canStartNow(item) {
   return !store.rhythmPaused
+    && !item.reminder.pausedIndividually
     && item.state !== 'due'
     && item.reminder.triggerType !== 'fixed-time'
     && !isWithinSchedule(item.reminder)
@@ -722,23 +708,21 @@ function supportsQuickAdjustment(item) {
   return item.reminder.triggerType !== 'fixed-time'
 }
 
-function cardControlSummary(item) {
-  if (store.rhythmPaused) return '提醒已暂停'
-  if (item.reminder.triggerType === 'active-duration') return '调整连续使用时长'
-  if (item.reminder.triggerType === 'fixed-time') return '固定时刻按规则执行'
-  return '临时调整下一次提醒'
-}
-
 function adjustCurrentRound(item, minutes) {
   store.adjustRhythmReminderTiming(item.reminder.id, minutes)
 }
 
+function toggleReminderPause(reminder) {
+  if (reminder.pausedIndividually) store.resumeRhythmReminder(reminder.id)
+  else store.pauseRhythmReminder(reminder.id)
+}
+
 function timingUsesProgress(item) {
-  return !store.rhythmPaused && item.state !== 'due'
+  return !store.rhythmPaused && item.state === 'running'
 }
 
 function timingProgress(item) {
-  const total = Math.max(60, Number(item.reminder.intervalSeconds) || 60)
+  const total = roundDurationSeconds(item.reminder)
   if (item.reminder.triggerType === 'active-duration') return Math.max(3, Math.min(100, ((Number(item.reminder.activitySeconds) || 0) / total) * 100))
   return Math.max(3, Math.min(100, (1 - Math.max(0, item.dueAt - now.value) / 1000 / total) * 100))
 }
@@ -755,17 +739,6 @@ function ringStyle(item) {
     strokeDasharray: RING_CIRCUMFERENCE,
     strokeDashoffset: RING_CIRCUMFERENCE * (1 - progress / 100)
   }
-}
-
-function presetPurpose(reminder) {
-  return {
-    eyes: '让长时间盯屏的视线换个焦点',
-    hydration: '忙碌时，也别忘了喝几口水',
-    sedentary: '连续使用电脑后，离开座位活动一下',
-    shoulders: '给肩颈一次轻柔的伸展机会',
-    breathe: '在紧张或专注后，换一口气',
-    'wrap-up': '下班前收好今天，写下明天第一步'
-  }[reminder?.id] || reminder?.message || '按你的节奏提醒自己'
 }
 
 function reminderTimingSummary(item) {
@@ -798,18 +771,13 @@ function weekdaySummary(days = []) {
 function formatRemaining(seconds) {
   const value = Math.max(0, Number(seconds) || 0)
   if (value >= 3600) {
-    const hours = Math.floor(value / 3600)
-    const minutes = Math.ceil((value % 3600) / 60)
+    const totalMinutes = Math.ceil(value / 60)
+    const hours = Math.floor(totalMinutes / 60)
+    const minutes = totalMinutes % 60
     return minutes ? `${hours} 小时 ${minutes} 分` : `${hours} 小时`
   }
   if (value >= 60) return `${Math.ceil(value / 60)} 分钟`
   return `${value} 秒`
-}
-
-function formatCompactDuration(seconds) {
-  const value = Math.max(0, Number(seconds) || 0)
-  if (value >= 3600) return `${Math.floor(value / 3600)}小时${Math.floor((value % 3600) / 60)}分`
-  return `${Math.floor(value / 60)}分`
 }
 
 function formatCountdown(seconds) {
@@ -819,6 +787,18 @@ function formatCountdown(seconds) {
   const remainingSeconds = value % 60
   const clock = `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`
   return hours ? `${hours}:${clock}` : clock
+}
+
+function roundDurationSeconds(reminder) {
+  return Math.max(60, Math.min(8 * 60 * 60, (Number(reminder?.intervalSeconds) || 60) + (Number(reminder?.roundAdjustmentSeconds) || 0)))
+}
+
+function formatDialCountdown(seconds) {
+  const value = Math.max(0, Math.ceil(Number(seconds) || 0))
+  if (value < 3600) return formatCountdown(value)
+  const hours = Math.floor(value / 3600)
+  const minutes = Math.floor((value % 3600) / 60)
+  return `${hours}:${String(minutes).padStart(2, '0')}`
 }
 
 function intervalLabel(minutes) {
@@ -898,6 +878,22 @@ function addCustomReminder() {
 function updateEditing(updates) {
   if (!editingReminder.value) return
   editingDraft.value = { ...editingReminder.value, ...updates }
+}
+
+function randomizeReminderCopy() {
+  if (!editingReminder.value) return
+  const reminder = editingReminder.value
+  const category = getRhythmCopyCategory(reminder)
+  const options = getRhythmCopyOptions(reminder)
+  const currentKey = options.find(option => option.message === reminder.message)?.key
+  const recent = recentCopyKeys.value[category] || []
+  const copy = pickRhythmCopy(reminder, [...recent, currentKey].filter(Boolean))
+  if (!copy) return
+  recentCopyKeys.value = {
+    ...recentCopyKeys.value,
+    [category]: [...recent, copy.key].slice(-6)
+  }
+  updateEditing({ message: copy.message })
 }
 
 async function saveEditor() {

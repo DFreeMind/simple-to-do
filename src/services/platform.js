@@ -213,9 +213,43 @@ export async function readProfileAvatar(relativePath) {
   return null
 }
 
+function buildWebStorageMock() {
+  // Web/演示环境下没有真实附件目录，返回一份可演示的扫描结果，
+  // 让"空间管理"页和"数据与安全"页能展示完整结构和文案。
+  const orphanAttachments = [
+    { id: 'web-orphan-1', relativePath: 'attachments/2024-04/old-photo.png', name: '旧版设计稿.png', sizeBytes: 1840521, kind: 'image', addedAt: '2024-04-12T09:24:00.000Z' },
+    { id: 'web-orphan-2', relativePath: 'attachments/2024-05/draft.md', name: '早期草稿.md', sizeBytes: 18421, kind: 'file', addedAt: '2024-05-30T17:11:00.000Z' }
+  ]
+  const quarantinedAttachments = [
+    { id: 'web-quarantine-1', relativePath: 'attachments/2024-06/note.txt', name: '旧笔记.txt', sizeBytes: 6291, kind: 'file', quarantinedAt: '2024-06-21T15:00:00.000Z' }
+  ]
+  const totalBytes = 12_847_503
+  const attachmentBytes = orphanAttachments.reduce((sum, item) => sum + item.sizeBytes, 0)
+    + quarantinedAttachments.reduce((sum, item) => sum + item.sizeBytes, 0)
+    + 9_822_270
+  return {
+    supported: true,
+    totalBytes,
+    attachmentBytes,
+    orphanAttachments,
+    quarantinedAttachments,
+    orphanBytes: orphanAttachments.reduce((sum, item) => sum + item.sizeBytes, 0),
+    quarantinedBytes: quarantinedAttachments.reduce((sum, item) => sum + item.sizeBytes, 0),
+    orphanImageBytes: orphanAttachments.filter(item => item.kind === 'image').reduce((sum, item) => sum + item.sizeBytes, 0),
+    orphanFileBytes: orphanAttachments.filter(item => item.kind !== 'image').reduce((sum, item) => sum + item.sizeBytes, 0),
+    databaseBytes: 1_823_410,
+    referencedImageBytes: 6_204_512,
+    referencedFileBytes: 1_443_120,
+    profileBytes: 412_870,
+    backupBytes: 2_148_006,
+    otherBytes: 102_502,
+    missingReferences: []
+  }
+}
+
 export async function scanStorageHealth() {
   if (isTauri()) return invoke('scan_storage_health')
-  return { supported: false, orphanAttachments: [], quarantinedAttachments: [] }
+  return buildWebStorageMock()
 }
 
 export async function quarantineOrphanAttachments(relativePaths) {
@@ -405,6 +439,16 @@ export async function setFocusControllerAlwaysOnTop(alwaysOnTop) {
   return invoke('set_focus_controller_always_on_top', { alwaysOnTop })
 }
 
+export async function setFocusControllerStyle(style) {
+  if (!isTauri()) return false
+  return invoke('set_focus_controller_style', { style })
+}
+
+export async function setFocusControllerIslandExpanded(expanded) {
+  if (!isTauri()) return false
+  return invoke('set_focus_controller_island_expanded', { expanded })
+}
+
 export async function handleFocusControllerAction(controller, action) {
   if (!isTauri() || !controller?.sessionId) return false
   return invoke('handle_focus_controller_action', {
@@ -511,11 +555,6 @@ export async function cancelRhythmReminder(reminderId = null) {
 export async function getRhythmReminderPayload() {
   if (!isTauri()) return null
   return invoke('get_rhythm_reminder_payload')
-}
-
-export async function markRhythmReminderReady(revision) {
-  if (!isTauri()) return false
-  return invoke('rhythm_reminder_ready', { revision })
 }
 
 export async function handleRhythmReminderAction(reminder, action) {

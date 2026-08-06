@@ -160,10 +160,10 @@
       "deletedAt": null,
       "pinned": true,
       "important": false,
-      "myDayDate": "2026-07-17",
+      "myDayDate": "2026-08-06",
       "listId": "meetings",
-      "dueDate": "2026-07-17T02:30:00.000Z",
-      "reminderAt": "2026-07-17T02:00:00.000Z",
+      "dueDate": "2026-08-06T02:30:00.000Z",
+      "reminderAt": "2026-08-04T02:00:00.000Z",
       "repeatRule": null,
       "priority": 2,
       "tags": [
@@ -174,8 +174,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-13T01:00:00.000Z",
-      "updatedAt": "2026-07-13T01:00:00.000Z"
+      "createdAt": "2026-07-31T01:00:00.000Z",
+      "updatedAt": "2026-07-31T01:00:00.000Z"
     },
     {
       "id": "today-2",
@@ -188,9 +188,9 @@
       "deletedAt": null,
       "pinned": false,
       "important": true,
-      "myDayDate": "2026-07-17",
+      "myDayDate": "2026-08-06",
       "listId": "work-tasks",
-      "dueDate": "2026-07-17T10:00:00.000Z",
+      "dueDate": "2026-08-06T10:00:00.000Z",
       "reminderAt": null,
       "repeatRule": null,
       "priority": 3,
@@ -223,8 +223,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-15T06:00:00.000Z",
-      "updatedAt": "2026-07-15T06:00:00.000Z"
+      "createdAt": "2026-08-02T06:00:00.000Z",
+      "updatedAt": "2026-08-02T06:00:00.000Z"
     },
     {
       "id": "today-3",
@@ -237,9 +237,9 @@
       "deletedAt": null,
       "pinned": false,
       "important": false,
-      "myDayDate": "2026-07-17",
+      "myDayDate": "2026-08-06",
       "listId": "home",
-      "dueDate": "2026-07-17T11:00:00.000Z",
+      "dueDate": "2026-08-06T11:00:00.000Z",
       "reminderAt": null,
       "repeatRule": null,
       "priority": 0,
@@ -272,8 +272,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-15T12:00:00.000Z",
-      "updatedAt": "2026-07-15T12:00:00.000Z",
+      "createdAt": "2026-08-02T12:00:00.000Z",
+      "updatedAt": "2026-08-02T12:00:00.000Z",
       "taskGroupId": "tg-home-weekly"
     },
     {
@@ -287,9 +287,9 @@
       "deletedAt": null,
       "pinned": false,
       "important": false,
-      "myDayDate": "2026-07-17",
+      "myDayDate": "2026-08-06",
       "listId": "reading",
-      "dueDate": "2026-07-17T14:00:00.000Z",
+      "dueDate": "2026-08-06T14:00:00.000Z",
       "reminderAt": null,
       "repeatRule": "daily",
       "priority": 0,
@@ -312,8 +312,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-04T23:00:00.000Z",
-      "updatedAt": "2026-07-04T23:00:00.000Z"
+      "createdAt": "2026-07-22T23:00:00.000Z",
+      "updatedAt": "2026-07-22T23:00:00.000Z"
     },
     {
       "id": "overdue-1",
@@ -328,8 +328,8 @@
       "important": true,
       "myDayDate": null,
       "listId": "project-alpha",
-      "dueDate": "2026-07-14T10:00:00.000Z",
-      "reminderAt": "2026-07-14T08:00:00.000Z",
+      "dueDate": "2026-08-01T10:00:00.000Z",
+      "reminderAt": "2026-08-01T08:00:00.000Z",
       "repeatRule": null,
       "priority": 3,
       "tags": [
@@ -340,8 +340,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-08T03:00:00.000Z",
-      "updatedAt": "2026-07-08T03:00:00.000Z"
+      "createdAt": "2026-07-26T03:00:00.000Z",
+      "updatedAt": "2026-07-26T03:00:00.000Z"
     },
     {
       "id": "overdue-2",
@@ -356,7 +356,7 @@
       "important": false,
       "myDayDate": null,
       "listId": "personal",
-      "dueDate": "2026-07-16T00:00:00.000Z",
+      "dueDate": "2026-08-03T00:00:00.000Z",
       "reminderAt": null,
       "repeatRule": null,
       "priority": 0,
@@ -367,8 +367,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-12T00:00:00.000Z",
-      "updatedAt": "2026-07-12T00:00:00.000Z"
+      "createdAt": "2026-07-30T00:00:00.000Z",
+      "updatedAt": "2026-07-30T00:00:00.000Z"
     },
     {
       "id": "tomorrow-1",
@@ -383,8 +383,8 @@
       "important": true,
       "myDayDate": null,
       "listId": "work-tasks",
-      "dueDate": "2026-07-18T01:00:00.000Z",
-      "reminderAt": "2026-07-18T00:30:00.000Z",
+      "dueDate": "2026-08-07T01:00:00.000Z",
+      "reminderAt": "2026-08-05T00:30:00.000Z",
       "repeatRule": null,
       "priority": 3,
       "tags": [
@@ -395,8 +395,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-16T07:00:00.000Z",
-      "updatedAt": "2026-07-16T07:00:00.000Z"
+      "createdAt": "2026-08-03T07:00:00.000Z",
+      "updatedAt": "2026-08-03T07:00:00.000Z"
     },
     {
       "id": "tomorrow-2",
@@ -411,7 +411,7 @@
       "important": true,
       "myDayDate": null,
       "listId": "project-alpha",
-      "dueDate": "2026-07-18T07:00:00.000Z",
+      "dueDate": "2026-08-07T07:00:00.000Z",
       "reminderAt": null,
       "repeatRule": null,
       "priority": 3,
@@ -449,8 +449,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-12T06:00:00.000Z",
-      "updatedAt": "2026-07-12T06:00:00.000Z",
+      "createdAt": "2026-07-30T06:00:00.000Z",
+      "updatedAt": "2026-07-30T06:00:00.000Z",
       "taskGroupId": "tg-alpha-review"
     },
     {
@@ -466,7 +466,7 @@
       "important": false,
       "myDayDate": null,
       "listId": "personal",
-      "dueDate": "2026-07-22T13:00:00.000Z",
+      "dueDate": "2026-08-09T13:00:00.000Z",
       "reminderAt": null,
       "repeatRule": null,
       "priority": 1,
@@ -477,8 +477,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-14T05:00:00.000Z",
-      "updatedAt": "2026-07-14T05:00:00.000Z"
+      "createdAt": "2026-08-01T05:00:00.000Z",
+      "updatedAt": "2026-08-01T05:00:00.000Z"
     },
     {
       "id": "week-2",
@@ -493,7 +493,7 @@
       "important": false,
       "myDayDate": null,
       "listId": "personal",
-      "dueDate": "2026-07-23T10:00:00.000Z",
+      "dueDate": "2026-08-10T10:00:00.000Z",
       "reminderAt": null,
       "repeatRule": "weekly",
       "priority": 0,
@@ -504,8 +504,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-06-27T01:00:00.000Z",
-      "updatedAt": "2026-06-27T01:00:00.000Z"
+      "createdAt": "2026-07-15T01:00:00.000Z",
+      "updatedAt": "2026-07-15T01:00:00.000Z"
     },
     {
       "id": "week-3",
@@ -520,8 +520,8 @@
       "important": false,
       "myDayDate": null,
       "listId": "health",
-      "dueDate": "2026-07-21T03:00:00.000Z",
-      "reminderAt": "2026-07-20T12:00:00.000Z",
+      "dueDate": "2026-08-08T03:00:00.000Z",
+      "reminderAt": "2026-08-07T12:00:00.000Z",
       "repeatRule": null,
       "priority": 2,
       "tags": [
@@ -531,8 +531,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-11T02:00:00.000Z",
-      "updatedAt": "2026-07-11T02:00:00.000Z"
+      "createdAt": "2026-07-29T02:00:00.000Z",
+      "updatedAt": "2026-07-29T02:00:00.000Z"
     },
     {
       "id": "later-1",
@@ -547,7 +547,7 @@
       "important": false,
       "myDayDate": null,
       "listId": "travel",
-      "dueDate": "2026-08-10T02:00:00.000Z",
+      "dueDate": "2026-08-28T02:00:00.000Z",
       "reminderAt": null,
       "repeatRule": null,
       "priority": 0,
@@ -559,8 +559,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-11T04:00:00.000Z",
-      "updatedAt": "2026-07-11T04:00:00.000Z"
+      "createdAt": "2026-07-29T04:00:00.000Z",
+      "updatedAt": "2026-07-29T04:00:00.000Z"
     },
     {
       "id": "later-2",
@@ -575,7 +575,7 @@
       "important": false,
       "myDayDate": null,
       "listId": "personal",
-      "dueDate": "2026-07-29T12:00:00.000Z",
+      "dueDate": "2026-08-16T12:00:00.000Z",
       "reminderAt": null,
       "repeatRule": "monthly",
       "priority": 2,
@@ -586,8 +586,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-06-29T01:00:00.000Z",
-      "updatedAt": "2026-06-29T01:00:00.000Z"
+      "createdAt": "2026-07-17T01:00:00.000Z",
+      "updatedAt": "2026-07-17T01:00:00.000Z"
     },
     {
       "id": "later-3",
@@ -602,7 +602,7 @@
       "important": false,
       "myDayDate": null,
       "listId": "travel",
-      "dueDate": "2026-08-16T02:00:00.000Z",
+      "dueDate": "2026-09-03T02:00:00.000Z",
       "reminderAt": null,
       "repeatRule": null,
       "priority": 0,
@@ -635,8 +635,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-07T07:00:00.000Z",
-      "updatedAt": "2026-07-07T07:00:00.000Z"
+      "createdAt": "2026-07-25T07:00:00.000Z",
+      "updatedAt": "2026-07-25T07:00:00.000Z"
     },
     {
       "id": "important-1",
@@ -663,8 +663,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-10T02:00:00.000Z",
-      "updatedAt": "2026-07-10T02:00:00.000Z"
+      "createdAt": "2026-07-28T02:00:00.000Z",
+      "updatedAt": "2026-07-28T02:00:00.000Z"
     },
     {
       "id": "important-2",
@@ -691,8 +691,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-06T02:00:00.000Z",
-      "updatedAt": "2026-07-06T02:00:00.000Z"
+      "createdAt": "2026-07-24T02:00:00.000Z",
+      "updatedAt": "2026-07-24T02:00:00.000Z"
     },
     {
       "id": "pinned-1",
@@ -719,8 +719,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-16T02:00:00.000Z",
-      "updatedAt": "2026-07-16T02:00:00.000Z"
+      "createdAt": "2026-08-03T02:00:00.000Z",
+      "updatedAt": "2026-08-03T02:00:00.000Z"
     },
     {
       "id": "inbox-1",
@@ -746,8 +746,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-16T00:00:00.000Z",
-      "updatedAt": "2026-07-16T00:00:00.000Z"
+      "createdAt": "2026-08-03T00:00:00.000Z",
+      "updatedAt": "2026-08-03T00:00:00.000Z"
     },
     {
       "id": "inbox-2",
@@ -773,8 +773,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-17T03:00:00.000Z",
-      "updatedAt": "2026-07-17T03:00:00.000Z"
+      "createdAt": "2026-08-04T03:00:00.000Z",
+      "updatedAt": "2026-08-04T03:00:00.000Z"
     },
     {
       "id": "inbox-3",
@@ -800,8 +800,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-02T02:00:00.000Z",
-      "updatedAt": "2026-07-02T02:00:00.000Z"
+      "createdAt": "2026-07-20T02:00:00.000Z",
+      "updatedAt": "2026-07-20T02:00:00.000Z"
     },
     {
       "id": "reading-1",
@@ -816,7 +816,7 @@
       "important": false,
       "myDayDate": null,
       "listId": "reading",
-      "dueDate": "2026-07-19T12:00:00.000Z",
+      "dueDate": "2026-08-06T12:00:00.000Z",
       "reminderAt": null,
       "repeatRule": null,
       "priority": 0,
@@ -828,8 +828,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-13T11:00:00.000Z",
-      "updatedAt": "2026-07-13T11:00:00.000Z"
+      "createdAt": "2026-07-31T11:00:00.000Z",
+      "updatedAt": "2026-07-31T11:00:00.000Z"
     },
     {
       "id": "reading-2",
@@ -844,7 +844,7 @@
       "important": false,
       "myDayDate": null,
       "listId": "courses",
-      "dueDate": "2026-07-20T10:00:00.000Z",
+      "dueDate": "2026-08-07T10:00:00.000Z",
       "reminderAt": null,
       "repeatRule": null,
       "priority": 0,
@@ -872,8 +872,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-10T02:00:00.000Z",
-      "updatedAt": "2026-07-10T02:00:00.000Z"
+      "createdAt": "2026-07-28T02:00:00.000Z",
+      "updatedAt": "2026-07-28T02:00:00.000Z"
     },
     {
       "id": "project-1",
@@ -888,7 +888,7 @@
       "important": true,
       "myDayDate": null,
       "listId": "project-alpha",
-      "dueDate": "2026-07-19T06:00:00.000Z",
+      "dueDate": "2026-08-06T06:00:00.000Z",
       "reminderAt": null,
       "repeatRule": null,
       "priority": 3,
@@ -900,8 +900,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-09T01:00:00.000Z",
-      "updatedAt": "2026-07-09T01:00:00.000Z",
+      "createdAt": "2026-07-27T01:00:00.000Z",
+      "updatedAt": "2026-07-27T01:00:00.000Z",
       "taskGroupId": "tg-alpha-review"
     },
     {
@@ -917,7 +917,7 @@
       "important": false,
       "myDayDate": null,
       "listId": "project-beta",
-      "dueDate": "2026-07-22T02:00:00.000Z",
+      "dueDate": "2026-08-09T02:00:00.000Z",
       "reminderAt": null,
       "repeatRule": null,
       "priority": 2,
@@ -929,8 +929,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-14T06:00:00.000Z",
-      "updatedAt": "2026-07-14T06:00:00.000Z"
+      "createdAt": "2026-08-01T06:00:00.000Z",
+      "updatedAt": "2026-08-01T06:00:00.000Z"
     },
     {
       "id": "health-1",
@@ -945,7 +945,7 @@
       "important": false,
       "myDayDate": null,
       "listId": "health",
-      "dueDate": "2026-07-17T10:00:00.000Z",
+      "dueDate": "2026-08-06T10:00:00.000Z",
       "reminderAt": null,
       "repeatRule": "daily",
       "priority": 0,
@@ -973,8 +973,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-06-16T23:00:00.000Z",
-      "updatedAt": "2026-06-16T23:00:00.000Z"
+      "createdAt": "2026-07-04T23:00:00.000Z",
+      "updatedAt": "2026-07-04T23:00:00.000Z"
     },
     {
       "id": "health-2",
@@ -989,7 +989,7 @@
       "important": false,
       "myDayDate": null,
       "listId": "health",
-      "dueDate": "2026-07-27T01:00:00.000Z",
+      "dueDate": "2026-08-14T01:00:00.000Z",
       "reminderAt": null,
       "repeatRule": null,
       "priority": 0,
@@ -1001,8 +1001,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-12T04:00:00.000Z",
-      "updatedAt": "2026-07-12T04:00:00.000Z"
+      "createdAt": "2026-07-30T04:00:00.000Z",
+      "updatedAt": "2026-07-30T04:00:00.000Z"
     },
     {
       "id": "completed-1",
@@ -1010,12 +1010,12 @@
       "description": "",
       "descriptionHtml": "",
       "completed": true,
-      "completedAt": "2026-07-17T01:40:00.000Z",
+      "completedAt": "2026-08-04T01:40:00.000Z",
       "deleted": false,
       "deletedAt": null,
       "pinned": false,
       "important": false,
-      "myDayDate": "2026-07-17",
+      "myDayDate": "2026-08-04",
       "listId": "personal",
       "dueDate": null,
       "reminderAt": null,
@@ -1028,8 +1028,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-15T01:00:00.000Z",
-      "updatedAt": "2026-07-15T01:00:00.000Z"
+      "createdAt": "2026-08-02T01:00:00.000Z",
+      "updatedAt": "2026-08-02T01:00:00.000Z"
     },
     {
       "id": "completed-2",
@@ -1037,7 +1037,7 @@
       "description": "",
       "descriptionHtml": "",
       "completed": true,
-      "completedAt": "2026-07-13T12:00:00.000Z",
+      "completedAt": "2026-07-31T12:00:00.000Z",
       "deleted": false,
       "deletedAt": null,
       "pinned": false,
@@ -1056,8 +1056,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-09T09:00:00.000Z",
-      "updatedAt": "2026-07-09T09:00:00.000Z"
+      "createdAt": "2026-07-27T09:00:00.000Z",
+      "updatedAt": "2026-07-27T09:00:00.000Z"
     },
     {
       "id": "completed-3",
@@ -1065,7 +1065,7 @@
       "description": "",
       "descriptionHtml": "",
       "completed": true,
-      "completedAt": "2026-07-16T10:00:00.000Z",
+      "completedAt": "2026-08-03T10:00:00.000Z",
       "deleted": false,
       "deletedAt": null,
       "pinned": false,
@@ -1084,8 +1084,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-12T04:00:00.000Z",
-      "updatedAt": "2026-07-12T04:00:00.000Z"
+      "createdAt": "2026-07-30T04:00:00.000Z",
+      "updatedAt": "2026-07-30T04:00:00.000Z"
     },
     {
       "id": "completed-4",
@@ -1093,7 +1093,7 @@
       "description": "",
       "descriptionHtml": "",
       "completed": true,
-      "completedAt": "2026-07-15T08:00:00.000Z",
+      "completedAt": "2026-08-02T08:00:00.000Z",
       "deleted": false,
       "deletedAt": null,
       "pinned": false,
@@ -1112,8 +1112,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-11T02:00:00.000Z",
-      "updatedAt": "2026-07-11T02:00:00.000Z"
+      "createdAt": "2026-07-29T02:00:00.000Z",
+      "updatedAt": "2026-07-29T02:00:00.000Z"
     },
     {
       "id": "completed-5",
@@ -1121,7 +1121,7 @@
       "description": "",
       "descriptionHtml": "",
       "completed": true,
-      "completedAt": "2026-07-16T03:00:00.000Z",
+      "completedAt": "2026-08-03T03:00:00.000Z",
       "deleted": false,
       "deletedAt": null,
       "pinned": false,
@@ -1140,8 +1140,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-14T06:00:00.000Z",
-      "updatedAt": "2026-07-14T06:00:00.000Z"
+      "createdAt": "2026-08-01T06:00:00.000Z",
+      "updatedAt": "2026-08-01T06:00:00.000Z"
     },
     {
       "id": "deleted-1",
@@ -1151,7 +1151,7 @@
       "completed": false,
       "completedAt": null,
       "deleted": true,
-      "deletedAt": "2026-07-16T09:00:00.000Z",
+      "deletedAt": "2026-08-03T09:00:00.000Z",
       "pinned": false,
       "important": false,
       "myDayDate": null,
@@ -1167,8 +1167,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-11T02:00:00.000Z",
-      "updatedAt": "2026-07-16T09:00:00.000Z"
+      "createdAt": "2026-07-29T02:00:00.000Z",
+      "updatedAt": "2026-08-03T09:00:00.000Z"
     },
     {
       "id": "deleted-2",
@@ -1178,7 +1178,7 @@
       "completed": false,
       "completedAt": null,
       "deleted": true,
-      "deletedAt": "2026-07-15T07:00:00.000Z",
+      "deletedAt": "2026-08-02T07:00:00.000Z",
       "pinned": false,
       "important": false,
       "myDayDate": null,
@@ -1195,8 +1195,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-02T02:00:00.000Z",
-      "updatedAt": "2026-07-15T07:00:00.000Z"
+      "createdAt": "2026-07-20T02:00:00.000Z",
+      "updatedAt": "2026-08-02T07:00:00.000Z"
     },
     {
       "id": "test-1",
@@ -1209,7 +1209,7 @@
       "deletedAt": null,
       "pinned": false,
       "important": false,
-      "myDayDate": "2026-07-17",
+      "myDayDate": "2026-08-06",
       "listId": "inbox",
       "dueDate": null,
       "reminderAt": null,
@@ -1223,8 +1223,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-16T03:00:00.000Z",
-      "updatedAt": "2026-07-16T03:00:00.000Z"
+      "createdAt": "2026-08-03T03:00:00.000Z",
+      "updatedAt": "2026-08-03T03:00:00.000Z"
     },
     {
       "id": "test-2",
@@ -1250,14 +1250,14 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-14T11:00:00.000Z",
-      "updatedAt": "2026-07-14T11:00:00.000Z"
+      "createdAt": "2026-08-01T11:00:00.000Z",
+      "updatedAt": "2026-08-01T11:00:00.000Z"
     },
     {
       "id": "test-3",
       "title": "带附件的任务：确认图片预览区域",
       "description": "",
-      "descriptionHtml": "",
+      "descriptionHtml": "<p>这是任务里插入的附件图片，点击可在大图模式预览：</p><img src=\"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgNTAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiM3YmUwYzQiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiM1YThjZTAiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIgZmlsbD0idXJsKCNnKSIvPjx0ZXh0IHg9IjQwMCIgeT0iMjcwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXNpemU9IjY0IiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9InN5c3RlbS11aSI+6ZmE5Lu256S65L6LIDE8L3RleHQ+PC9zdmc+\" alt=\"附件示例 1\" style=\"max-width: 100%; border-radius: 12px;\" /><p>多张图片可左右切换查看：</p><img src=\"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgNTAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiM3YzZlZTYiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiMzYWE2YjkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIgZmlsbD0idXJsKCNnKSIvPjx0ZXh0IHg9IjQwMCIgeT0iMjcwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXNpemU9IjY0IiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9InN5c3RlbS11aSI+6ZmE5Lu256S65L6LIDI8L3RleHQ+PC9zdmc+\" alt=\"附件示例 2\" style=\"max-width: 100%; border-radius: 12px;\" /><p>图片附件保存在应用数据目录，扫描后可在\"个人空间 → 空间管理\"中查看引用情况。</p>",
       "completed": false,
       "completedAt": null,
       "deleted": false,
@@ -1274,11 +1274,26 @@
         "附件"
       ],
       "subtasks": [],
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "preview-1",
+          "name": "附件示例 1.png",
+          "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgNTAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiM3YmUwYzQiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiM1YThjZTAiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIgZmlsbD0idXJsKCNnKSIvPjx0ZXh0IHg9IjQwMCIgeT0iMjcwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXNpemU9IjY0IiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9InN5c3RlbS11aSI+6ZmE5Lu256S65L6LIDE8L3RleHQ+PC9zdmc+",
+          "sizeBytes": 184052,
+          "kind": "image"
+        },
+        {
+          "id": "preview-2",
+          "name": "附件示例 2.png",
+          "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgNTAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiM3YzZlZTYiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiMzYWE2YjkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIgZmlsbD0idXJsKCNnKSIvPjx0ZXh0IHg9IjQwMCIgeT0iMjcwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXNpemU9IjY0IiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9InN5c3RlbS11aSI+6ZmE5Lu256S65L6LIDI8L3RleHQ+PC9zdmc+",
+          "sizeBytes": 196012,
+          "kind": "image"
+        }
+      ],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-13T10:00:00.000Z",
-      "updatedAt": "2026-07-13T10:00:00.000Z"
+      "createdAt": "2026-07-31T10:00:00.000Z",
+      "updatedAt": "2026-07-31T10:00:00.000Z"
     },
     {
       "id": "yesterday-1",
@@ -1291,7 +1306,7 @@
       "deletedAt": null,
       "pinned": false,
       "important": false,
-      "myDayDate": "2026-07-16",
+      "myDayDate": "2026-08-03",
       "listId": "inbox",
       "dueDate": null,
       "reminderAt": null,
@@ -1304,8 +1319,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-15T23:00:00.000Z",
-      "updatedAt": "2026-07-15T23:00:00.000Z"
+      "createdAt": "2026-08-02T23:00:00.000Z",
+      "updatedAt": "2026-08-02T23:00:00.000Z"
     }
   ],
   "trash": [
@@ -1317,7 +1332,7 @@
       "completed": false,
       "completedAt": null,
       "deleted": true,
-      "deletedAt": "2026-07-16T09:00:00.000Z",
+      "deletedAt": "2026-08-03T09:00:00.000Z",
       "pinned": false,
       "important": false,
       "myDayDate": null,
@@ -1333,8 +1348,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-11T02:00:00.000Z",
-      "updatedAt": "2026-07-16T09:00:00.000Z"
+      "createdAt": "2026-07-29T02:00:00.000Z",
+      "updatedAt": "2026-08-03T09:00:00.000Z"
     },
     {
       "id": "deleted-2",
@@ -1344,7 +1359,7 @@
       "completed": false,
       "completedAt": null,
       "deleted": true,
-      "deletedAt": "2026-07-15T07:00:00.000Z",
+      "deletedAt": "2026-08-02T07:00:00.000Z",
       "pinned": false,
       "important": false,
       "myDayDate": null,
@@ -1361,8 +1376,8 @@
       "attachments": [],
       "comments": [],
       "editorMode": "detail",
-      "createdAt": "2026-07-02T02:00:00.000Z",
-      "updatedAt": "2026-07-15T07:00:00.000Z"
+      "createdAt": "2026-07-20T02:00:00.000Z",
+      "updatedAt": "2026-08-02T07:00:00.000Z"
     }
   ],
   "listTrash": [],
@@ -1376,8 +1391,8 @@
       "listId": "project-alpha",
       "sortOrder": 1000,
       "collapsed": false,
-      "createdAt": "2026-07-10T01:00:00.000Z",
-      "updatedAt": "2026-07-16T08:00:00.000Z"
+      "createdAt": "2026-07-28T01:00:00.000Z",
+      "updatedAt": "2026-08-03T08:00:00.000Z"
     },
     {
       "id": "tg-alpha-followup",
@@ -1388,8 +1403,8 @@
       "listId": "project-alpha",
       "sortOrder": 2000,
       "collapsed": false,
-      "createdAt": "2026-07-11T01:00:00.000Z",
-      "updatedAt": "2026-07-15T07:00:00.000Z"
+      "createdAt": "2026-07-29T01:00:00.000Z",
+      "updatedAt": "2026-08-02T07:00:00.000Z"
     },
     {
       "id": "tg-home-weekly",
@@ -1400,11 +1415,419 @@
       "listId": "home",
       "sortOrder": 1000,
       "collapsed": false,
-      "createdAt": "2026-07-03T01:00:00.000Z",
-      "updatedAt": "2026-07-14T10:00:00.000Z"
+      "createdAt": "2026-07-21T01:00:00.000Z",
+      "updatedAt": "2026-08-01T10:00:00.000Z"
     }
   ],
   "viewOrders": {},
+  "clock": {
+    "profiles": [],
+    "focusSettings": {
+      "defaultProfileId": "pomodoro",
+      "autoStartBreak": false,
+      "autoStartFocus": false,
+      "globalMute": false,
+      "notificationCenterEnabled": true,
+      "focusCompleteNotificationEnabled": true
+    },
+    "activeSession": null,
+    "pendingBreak": null,
+    "cycleFocusCount": 0,
+    "rhythm": {
+      "reminders": [],
+      "enabled": true,
+      "pauseDuringFocus": true,
+      "globalQuietHours": {
+        "start": "22:00",
+        "end": "08:00"
+      }
+    },
+    "garden": {
+      "startedAt": "2026-07-15T08:00:00.000Z",
+      "unlockLadderVersion": 2,
+      "dailyGoalMinutes": 50,
+      "selectedSpeciesId": "daisy",
+      "nextSpeciesId": "tulip",
+      "longestSessionMinutes": 50,
+      "days": [
+        {
+          "date": "2026-07-15",
+          "speciesId": "daisy",
+          "growthMinutes": 50,
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "achievementIds": [
+            "first-growth",
+            "first-bloom"
+          ]
+        },
+        {
+          "date": "2026-07-17",
+          "speciesId": "daisy",
+          "growthMinutes": 35,
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "achievementIds": []
+        },
+        {
+          "date": "2026-07-20",
+          "speciesId": "daisy",
+          "growthMinutes": 60,
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "achievementIds": []
+        },
+        {
+          "date": "2026-07-22",
+          "speciesId": "daisy",
+          "growthMinutes": 25,
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "achievementIds": []
+        },
+        {
+          "date": "2026-07-24",
+          "speciesId": "daisy",
+          "growthMinutes": 50,
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "achievementIds": []
+        },
+        {
+          "date": "2026-07-27",
+          "speciesId": "daisy",
+          "growthMinutes": 30,
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "achievementIds": []
+        },
+        {
+          "date": "2026-07-29",
+          "speciesId": "daisy",
+          "growthMinutes": 45,
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "achievementIds": []
+        },
+        {
+          "date": "2026-07-31",
+          "speciesId": "daisy",
+          "growthMinutes": 50,
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "achievementIds": []
+        },
+        {
+          "date": "2026-08-01",
+          "speciesId": "daisy",
+          "growthMinutes": 20,
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "achievementIds": []
+        },
+        {
+          "date": "2026-08-03",
+          "speciesId": "daisy",
+          "growthMinutes": 50,
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "achievementIds": []
+        },
+        {
+          "date": "2026-08-05",
+          "speciesId": "daisy",
+          "growthMinutes": 25,
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "achievementIds": []
+        },
+        {
+          "date": "2026-08-06",
+          "speciesId": "daisy",
+          "growthMinutes": 30,
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "achievementIds": []
+        }
+      ],
+      "achievements": [
+        {
+          "id": "first-growth",
+          "unlockedAt": "2026-07-15T09:30:00.000Z"
+        },
+        {
+          "id": "first-bloom",
+          "unlockedAt": "2026-07-15T10:00:00.000Z"
+        },
+        {
+          "id": "active-days-3",
+          "unlockedAt": "2026-07-20T18:00:00.000Z"
+        },
+        {
+          "id": "active-days-7",
+          "unlockedAt": "2026-07-31T20:00:00.000Z"
+        },
+        {
+          "id": "total-60",
+          "unlockedAt": "2026-07-20T18:00:00.000Z"
+        }
+      ]
+    },
+    "history": [
+      {
+        "id": "fh-demo-today-1",
+        "profileId": "pomodoro",
+        "taskId": "today-2",
+        "taskTitle": "完成季度报告初稿",
+        "startedAt": "2026-08-06T01:00:00.000Z",
+        "finishedAt": "2026-08-06T01:25:00.000Z",
+        "elapsedSeconds": 1500,
+        "phase": "focus",
+        "result": "completed",
+        "reward": null,
+        "note": "今天的第一段专注",
+        "timeline": [
+          {
+            "type": "finished",
+            "at": "2026-08-06T01:25:00.000Z",
+            "result": "completed",
+            "pausedSeconds": 0
+          }
+        ]
+      },
+      {
+        "id": "fh-demo-today-2",
+        "profileId": "pomodoro",
+        "taskId": "today-1",
+        "taskTitle": "10:30 团队站会同步阻塞事项",
+        "startedAt": "2026-08-06T05:30:00.000Z",
+        "finishedAt": "2026-08-06T06:00:00.000Z",
+        "elapsedSeconds": 1800,
+        "phase": "focus",
+        "result": "completed",
+        "reward": null,
+        "note": "站会前整理了阻塞项",
+        "timeline": [
+          {
+            "type": "finished",
+            "at": "2026-08-06T06:00:00.000Z",
+            "result": "completed",
+            "pausedSeconds": 0
+          }
+        ]
+      },
+      {
+        "id": "fh-demo-1",
+        "profileId": "pomodoro",
+        "taskId": "today-2",
+        "taskTitle": "完成季度报告初稿",
+        "startedAt": "2026-08-03T09:00:00.000Z",
+        "finishedAt": "2026-08-03T09:50:00.000Z",
+        "elapsedSeconds": 3000,
+        "phase": "focus",
+        "result": "completed",
+        "reward": null,
+        "note": "完成了大纲和数据收集",
+        "timeline": [
+          {
+            "type": "finished",
+            "at": "2026-08-03T09:50:00.000Z",
+            "result": "completed",
+            "pausedSeconds": 0
+          }
+        ]
+      },
+      {
+        "id": "fh-demo-2",
+        "profileId": "pomodoro",
+        "taskId": "today-3",
+        "taskTitle": "下班后买咖啡豆和洗衣液",
+        "startedAt": "2026-08-03T14:00:00.000Z",
+        "finishedAt": "2026-08-03T14:25:00.000Z",
+        "elapsedSeconds": 1500,
+        "phase": "focus",
+        "result": "completed",
+        "reward": null,
+        "note": "",
+        "timeline": [
+          {
+            "type": "finished",
+            "at": "2026-08-03T14:25:00.000Z",
+            "result": "completed",
+            "pausedSeconds": 0
+          }
+        ]
+      },
+      {
+        "id": "fh-demo-3",
+        "profileId": "pomodoro",
+        "taskId": "today-1",
+        "taskTitle": "10:30 团队站会同步阻塞事项",
+        "startedAt": "2026-08-01T10:00:00.000Z",
+        "finishedAt": "2026-08-01T10:25:00.000Z",
+        "elapsedSeconds": 1500,
+        "phase": "focus",
+        "result": "completed",
+        "reward": null,
+        "note": "站会前整理了阻塞项",
+        "timeline": [
+          {
+            "type": "finished",
+            "at": "2026-08-01T10:25:00.000Z",
+            "result": "completed",
+            "pausedSeconds": 0
+          }
+        ]
+      },
+      {
+        "id": "fh-demo-4",
+        "profileId": "pomodoro",
+        "taskId": null,
+        "taskTitle": "",
+        "startedAt": "2026-07-31T15:00:00.000Z",
+        "finishedAt": "2026-07-31T15:30:00.000Z",
+        "elapsedSeconds": 1800,
+        "phase": "focus",
+        "result": "completed",
+        "reward": null,
+        "note": "阅读《原子习惯》",
+        "timeline": [
+          {
+            "type": "finished",
+            "at": "2026-07-31T15:30:00.000Z",
+            "result": "completed",
+            "pausedSeconds": 0
+          }
+        ]
+      },
+      {
+        "id": "fh-demo-5",
+        "profileId": "pomodoro",
+        "taskId": null,
+        "taskTitle": "",
+        "startedAt": "2026-07-29T09:30:00.000Z",
+        "finishedAt": "2026-07-29T09:55:00.000Z",
+        "elapsedSeconds": 1500,
+        "phase": "focus",
+        "result": "interrupted",
+        "reward": null,
+        "note": "被电话打断",
+        "timeline": [
+          {
+            "type": "finished",
+            "at": "2026-07-29T09:55:00.000Z",
+            "result": "interrupted",
+            "pausedSeconds": 0
+          }
+        ]
+      },
+      {
+        "id": "fh-demo-6",
+        "profileId": "pomodoro",
+        "taskId": null,
+        "taskTitle": "",
+        "startedAt": "2026-07-27T10:00:00.000Z",
+        "finishedAt": "2026-07-27T10:50:00.000Z",
+        "elapsedSeconds": 3000,
+        "phase": "focus",
+        "result": "completed",
+        "reward": null,
+        "note": "",
+        "timeline": [
+          {
+            "type": "finished",
+            "at": "2026-07-27T10:50:00.000Z",
+            "result": "completed",
+            "pausedSeconds": 0
+          }
+        ]
+      },
+      {
+        "id": "fh-demo-7",
+        "profileId": "pomodoro",
+        "taskId": null,
+        "taskTitle": "",
+        "startedAt": "2026-07-24T14:00:00.000Z",
+        "finishedAt": "2026-07-24T14:25:00.000Z",
+        "elapsedSeconds": 1500,
+        "phase": "focus",
+        "result": "completed",
+        "reward": null,
+        "note": "",
+        "timeline": [
+          {
+            "type": "finished",
+            "at": "2026-07-24T14:25:00.000Z",
+            "result": "completed",
+            "pausedSeconds": 0
+          }
+        ]
+      },
+      {
+        "id": "fh-demo-8",
+        "profileId": "pomodoro",
+        "taskId": null,
+        "taskTitle": "",
+        "startedAt": "2026-07-22T11:00:00.000Z",
+        "finishedAt": "2026-07-22T11:25:00.000Z",
+        "elapsedSeconds": 1500,
+        "phase": "focus",
+        "result": "abandoned",
+        "reward": null,
+        "note": "",
+        "timeline": [
+          {
+            "type": "finished",
+            "at": "2026-07-22T11:25:00.000Z",
+            "result": "abandoned",
+            "pausedSeconds": 0
+          }
+        ]
+      },
+      {
+        "id": "fh-demo-9",
+        "profileId": "pomodoro",
+        "taskId": null,
+        "taskTitle": "",
+        "startedAt": "2026-07-20T16:00:00.000Z",
+        "finishedAt": "2026-07-20T16:50:00.000Z",
+        "elapsedSeconds": 3000,
+        "phase": "focus",
+        "result": "completed",
+        "reward": null,
+        "note": "",
+        "timeline": [
+          {
+            "type": "finished",
+            "at": "2026-07-20T16:50:00.000Z",
+            "result": "completed",
+            "pausedSeconds": 0
+          }
+        ]
+      },
+      {
+        "id": "fh-demo-10",
+        "profileId": "pomodoro",
+        "taskId": null,
+        "taskTitle": "",
+        "startedAt": "2026-07-15T09:00:00.000Z",
+        "finishedAt": "2026-07-15T10:00:00.000Z",
+        "elapsedSeconds": 3600,
+        "phase": "focus",
+        "result": "completed",
+        "reward": null,
+        "note": "第一段专注",
+        "timeline": [
+          {
+            "type": "finished",
+            "at": "2026-07-15T10:00:00.000Z",
+            "result": "completed",
+            "pausedSeconds": 0
+          }
+        ]
+      }
+    ]
+  },
   "settings": {
     "theme": "mint",
     "themeBackgrounds": true,
@@ -1434,7 +1857,7 @@
     "nickname": "演示用户",
     "avatarRelativePath": null,
     "avatarSha256": null,
-    "createdAt": "2026-06-17T01:00:00.000Z",
-    "updatedAt": "2026-07-16T01:00:00.000Z"
+    "createdAt": "2026-07-05T01:00:00.000Z",
+    "updatedAt": "2026-08-03T01:00:00.000Z"
   }
 }

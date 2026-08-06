@@ -9,7 +9,7 @@
     aria-hidden="true"
   >
     <img
-      :key="activeArtwork.id"
+      :key="activeArtwork.source"
       class="focus-stage-artwork__layer active"
       :src="activeArtwork.source"
       alt=""
@@ -53,7 +53,6 @@ const stageModules = import.meta.glob(
 )
 const ready = ref(false)
 const failed = ref(false)
-const loadedSources = ref(new Set())
 
 function sourceForStage(speciesId, stageId) {
   return stageModules[
@@ -75,12 +74,10 @@ const normalizedProgress = computed(() => {
 
 const activeArtwork = computed(() => artwork.value[Math.round(normalizedProgress.value)] || artwork.value[0])
 
-function handleLoad(event) {
-  loadedSources.value.add(event.currentTarget.currentSrc || event.currentTarget.src)
-  if (!ready.value && loadedSources.value.has(activeArtwork.value.source)) {
-    ready.value = true
-    emit('ready')
-  }
+function handleLoad() {
+  if (ready.value) return
+  ready.value = true
+  emit('ready')
 }
 
 function handleError(error) {
@@ -89,10 +86,9 @@ function handleError(error) {
   emit('error', error)
 }
 
-watch(() => props.speciesId, () => {
+watch(() => activeArtwork.value.source, () => {
   ready.value = false
   failed.value = false
-  loadedSources.value = new Set()
 })
 </script>
 
