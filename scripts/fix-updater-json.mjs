@@ -33,7 +33,9 @@ const headers = {
 }
 
 async function gh(path, options = {}) {
-  const response = await fetch(`https://api.github.com${path}`, {
+  // 上传 asset 走 uploads.github.com；其余走 api.github.com
+  const url = path.startsWith('http') ? path : `https://api.github.com${path}`
+  const response = await fetch(url, {
     ...options,
     headers: { ...headers, ...(options.headers || {}) }
   })
@@ -63,22 +65,27 @@ async function run() {
     return
   }
 
-  // 3. 读取现有内容
-  const raw = await (await fetch(asset.browser_download_url, { headers: { 'User-Agent': 'simple-to-do-release-fix' } })).text()
+  // 3. 读取现有内容；tauri-action 在 Windows runner 上可能写入 UTF-8 BOM，
+  //    serde_json 不认 BOM 会导致客户端解析 latest.json 失败（更新检查报错），必须一并清理。
+  //    注意：fetch().text() 会用 TextDecoder 自动剥离 BOM，必须用 arrayBuffer 检查原始字节。
+  const buf = Buffer.from(await (await fetch(asset.browser_download_url, { headers: { 'User-Agent': 'simple-to-do-release-fix' } })).arrayBuffer())
+  const hasBom = buf.length >= 3 && buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf
+  const text = hasBom ? buf.subarray(3).toString('utf8') : buf.toString('utf8')
   let latest
   try {
-    latest = JSON.parse(raw)
+    latest = JSON.parse(text)
   } catch (error) {
     throw new Error(`latest.json 不是合法 JSON: ${error.message}`)
   }
 
-  // 4. notes 已正确则跳过；tauri-action 的乱码或缺失时写回 Release body
+  // 4. notes 已正确且无 BOM 则跳过；tauri-action 的乱码或缺失时写回 Release body
   const currentNotes = String(latest.notes ?? '').trim()
-  const needsFix = !notes || currentNotes !== notes || looksCorrupted(currentNotes)
+  const needsFix = hasBom || !notes || currentNotes !== notes || looksCorrupted(currentNotes)
   if (!needsFix) {
-    console.log('latest.json 的 notes 已与 Release body 一致，无需修复')
+    console.log('latest.json 的 notes 已与 Release body 一致且无 BOM，无需修复')
     return
   }
+  if (hasBom) console.log('检测到 latest.json 带 UTF-8 BOM，将一并清理')
 
   latest.notes = notes
   const payload = JSON.stringify(latest, null, 2)
@@ -87,7 +94,7 @@ async function run() {
   await gh(`/repos/${repo}/releases/assets/${asset.id}`, { method: 'DELETE' })
   console.log(`已删除旧 latest.json (asset ${asset.id})`)
 
-  const uploadPath = `/repos/${repo}/releases/${release.id}/assets?name=latest.json`
+  const uploadPath = `https://uploads.github.com/repos/${repo}/releases/${release.id}/assets?name=latest.json`
   const uploadResponse = await gh(uploadPath, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

@@ -28,6 +28,9 @@ function classifyError(error) {
   if (message.includes('404') || message.includes('latest.json')) {
     return '当前发布未提供已签名的自动更新清单（latest.json），请到发布页下载安装包手动更新。'
   }
+  if (message.includes('decoding response body') || message.includes('expected value')) {
+    return '更新服务返回的数据格式异常，请稍后重试；若持续出现请到发布页手动更新。'
+  }
   return '更新服务暂时不可用，不影响本机任务数据；请稍后重试。'
 }
 
