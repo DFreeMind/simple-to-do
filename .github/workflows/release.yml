@@ -57,6 +57,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: 配置部署私钥
+        shell: pwsh
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          $keyPath = Join-Path $env:RUNNER_TEMP 'deploy_key'
+          [System.IO.File]::WriteAllText($keyPath, $env:DEPLOY_SSH_KEY)
+          Write-Output "DEPLOY_KEY_FILE=$keyPath" >> $env:GITHUB_ENV
+
+      - name: 同步更新源到自建服务器
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/sync-update-source.mjs --version ${{ inputs.version }} --base-url https://simpletodo.duqimeng.cn
+
   release-macos:
     name: 追加 macOS 资产
     needs: release-windows
