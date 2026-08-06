@@ -874,6 +874,7 @@
 import { computed, ref } from 'vue'
 import { Bell, Check, Compass, Database, Download, ExternalLink, File, HardDrive, Image, Info, PanelTop, Palette, Pin, ShieldCheck, SlidersHorizontal, Timer, Trash2, UserRound, X, Volume2, CheckSquare, Folder, Tag } from 'lucide-vue-next'
 import { checkForUpdates as checkForUpdatesService, installUpdate as installUpdateService, skipCurrentUpdate, updaterState, updateNotes as resolveUpdateNotes } from '@/services/updater'
+import { currentReleaseHighlights, releaseHistory } from '@/data/releases'
 import { useTaskStore } from '@/stores/task'
 import { openReleasePage as openReleasePageInBrowser, openSystemNotificationSettings, purgeQuarantinedAttachments, quarantineOrphanAttachments, readAttachment, readQuarantinedAttachment, restoreQuarantinedAttachments, scanStorageHealth } from '@/services/platform'
 import ImageLightbox from './ImageLightbox.vue'
@@ -881,19 +882,6 @@ import ConfirmDialog from './ConfirmDialog.vue'
 import appIcon from '@/assets/app-icon.svg'
 
 const version = __APP_VERSION__
-
-const currentReleaseHighlights = [
-  '新增时钟模块：番茄、深度专注与自由时长，完成后保留轻量奖励与回顾。',
-  '新增节律提醒：支持间隔、固定时刻和连续使用三种触发方式，并可直接暂停或微调本轮。',
-  '后台到期时提供原生置顶提醒窗；专注还可打开轨道表盘、专注岛或经典卡片桌面控制器。',
-  '专注与节律回顾支持概览、筛选、分页、详情和单条删除，数据仍只保存在本机。'
-]
-
-const releaseHistory = [
-  { version: '0.2.5', summary: '新增多条件筛选，完善任务与子任务完成逻辑、日期和分组操作。' },
-  { version: '0.2.4', summary: '重构个人空间与本地数据管理，并加入头像、主题背景和清单进度。' },
-  { version: '0.2.3', summary: '优化任务阅读与子任务布局，完善桌面端提醒投递。' }
-]
 
 const store = useTaskStore()
 const activeSection = ref('appearance')
