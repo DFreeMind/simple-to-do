@@ -64,7 +64,8 @@ function looksCorrupted(value) {
 }
 
 function download(url) {
-  return execFileSync('curl', ['-sS', '--connect-timeout', '20', '--max-time', '300', url], { encoding: 'buffer' })
+  // -L 跟随 GitHub 资产下载的 302 重定向（跳转到 objects.githubusercontent.com），否则拿到空 body
+  return execFileSync('curl', ['-sS', '-L', '--connect-timeout', '20', '--max-time', '300', url], { encoding: 'buffer' })
 }
 
 async function run() {
