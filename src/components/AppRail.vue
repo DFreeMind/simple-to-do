@@ -73,7 +73,7 @@
     <div class="app-rail__footer">
       <button v-if="store.settings.sidebarCollapsed" class="app-rail__button" type="button" :title="store.settings.activeModule === 'tasks' ? '展开清单栏' : '展开时钟栏'" :aria-label="store.settings.activeModule === 'tasks' ? '展开清单栏' : '展开时钟栏'" @click="store.updateSettings({ sidebarCollapsed: false })"><PanelLeft :size="20" /></button>
       <button class="app-rail__button" type="button" title="使用指南" aria-label="使用指南" @click="store.openHelpCenter"><Compass :size="20" /></button>
-      <button class="app-rail__button" type="button" title="设置" aria-label="设置" @click="store.openSettings"><Settings :size="20" /></button>
+      <button class="app-rail__button app-rail__button--badge" type="button" title="设置" aria-label="设置" @click="store.openSettings"><Settings :size="20" /><span v-if="updaterState.status === 'available'" class="app-rail__dot" title="发现可用更新"></span></button>
     </div>
 
     <Teleport to=".app">
@@ -93,6 +93,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { AlarmClock, Bell, CalendarCheck, ChartNoAxesColumnIncreasing, CheckCircle2, Compass, Folder, HardDrive, Inbox, ListChecks, PanelLeft, Search, Settings, Star, Timer, Trash2, Trophy } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
+import { updaterState } from '@/services/updater'
 import { readProfileAvatar } from '@/services/platform'
 import ProfilePanel from './ProfilePanel.vue'
 

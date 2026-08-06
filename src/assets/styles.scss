@@ -509,6 +509,18 @@ select:focus-visible,
   line-height: 1;
 }
 
+.app-rail__dot {
+  position: absolute;
+  top: 2px;
+  right: 1px;
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid var(--surface);
+  border-radius: 50%;
+  background: var(--danger);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 20%, transparent);
+}
+
 .app-rail__list-anchor { position: relative; }
 .app-rail__list-flyout {
   position: fixed;
