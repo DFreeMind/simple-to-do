@@ -20,7 +20,11 @@ for (const required of [
   'releaseDraft: false',
   'args: --bundles nsis',
   'updaterJsonPreferNsis: true',
-  'releaseAssetNamePattern: simple-to-do_[version]_[arch][setup].[ext]'
+  'releaseAssetNamePattern: simple-to-do_[version]_[arch][setup].[ext]',
+  'needs: release-windows',
+  'args: --bundles dmg',
+  'releaseAssetNamePattern: simple-to-do_[version]_[arch].[ext]',
+  'node scripts/fix-updater-json.mjs --tag v${{ inputs.version }}'
 ]) {
   if (!workflow.includes(required)) errors.push(`发布工作流缺少约束：${required}`)
 }

@@ -50,3 +50,51 @@ jobs:
           args: --bundles nsis
           updaterJsonPreferNsis: true
           releaseAssetNamePattern: simple-to-do_[version]_[arch][setup].[ext]
+
+      - name: 修复 latest.json 更新说明编码
+        run: node scripts/fix-updater-json.mjs --tag v${{ inputs.version }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  release-macos:
+    name: 追加 macOS 资产
+    needs: release-windows
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 安装 Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: 安装前端依赖
+        run: npm ci
+
+      - name: 发布前校验
+        run: npm run release:check -- ${{ inputs.version }}
+
+      - name: 构建并追加 macOS Release 资源
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        with:
+          tagName: v__VERSION__
+          releaseName: __VERSION__
+          releaseDraft: false
+          prerelease: false
+          args: --bundles dmg
+          updaterJsonPreferNsis: true
+          releaseAssetNamePattern: simple-to-do_[version]_[arch].[ext]
+
+      - name: 修复 latest.json 更新说明编码
+        run: node scripts/fix-updater-json.mjs --tag v${{ inputs.version }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
