@@ -10490,6 +10490,13 @@ body.is-resizing {
     grid-template-columns: 48px minmax(300px, 1fr) 12px var(--detail-w, 400px);
   }
 
+  // 折叠侧栏 + 隐藏详情时，resizer/详情都被 v-if 移除，4 列模板会把
+  // TaskList 挤在 col 2 的 300px 下限里，右侧出现 12px + --detail-w 的空白。
+  // 与媒体外的 detail-closed 规则对齐，改回 2 列布局。
+  .app-shell:not(.app-shell--clock).app-shell--sidebar-closed.app-shell--detail-closed {
+    grid-template-columns: 48px 1fr;
+  }
+
   .app-shell--clock:not(.app-shell--sidebar-closed) {
     grid-template-columns: 48px 250px minmax(0, 1fr);
   }
