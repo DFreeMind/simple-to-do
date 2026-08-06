@@ -117,7 +117,8 @@ const DEFAULT_SETTINGS = {
   focusControllerStyle: 'orbit',
   windowCloseBehavior: 'hide',
   dailyGuidanceEnabled: true,
-  dailyGuidanceStyle: 'practical'
+  dailyGuidanceStyle: 'practical',
+  skippedUpdateVersion: ''
 }
 
 const DEFAULT_PROFILE = {
@@ -3148,7 +3149,10 @@ export const useTaskStore = defineStore('task', () => {
       focusControllerStyle,
       windowCloseBehavior,
       dailyGuidanceEnabled,
-      dailyGuidanceStyle
+      dailyGuidanceStyle,
+      skippedUpdateVersion: typeof rawSettings.skippedUpdateVersion === 'string'
+        ? rawSettings.skippedUpdateVersion
+        : ''
     }
   }
 

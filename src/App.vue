@@ -96,7 +96,6 @@ import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { getVersion } from '@tauri-apps/api/app'
-import { check } from '@tauri-apps/plugin-updater'
 import AppRail from './components/AppRail.vue'
 import Sidebar from './components/Sidebar.vue'
 import TaskList from './components/TaskList.vue'
@@ -112,6 +111,7 @@ import FocusControllerWindow from './components/FocusControllerWindow.vue'
 import RhythmReminderPrompt from './components/RhythmReminderPrompt.vue'
 import { useTaskStore } from './stores/task'
 import { useTheme } from './composables/useTheme'
+import { checkForUpdates as checkForUpdatesService, installUpdate as installUpdateService, updaterState } from './services/updater'
 import { openDataBackupLocation, openReleasePage as openReleasePageInBrowser } from './services/platform'
 
 const store = useTaskStore()
@@ -124,9 +124,6 @@ const isFocusControllerWindow = typeof window !== 'undefined'
   && getCurrentWebviewWindow().label === 'focus-controller'
 const appVersion = ref(__APP_VERSION__)
 const isDevelopment = import.meta.env.DEV
-const recoveryUpdateState = ref(isDevelopment ? 'development' : 'idle')
-const recoveryUpdateError = ref('')
-const recoveryUpdate = ref(null)
 
 // 动态计算主题派生色变量，兼容不支持 color-mix 内 var() 引用的 WebView
 const themeRef = computed(() => store.settings.theme)
@@ -215,6 +212,12 @@ function startBreakFromInApp() {
 
 const layoutDetailWidth = computed(() => clampDetailWidth(detailWidth.value, getDetailMaxWidth()))
 const isCheckingRecoveryUpdate = computed(() => ['checking', 'downloading', 'installing'].includes(recoveryUpdateState.value))
+const recoveryUpdateState = computed(() => {
+  if (isDevelopment) return 'development'
+  // 恢复页必须能安装最新版，跳过记录不适用于该场景（force 检查不会进入 skipped）。
+  if (updaterState.status === 'skipped' || updaterState.status === 'unsupported') return 'error'
+  return updaterState.status
+})
 const recoveryUpdateAction = computed(() => ({
   idle: '检查并安装更新',
   checking: '正在检查…',
@@ -225,13 +228,18 @@ const recoveryUpdateAction = computed(() => ({
   error: '重试检查更新'
 }[recoveryUpdateState.value] || '检查并安装更新'))
 const recoveryDescription = computed(() => {
-  if (recoveryUpdateState.value === 'available') return `发现可用版本 v${recoveryUpdate.value?.version || ''}，安装后可再次打开本机数据。`
-  if (recoveryUpdateState.value === 'downloading') return '正在下载已签名的更新包，请勿关闭应用。'
-  if (recoveryUpdateState.value === 'installing') return '下载完成，安装程序即将启动。'
+  if (recoveryUpdateState.value === 'available') return `发现可用版本 v${updaterState.update?.version || ''}，安装后可再次打开本机数据。`
+  if (recoveryUpdateState.value === 'downloading') return recoveryUpdateProgressText.value
+  if (recoveryUpdateState.value === 'installing') return '下载完成，应用将自动重新打开并完成安装。'
   if (recoveryUpdateState.value === 'upToDate') return '当前已是最新稳定版；请保留数据和备份后联系支持。'
-  if (recoveryUpdateState.value === 'error') return recoveryUpdateError.value
+  if (recoveryUpdateState.value === 'error') return updaterState.error
   if (isDevelopment) return '当前为开发环境，请使用新版正式安装包验证数据兼容性。'
   return '请先检查更新；旧版无法安全打开由新版创建的数据。'
+})
+const recoveryUpdateProgressText = computed(() => {
+  const { downloaded, total } = updaterState.progress
+  if (!total) return '正在下载已签名的更新包，请勿关闭应用。'
+  return `正在下载 ${Math.min(100, Math.round(downloaded / total * 100))}%，请勿关闭应用。`
 })
 
 function openReminderTask(event) {
@@ -306,40 +314,20 @@ function syncShellWidth() {
 }
 
 async function checkRecoveryUpdate() {
-  if (recoveryUpdateState.value === 'available' && recoveryUpdate.value) {
-    recoveryUpdateState.value = 'downloading'
-    try {
-      await recoveryUpdate.value.downloadAndInstall((event) => {
-        if (event.event === 'Finished') recoveryUpdateState.value = 'installing'
-      })
-    } catch (error) {
-      recoveryUpdateState.value = 'error'
-      recoveryUpdateError.value = '更新下载或安装失败。请打开下载页获取最新安装包，数据不会被修改。'
-    }
+  if (updaterState.status === 'available' && updaterState.update) {
+    await installUpdateService()
     return
   }
-
-  recoveryUpdateState.value = 'checking'
-  recoveryUpdateError.value = ''
-  try {
-    const update = await check({ timeout: 10000 })
-    recoveryUpdate.value = update
-    recoveryUpdateState.value = update ? 'available' : 'upToDate'
-  } catch (error) {
-    recoveryUpdateState.value = 'error'
-    const message = String(error?.message || '')
-    recoveryUpdateError.value = message.includes('404') || message.includes('latest.json')
-      ? '自动更新清单暂不可用，请打开下载页安装最新版本。'
-      : '暂时无法检查更新，请检查网络后重试，或打开下载页手动更新。'
-  }
+  // force：恢复页必须能安装最新版，不受「跳过此版本」影响。
+  await checkForUpdatesService({ force: true })
 }
 
 async function openRecoveryBackupLocation() {
   try {
     await openDataBackupLocation()
   } catch (error) {
-    recoveryUpdateState.value = 'error'
-    recoveryUpdateError.value = error?.message || '无法打开备份目录。'
+    updaterState.status = 'error'
+    updaterState.error = error?.message || '无法打开备份目录。'
   }
 }
 
@@ -347,8 +335,8 @@ async function openReleasePage() {
   try {
     await openReleasePageInBrowser()
   } catch (error) {
-    recoveryUpdateState.value = 'error'
-    recoveryUpdateError.value = error?.message || '无法打开下载页，请稍后重试。'
+    updaterState.status = 'error'
+    updaterState.error = error?.message || '无法打开下载页，请稍后重试。'
   }
 }
 
@@ -389,6 +377,10 @@ onMounted(async () => {
       .catch(error => console.warn('[App] 注册专注控制器操作失败:', error))
   }
   store.loadData()
+  // 主窗口启动后静默检查更新：发现新版本在设置面板「关于与更新」显示角标，不打扰当前操作。
+  if (!isDevelopment && window.__TAURI_INTERNALS__) {
+    checkForUpdatesService({ skippedVersion: store.settings.skippedUpdateVersion, silent: true })
+  }
 })
 
 onBeforeUnmount(() => {

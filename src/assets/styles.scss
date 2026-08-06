@@ -7404,6 +7404,7 @@ body.is-resizing {
 }
 
 .settings-nav__item {
+  position: relative;
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr);
   align-items: center;
@@ -7427,6 +7428,18 @@ body.is-resizing {
     font-weight: 650;
     box-shadow: 0 1px 8px var(--text-8-fallback);
   }
+}
+
+.settings-nav__badge {
+  position: absolute;
+  top: 7px;
+  right: 9px;
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--surface-muted);
+  border-radius: 50%;
+  background: var(--danger);
+  box-sizing: content-box;
 }
 
 .settings-nav__icon {
@@ -9208,7 +9221,9 @@ body.is-resizing {
 
 .update-card__actions {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: 10px;
 }
 
 .update-card__action {

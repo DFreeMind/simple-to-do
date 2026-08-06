@@ -31,6 +31,12 @@
               <strong>{{ section.label }}</strong>
               <small>{{ section.summary }}</small>
             </span>
+            <span
+              v-if="section.id === 'about' && updateBadgeVisible"
+              class="settings-nav__badge"
+              title="发现可用更新"
+              aria-label="发现可用更新"
+            ></span>
           </button>
         </nav>
 
@@ -790,28 +796,37 @@
                   </span>
                 </div>
                 <div v-if="updateState === 'available'" class="update-card__release">
-                  <strong>v{{ availableUpdate?.version }}</strong>
+                  <strong>v{{ updaterState.update?.version }}</strong>
                   <p>{{ updateNotes }}</p>
                 </div>
                 <div v-if="updateState === 'downloading'" class="update-card__progress" aria-label="更新下载进度">
                   <span :style="{ width: `${updateProgressPercent}%` }"></span>
                 </div>
                 <div v-if="updateState !== 'development'" class="update-card__actions">
-                  <button
-                    v-if="updateState === 'available'"
-                    class="small-btn update-card__action"
-                    type="button"
-                    :disabled="updateState === 'downloading' || updateState === 'installing'"
-                    @click="installUpdate"
-                  >
-                    下载并安装
-                  </button>
+                  <template v-if="updateState === 'available'">
+                    <button
+                      class="small-btn update-card__action"
+                      type="button"
+                      :disabled="updateActionDisabled"
+                      @click="installUpdate"
+                    >
+                      下载并安装
+                    </button>
+                    <button
+                      class="text-btn"
+                      type="button"
+                      :disabled="updateActionDisabled"
+                      @click="skipUpdateVersion"
+                    >
+                      跳过此版本
+                    </button>
+                  </template>
                   <button
                     v-else
                     class="small-btn update-card__action"
                     type="button"
                     :disabled="updateActionDisabled"
-                    @click="checkForUpdates"
+                    @click="runUpdateAction"
                   >
                     {{ updateActionText }}
                   </button>
@@ -858,9 +873,9 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { Bell, Check, Compass, Database, Download, ExternalLink, File, HardDrive, Image, Info, PanelTop, Palette, Pin, ShieldCheck, SlidersHorizontal, Timer, Trash2, UserRound, X, Volume2, CheckSquare, Folder, Tag } from 'lucide-vue-next'
-import { check } from '@tauri-apps/plugin-updater'
+import { checkForUpdates as checkForUpdatesService, installUpdate as installUpdateService, skipCurrentUpdate, updaterState, updateNotes as resolveUpdateNotes } from '@/services/updater'
 import { useTaskStore } from '@/stores/task'
-import { openSystemNotificationSettings, purgeQuarantinedAttachments, quarantineOrphanAttachments, readAttachment, readQuarantinedAttachment, restoreQuarantinedAttachments, scanStorageHealth } from '@/services/platform'
+import { openReleasePage as openReleasePageInBrowser, openSystemNotificationSettings, purgeQuarantinedAttachments, quarantineOrphanAttachments, readAttachment, readQuarantinedAttachment, restoreQuarantinedAttachments, scanStorageHealth } from '@/services/platform'
 import ImageLightbox from './ImageLightbox.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
 import appIcon from '@/assets/app-icon.svg'
@@ -898,10 +913,7 @@ const storageFilter = ref('all')
 const inlineLimit = 3
 const browserPageSize = 40
 const isDevelopment = import.meta.env.DEV
-const updateState = ref(isDevelopment ? 'development' : 'idle')
-const availableUpdate = ref(null)
-const updateError = ref('')
-const updateProgress = ref({ downloaded: 0, total: 0 })
+const updateState = computed(() => updaterState.status)
 
 async function openNotificationSettings() {
   const opened = await openSystemNotificationSettings()
@@ -991,10 +1003,12 @@ const updateStatusText = computed(() => ({
   idle: '手动检查',
   checking: '正在检查',
   upToDate: '已是最新',
-  available: `可更新至 ${availableUpdate.value?.version || ''}`,
+  available: `可更新至 ${updaterState.update?.version || ''}`,
+  skipped: '已跳过',
   downloading: '正在下载',
   installing: '正在安装',
-  error: '自动更新不可用'
+  error: '自动更新不可用',
+  unsupported: '平台不支持'
 }[updateState.value] || '手动检查'))
 const updateTitle = computed(() => ({
   development: '开发环境不检查在线更新',
@@ -1002,16 +1016,19 @@ const updateTitle = computed(() => ({
   checking: '正在检查更新',
   upToDate: `已是最新版本 · v${version}`,
   available: '发现可用更新',
+  skipped: `已跳过 v${updaterState.update?.version || ''}`,
   downloading: '正在下载更新',
   installing: '安装程序即将启动',
-  error: '自动更新暂不可用'
+  error: '自动更新暂不可用',
+  unsupported: '当前平台暂不支持自动更新'
 }[updateState.value] || '检查稳定版本'))
 const updateDescription = computed(() => {
   if (updateState.value === 'development') return 'npm run dev 不会请求 GitHub Release；请使用正式签名安装包验证更新。'
-  if (updateState.value === 'available') return '更新包已通过签名验证，下载完成后将启动安装程序。'
+  if (updateState.value === 'available') return '更新包已通过签名验证，下载完成后将自动完成安装。'
+  if (updateState.value === 'skipped') return '本次更新已跳过；新版本发布后或重新检查时会再次提示。'
   if (updateState.value === 'downloading') return updateProgressText.value
-  if (updateState.value === 'installing') return '下载已完成，请按照安装程序提示完成更新。'
-  if (updateState.value === 'error') return updateError.value
+  if (updateState.value === 'installing') return '下载已完成，应用将自动重新打开并完成安装。'
+  if (updateState.value === 'error' || updateState.value === 'unsupported') return updaterState.error
   if (updateState.value === 'upToDate') return '当前已安装最新的稳定版本。'
   return '从 GitHub Release 检查经过签名验证的稳定版本。'
 })
@@ -1022,19 +1039,22 @@ const updateActionText = computed(() => ({
   installing: '正在启动安装程序…',
   upToDate: '重新检查',
   error: '重试检查',
+  skipped: '重新检查',
+  unsupported: '打开下载页',
   idle: '检查更新'
 }[updateState.value] || '检查更新'))
 const updateActionDisabled = computed(() => isDevelopment || ['checking', 'downloading', 'installing'].includes(updateState.value))
+const updateBadgeVisible = computed(() => updateState.value === 'available')
 const updateProgressText = computed(() => {
-  const { downloaded, total } = updateProgress.value
+  const { downloaded, total } = updaterState.progress
   if (!total) return '正在下载…'
   return `正在下载 ${Math.min(100, Math.round(downloaded / total * 100))}%`
 })
 const updateProgressPercent = computed(() => {
-  const { downloaded, total } = updateProgress.value
+  const { downloaded, total } = updaterState.progress
   return total ? Math.min(100, Math.round(downloaded / total * 100)) : 0
 })
-const updateNotes = computed(() => availableUpdate.value?.body?.trim() || '本次更新已准备就绪。')
+const updateNotes = computed(() => resolveUpdateNotes())
 const orphanGroups = computed(() => {
   const items = storageReport.value?.orphanAttachments || []
   const images = items.filter(item => item.isImage)
@@ -1082,49 +1102,28 @@ function formatDate(value) {
 }
 
 async function checkForUpdates() {
-  if (isDevelopment) {
-    updateState.value = 'development'
+  await checkForUpdatesService({ skippedVersion: store.settings.skippedUpdateVersion })
+}
+
+async function runUpdateAction() {
+  if (updateState.value === 'unsupported') {
+    try {
+      await openReleasePageInBrowser()
+    } catch (error) {
+      updaterState.error = error?.message || '无法打开下载页，请稍后重试。'
+    }
     return
   }
-  updateState.value = 'checking'
-  updateError.value = ''
-  availableUpdate.value = null
-  try {
-    const update = await check({ timeout: 10000 })
-    if (!update) {
-      updateState.value = 'upToDate'
-      return
-    }
-    availableUpdate.value = update
-    updateState.value = 'available'
-  } catch (error) {
-    updateState.value = 'error'
-    const message = String(error?.message || '')
-    updateError.value = message.includes('404') || message.includes('latest.json')
-      ? '当前发布未提供已签名的自动更新清单（latest.json），因此无法在线检查；请在发布页下载安装包更新。'
-      : '更新服务暂时不可用，不影响本机任务数据；请稍后重试。'
-  }
+  await checkForUpdates()
+}
+
+function skipUpdateVersion() {
+  const skipped = skipCurrentUpdate()
+  if (skipped) store.updateSettings({ skippedUpdateVersion: skipped })
 }
 
 async function installUpdate() {
-  if (!availableUpdate.value) return
-  updateState.value = 'downloading'
-  updateError.value = ''
-  updateProgress.value = { downloaded: 0, total: 0 }
-  try {
-    await availableUpdate.value.downloadAndInstall((event) => {
-      if (event.event === 'Started') {
-        updateProgress.value = { downloaded: 0, total: event.data.contentLength || 0 }
-      } else if (event.event === 'Progress') {
-        updateProgress.value = { ...updateProgress.value, downloaded: updateProgress.value.downloaded + event.data.chunkLength }
-      } else if (event.event === 'Finished') {
-        updateState.value = 'installing'
-      }
-    })
-  } catch (error) {
-    updateState.value = 'error'
-    updateError.value = '更新下载或安装失败，不影响本机任务数据；请稍后重试。'
-  }
+  await installUpdateService()
 }
 
 async function scanStorage() {
