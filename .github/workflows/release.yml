@@ -70,7 +70,7 @@ jobs:
         shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/sync-update-source.mjs --version ${{ inputs.version }} --base-url https://simpletodo.duqimeng.cn
+        run: node scripts/sync-update-source.mjs --version ${{ inputs.version }} --base-url https://simpletodo.duqimeng.cn/releases
 
   release-macos:
     name: 追加 macOS 资产

@@ -48,7 +48,7 @@ struct UpdateInfo {
     download_url: String,
 }
 
-const UPDATE_ENDPOINT_SELF: &str = "https://simpletodo.duqimeng.cn/latest.json";
+const UPDATE_ENDPOINT_SELF: &str = "https://simpletodo.duqimeng.cn/releases/latest.json";
 const UPDATE_ENDPOINT_GITHUB: &str = "https://github.com/DFreeMind/simple-to-do/releases/latest/download/latest.json";
 
 /// 按更新源选择解析 updater endpoints：默认自动（自建服务器优先，GitHub 兜底）。
