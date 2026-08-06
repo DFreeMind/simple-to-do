@@ -13,14 +13,18 @@
 - 提交粒度按功能划分，避免把文档、运行时迁移、业务功能修复混在一个提交里。
 - 代码变更后不主动执行 `npm run build`、`npm run tauri build` 或安装包构建；改动交付前应完成静态检查、相关单元或局部交互验证，并确保构建前阶段无报错。最终功能与打包验证由用户自行执行，除非用户在当次明确要求构建。
 
-## GitHub 发布规范
-- GitHub Release 由 agent 发布时，Release title 必须只使用应用版本号，与 `src-tauri/tauri.conf.json` 中的 `version` 完全一致，例如 `0.2.2`；不要加入“发布”“更新”等前缀。
-- Release tag 统一使用 `v<version>`，例如 `v0.2.2`；发布前确认 tag、Release title、安装包内版本三者对应同一版本。
-- Release Assets 必须使用英文文件名，禁止上传中文名或依赖 GitHub 自动生成下载名。Windows NSIS 安装包统一重命名为 `simple-to-do_<version>_x64-setup.exe`，例如 `simple-to-do_0.2.2_x64-setup.exe`。macOS 包按架构命名为 `simple-to-do_<version>_<arch>.dmg`，例如 `simple-to-do_0.2.2_aarch64.dmg` 或 `simple-to-do_0.2.2_x64.dmg`。
+## 发布规范（本地流程）
+- 发布固定为本地执行，不依赖 GitHub Actions：`node scripts/release-local.mjs --version <v> --notes-file <notes.md>` 一条龙完成「本地构建 → GitHub Release → 修复 latest.json → 同步自建服务器 → 线上验证」；`release.yml` 已废弃删除。
+- 发布前必须通过 `npm run release:check -- <version>`（版本一致性、签名密钥文件、Git 工作区干净、gh 已登录）。
+- 签名密钥：本地从 `~/.tauri/simple-to-do-updater-v3.key` 与 `~/.tauri/simple-to-do-updater-v3.password` 读取，由 `scripts/build-windows.ps1` 注入构建环境；不写入脚本、命令行或仓库。
+- GitHub Release 由 agent 发布时，Release title 必须只使用应用版本号，与 `src-tauri/tauri.conf.json` 中的 `version` 完全一致，例如 `0.4.5`；不要加入“发布”“更新”等前缀。
+- Release tag 统一使用 `v<version>`，例如 `v0.4.5`；发布前确认 tag、Release title、安装包内版本三者对应同一版本。
+- Release Assets 必须使用英文文件名，禁止上传中文名或依赖 GitHub 自动生成下载名。Windows NSIS 安装包统一命名为 `simple-to-do_<version>_x64-setup.exe`，例如 `simple-to-do_0.4.5_x64-setup.exe`。macOS 包按架构命名为 `simple-to-do_<version>_<arch>.dmg`，例如 `simple-to-do_0.4.5_aarch64.dmg` 或 `simple-to-do_0.4.5_x64.dmg`（Windows 本地无法构建 dmg，需在 macOS 上构建后追加）。
 - Release notes 使用中文，包含本版本的主要更新、修复和已知限制（如有）；不设置“安装”章节，也不重复通用安装步骤。可按需要增加“数据与兼容性”“已知限制”“后续计划”等对用户有价值的内容。
 - Release notes 可增加“贡献者”章节，仅列出可从本次发布提交记录或 GitHub 记录确认的贡献者，使用 GitHub 用户名或公开姓名；不能猜测或虚构贡献者。
-- 发布顺序：Windows 构建验证通过后先创建或更新该版本 Release 并上传 Windows Asset；macOS 构建完成后向同一个 Release 追加 macOS Asset 和对应 Release notes，不新建重复 Release。
+- 发布顺序：Windows 构建验证通过后先创建该版本 Release 并上传 Windows Asset；macOS 构建完成后向同一个 Release 追加 macOS Asset 和对应 Release notes，不新建重复 Release。
 - 上传前必须核验 Asset 可下载、文件名正确、版本正确且无重复或过期资产；如需替换，先删除同名旧 Asset 再上传新文件。
+- 发布后自动同步产物到自建更新源 `https://simpletodo.duqimeng.cn/releases/`（`scripts/sync-update-source.mjs`），latest.json 下载地址指向服务器；线上验证以 release-local.mjs 第 7 步为准（签名 keyid、BOM、服务器版本与下载地址）。
 
 ## 代码约定
 - Vue 组件保持组合式 API 写法。
