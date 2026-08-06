@@ -719,7 +719,7 @@ onBeforeUnmount(cancelGrowthReplay)
 .achievement-header .eyebrow { margin: 0 0 4px; color: var(--accent-strong); font-size: 11px; font-weight: 750; letter-spacing: .1em; }
 .achievement-header h1 { margin: 0; color: var(--text); font-size: 28px; letter-spacing: -.035em; }
 .achievement-header p { margin: 5px 0 0; color: var(--text-muted); font-size: 13px; }
-.achievement-header__today { display: flex; align-items: center; gap: 4px; min-width: 210px; padding: 6px 14px 6px 4px; border: 1px solid var(--divider-soft); border-radius: 16px; background: var(--surface); }
+.achievement-header__today { display: flex; align-items: center; gap: 4px; min-width: 210px; padding: 6px 14px 6px 4px; border: 0; border-radius: 16px; background: var(--surface-muted); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .6); }
 .achievement-header__today .focus-plant { width: 68px; margin: -14px 0 -16px; }
 .achievement-header__today span { display: grid; gap: 2px; }.achievement-header__today small { color: var(--text-muted); font-size: 10px; }.achievement-header__today strong { color: var(--text); font-size: 12px; }
 .achievement-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border: 1px solid var(--divider-soft); border-radius: 14px; background: var(--surface); }
@@ -733,8 +733,9 @@ onBeforeUnmount(cancelGrowthReplay)
 .achievement-section-heading span { color: var(--accent-strong); font-size: 10px; font-weight: 750; letter-spacing: .08em; }.achievement-section-heading h2 { margin: 3px 0; color: var(--text); font-size: 18px; letter-spacing: -.02em; }.achievement-section-heading p { margin: 0; color: var(--text-muted); font-size: 11px; }
 .achievement-section-heading label { display: flex; align-items: center; gap: 7px; color: var(--text-muted); font-size: 11px; }.achievement-section-heading select { min-height: 30px; padding: 0 28px 0 8px; border: 1px solid var(--divider-soft); border-radius: 8px; background: var(--surface-muted); color: var(--text); }
 .achievement-year__landscape { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin-top: 16px; padding: 15px; border-radius: 15px; background: linear-gradient(#eef7f4 0 25%, #e3eee2 25% 67%, #cbd9bd 67%); }
-.achievement-year__landscape button { display: grid; justify-items: center; min-width: 0; min-height: 130px; padding: 5px 3px 7px; border: 1px solid transparent; border-radius: 12px; color: var(--text-muted); cursor: pointer; }
-.achievement-year__landscape button:hover,.achievement-year__landscape button.active { border-color: color-mix(in srgb, var(--accent) 28%, transparent); background: rgba(255,255,255,.5); }.achievement-year__landscape button.active { box-shadow: inset 0 0 0 1px rgba(255,255,255,.7); }
+.achievement-year__landscape button { display: grid; justify-items: center; min-width: 0; min-height: 130px; padding: 5px 3px 7px; border: 0; border-radius: 12px; color: var(--text-muted); cursor: pointer; }
+.achievement-year__landscape button:hover { background: rgba(255,255,255,.55); }
+.achievement-year__landscape button.active { background: var(--surface); box-shadow: 0 6px 18px rgba(36, 85, 73, .12), 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent); }
 .achievement-year__landscape .focus-plant { width: 82px; height: 82px; margin: -10px 0 -6px; }.achievement-year__month { font-size: 10px; font-weight: 700; }.achievement-year__landscape small { font-size: 9px; }
 .achievement-soil { width: 54px; height: 14px; margin: 44px 0 17px; border-radius: 50%; background: #9d7d5e; box-shadow: inset 0 4px 0 rgba(255,255,255,.12); opacity: .62; }
 .achievement-summary { padding: 17px; }.achievement-summary > header,.achievement-unlock > header { display: flex; justify-content: space-between; color: var(--accent-strong); font-size: 11px; font-weight: 700; }.achievement-summary dl { display: grid; gap: 0; margin: 12px 0 0; }.achievement-summary dl div { display: flex; justify-content: space-between; gap: 10px; padding: 12px 0; border-top: 1px solid var(--divider-soft); }.achievement-summary dt { color: var(--text-muted); font-size: 11px; }.achievement-summary dd { margin: 0; color: var(--text); font-size: 15px; font-weight: 750; }
@@ -834,4 +835,21 @@ onBeforeUnmount(cancelGrowthReplay)
 @media (max-width: 980px) { .field-hero { grid-template-columns: minmax(0, 1.2fr) minmax(180px, .8fr); }.field-hero__progress { grid-column: 1 / -1; } .badges-category-index { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 620px) { .field-hero { grid-template-columns: 1fr; gap: 13px; padding: 18px; }.field-hero__copy h2 { font-size: 21px; }.field-hero__plant { order: -1; }.field-hero__facts { margin-top: 12px; }.field-hero__progress { grid-column: auto; }.achievement-month__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }.badges-category-index { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 760px) { .badges-featured { grid-template-columns: 1fr; gap: 14px; padding: 16px; }.badges-featured__progress { width: auto; } }
+
+/* 修复：WebView2 上鼠标点击 button 后会显示系统默认深色 outline
+   （Chromium 桌面版不会），全局 :focus-visible 规则只在键盘 tab 时触发，
+   鼠标点击触发的 :focus 会让花朵周围出现一圈深色框。统一抑制非 :focus-visible
+   的 outline；键盘 focus 仍由全局规则接管以保证 a11y。 */
+.achievement-tabs button,
+.achievement-year__landscape button,
+.achievement-month__nav button,
+.achievement-month__grid button,
+.achievement-recent .achievement-section-heading > button,
+.species-playground__hint,
+.species-playground__choose,
+.species-replay__actions button,
+.species-replay__steps button,
+.species-collection__garden > button {
+  &:focus:not(:focus-visible) { outline: none; }
+}
 </style>
