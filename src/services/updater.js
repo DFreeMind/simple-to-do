@@ -1,7 +1,6 @@
 import { reactive } from 'vue'
-import { check } from '@tauri-apps/plugin-updater'
-
-const UPDATE_TIMEOUT = 20000
+import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 
 function isTauri() {
   return typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__)
@@ -36,7 +35,7 @@ function classifyError(error) {
 
 /** 更新说明：latest.json 的 notes 可能被发布流程写坏（mojibake），此时降级为通用文案。 */
 export function updateNotes() {
-  const notes = updaterState.update?.body?.trim()
+  const notes = updaterState.update?.notes?.trim()
   if (!notes) return '本次更新已准备就绪。'
   if (/\uFFFD/.test(notes) || /[\u0080-\u00FF]{4,}/.test(notes)) return '本次更新已准备就绪。'
   return notes
@@ -49,7 +48,7 @@ export function updateNotes() {
  * @param {boolean} options.force 为 true 时无视跳过记录（数据保护页必须能安装最新版）
  * @param {boolean} options.silent 静默检查：失败时不打印告警，由设置面板呈现状态
  */
-export async function checkForUpdates({ skippedVersion = '', force = false, silent = false } = {}) {
+export async function checkForUpdates({ skippedVersion = '', force = false, silent = false, source = 'auto' } = {}) {
   if (!isTauri() || import.meta.env.DEV) {
     updaterState.status = 'idle'
     return false
@@ -59,7 +58,7 @@ export async function checkForUpdates({ skippedVersion = '', force = false, sile
   updaterState.update = null
   updaterState.progress = { downloaded: 0, total: 0 }
   try {
-    const update = await check({ timeout: UPDATE_TIMEOUT })
+    const update = await invoke('check_for_update', { source })
     if (!update) {
       // macOS 从未发布签名更新包时 check 返回 null，误显示「已是最新」会误导用户。
       if (isMacOS()) {
@@ -93,19 +92,20 @@ export async function installUpdate() {
   updaterState.status = 'downloading'
   updaterState.error = ''
   updaterState.progress = { downloaded: 0, total: 0 }
+  let unlisten = null
   try {
-    await update.downloadAndInstall((event) => {
-      if (event.event === 'Started') {
-        updaterState.progress = { downloaded: 0, total: event.data.contentLength || 0 }
-      } else if (event.event === 'Progress') {
+    unlisten = await listen('updater:progress', (event) => {
+      const payload = event.payload || {}
+      if (payload.event === 'Progress') {
         updaterState.progress = {
-          ...updaterState.progress,
-          downloaded: updaterState.progress.downloaded + event.data.chunkLength
+          downloaded: updaterState.progress.downloaded + (payload.chunkLength || 0),
+          total: payload.contentLength ?? updaterState.progress.total
         }
-      } else if (event.event === 'Finished') {
+      } else if (payload.event === 'Finished') {
         updaterState.status = 'installing'
       }
     })
+    await invoke('install_pending_update')
     updaterState.status = 'installing'
     return true
   } catch (error) {
@@ -113,6 +113,8 @@ export async function installUpdate() {
     updaterState.error = '更新下载或安装失败，不影响本机任务数据；请稍后重试。'
     console.warn('[updater] 下载或安装失败:', error)
     return false
+  } finally {
+    if (unlisten) unlisten()
   }
 }
 

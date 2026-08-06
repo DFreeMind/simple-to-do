@@ -832,6 +832,18 @@
                   </button>
                 </div>
               </article>
+              <label class="setting-select-card">
+                <span class="setting-select-card__icon"><Globe :size="17" /></span>
+                <span class="setting-select-card__copy">
+                  <strong>更新源</strong>
+                  <small>默认自动选择可用更新源（自建服务器优先，GitHub 兜底）；GitHub 访问不稳定时可手动指定。</small>
+                </span>
+                <select :value="store.settings.updateSource" @change="store.updateSettings({ updateSource: $event.target.value })">
+                  <option value="auto">自动（自建优先）</option>
+                  <option value="self">自建服务器</option>
+                  <option value="github">GitHub</option>
+                </select>
+              </label>
             </div>
           </section>
         </div>
@@ -872,7 +884,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { Bell, Check, Compass, Database, Download, ExternalLink, File, HardDrive, Image, Info, PanelTop, Palette, Pin, ShieldCheck, SlidersHorizontal, Timer, Trash2, UserRound, X, Volume2, CheckSquare, Folder, Tag } from 'lucide-vue-next'
+import { Bell, Check, Compass, Database, Download, ExternalLink, File, Folder, Globe, HardDrive, Image, Info, PanelTop, Palette, Pin, ShieldCheck, SlidersHorizontal, Tag, Timer, Trash2, UserRound, Volume2, X, CheckSquare } from 'lucide-vue-next'
 import { checkForUpdates as checkForUpdatesService, installUpdate as installUpdateService, skipCurrentUpdate, updaterState, updateNotes as resolveUpdateNotes } from '@/services/updater'
 import { currentReleaseHighlights, releaseHistory } from '@/data/releases'
 import { useTaskStore } from '@/stores/task'
@@ -1011,14 +1023,14 @@ const updateTitle = computed(() => ({
   unsupported: '当前平台暂不支持自动更新'
 }[updateState.value] || '检查稳定版本'))
 const updateDescription = computed(() => {
-  if (updateState.value === 'development') return 'npm run dev 不会请求 GitHub Release；请使用正式签名安装包验证更新。'
+  if (updateState.value === 'development') return 'npm run dev 不会请求更新服务；请使用正式签名安装包验证更新。'
   if (updateState.value === 'available') return '更新包已通过签名验证，下载完成后将自动完成安装。'
   if (updateState.value === 'skipped') return '本次更新已跳过；新版本发布后或重新检查时会再次提示。'
   if (updateState.value === 'downloading') return updateProgressText.value
   if (updateState.value === 'installing') return '下载已完成，应用将自动重新打开并完成安装。'
   if (updateState.value === 'error' || updateState.value === 'unsupported') return updaterState.error
   if (updateState.value === 'upToDate') return '当前已安装最新的稳定版本。'
-  return '从 GitHub Release 检查经过签名验证的稳定版本。'
+  return '从自建服务器或 GitHub Release 检查经过签名验证的稳定版本。'
 })
 const updateActionText = computed(() => ({
   development: '开发模式不检查',
@@ -1090,7 +1102,10 @@ function formatDate(value) {
 }
 
 async function checkForUpdates() {
-  await checkForUpdatesService({ skippedVersion: store.settings.skippedUpdateVersion })
+  await checkForUpdatesService({
+    skippedVersion: store.settings.skippedUpdateVersion,
+    source: store.settings.updateSource
+  })
 }
 
 async function runUpdateAction() {

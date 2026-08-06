@@ -12,6 +12,7 @@ use std::{
     process::Command,
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
+        Arc,
         Mutex,
     },
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -21,6 +22,7 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_updater::UpdaterExt;
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use tauri_plugin_notification::NotificationExt;
 
@@ -33,6 +35,31 @@ use windows_sys::Win32::{
     System::SystemInformation::GetTickCount,
     UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO},
 };
+
+/// 自动更新：check 成功后暂存待安装的更新对象，由下载安装 command 消费。
+struct PendingUpdate(Mutex<Option<tauri_plugin_updater::Update>>);
+
+/// 检查更新返回给前端的最小信息。
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateInfo {
+    version: String,
+    notes: Option<String>,
+    download_url: String,
+}
+
+const UPDATE_ENDPOINT_SELF: &str = "https://simpletodo.duqimeng.cn/latest.json";
+const UPDATE_ENDPOINT_GITHUB: &str = "https://github.com/DFreeMind/simple-to-do/releases/latest/download/latest.json";
+
+/// 按更新源选择解析 updater endpoints：默认自动（自建服务器优先，GitHub 兜底）。
+fn updater_endpoints(source: &str) -> Vec<url::Url> {
+    let parse = |s: &str| url::Url::parse(s).expect("更新源地址必须是合法 URL");
+    match source {
+        "self" => vec![parse(UPDATE_ENDPOINT_SELF)],
+        "github" => vec![parse(UPDATE_ENDPOINT_GITHUB)],
+        _ => vec![parse(UPDATE_ENDPOINT_SELF), parse(UPDATE_ENDPOINT_GITHUB)],
+    }
+}
 
 struct WindowCloseBehavior(AtomicBool);
 
@@ -335,6 +362,69 @@ fn set_window_close_behavior(app: tauri::AppHandle, behavior: String) -> Result<
     app.state::<WindowCloseBehavior>()
         .0
         .store(hide_on_close, Ordering::Relaxed);
+    Ok(true)
+}
+
+/// 检查更新。source 为前端选择的更新源：auto / github / self。
+/// 有可用更新时将 Update 存入 PendingUpdate，供 install_pending_update 消费。
+#[tauri::command]
+async fn check_for_update(app: tauri::AppHandle, source: String) -> Result<Option<UpdateInfo>, String> {
+    let updater = app
+        .updater_builder()
+        .endpoints(updater_endpoints(&source))
+        .map_err(|error| format!("更新源配置无效: {error}"))?
+        .timeout(Duration::from_secs(20))
+        .build()
+        .map_err(|error| format!("更新器初始化失败: {error}"))?;
+    let Some(update) = updater
+        .check()
+        .await
+        .map_err(|error| format!("检查更新失败: {error}"))?
+    else {
+        return Ok(None);
+    };
+    let info = UpdateInfo {
+        version: update.version.clone(),
+        notes: update.body.clone(),
+        download_url: update.download_url.to_string(),
+    };
+    *app.state::<PendingUpdate>()
+        .0
+        .lock()
+        .map_err(|_| "更新状态不可用".to_string())? = Some(update);
+    Ok(Some(info))
+}
+
+/// 下载并安装 check_for_update 暂存的更新，进度通过 updater:progress 事件回传前端。
+#[tauri::command]
+async fn install_pending_update(app: tauri::AppHandle) -> Result<bool, String> {
+    let update = app
+        .state::<PendingUpdate>()
+        .0
+        .lock()
+        .map_err(|_| "更新状态不可用".to_string())?
+        .take()
+        .ok_or_else(|| "没有待安装的更新".to_string())?;
+    let emit_app = Arc::new(app.clone());
+    let emit_progress = emit_app.clone();
+    update
+        .download_and_install(
+            move |chunk_length, content_length| {
+                let _ = emit_progress.emit(
+                    "updater:progress",
+                    serde_json::json!({
+                        "event": "Progress",
+                        "chunkLength": chunk_length,
+                        "contentLength": content_length,
+                    }),
+                );
+            },
+            move || {
+                let _ = emit_app.emit("updater:progress", serde_json::json!({ "event": "Finished" }));
+            },
+        )
+        .await
+        .map_err(|error| format!("更新下载或安装失败: {error}"))?;
     Ok(true)
 }
 
@@ -4348,6 +4438,7 @@ fn main() {
         .manage(ReminderWindowCoordinator::default())
         .manage(FocusReminderState::default())
         .manage(RhythmReminderState::default())
+        .manage(PendingUpdate(Mutex::new(None)))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {
@@ -4439,7 +4530,9 @@ fn main() {
             get_rhythm_reminder_payload,
             handle_rhythm_reminder_action,
             set_window_close_behavior,
-            get_system_idle_seconds
+            get_system_idle_seconds,
+            check_for_update,
+            install_pending_update
         ])
         .build(tauri::generate_context!())
         .expect("初始化 Tauri 应用失败")

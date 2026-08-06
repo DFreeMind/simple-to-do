@@ -15,9 +15,11 @@ image = { version = "0.25", default-features = false, features = ["gif", "jpeg",
 rfd = "0.15"
 rusqlite = { version = "0.32", features = ["backup", "bundled"] }
 serde = { version = "1", features = ["derive"] }
+reqwest = { version = "0.13", features = ["system-proxy"] }
 serde_json = "1"
 sha2 = "0.10"
 tauri = { version = "2", features = ["macos-private-api", "tray-icon"] }
+url = "2"
 tauri-plugin-notification = "2.3.3"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]

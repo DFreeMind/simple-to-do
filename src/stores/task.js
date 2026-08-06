@@ -118,7 +118,8 @@ const DEFAULT_SETTINGS = {
   windowCloseBehavior: 'hide',
   dailyGuidanceEnabled: true,
   dailyGuidanceStyle: 'practical',
-  skippedUpdateVersion: ''
+  skippedUpdateVersion: '',
+  updateSource: 'auto'
 }
 
 const DEFAULT_PROFILE = {
@@ -3152,7 +3153,10 @@ export const useTaskStore = defineStore('task', () => {
       dailyGuidanceStyle,
       skippedUpdateVersion: typeof rawSettings.skippedUpdateVersion === 'string'
         ? rawSettings.skippedUpdateVersion
-        : ''
+        : '',
+      updateSource: ['auto', 'github', 'self'].includes(rawSettings.updateSource)
+        ? rawSettings.updateSource
+        : 'auto'
     }
   }
 

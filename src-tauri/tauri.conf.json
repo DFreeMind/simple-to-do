@@ -80,6 +80,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENDNkQ1MDk3QjkxMTM1NDAKUldSQU5SRzVsMUJ0ekhWdjhCcktsR0FXSnAzMGljMndvV3hiYjE3Q3N5VDJGRzd3TWs0OTJiRE8K",
       "endpoints": [
+        "https://simpletodo.duqimeng.cn/latest.json",
         "https://github.com/DFreeMind/simple-to-do/releases/latest/download/latest.json"
       ],
       "windows": {
