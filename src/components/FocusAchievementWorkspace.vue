@@ -849,7 +849,8 @@ onBeforeUnmount(cancelGrowthReplay)
 .species-playground__choose,
 .species-replay__actions button,
 .species-replay__steps button,
-.species-collection__garden > button {
+.species-collection__garden > button,
+.focus-plant {
   &:focus:not(:focus-visible) { outline: none; }
 }
 </style>
