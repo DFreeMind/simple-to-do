@@ -160,9 +160,9 @@
       "deletedAt": null,
       "pinned": true,
       "important": false,
-      "myDayDate": "2026-08-04",
+      "myDayDate": "2026-08-06",
       "listId": "meetings",
-      "dueDate": "2026-08-04T02:30:00.000Z",
+      "dueDate": "2026-08-06T02:30:00.000Z",
       "reminderAt": "2026-08-04T02:00:00.000Z",
       "repeatRule": null,
       "priority": 2,
@@ -188,9 +188,9 @@
       "deletedAt": null,
       "pinned": false,
       "important": true,
-      "myDayDate": "2026-08-04",
+      "myDayDate": "2026-08-06",
       "listId": "work-tasks",
-      "dueDate": "2026-08-04T10:00:00.000Z",
+      "dueDate": "2026-08-06T10:00:00.000Z",
       "reminderAt": null,
       "repeatRule": null,
       "priority": 3,
@@ -237,9 +237,9 @@
       "deletedAt": null,
       "pinned": false,
       "important": false,
-      "myDayDate": "2026-08-04",
+      "myDayDate": "2026-08-06",
       "listId": "home",
-      "dueDate": "2026-08-04T11:00:00.000Z",
+      "dueDate": "2026-08-06T11:00:00.000Z",
       "reminderAt": null,
       "repeatRule": null,
       "priority": 0,
@@ -287,9 +287,9 @@
       "deletedAt": null,
       "pinned": false,
       "important": false,
-      "myDayDate": "2026-08-04",
+      "myDayDate": "2026-08-06",
       "listId": "reading",
-      "dueDate": "2026-08-04T14:00:00.000Z",
+      "dueDate": "2026-08-06T14:00:00.000Z",
       "reminderAt": null,
       "repeatRule": "daily",
       "priority": 0,
@@ -383,7 +383,7 @@
       "important": true,
       "myDayDate": null,
       "listId": "work-tasks",
-      "dueDate": "2026-08-05T01:00:00.000Z",
+      "dueDate": "2026-08-07T01:00:00.000Z",
       "reminderAt": "2026-08-05T00:30:00.000Z",
       "repeatRule": null,
       "priority": 3,
@@ -411,7 +411,7 @@
       "important": true,
       "myDayDate": null,
       "listId": "project-alpha",
-      "dueDate": "2026-08-05T07:00:00.000Z",
+      "dueDate": "2026-08-07T07:00:00.000Z",
       "reminderAt": null,
       "repeatRule": null,
       "priority": 3,
@@ -945,7 +945,7 @@
       "important": false,
       "myDayDate": null,
       "listId": "health",
-      "dueDate": "2026-08-04T10:00:00.000Z",
+      "dueDate": "2026-08-06T10:00:00.000Z",
       "reminderAt": null,
       "repeatRule": "daily",
       "priority": 0,
@@ -1209,7 +1209,7 @@
       "deletedAt": null,
       "pinned": false,
       "important": false,
-      "myDayDate": "2026-08-04",
+      "myDayDate": "2026-08-06",
       "listId": "inbox",
       "dueDate": null,
       "reminderAt": null,
@@ -1257,7 +1257,7 @@
       "id": "test-3",
       "title": "带附件的任务：确认图片预览区域",
       "description": "",
-      "descriptionHtml": "<p>这是任务里插入的附件图片，点击可在大图模式预览：</p>\n<img src=\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAlgAAAGQCAIAAAD9V4nPAAAQj0lEQVR4nO3V1VIWYQAAUN8UWzEAaRHF7sZW7ERBRRTF7m6xu57D2dmdrf/bOy/PzHmHM67u4kDByEDdyGDe+NiF1OmC87XORIYTE0rOnQ0bSg2lJg4NTTxbci5xpsLp4dSkksHhSYPnAwbyLqQmn6o1EjlZoX9kcv/F2JS8E3mXMsdrjUaOjU4NOjo69ejlsCOxK7FpqcMlVxOHgq5NO3htetCB2PWy/Xk3pu+/UR/bF3Szfm+Fvpv1fbfq+27NKNmTd7tgd8mdmbFdFXbeDdsRuzerZHvJ/cS2oAezt1bYEntY1ptp6H1UsLnW48imsMaNjxs3PgnYkHpasL6gKfIssq7C2udhayJzIi8KVpe8zKwqaE68al5ZYcWr5hWvA5ZHWhJvMstqjUWWBrQuHWtdMta65G3A4tS7gkWJtsz7xMKgD209Ae09H9oXxD6Wzc/7lOnOdGQ+d8yr0PW5o+tLrc65eV8znUHfOjsK5ua1fw9rS/0oaP3RVfAz0VKh+VfevNSc2O+yppI/icZId9nf7obMOBGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhH+jwj/AXgInJToRkFnAAAAAElFTkSuQmCC\" alt=\"附件示例 1\" data-attachment-src=\"attachments/demo/preview-1.svg\" style=\"max-width: 100%; border-radius: 12px;\" />\n<p>多张图片可左右切换查看：</p>\n<img src=\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAlgAAAGQCAIAAAD9V4nPAAAP4UlEQVR4nO3V6TZWYRgAUHcoJKVMSZGMhUxRGYrKLERluq9zKS3r+xbOWe/3vH/6udfa97CbiuvmqquKByWXoYukljvnob9JrXV/cn4ntdWdhU4DD2/8Cp0E2ovjnKPQz0cZh6GDjsh+zl5Hsfe4od3QTs2ThrZDWzWdaT9yvt96mvAttHnfs4SN0NeKrpIvOesV3SVrodWknjsroc9JvXWfcj4m9dUth5YCz298CC0G+ouFnPnQ3IuM2dD7gchMzvRAMf2yoanQu5pXDb0NTdYMpk3kjN8aShgLjd73OmEk9KZiuGS4pEmEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCEIhShCEUoQhGKUIQiFKEIRShCEYpQhCIUoQhFKEIRilCE/yPCfzeUbNa0HFpeAAAAAElFTkSuQmCC\" alt=\"附件示例 2\" data-attachment-src=\"attachments/demo/preview-2.svg\" style=\"max-width: 100%; border-radius: 12px;\" />\n<p>图片附件保存在应用数据目录，扫描后可在\"个人空间 → 空间管理\"中查看引用情况。</p>",
+      "descriptionHtml": "<p>这是任务里插入的附件图片，点击可在大图模式预览：</p><img src=\"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgNTAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiM3YmUwYzQiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiM1YThjZTAiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIgZmlsbD0idXJsKCNnKSIvPjx0ZXh0IHg9IjQwMCIgeT0iMjcwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXNpemU9IjY0IiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9InN5c3RlbS11aSI+6ZmE5Lu256S65L6LIDE8L3RleHQ+PC9zdmc+\" alt=\"附件示例 1\" style=\"max-width: 100%; border-radius: 12px;\" /><p>多张图片可左右切换查看：</p><img src=\"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgNTAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiM3YzZlZTYiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiMzYWE2YjkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIgZmlsbD0idXJsKCNnKSIvPjx0ZXh0IHg9IjQwMCIgeT0iMjcwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXNpemU9IjY0IiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9InN5c3RlbS11aSI+6ZmE5Lu256S65L6LIDI8L3RleHQ+PC9zdmc+\" alt=\"附件示例 2\" style=\"max-width: 100%; border-radius: 12px;\" /><p>图片附件保存在应用数据目录，扫描后可在\"个人空间 → 空间管理\"中查看引用情况。</p>",
       "completed": false,
       "completedAt": null,
       "deleted": false,
@@ -1276,32 +1276,18 @@
       "subtasks": [],
       "attachments": [
         {
-          "id": "att-1",
-          "kind": "image",
-          "mime": "image/svg+xml",
-          "originalName": "preview-1.svg",
-          "relativePath": "demo/preview-1.svg",
-          "sha256": "demo-1",
-          "sizeBytes": 656,
-          "width": 600,
-          "height": 400,
-          "url": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20400%22%3E%0A%20%20%3Cdefs%3E%0A%20%20%20%20%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%235fb8ad%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%237c6ee6%22%2F%3E%0A%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%3C%2Fdefs%3E%0A%20%20%3Crect%20width%3D%22600%22%20height%3D%22400%22%20fill%3D%22url(%23g)%22%2F%3E%0A%20%20%3Ctext%20x%3D%2240%22%20y%3D%2280%22%20font-family%3D%22sans-serif%22%20font-size%3D%2234%22%20fill%3D%22white%22%20font-weight%3D%22bold%22%3E%E9%99%84%E4%BB%B6%E9%A2%84%E8%A7%88%E7%A4%BA%E4%BE%8B%3C%2Ftext%3E%0A%20%20%3Ctext%20x%3D%2240%22%20y%3D%22125%22%20font-family%3D%22sans-serif%22%20font-size%3D%2220%22%20fill%3D%22white%22%20opacity%3D%220.9%22%3E%E7%82%B9%E5%87%BB%E5%9B%BE%E7%89%87%E6%89%93%E5%BC%80%E5%A4%A7%E5%9B%BE%E6%A8%A1%E5%BC%8F%3C%2Ftext%3E%0A%20%20%3Ccircle%20cx%3D%22450%22%20cy%3D%22280%22%20r%3D%2280%22%20fill%3D%22white%22%20opacity%3D%220.3%22%2F%3E%0A%20%20%3Ccircle%20cx%3D%22380%22%20cy%3D%22240%22%20r%3D%2240%22%20fill%3D%22white%22%20opacity%3D%220.5%22%2F%3E%0A%3C%2Fsvg%3E",
-          "createdAt": "2026-07-30T08:00:00.000Z",
-          "lastReferencedAt": "2026-08-04T01:00:00.000Z"
+          "id": "preview-1",
+          "name": "附件示例 1.png",
+          "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgNTAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiM3YmUwYzQiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiM1YThjZTAiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIgZmlsbD0idXJsKCNnKSIvPjx0ZXh0IHg9IjQwMCIgeT0iMjcwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXNpemU9IjY0IiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9InN5c3RlbS11aSI+6ZmE5Lu256S65L6LIDE8L3RleHQ+PC9zdmc+",
+          "sizeBytes": 184052,
+          "kind": "image"
         },
         {
-          "id": "att-2",
-          "kind": "image",
-          "mime": "image/svg+xml",
-          "originalName": "preview-2.svg",
-          "relativePath": "demo/preview-2.svg",
-          "sha256": "demo-2",
-          "sizeBytes": 610,
-          "width": 600,
-          "height": 400,
-          "url": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20400%22%3E%0A%20%20%3Cdefs%3E%0A%20%20%20%20%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%220%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23e0a54f%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23e06b6b%22%2F%3E%0A%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%3C%2Fdefs%3E%0A%20%20%3Crect%20width%3D%22600%22%20height%3D%22400%22%20fill%3D%22url(%23g)%22%2F%3E%0A%20%20%3Ctext%20x%3D%2240%22%20y%3D%2280%22%20font-family%3D%22sans-serif%22%20font-size%3D%2234%22%20fill%3D%22white%22%20font-weight%3D%22bold%22%3E%E7%AC%AC%E4%BA%8C%E5%BC%A0%E5%9B%BE%3C%2Ftext%3E%0A%20%20%3Ctext%20x%3D%2240%22%20y%3D%22125%22%20font-family%3D%22sans-serif%22%20font-size%3D%2220%22%20fill%3D%22white%22%20opacity%3D%220.9%22%3E%E7%94%A8%E4%BA%8E%E6%BC%94%E7%A4%BA%E5%B7%A6%E5%8F%B3%E5%88%87%E6%8D%A2%3C%2Ftext%3E%0A%20%20%3Crect%20x%3D%22380%22%20y%3D%22180%22%20width%3D%22180%22%20height%3D%22120%22%20fill%3D%22white%22%20opacity%3D%220.4%22%20rx%3D%2212%22%2F%3E%0A%3C%2Fsvg%3E",
-          "createdAt": "2026-07-31T08:00:00.000Z",
-          "lastReferencedAt": "2026-08-04T01:00:00.000Z"
+          "id": "preview-2",
+          "name": "附件示例 2.png",
+          "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgNTAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiM3YzZlZTYiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiMzYWE2YjkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIgZmlsbD0idXJsKCNnKSIvPjx0ZXh0IHg9IjQwMCIgeT0iMjcwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXNpemU9IjY0IiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9InN5c3RlbS11aSI+6ZmE5Lu256S65L6LIDI8L3RleHQ+PC9zdmc+",
+          "sizeBytes": 196012,
+          "kind": "image"
         }
       ],
       "comments": [],
@@ -1456,8 +1442,391 @@
         "end": "08:00"
       }
     },
-    "garden": {},
-    "history": []
+    "garden": {
+      "startedAt": "2026-07-15T08:00:00.000Z",
+      "unlockLadderVersion": 2,
+      "dailyGoalMinutes": 50,
+      "selectedSpeciesId": "daisy",
+      "nextSpeciesId": "tulip",
+      "longestSessionMinutes": 50,
+      "days": [
+        {
+          "date": "2026-07-15",
+          "speciesId": "daisy",
+          "growthMinutes": 50,
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "achievementIds": [
+            "first-growth",
+            "first-bloom"
+          ]
+        },
+        {
+          "date": "2026-07-17",
+          "speciesId": "daisy",
+          "growthMinutes": 35,
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "achievementIds": []
+        },
+        {
+          "date": "2026-07-20",
+          "speciesId": "daisy",
+          "growthMinutes": 60,
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "achievementIds": []
+        },
+        {
+          "date": "2026-07-22",
+          "speciesId": "daisy",
+          "growthMinutes": 25,
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "achievementIds": []
+        },
+        {
+          "date": "2026-07-24",
+          "speciesId": "daisy",
+          "growthMinutes": 50,
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "achievementIds": []
+        },
+        {
+          "date": "2026-07-27",
+          "speciesId": "daisy",
+          "growthMinutes": 30,
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "achievementIds": []
+        },
+        {
+          "date": "2026-07-29",
+          "speciesId": "daisy",
+          "growthMinutes": 45,
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "achievementIds": []
+        },
+        {
+          "date": "2026-07-31",
+          "speciesId": "daisy",
+          "growthMinutes": 50,
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "achievementIds": []
+        },
+        {
+          "date": "2026-08-01",
+          "speciesId": "daisy",
+          "growthMinutes": 20,
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "achievementIds": []
+        },
+        {
+          "date": "2026-08-03",
+          "speciesId": "daisy",
+          "growthMinutes": 50,
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "achievementIds": []
+        },
+        {
+          "date": "2026-08-05",
+          "speciesId": "daisy",
+          "growthMinutes": 25,
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "achievementIds": []
+        },
+        {
+          "date": "2026-08-06",
+          "speciesId": "daisy",
+          "growthMinutes": 30,
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "achievementIds": []
+        }
+      ],
+      "achievements": [
+        {
+          "id": "first-growth",
+          "unlockedAt": "2026-07-15T09:30:00.000Z"
+        },
+        {
+          "id": "first-bloom",
+          "unlockedAt": "2026-07-15T10:00:00.000Z"
+        },
+        {
+          "id": "active-days-3",
+          "unlockedAt": "2026-07-20T18:00:00.000Z"
+        },
+        {
+          "id": "active-days-7",
+          "unlockedAt": "2026-07-31T20:00:00.000Z"
+        },
+        {
+          "id": "total-60",
+          "unlockedAt": "2026-07-20T18:00:00.000Z"
+        }
+      ]
+    },
+    "history": [
+      {
+        "id": "fh-demo-today-1",
+        "profileId": "pomodoro",
+        "taskId": "today-2",
+        "taskTitle": "完成季度报告初稿",
+        "startedAt": "2026-08-06T01:00:00.000Z",
+        "finishedAt": "2026-08-06T01:25:00.000Z",
+        "elapsedSeconds": 1500,
+        "phase": "focus",
+        "result": "completed",
+        "reward": null,
+        "note": "今天的第一段专注",
+        "timeline": [
+          {
+            "type": "finished",
+            "at": "2026-08-06T01:25:00.000Z",
+            "result": "completed",
+            "pausedSeconds": 0
+          }
+        ]
+      },
+      {
+        "id": "fh-demo-today-2",
+        "profileId": "pomodoro",
+        "taskId": "today-1",
+        "taskTitle": "10:30 团队站会同步阻塞事项",
+        "startedAt": "2026-08-06T05:30:00.000Z",
+        "finishedAt": "2026-08-06T06:00:00.000Z",
+        "elapsedSeconds": 1800,
+        "phase": "focus",
+        "result": "completed",
+        "reward": null,
+        "note": "站会前整理了阻塞项",
+        "timeline": [
+          {
+            "type": "finished",
+            "at": "2026-08-06T06:00:00.000Z",
+            "result": "completed",
+            "pausedSeconds": 0
+          }
+        ]
+      },
+      {
+        "id": "fh-demo-1",
+        "profileId": "pomodoro",
+        "taskId": "today-2",
+        "taskTitle": "完成季度报告初稿",
+        "startedAt": "2026-08-03T09:00:00.000Z",
+        "finishedAt": "2026-08-03T09:50:00.000Z",
+        "elapsedSeconds": 3000,
+        "phase": "focus",
+        "result": "completed",
+        "reward": null,
+        "note": "完成了大纲和数据收集",
+        "timeline": [
+          {
+            "type": "finished",
+            "at": "2026-08-03T09:50:00.000Z",
+            "result": "completed",
+            "pausedSeconds": 0
+          }
+        ]
+      },
+      {
+        "id": "fh-demo-2",
+        "profileId": "pomodoro",
+        "taskId": "today-3",
+        "taskTitle": "下班后买咖啡豆和洗衣液",
+        "startedAt": "2026-08-03T14:00:00.000Z",
+        "finishedAt": "2026-08-03T14:25:00.000Z",
+        "elapsedSeconds": 1500,
+        "phase": "focus",
+        "result": "completed",
+        "reward": null,
+        "note": "",
+        "timeline": [
+          {
+            "type": "finished",
+            "at": "2026-08-03T14:25:00.000Z",
+            "result": "completed",
+            "pausedSeconds": 0
+          }
+        ]
+      },
+      {
+        "id": "fh-demo-3",
+        "profileId": "pomodoro",
+        "taskId": "today-1",
+        "taskTitle": "10:30 团队站会同步阻塞事项",
+        "startedAt": "2026-08-01T10:00:00.000Z",
+        "finishedAt": "2026-08-01T10:25:00.000Z",
+        "elapsedSeconds": 1500,
+        "phase": "focus",
+        "result": "completed",
+        "reward": null,
+        "note": "站会前整理了阻塞项",
+        "timeline": [
+          {
+            "type": "finished",
+            "at": "2026-08-01T10:25:00.000Z",
+            "result": "completed",
+            "pausedSeconds": 0
+          }
+        ]
+      },
+      {
+        "id": "fh-demo-4",
+        "profileId": "pomodoro",
+        "taskId": null,
+        "taskTitle": "",
+        "startedAt": "2026-07-31T15:00:00.000Z",
+        "finishedAt": "2026-07-31T15:30:00.000Z",
+        "elapsedSeconds": 1800,
+        "phase": "focus",
+        "result": "completed",
+        "reward": null,
+        "note": "阅读《原子习惯》",
+        "timeline": [
+          {
+            "type": "finished",
+            "at": "2026-07-31T15:30:00.000Z",
+            "result": "completed",
+            "pausedSeconds": 0
+          }
+        ]
+      },
+      {
+        "id": "fh-demo-5",
+        "profileId": "pomodoro",
+        "taskId": null,
+        "taskTitle": "",
+        "startedAt": "2026-07-29T09:30:00.000Z",
+        "finishedAt": "2026-07-29T09:55:00.000Z",
+        "elapsedSeconds": 1500,
+        "phase": "focus",
+        "result": "interrupted",
+        "reward": null,
+        "note": "被电话打断",
+        "timeline": [
+          {
+            "type": "finished",
+            "at": "2026-07-29T09:55:00.000Z",
+            "result": "interrupted",
+            "pausedSeconds": 0
+          }
+        ]
+      },
+      {
+        "id": "fh-demo-6",
+        "profileId": "pomodoro",
+        "taskId": null,
+        "taskTitle": "",
+        "startedAt": "2026-07-27T10:00:00.000Z",
+        "finishedAt": "2026-07-27T10:50:00.000Z",
+        "elapsedSeconds": 3000,
+        "phase": "focus",
+        "result": "completed",
+        "reward": null,
+        "note": "",
+        "timeline": [
+          {
+            "type": "finished",
+            "at": "2026-07-27T10:50:00.000Z",
+            "result": "completed",
+            "pausedSeconds": 0
+          }
+        ]
+      },
+      {
+        "id": "fh-demo-7",
+        "profileId": "pomodoro",
+        "taskId": null,
+        "taskTitle": "",
+        "startedAt": "2026-07-24T14:00:00.000Z",
+        "finishedAt": "2026-07-24T14:25:00.000Z",
+        "elapsedSeconds": 1500,
+        "phase": "focus",
+        "result": "completed",
+        "reward": null,
+        "note": "",
+        "timeline": [
+          {
+            "type": "finished",
+            "at": "2026-07-24T14:25:00.000Z",
+            "result": "completed",
+            "pausedSeconds": 0
+          }
+        ]
+      },
+      {
+        "id": "fh-demo-8",
+        "profileId": "pomodoro",
+        "taskId": null,
+        "taskTitle": "",
+        "startedAt": "2026-07-22T11:00:00.000Z",
+        "finishedAt": "2026-07-22T11:25:00.000Z",
+        "elapsedSeconds": 1500,
+        "phase": "focus",
+        "result": "abandoned",
+        "reward": null,
+        "note": "",
+        "timeline": [
+          {
+            "type": "finished",
+            "at": "2026-07-22T11:25:00.000Z",
+            "result": "abandoned",
+            "pausedSeconds": 0
+          }
+        ]
+      },
+      {
+        "id": "fh-demo-9",
+        "profileId": "pomodoro",
+        "taskId": null,
+        "taskTitle": "",
+        "startedAt": "2026-07-20T16:00:00.000Z",
+        "finishedAt": "2026-07-20T16:50:00.000Z",
+        "elapsedSeconds": 3000,
+        "phase": "focus",
+        "result": "completed",
+        "reward": null,
+        "note": "",
+        "timeline": [
+          {
+            "type": "finished",
+            "at": "2026-07-20T16:50:00.000Z",
+            "result": "completed",
+            "pausedSeconds": 0
+          }
+        ]
+      },
+      {
+        "id": "fh-demo-10",
+        "profileId": "pomodoro",
+        "taskId": null,
+        "taskTitle": "",
+        "startedAt": "2026-07-15T09:00:00.000Z",
+        "finishedAt": "2026-07-15T10:00:00.000Z",
+        "elapsedSeconds": 3600,
+        "phase": "focus",
+        "result": "completed",
+        "reward": null,
+        "note": "第一段专注",
+        "timeline": [
+          {
+            "type": "finished",
+            "at": "2026-07-15T10:00:00.000Z",
+            "result": "completed",
+            "pausedSeconds": 0
+          }
+        ]
+      }
+    ]
   },
   "settings": {
     "theme": "mint",

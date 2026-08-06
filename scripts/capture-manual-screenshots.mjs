@@ -88,14 +88,26 @@ async function closeSettings() {
   }
 }
 
-// Core workflow: intentionally keep the first shot in the clean three-column
-// empty-detail state, then show the detail panel only when a task is selected.
+// Core workflow: 今日视图保持空详情状态（不点选任何任务），让"选中一项任务"提示语可见。
 await closeDetail()
 await capture('today-view')
 
-// 应用三栏全貌：左侧栏 + 任务列表 + 空详情。
-await closeDetail()
-await capture('sidebar-overview')
+// 应用三栏全貌：选择一个清单（如"工作任务"）并选中一条任务，让中间列表有内容、右侧详情完整。
+{
+  const workListButton = page.locator('aside.sidebar').getByText('工作任务', { exact: true }).first()
+  if (await workListButton.count()) {
+    await workListButton.click()
+    await waitForUi()
+  }
+  const firstTask = page.locator('.task-list__item .task-item__title, .task-list__item .task-item__checkbox').first()
+  if (await firstTask.count()) {
+    await firstTask.click()
+    await waitForUi(500)
+  }
+  await capture('sidebar-overview')
+  // 拍完后关闭详情，回到无选中状态。
+  await closeDetail()
+}
 
 // Object management: switch to a list, enable group view, then open the "新建分组"
 // dialog so the new emoji picker and color picker are visible.
@@ -123,12 +135,32 @@ if (await workListButton.count()) {
   } catch (error) {
     console.error('新建分组按钮未出现:', error.message)
   }
+  // 输入名称、点开 emoji 选择器选中一个图标、点选预设强调色，让对话框在截图时是"已填好"的状态。
+  const nameInput = page.locator('.group-dialog input[type="text"], .group-dialog input[placeholder*="分组"]').first()
+  if (await nameInput.count()) {
+    await nameInput.fill('阅读')
+    await waitForUi(300)
+  }
   const emojiTrigger = page.locator('button.group-dialog__emoji-trigger').first()
   if (await emojiTrigger.count()) {
     await emojiTrigger.click()
-    await waitForUi()
+    await waitForUi(800)
+    // 在 emoji 选择器打开的状态下截图，让浮层面板可见；选完第一个图标后再关闭。
+    await capture('group-management')
+    const firstEmoji = page.locator('button.emoji-item').first()
+    if (await firstEmoji.count()) {
+      await firstEmoji.click({ force: true })
+      await waitForUi(400)
+    }
+  } else {
+    await capture('group-management')
   }
-  await capture('group-management')
+  // 点选一个预设强调色（第一个非"自动配色"的色块），让色板出现在截图里。
+  const colorSwatch = page.locator('.group-dialog__color-grid button:not(.is-active), .group-dialog button[aria-label*="颜色"]').first()
+  if (await colorSwatch.count()) {
+    await colorSwatch.click()
+    await waitForUi(300)
+  }
   await page.keyboard.press('Escape')
   await waitForUi()
   const dialogClose = page.locator('button.group-dialog__close').first()
@@ -145,11 +177,23 @@ if (await workListButton.count()) {
 const newListButton = page.locator('aside.sidebar button[aria-label="新建清单"]').first()
 if (await newListButton.count()) {
   await newListButton.click()
-  await page.locator('input[placeholder="清单名称"]').fill('客户跟进')
-  await waitForUi()
+  await waitForUi(400)
+  const listInput = page.locator('input[placeholder="清单名称"]').first()
+  if (await listInput.count()) {
+    // 用真实键盘输入字符（不会触发 Playwright fill 后的 blur），input 保持焦点。
+    await listInput.focus()
+    await page.keyboard.type('客户跟进', { delay: 30 })
+    await waitForUi(300)
+  }
   await capture('list-management')
-  await page.keyboard.press('Escape')
-  await waitForUi()
+  // 截图后显式按 Enter 完成创建（input 仍保留焦点），再切回"工作任务"清单继续后续截图。
+  await page.keyboard.press('Enter')
+  await waitForUi(400)
+  const workListButton = page.locator('aside.sidebar').getByText('工作任务', { exact: true }).first()
+  if (await workListButton.count()) {
+    await workListButton.click()
+    await waitForUi()
+  }
 }
 
 await page.getByText('完成季度报告初稿', { exact: true }).click()
@@ -157,13 +201,21 @@ await waitForUi()
 await capture('task-detail')
 
 // 任务详情顶部属性行：日期/提醒/重复/优先级/清单
+// 滚到详情顶部，并把日期浮层展开，让"顶部属性行"截图能展示日期/提醒/重复按钮与摘要。
 {
   const detailTop = page.locator('.task-detail').first()
   if (await detailTop.count()) {
     await detailTop.evaluate((element) => { element.scrollTop = 0 })
     await waitForUi(400)
   }
+  const dateMetaButton = page.locator('.task-detail .detail-meta-action').first()
+  if (await dateMetaButton.count()) {
+    await dateMetaButton.click()
+    await waitForUi(500)
+  }
   await capture('task-detail-meta')
+  await page.keyboard.press('Escape')
+  await waitForUi(400)
 }
 
 // 任务详情子任务区域：滚到子任务进度 + 列表
@@ -182,37 +234,58 @@ await capture('task-detail')
 
 const detailPanel = page.locator('.task-detail').first()
 if (await detailPanel.count()) {
-  // Capture the date / time / reminder / repeat popover so the new collapsible layout is visible.
+  // 关闭 task-detail-meta 留下的浮层（如有），再展开 date 浮层。
+  await page.keyboard.press('Escape')
+  await waitForUi(400)
   const dateTrigger = page.locator('.detail-meta-action').first()
   if (await dateTrigger.count()) {
     await dateTrigger.click()
-    await waitForUi()
-    // Open each extras section to expose the time presets, reminder and repeat rows.
-    const timeRow = page.locator('button.dp-extra-row:has-text("时间")').first()
-    if (await timeRow.count()) {
-      await timeRow.click()
-      await waitForUi()
+    await waitForUi(500)
+    // 只展开"提醒"组：DatePicker 同时只能展开一个 extra，最后保留提醒的丰富选项，
+    // 让截图和 task-detail-meta 区分开（后者是默认折叠的浮层全貌）。
+    for (const label of ['提醒']) {
+      const row = page.locator(`button.dp-extra-row:has-text("${label}")`).first()
+      if (await row.count()) {
+        const expanded = await row.getAttribute('aria-expanded').catch(() => null)
+        if (expanded !== 'true') {
+          await row.click()
+          await waitForUi(400)
+        }
+      }
     }
     await capture('date-reminder')
     await page.keyboard.press('Escape')
-    await waitForUi()
+    await waitForUi(400)
   }
 
-  await detailPanel.evaluate((element) => { element.scrollTop = element.scrollHeight })
-  await waitForUi()
-  // Open the "more" menu so the new blocks (table, details, code, task reference, alignment, underline) are visible.
+  // 富文本编辑器：把"更多块"按钮滚到 .task-detail 视口中部，让向下展开的菜单能完整显示。
+  // 弹层在 .task-detail 内部 absolute 定位，受 overflow:auto 裁切；先留出约 320px 视口空间。
+  await detailPanel.evaluate((element) => {
+    const wrap = element.querySelector('.rich-editor__more-wrap')
+    if (wrap) wrap.scrollIntoView({ block: 'center' })
+    else element.scrollTop = element.scrollHeight
+  })
+  await waitForUi(500)
   const moreMenu = page.locator('button[aria-label="更多块"]').first()
   if (await moreMenu.count()) {
     await moreMenu.click()
-    await waitForUi()
+    await waitForUi(600)
   }
   await capture('rich-editor')
   await page.keyboard.press('Escape')
-  await waitForUi()
+  await waitForUi(400)
 }
 
 await closeDetail()
 await clickText('计划')
+// 让"已逾期 / 今天 / 明天"三个分组都能进入画面。
+{
+  const taskList = page.locator('.task-list, .planned-list, .plan-list, main').first()
+  if (await taskList.count()) {
+    await taskList.evaluate((el) => { el.scrollTop = 240 })
+    await waitForUi(400)
+  }
+}
 await capture('planned-view')
 await clickText('重要')
 await capture('important-view')
@@ -233,7 +306,9 @@ await capture('inbox-view')
     const img = page.locator('.task-detail img[src^="data:image"]').first()
     if (await img.count()) {
       await img.click()
-      await waitForUi(700)
+      await waitForUi(900)
+      // 等灯箱完全打开并完成图片淡入。
+      await page.waitForTimeout(300)
       await capture('image-preview')
       await page.keyboard.press('Escape')
       await waitForUi(400)
@@ -249,7 +324,7 @@ await capture('inbox-view')
 // Search is captured as an active, useful state rather than an empty overlay.
 const searchInput = page.locator('input[placeholder="搜索任务、标签、备注"]').first()
 if (await searchInput.count()) {
-  await searchInput.fill('报告')
+  await searchInput.fill('项目')
   await waitForUi()
   await capture('search')
   await searchInput.fill('')
@@ -257,11 +332,13 @@ if (await searchInput.count()) {
   await clickText('今日')
 }
 
-const settingsButton = page.locator('button[title="应用设置"], button[aria-label="打开设置"]').first()
+const settingsButton = page.locator('button[title="设置"], button[aria-label="设置"]').first()
 if (await settingsButton.count()) {
   await settingsButton.click()
   await waitForUi()
   await capture('settings-appearance')
+  await clickText('专注与休息')
+  await capture('settings-focus')
   await clickText('通知与反馈')
   await capture('settings-notifications')
   await clickText('应用行为')
@@ -283,6 +360,12 @@ if (await profileButton.count()) {
     await waitForUi()
   }
   await clickText('空间管理')
+  // 触发扫描，让"应用总占用"和各分类明细都展示出来，而不是停在初始"开始查看"状态。
+  const scanButton = page.locator('button:has-text("开始扫描"), button:has-text("重新扫描"), button:has-text("开始查看本机空间")').first()
+  if (await scanButton.count()) {
+    await scanButton.click()
+    await page.waitForTimeout(1500)
+  }
   await capture('space-management')
   await clickText('数据与安全')
   await capture('profile-security')
