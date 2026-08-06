@@ -6970,10 +6970,18 @@ body.is-resizing {
 .rich-editor__block-trigger { width: 38px; grid-template-columns: 1fr auto; gap: 1px; padding: 0 4px; }
 
 .rich-editor__block-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 30;
+  // 位置由 RichTextEditor.vue 的 anchorStyle 计算并通过 inline style 设置 position: fixed
+  // Teleport 到 body 后需要重新声明 CSS 变量，否则 var() 回退为空（背景变透明）
+  --surface: #ffffff;
+  --surface-muted: #f8faf9;
+  --border: #e2e8e6;
+  --text: #17211f;
+  --text-muted: #687674;
+  --accent: #2f8f86;
+  --accent-strong: #1f6f68;
+  --accent-soft: #e5f5f2;
+  --radius-sm: 8px;
+  --shadow-popover: 0 18px 48px rgba(15, 23, 42, 0.18);
   display: grid;
   width: 132px;
   gap: 3px;
@@ -7002,9 +7010,18 @@ body.is-resizing {
 
 .rich-editor__more-menu,
 .rich-editor__link-popover {
-  position: absolute;
-  top: calc(100% + 6px);
-  z-index: 20;
+  // 位置由 RichTextEditor.vue 的 anchorStyle 计算并通过 inline style 设置 position: fixed
+  // Teleport 到 body 后需要重新声明 CSS 变量，否则 var() 回退为空（背景变透明）
+  --surface: #ffffff;
+  --surface-muted: #f8faf9;
+  --border: #e2e8e6;
+  --text: #17211f;
+  --text-muted: #687674;
+  --accent: #2f8f86;
+  --accent-strong: #1f6f68;
+  --accent-soft: #e5f5f2;
+  --radius-sm: 8px;
+  --shadow-popover: 0 18px 48px rgba(15, 23, 42, 0.18);
   display: grid;
   gap: 3px;
   padding: 5px;
@@ -7015,10 +7032,18 @@ body.is-resizing {
 }
 
 .rich-editor__task-reference {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 7px;
-  z-index: 20;
+  // 位置由 RichTextEditor.vue 的 anchorStyle 计算并通过 inline style 设置 position: fixed
+  // Teleport 到 body 后需要重新声明 CSS 变量
+  --surface: #ffffff;
+  --surface-muted: #f8faf9;
+  --border: #e2e8e6;
+  --text: #17211f;
+  --text-muted: #687674;
+  --accent: #2f8f86;
+  --accent-strong: #1f6f68;
+  --accent-soft: #e5f5f2;
+  --radius-sm: 8px;
+  --shadow-popover: 0 18px 48px rgba(15, 23, 42, 0.18);
   display: grid;
   width: min(280px, calc(100vw - 48px));
   gap: 3px;
@@ -7035,9 +7060,7 @@ body.is-resizing {
 }
 
 .rich-editor__more-menu {
-  right: 0;
   width: 156px;
-  z-index: 40;
 
   button {
     display: flex;
@@ -7056,7 +7079,6 @@ body.is-resizing {
 }
 
 .rich-editor__link-popover {
-  right: 7px;
   grid-template-columns: minmax(150px, 1fr) auto auto;
   width: min(300px, calc(100vw - 48px));
   padding: 6px;

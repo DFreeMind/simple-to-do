@@ -11,10 +11,7 @@
     <template v-else>
       <div class="rich-editor__toolbar" role="toolbar" aria-label="备注格式工具">
         <div class="rich-editor__block-wrap">
-          <button class="rich-editor__tool rich-editor__block-trigger" :class="{ active: blockMenuOpen }" type="button" :title="`文本类型：${currentBlockLabel()}`" :aria-label="`文本类型：${currentBlockLabel()}`" :aria-expanded="blockMenuOpen" @mousedown.prevent @click="blockMenuOpen = !blockMenuOpen"><Type :size="16" /><ChevronDown :size="12" /></button>
-          <div v-if="blockMenuOpen" class="rich-editor__block-menu" role="menu">
-            <button v-for="item in blockItems" :key="item.value" type="button" role="menuitemradio" :aria-checked="currentBlockType() === item.value" :class="{ active: currentBlockType() === item.value }" @mousedown.prevent @click="setBlockType(item.value)"><strong>{{ item.badge }}</strong><span>{{ item.label }}</span></button>
-          </div>
+          <button ref="blockTriggerRef" class="rich-editor__tool rich-editor__block-trigger" :class="{ active: blockMenuOpen }" type="button" :title="`文本类型：${currentBlockLabel()}`" :aria-label="`文本类型：${currentBlockLabel()}`" :aria-expanded="blockMenuOpen" @mousedown.prevent @click="blockMenuOpen = !blockMenuOpen"><Type :size="16" /><ChevronDown :size="12" /></button>
         </div>
         <span class="rich-editor__toolbar-divider"></span>
         <button class="rich-editor__tool" type="button" title="撤销 (⌘/Ctrl+Z)" aria-label="撤销" @mousedown.prevent @click="editor?.chain().focus().undo().run()"><Undo2 :size="15" /></button>
@@ -25,7 +22,7 @@
         <button class="rich-editor__tool" :class="{ active: isActive('strike') }" type="button" title="删除线" aria-label="删除线" @mousedown.prevent @click="toggleMark('strike')"><Strikethrough :size="15" /></button>
         <button class="rich-editor__tool" :class="{ active: isActive('highlight') }" type="button" title="高亮" aria-label="高亮" @mousedown.prevent @click="toggleMark('highlight')"><Highlighter :size="15" /></button>
         <button class="rich-editor__tool" :class="{ active: isActive('code') }" type="button" title="行内代码" aria-label="行内代码" @mousedown.prevent @click="toggleMark('code')"><Code2 :size="15" /></button>
-        <button class="rich-editor__tool" :class="{ active: isActive('link') }" type="button" title="添加链接" aria-label="添加链接" @mousedown.prevent @click="openLinkPopover"><Link :size="15" /></button>
+        <button ref="linkTriggerRef" class="rich-editor__tool" :class="{ active: isActive('link') }" type="button" title="添加链接" aria-label="添加链接" @mousedown.prevent @click="openLinkPopover"><Link :size="15" /></button>
         <span class="rich-editor__toolbar-divider"></span>
         <button class="rich-editor__tool" :class="{ active: isActive('bulletList') }" type="button" title="无序列表" aria-label="无序列表" @mousedown.prevent @click="toggleList('bulletList')"><List :size="15" /></button>
         <button class="rich-editor__tool" :class="{ active: isActive('orderedList') }" type="button" title="编号列表" aria-label="编号列表" @mousedown.prevent @click="toggleList('orderedList')"><ListOrdered :size="15" /></button>
@@ -34,29 +31,7 @@
         <button class="rich-editor__tool" type="button" title="插入图片" aria-label="插入图片" @mousedown.prevent @click="chooseImage"><ImagePlus :size="15" /></button>
         <button class="rich-editor__tool rich-editor__focus-trigger" type="button" :title="isFocusMode ? '退出独立编辑器' : '放大编辑器'" :aria-label="isFocusMode ? '退出独立编辑器' : '放大编辑器'" @mousedown.prevent @click="toggleFocusMode"><Minimize2 v-if="isFocusMode" :size="15" /><Maximize2 v-else :size="15" /></button>
         <div class="rich-editor__more-wrap">
-          <button class="rich-editor__tool" :class="{ active: moreMenuOpen }" type="button" title="更多块" aria-label="更多块" @mousedown.prevent @click="moreMenuOpen = !moreMenuOpen"><MoreHorizontal :size="16" /></button>
-          <div v-if="moreMenuOpen" class="rich-editor__more-menu" role="menu">
-            <button type="button" role="menuitem" @mousedown.prevent @click="insertBlockquote"><Quote :size="15" /> 引用</button>
-            <button type="button" role="menuitem" @mousedown.prevent @click="insertHorizontalRule"><Minus :size="15" /> 分割线</button>
-            <button type="button" role="menuitem" @mousedown.prevent @click="toggleMark('underline')"><Underline :size="15" /> 下划线</button>
-            <button type="button" role="menuitem" @mousedown.prevent @click="toggleCodeBlock"><Code2 :size="15" /> 代码块</button>
-            <button type="button" role="menuitem" @mousedown.prevent @click="insertTable"><Table2 :size="15" /> 表格</button>
-            <button type="button" role="menuitem" @mousedown.prevent @click="insertDetails"><ChevronRight :size="15" /> 折叠块</button>
-            <button type="button" role="menuitem" @mousedown.prevent @click="taskReferenceOpen = true; moreMenuOpen = false"><ListTodo :size="15" /> 任务引用</button>
-            <button type="button" role="menuitem" @mousedown.prevent @click="setTextAlign('center')"><AlignCenter :size="15" /> 居中对齐</button>
-            <button type="button" role="menuitem" @mousedown.prevent @click="setTextAlign('left')"><AlignLeft :size="15" /> 左对齐</button>
-          </div>
-        </div>
-
-        <form v-if="linkPopoverOpen" class="rich-editor__link-popover" @submit.prevent="applyLink">
-          <input ref="linkInput" v-model="linkUrl" type="url" placeholder="https://example.com" aria-label="链接地址" @keydown.esc.prevent="closeLinkPopover" />
-          <button type="submit">应用</button>
-          <button v-if="isActive('link')" type="button" title="移除链接" aria-label="移除链接" @click="removeLink"><Link2Off :size="14" /></button>
-        </form>
-        <div v-if="taskReferenceOpen" class="rich-editor__task-reference">
-          <input v-model.trim="taskReferenceQuery" type="search" placeholder="搜索并引用任务" aria-label="搜索任务" />
-          <button v-for="task in taskReferenceCandidates" :key="task.id" type="button" @mousedown.prevent @click="insertTaskReference(task)"><ListTodo :size="14" />{{ task.title }}</button>
-          <small v-if="!taskReferenceCandidates.length">没有匹配任务</small>
+          <button ref="moreTriggerRef" class="rich-editor__tool" :class="{ active: moreMenuOpen }" type="button" title="更多块" aria-label="更多块" @mousedown.prevent @click="moreMenuOpen = !moreMenuOpen"><MoreHorizontal :size="16" /></button>
         </div>
       </div>
       <editor-content :editor="editor" class="editor-content" @click="onEditorContentClick" />
@@ -73,6 +48,33 @@
     :visible="lightboxVisible"
     @close="lightboxVisible = false"
   />
+
+  <Teleport to="body">
+    <div v-if="blockMenuOpen" ref="blockMenuRef" class="rich-editor__block-menu" :style="blockMenuStyle" role="menu">
+      <button v-for="item in blockItems" :key="item.value" type="button" role="menuitemradio" :aria-checked="currentBlockType() === item.value" :class="{ active: currentBlockType() === item.value }" @mousedown.prevent @click="setBlockType(item.value)"><strong>{{ item.badge }}</strong><span>{{ item.label }}</span></button>
+    </div>
+    <div v-if="moreMenuOpen" ref="moreMenuRef" class="rich-editor__more-menu" :style="moreMenuStyle" role="menu">
+      <button type="button" role="menuitem" @mousedown.prevent @click="insertBlockquote"><Quote :size="15" /> 引用</button>
+      <button type="button" role="menuitem" @mousedown.prevent @click="insertHorizontalRule"><Minus :size="15" /> 分割线</button>
+      <button type="button" role="menuitem" @mousedown.prevent @click="toggleMark('underline')"><Underline :size="15" /> 下划线</button>
+      <button type="button" role="menuitem" @mousedown.prevent @click="toggleCodeBlock"><Code2 :size="15" /> 代码块</button>
+      <button type="button" role="menuitem" @mousedown.prevent @click="insertTable"><Table2 :size="15" /> 表格</button>
+      <button type="button" role="menuitem" @mousedown.prevent @click="insertDetails"><ChevronRight :size="15" /> 折叠块</button>
+      <button type="button" role="menuitem" @mousedown.prevent @click="openTaskReference"><ListTodo :size="15" /> 任务引用</button>
+      <button type="button" role="menuitem" @mousedown.prevent @click="setTextAlign('center')"><AlignCenter :size="15" /> 居中对齐</button>
+      <button type="button" role="menuitem" @mousedown.prevent @click="setTextAlign('left')"><AlignLeft :size="15" /> 左对齐</button>
+    </div>
+    <form v-if="linkPopoverOpen" ref="linkPopoverRef" class="rich-editor__link-popover" :style="linkPopoverStyle" @submit.prevent="applyLink">
+      <input ref="linkInput" v-model="linkUrl" type="url" placeholder="https://example.com" aria-label="链接地址" @keydown.esc.prevent="closeLinkPopover" />
+      <button type="submit">应用</button>
+      <button v-if="isActive('link')" type="button" title="移除链接" aria-label="移除链接" @click="removeLink"><Link2Off :size="14" /></button>
+    </form>
+    <div v-if="taskReferenceOpen" ref="taskReferenceRef" class="rich-editor__task-reference" :style="taskReferenceStyle">
+      <input ref="taskReferenceInput" v-model.trim="taskReferenceQuery" type="search" placeholder="搜索并引用任务" aria-label="搜索任务" @keydown.esc.prevent="taskReferenceOpen = false" />
+      <button v-for="task in taskReferenceCandidates" :key="task.id" type="button" @mousedown.prevent @click="insertTaskReference(task)"><ListTodo :size="14" />{{ task.title }}</button>
+      <small v-if="!taskReferenceCandidates.length">没有匹配任务</small>
+    </div>
+  </Teleport>
 </template>
 
 <script setup>
@@ -130,6 +132,15 @@ const editorVersion = ref(0)
 const lightboxVisible = ref(false)
 const lightboxImages = ref([])
 const lightboxIndex = ref(0)
+const blockTriggerRef = ref(null)
+const moreTriggerRef = ref(null)
+const linkTriggerRef = ref(null)
+const blockMenuRef = ref(null)
+const moreMenuRef = ref(null)
+const linkPopoverRef = ref(null)
+const taskReferenceRef = ref(null)
+const taskReferenceInput = ref(null)
+const popoverPositionTick = ref(0)
 const blockItems = [
   { value: 'paragraph', label: '正文', badge: 'T' },
   { value: 'heading-1', label: '标题 1', badge: 'H1' },
@@ -148,6 +159,61 @@ const editorStats = computed(() => {
   const words = text ? text.split(/\s+/).length : 0
   return { characters, words, readingMinutes: Math.max(1, Math.ceil(words / 300)) }
 })
+
+const MENU_GAP = 6
+const VIEWPORT_PADDING = 8
+
+function anchorStyle(triggerEl, menuEl, { rightAlign = false, width = 156, height = null } = {}) {
+  if (!triggerEl) return { visibility: 'hidden' }
+  popoverPositionTick.value // 触发响应式更新
+  const rect = triggerEl.getBoundingClientRect()
+  const menuHeight = menuEl?.offsetHeight || height || 200
+  const measuredWidth = menuEl?.offsetWidth || width
+  const spaceBelow = window.innerHeight - rect.bottom - MENU_GAP
+  const flipUp = spaceBelow < menuHeight && rect.top - MENU_GAP >= menuHeight
+  const y = flipUp ? rect.top - menuHeight - MENU_GAP : rect.bottom + MENU_GAP
+  const x = rightAlign
+    ? Math.max(VIEWPORT_PADDING, Math.min(rect.right - measuredWidth, window.innerWidth - measuredWidth - VIEWPORT_PADDING))
+    : Math.max(VIEWPORT_PADDING, Math.min(rect.left, window.innerWidth - measuredWidth - VIEWPORT_PADDING))
+  return {
+    position: 'fixed',
+    top: `${Math.max(VIEWPORT_PADDING, y)}px`,
+    left: `${x}px`,
+    zIndex: 2400,
+    visibility: 'visible'
+  }
+}
+
+const blockMenuStyle = computed(() => {
+  if (!blockMenuOpen.value) return null
+  popoverPositionTick.value
+  return anchorStyle(blockTriggerRef.value, blockMenuRef.value, { rightAlign: false, width: 132 })
+})
+const moreMenuStyle = computed(() => {
+  if (!moreMenuOpen.value) return null
+  popoverPositionTick.value
+  return anchorStyle(moreTriggerRef.value, moreMenuRef.value, { rightAlign: true, width: 156 })
+})
+const linkPopoverStyle = computed(() => {
+  if (!linkPopoverOpen.value) return null
+  popoverPositionTick.value
+  return anchorStyle(linkTriggerRef.value, linkPopoverRef.value, { rightAlign: true, width: 300 })
+})
+const taskReferenceStyle = computed(() => {
+  if (!taskReferenceOpen.value) return null
+  popoverPositionTick.value
+  return anchorStyle(moreTriggerRef.value, taskReferenceRef.value, { rightAlign: true, width: 280 })
+})
+
+function refreshPopoverPositions() {
+  popoverPositionTick.value += 1
+}
+
+function openTaskReference() {
+  moreMenuOpen.value = false
+  taskReferenceOpen.value = true
+  nextTick(() => taskReferenceInput.value?.focus())
+}
 
 function touchEditor() {
   editorVersion.value += 1
@@ -359,7 +425,10 @@ function openLinkPopover() {
   linkSelection.value = editor.value.state.selection
   linkUrl.value = editor.value.getAttributes('link').href || ''
   linkPopoverOpen.value = true
-  nextTick(() => linkInput.value?.focus())
+  nextTick(() => {
+    refreshPopoverPositions()
+    linkInput.value?.focus()
+  })
 }
 
 function closeLinkPopover() {
@@ -370,10 +439,11 @@ function closeLinkPopover() {
 function closeTransientMenus(event) {
   const target = event.target
   if (!(target instanceof Element)) return
-  if (!target.closest('.rich-editor__block-wrap')) blockMenuOpen.value = false
-  if (!target.closest('.rich-editor__more-wrap')) moreMenuOpen.value = false
-  if (!target.closest('.rich-editor__link-popover')) linkPopoverOpen.value = false
-  if (!target.closest('.rich-editor__task-reference')) taskReferenceOpen.value = false
+  const insideTrigger = (el) => el && (el.contains(target) || target === el)
+  if (!insideTrigger(blockTriggerRef.value) && !blockMenuRef.value?.contains(target)) blockMenuOpen.value = false
+  if (!insideTrigger(moreTriggerRef.value) && !moreMenuRef.value?.contains(target) && !taskReferenceRef.value?.contains(target)) moreMenuOpen.value = false
+  if (!insideTrigger(linkTriggerRef.value) && !linkPopoverRef.value?.contains(target)) linkPopoverOpen.value = false
+  if (!insideTrigger(moreTriggerRef.value) && !taskReferenceRef.value?.contains(target)) taskReferenceOpen.value = false
 }
 
 function normalizeUrl(value) {
@@ -556,6 +626,8 @@ const editor = useEditor({
 
 onMounted(async () => {
   document.addEventListener('pointerdown', closeTransientMenus, true)
+  window.addEventListener('resize', refreshPopoverPositions)
+  window.addEventListener('scroll', refreshPopoverPositions, true)
   const resolved = await resolveEditorHtml(props.modelValue)
   if (editor.value && resolved !== props.modelValue) editor.value.commands.setContent(resolved, false)
   await repairEmbeddedImages()
@@ -571,6 +643,8 @@ watch(() => props.modelValue, async (value) => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', closeTransientMenus, true)
+  window.removeEventListener('resize', refreshPopoverPositions)
+  window.removeEventListener('scroll', refreshPopoverPositions, true)
   editor.value?.destroy()
 })
 
