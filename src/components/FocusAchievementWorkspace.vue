@@ -836,10 +836,9 @@ onBeforeUnmount(cancelGrowthReplay)
 @media (max-width: 620px) { .field-hero { grid-template-columns: 1fr; gap: 13px; padding: 18px; }.field-hero__copy h2 { font-size: 21px; }.field-hero__plant { order: -1; }.field-hero__facts { margin-top: 12px; }.field-hero__progress { grid-column: auto; }.achievement-month__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }.badges-category-index { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 760px) { .badges-featured { grid-template-columns: 1fr; gap: 14px; padding: 16px; }.badges-featured__progress { width: auto; } }
 
-/* 修复：WebView2 上鼠标点击 button 后会显示系统默认深色 outline
-   （Chromium 桌面版不会），全局 :focus-visible 规则只在键盘 tab 时触发，
-   鼠标点击触发的 :focus 会让花朵周围出现一圈深色框。统一抑制非 :focus-visible
-   的 outline；键盘 focus 仍由全局规则接管以保证 a11y。 */
+/* 修复：WebView2 上鼠标点完花朵后系统会强制显示深色 outline（Chromium 桌面版默认
+   走 :focus-visible 会被覆盖；WebView2 在部分场景把任何 :focus 都按可视焦点处理）。
+   直接把 outline 默认置为 none，只在键盘 :focus-visible 时回显以兼顾 a11y。 */
 .achievement-tabs button,
 .achievement-year__landscape button,
 .achievement-month__nav button,
@@ -850,7 +849,9 @@ onBeforeUnmount(cancelGrowthReplay)
 .species-replay__actions button,
 .species-replay__steps button,
 .species-collection__garden > button,
-.focus-plant {
-  &:focus:not(:focus-visible) { outline: none; }
+.focus-plant,
+.field-hero__plant > div {
+  outline: none;
+  &:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 }
 </style>
