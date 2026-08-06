@@ -64,8 +64,19 @@ function looksCorrupted(value) {
 }
 
 function download(url) {
-  // -L 跟随 GitHub 资产下载的 302 重定向（跳转到 objects.githubusercontent.com），否则拿到空 body
-  return execFileSync('curl', ['-sS', '-L', '--connect-timeout', '20', '--max-time', '300', url], { encoding: 'buffer' })
+  // -L 跟随 GitHub 资产下载的 302 重定向（跳转到 objects.githubusercontent.com），否则拿到空 body。
+  // 刚用 gh release upload --clobber 覆盖的 asset 其 blob 复制有延迟，可能短暂 404/空 body，重试几次。
+  for (let attempt = 1; attempt <= 6; attempt++) {
+    try {
+      const buf = execFileSync('curl', ['-sS', '-L', '--fail', '--connect-timeout', '20', '--max-time', '300', url], { encoding: 'buffer' })
+      if (buf.length > 0) return buf
+      console.log(`下载为空（第 ${attempt} 次），等待重试...`)
+    } catch {
+      console.log(`下载失败（第 ${attempt} 次），等待重试...`)
+    }
+    if (attempt < 6) execFileSync('node', ['-e', 'setTimeout(()=>{}, 10000)'])
+  }
+  throw new Error(`多次重试后仍无法下载: ${url}`)
 }
 
 async function run() {
