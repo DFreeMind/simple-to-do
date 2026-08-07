@@ -539,12 +539,12 @@
                 <ArrowRight :size="19" />
                 <div><span>结束</span><strong>{{ formatClock(detail.item.finishedAt) }}</strong><small>{{ formatShortDate(detail.item.finishedAt) }}</small></div>
               </div>
+              <div class="review-detail-hero__stats">
+                <div><span>暂停次数</span><strong>{{ focusPauseCount(detail.item) }} 次</strong></div>
+                <div><span>暂停总时长</span><strong>{{ formatDuration(focusPausedSeconds(detail.item)) }}</strong></div>
+                <div><span>实际时间跨度</span><strong>{{ formatDuration(focusWallSeconds(detail.item)) }}</strong></div>
+              </div>
             </section>
-            <div class="review-detail-summary">
-              <div><span>暂停次数</span><strong>{{ focusPauseCount(detail.item) }} 次</strong></div>
-              <div><span>暂停总时长</span><strong>{{ formatDuration(focusPausedSeconds(detail.item)) }}</strong></div>
-              <div><span>实际时间跨度</span><strong>{{ formatDuration(focusWallSeconds(detail.item)) }}</strong></div>
-            </div>
             <section class="review-detail-section">
               <header><Activity :size="16" /><h3>记录信息</h3></header>
               <dl class="review-detail-fields">
@@ -618,12 +618,12 @@
                 <ArrowRight :size="19" />
                 <div><span>处理</span><strong>{{ formatClock(detail.item.resolvedAt) }}</strong><small>{{ formatShortDate(detail.item.resolvedAt) }}</small></div>
               </div>
+              <div class="review-detail-hero__stats">
+                <div><span>响应耗时</span><strong>{{ formatResponseTime(detail.item.responseSeconds) }}</strong></div>
+                <div><span>触发方式</span><strong>{{ triggerTypeLabel(detail.item.triggerType) }}</strong></div>
+                <div><span>延后时长</span><strong>{{ detail.item.snoozeMinutes ? `${detail.item.snoozeMinutes} 分钟` : '未延后' }}</strong></div>
+              </div>
             </section>
-            <div class="review-detail-summary">
-              <div><span>响应耗时</span><strong>{{ formatResponseTime(detail.item.responseSeconds) }}</strong></div>
-              <div><span>触发方式</span><strong>{{ triggerTypeLabel(detail.item.triggerType) }}</strong></div>
-              <div><span>延后时长</span><strong>{{ detail.item.snoozeMinutes ? `${detail.item.snoozeMinutes} 分钟` : '未延后' }}</strong></div>
-            </div>
             <section class="review-detail-section">
               <header>
                 <BellRing :size="16" />
@@ -2239,34 +2239,38 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
   background: var(--text-muted, #687674);
   background-clip: padding-box;
 }
-.review-detail > header { position: sticky; z-index: 2; top: 0; display: flex; min-height: 84px; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 20px; border-bottom: 1px solid var(--divider-soft); background: var(--surface); }
-.review-detail-heading { display: flex; min-width: 0; align-items: center; gap: 12px; }
-.review-detail-heading__icon { display: grid; width: 44px; height: 44px; flex: 0 0 auto; place-items: center; border-radius: 13px; }
+.review-detail > header { position: sticky; z-index: 2; top: 0; display: flex; min-height: 64px; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 20px; border-bottom: 1px solid var(--divider-soft); background: var(--surface); }
+.review-detail-heading { display: flex; min-width: 0; align-items: center; gap: 11px; }
+.review-detail-heading__icon { display: grid; width: 38px; height: 38px; flex: 0 0 auto; place-items: center; border-radius: 11px; }
 .review-detail-heading__icon.is-focus { background: var(--accent-soft); color: var(--accent-strong); }
 .review-detail-heading__icon.is-rhythm { background: #eaf2f8; color: #4f7fa6; }
 .review-detail-heading > div { display: grid; min-width: 0; gap: 2px; }
 .review-detail-heading > div > span { color: var(--accent-strong); font-size: 10px; font-weight: 730; }
-.review-detail > header h2 { margin: 0; color: var(--text); font-size: 19px; letter-spacing: -.025em; }
+.review-detail > header h2 { margin: 0; color: var(--text); font-size: 16px; letter-spacing: -.02em; }
 .review-detail-heading p { margin: 0; color: var(--text-muted); font-size: 10px; font-variant-numeric: tabular-nums; }
-.review-detail > header button { display: grid; width: 44px; height: 44px; flex: 0 0 auto; place-items: center; border-radius: 11px; color: var(--text-muted); }
+.review-detail > header button { display: grid; width: 38px; height: 38px; flex: 0 0 auto; place-items: center; border-radius: 10px; color: var(--text-muted); }
 .review-detail > header button:hover { background: var(--surface-muted); color: var(--text); }
-.review-detail-hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 18px; margin: 14px 20px 8px; padding: 16px 18px; border: 1px solid var(--divider-soft); border-radius: 16px; }
+.review-detail-hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px 18px; margin: 10px 20px 8px; padding: 12px 16px; border: 1px solid var(--divider-soft); border-radius: 16px; }
 .review-detail-hero.is-focus { background: linear-gradient(145deg, var(--accent-tint), var(--surface)); }
 .review-detail-hero.is-rhythm { background: linear-gradient(145deg, #f2f7fb, var(--surface)); }
-.review-detail-hero__value { display: grid; min-width: 0; gap: 3px; }
+.review-detail-hero__value { display: grid; min-width: 0; gap: 2px; }
 .review-detail-hero__value > span { color: var(--text-muted); font-size: 10px; }
-.review-detail-hero__value > strong { overflow: hidden; color: var(--text); font-size: 28px; letter-spacing: -.045em; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.review-detail-hero__value > strong { overflow: hidden; color: var(--text); font-size: 22px; letter-spacing: -.04em; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
 .review-detail-hero__value > small { color: var(--accent-strong); font-size: 11px; font-weight: 680; }
 .review-detail-hero__window { display: flex; align-items: center; gap: 10px; color: var(--text-muted); }
 .review-detail-hero__window > div { display: grid; min-width: 62px; gap: 2px; }
 .review-detail-hero__window > div:last-child { justify-items: end; }
 .review-detail-hero__window span, .review-detail-hero__window small { color: var(--text-muted); font-size: 9px; }
-.review-detail-hero__window strong { color: var(--text); font-size: 15px; font-variant-numeric: tabular-nums; }
-.review-detail-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 0 20px 14px; }
-.review-detail-summary > div { display: grid; gap: 5px; padding: 11px 12px; border: 1px solid var(--divider-soft); border-radius: 12px; background-color: var(--surface-muted, #f8faf9); }
-.review-detail-summary span { color: var(--text-muted); font-size: 10px; }
-.review-detail-summary strong { color: var(--text); font-size: 12px; line-height: 1.45; font-variant-numeric: tabular-nums; }
-.review-detail-section { padding: 14px 20px 16px; border-top: 1px solid var(--divider-soft); }
+.review-detail-hero__window strong { color: var(--text); font-size: 13px; font-variant-numeric: tabular-nums; }
+/* 统计行并入 hero 卡内底部，取代独立三格卡 */
+.review-detail-hero__stats { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; padding-top: 9px; border-top: 1px solid color-mix(in srgb, var(--accent) 15%, var(--divider-soft)); }
+.review-detail-hero__stats > div { display: grid; gap: 2px; padding: 0 12px; }
+.review-detail-hero__stats > div:first-child { padding-left: 0; }
+.review-detail-hero__stats > div:last-child { padding-right: 0; }
+.review-detail-hero__stats > div + div { border-left: 1px solid var(--divider-soft); }
+.review-detail-hero__stats span { color: var(--text-muted); font-size: 9.5px; }
+.review-detail-hero__stats strong { color: var(--text); font-size: 12px; font-variant-numeric: tabular-nums; }
+.review-detail-section { padding: 18px 20px 16px; border-top: 1px solid var(--border); }
 .review-detail-section > header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; color: var(--accent-strong); }
 .review-detail-section > header svg { color: var(--accent-strong); }
 .review-detail-section h3 { margin: 0; color: var(--text); font-size: 14px; font-weight: 730; letter-spacing: -.01em; }
@@ -2332,7 +2336,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 @media (max-width: 900px) {
   .review-filters label { flex-basis: 100%; }
 }
-@media (max-width: 680px) { .review-workspace { padding: 14px; }.review-header { display: grid; gap: 14px; }.review-range, .review-tabs { overflow-x: auto; }.review-tabs button { white-space: nowrap; }.review-metrics { grid-template-columns: 1fr 1fr; }.review-metric { min-height: 88px; padding: 12px; }.review-recent__header { display: grid !important; }.review-recent-switch { width: 100%; }.review-recent-switch button { flex: 1; }.review-recent__footer { display: grid; }.review-recent__footer > div { display: grid; grid-template-columns: 1fr 1fr; }.review-filters label { flex-basis: 100%; }.review-filter-summary { gap: 4px 10px; }.review-pagination { flex-wrap: wrap; justify-content: space-between; }.review-detail-hero { grid-template-columns: 1fr; }.review-detail-hero__window { justify-content: space-between; }.review-detail-summary { grid-template-columns: 1fr; } }
+@media (max-width: 680px) { .review-workspace { padding: 14px; }.review-header { display: grid; gap: 14px; }.review-range, .review-tabs { overflow-x: auto; }.review-tabs button { white-space: nowrap; }.review-metrics { grid-template-columns: 1fr 1fr; }.review-metric { min-height: 88px; padding: 12px; }.review-recent__header { display: grid !important; }.review-recent-switch { width: 100%; }.review-recent-switch button { flex: 1; }.review-recent__footer { display: grid; }.review-recent__footer > div { display: grid; grid-template-columns: 1fr 1fr; }.review-filters label { flex-basis: 100%; }.review-filter-summary { gap: 4px 10px; }.review-pagination { flex-wrap: wrap; justify-content: space-between; }.review-detail-hero { grid-template-columns: 1fr; }.review-detail-hero__window { justify-content: space-between; }.review-detail-hero__stats { grid-template-columns: 1fr; }.review-detail-hero__stats > div + div { border-left: 0; border-top: 1px solid var(--divider-soft); } }
 /* 新增：本期亮点洞察 */
 .review-insights { display: grid; gap: clamp(8px, 1.2vw, 12px); margin-bottom: clamp(10px, 1.4vw, 16px); padding: clamp(12px, 1.6vw, 16px); border: 1px solid var(--accent-34-fallback); border-radius: 16px; background: linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 70%, var(--surface)) 0%, var(--surface) 100%); }
 .review-insights > header { display: flex; align-items: center; gap: 7px; color: var(--accent-strong); }
