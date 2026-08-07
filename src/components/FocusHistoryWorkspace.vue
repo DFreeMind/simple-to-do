@@ -2239,7 +2239,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
   background: var(--text-muted, #687674);
   background-clip: padding-box;
 }
-.review-detail > header { position: sticky; z-index: 2; top: 0; display: flex; min-height: 92px; align-items: center; justify-content: space-between; gap: 16px; padding: 17px 20px; border-bottom: 1px solid var(--divider-soft); background: var(--surface); }
+.review-detail > header { position: sticky; z-index: 2; top: 0; display: flex; min-height: 84px; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 20px; border-bottom: 1px solid var(--divider-soft); background: var(--surface); }
 .review-detail-heading { display: flex; min-width: 0; align-items: center; gap: 12px; }
 .review-detail-heading__icon { display: grid; width: 44px; height: 44px; flex: 0 0 auto; place-items: center; border-radius: 13px; }
 .review-detail-heading__icon.is-focus { background: var(--accent-soft); color: var(--accent-strong); }
@@ -2250,7 +2250,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-detail-heading p { margin: 0; color: var(--text-muted); font-size: 10px; font-variant-numeric: tabular-nums; }
 .review-detail > header button { display: grid; width: 44px; height: 44px; flex: 0 0 auto; place-items: center; border-radius: 11px; color: var(--text-muted); }
 .review-detail > header button:hover { background: var(--surface-muted); color: var(--text); }
-.review-detail-hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 18px; margin: 18px 20px 10px; padding: 18px; border: 1px solid var(--divider-soft); border-radius: 16px; }
+.review-detail-hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 18px; margin: 14px 20px 8px; padding: 16px 18px; border: 1px solid var(--divider-soft); border-radius: 16px; }
 .review-detail-hero.is-focus { background: linear-gradient(145deg, var(--accent-tint), var(--surface)); }
 .review-detail-hero.is-rhythm { background: linear-gradient(145deg, #f2f7fb, var(--surface)); }
 .review-detail-hero__value { display: grid; min-width: 0; gap: 3px; }
@@ -2262,18 +2262,19 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-detail-hero__window > div:last-child { justify-items: end; }
 .review-detail-hero__window span, .review-detail-hero__window small { color: var(--text-muted); font-size: 9px; }
 .review-detail-hero__window strong { color: var(--text); font-size: 15px; font-variant-numeric: tabular-nums; }
-.review-detail-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 0 20px 18px; }
-.review-detail-summary > div { display: grid; gap: 5px; padding: 12px; border: 1px solid var(--divider-soft); border-radius: 12px; background-color: var(--surface-muted, #f8faf9); }
+.review-detail-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 0 20px 14px; }
+.review-detail-summary > div { display: grid; gap: 5px; padding: 11px 12px; border: 1px solid var(--divider-soft); border-radius: 12px; background-color: var(--surface-muted, #f8faf9); }
 .review-detail-summary span { color: var(--text-muted); font-size: 10px; }
 .review-detail-summary strong { color: var(--text); font-size: 12px; line-height: 1.45; font-variant-numeric: tabular-nums; }
-.review-detail-section { padding: 4px 20px 20px; }
-.review-detail-section > header { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; color: var(--accent-strong); }
+.review-detail-section { padding: 2px 20px 16px; }
+.review-detail-section > header { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; color: var(--accent-strong); }
 .review-detail-section h3 { margin: 0; color: var(--text); font-size: 13px; }
 .review-detail-section__count { margin-left: auto; padding: 3px 7px; border-radius: 999px; background: var(--surface-muted); color: var(--text-muted); font-size: 9px; font-weight: 680; }
 .review-timeline { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
-.review-timeline li { position: relative; display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 10px; min-height: 64px; padding-bottom: 12px; }
-.review-timeline li:not(:last-child)::before { position: absolute; top: 13px; bottom: -2px; left: 5px; width: 1px; background: var(--divider-soft); content: ''; }
-.review-timeline li > i { position: relative; z-index: 1; width: 11px; height: 11px; margin-top: 4px; border: 2px solid var(--surface); border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.review-timeline li { position: relative; display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 10px; min-height: 44px; padding-bottom: 8px; }
+.review-timeline li:last-child { padding-bottom: 0; }
+.review-timeline li:not(:last-child)::before { position: absolute; top: 12px; bottom: -2px; left: 5px; width: 1px; background: var(--divider-soft); content: ''; }
+.review-timeline li > i { position: relative; z-index: 1; width: 11px; height: 11px; margin-top: 3px; border: 2px solid var(--surface); border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .review-timeline li > i.is-paused { background: #d69c42; box-shadow: 0 0 0 1px #d69c42; }
 .review-timeline li > i.is-snoozed { background: #d69c42; box-shadow: 0 0 0 1px #d69c42; }
 .review-timeline li > i.is-skipped { background: #89918f; box-shadow: 0 0 0 1px #89918f; }
@@ -2281,9 +2282,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-timeline li > i.is-natural-break { background: #6a9bc3; box-shadow: 0 0 0 1px #6a9bc3; }
 .review-timeline li > i.is-duration-adjusted, .review-timeline li > i.is-task-changed { background: #6b91b4; box-shadow: 0 0 0 1px #6b91b4; }
 .review-timeline li > i.is-finished { background: #677b75; box-shadow: 0 0 0 1px #677b75; }
-.review-timeline li > div { display: grid; gap: 2px; }
-.review-timeline strong { color: var(--text); font-size: 12px; }
-.review-timeline span, .review-timeline small { color: var(--text-muted); font-size: 10px; line-height: 1.45; }
+.review-timeline li > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 2px 12px; }
+.review-timeline strong { color: var(--text); font-size: 12px; font-weight: 680; }
+.review-timeline span { color: var(--text-muted); font-size: 10px; font-variant-numeric: tabular-nums; justify-self: end; white-space: nowrap; }
+.review-timeline small { grid-column: 1 / -1; color: var(--text-muted); font-size: 10px; line-height: 1.45; }
 .review-detail-legacy { display: flex; align-items: flex-start; gap: 12px; padding: 13px; border: 1px solid #e7d9bd; border-radius: 12px; background: #fff9ee; color: #8a6a31; }
 .review-detail-legacy > svg { flex: 0 0 auto; margin-top: 2px; }
 .review-detail-legacy > div { display: grid; gap: 10px; min-width: 0; }
@@ -2309,9 +2311,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-detail-note-save:hover:not(:disabled) { background: var(--accent-strong); }
 .review-detail-note-save:disabled { opacity: .5; cursor: not-allowed; }
 .review-detail-fields { display: grid; margin: 0; }
+/* 新记录：两列竖排，减少纵向占用（4 项 2 行） */
+.review-detail-fields:not(.review-detail-fields--legacy) { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 22px; }
 .review-detail-fields > div { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--divider-soft); }
+.review-detail-fields:not(.review-detail-fields--legacy) > div { grid-template-columns: 1fr; gap: 3px; padding: 9px 0; }
 .review-detail-fields dt { color: var(--text-muted); font-size: 11px; }
 .review-detail-fields dd { margin: 0; color: var(--text); font-size: 11px; text-align: right; }
+.review-detail-fields:not(.review-detail-fields--legacy) dd { text-align: left; font-size: 12px; }
 .review-detail-task-link { display: inline-flex; align-items: center; gap: 4px; color: var(--accent-strong); font: inherit; font-size: 11px; font-weight: 650; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--accent) 35%, transparent); text-underline-offset: 2px; transition: text-decoration-color var(--transition-fast); }
 .review-detail-task-link:hover { text-decoration-color: var(--accent-strong); }
 .review-detail-task-link svg { flex-shrink: 0; }
