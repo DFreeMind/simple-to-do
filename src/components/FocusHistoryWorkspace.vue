@@ -85,11 +85,19 @@
               <span class="review-metric__label"><Activity :size="13" />暂停</span>
               <strong>{{ totalPauseCount }} 次</strong>
               <small>累计 {{ formatDuration(totalPausedSeconds) }}</small>
+              <span v-if="previousRangeStart && pauseCountDelta" :class="['review-metric__delta', pauseCountDelta < 0 ? 'is-up' : 'is-down']" :title="`与上一周期对比（${previousRangeStart.days} 天）`">
+                {{ pauseCountDelta > 0 ? '↑' : '↓' }}{{ Math.abs(pauseCountDelta) }} 次
+                <small v-if="pauseSecondsDelta">({{ pauseSecondsDelta > 0 ? '多' : '少' }} {{ Math.abs(pauseSecondsDelta) }}%)</small>
+              </span>
             </article>
             <article class="review-metric review-metric--rhythm">
               <span class="review-metric__label"><BellRing :size="13" />节律响应</span>
               <strong>{{ rhythmEntries.length }} 次</strong>
               <small>{{ rhythmCompletionRate }}% 完成或自然离席</small>
+              <span v-if="previousRangeStart && rhythmCountDelta" :class="['review-metric__delta', rhythmCountDelta > 0 ? 'is-up' : 'is-down']" :title="`与上一周期对比`">
+                {{ rhythmCountDelta > 0 ? '↑' : '↓' }}{{ Math.abs(rhythmCountDelta) }} 次
+                <small v-if="rhythmRateDelta">· 完成率 {{ rhythmRateDelta > 0 ? '+' : '' }}{{ rhythmRateDelta }}pp</small>
+              </span>
             </article>
           </div>
         </section>
@@ -103,7 +111,11 @@
                 <small v-if="trendAverage" :title="`只统计有投入的天数（共 ${trendDays.filter(d => d.seconds > 0).length} 天）`">日均 {{ formatCompactDuration(trendAverage) }}</small>
               </div>
             </header>
-            <p v-if="trendTruncated" class="review-chart-note">记录超过 {{ TREND_HARD_CAP }} 天，仅显示最近 {{ trendDaysCount }} 天。试试缩短时间范围看完整曲线。</p>
+            <p v-if="trendTruncated" class="review-chart-note">
+              记录超过 {{ TREND_HARD_CAP }} 天，仅显示最近 {{ trendDaysCount }} 天。
+              <button type="button" class="review-chart-note__btn" @click="range = '90d'">查看近 90 天</button>
+              <button type="button" class="review-chart-note__btn" @click="range = 'custom'">自定义</button>
+            </p>
             <div class="review-chart" :style="{ gridTemplateColumns: `repeat(${trendDays.length}, minmax(0, 1fr))` }">
               <div v-for="day in trendDays" :key="day.key" :class="{ 'is-today': day.isToday, 'is-empty': !day.seconds }" :title="`${day.label}：${formatDuration(day.seconds)}${day.isToday ? '（今日）' : ''}`">
                 <span>{{ day.seconds ? formatCompactDuration(day.seconds) : '' }}</span>
@@ -911,6 +923,14 @@ const previousFocusEntries = computed(() => {
     return t >= start.getTime() && t <= end.getTime()
   })
 })
+const previousRhythmEntries = computed(() => {
+  if (!previousRangeStart.value) return []
+  const { start, end } = previousRangeStart.value
+  return store.rhythmHistory.filter(item => {
+    const t = new Date(item.resolvedAt).getTime()
+    return t >= start.getTime() && t <= end.getTime()
+  })
+})
 const previousFocusSeconds = computed(() => previousFocusEntries.value.reduce((t, i) => t + i.elapsedSeconds, 0))
 const focusSecondsDelta = computed(() => {
   if (!previousRangeStart.value) return 0
@@ -928,6 +948,32 @@ const completionRateDelta = computed(() => {
     ? Math.round(previousFocusEntries.value.filter(i => i.result === 'completed').length / previousFocusEntries.value.length * 100)
     : 0
   return focusCompletionRate.value - prevRate
+})
+// 暂停：次数差与累计暂停时长差
+const previousPauseCount = computed(() => previousFocusEntries.value.reduce((total, item) => total + focusPauseCount(item), 0))
+const previousPausedSeconds = computed(() => previousFocusEntries.value.reduce((total, item) => total + focusPausedSeconds(item), 0))
+const pauseCountDelta = computed(() => {
+  if (!previousRangeStart.value) return 0
+  return totalPauseCount.value - previousPauseCount.value
+})
+const pauseSecondsDelta = computed(() => {
+  if (!previousRangeStart.value) return 0
+  if (previousPausedSeconds.value === 0) return totalPausedSeconds.value > 0 ? 100 : 0
+  return Math.round((totalPausedSeconds.value - previousPausedSeconds.value) / previousPausedSeconds.value * 100)
+})
+// 节律：响应数差与完成率差
+const previousRhythmCompletionRate = computed(() => {
+  if (!previousRhythmEntries.value.length) return 0
+  const done = previousRhythmEntries.value.filter(item => ['completed', 'natural-break'].includes(item.action)).length
+  return Math.round(done / previousRhythmEntries.value.length * 100)
+})
+const rhythmCountDelta = computed(() => {
+  if (!previousRangeStart.value) return 0
+  return rhythmEntries.value.length - previousRhythmEntries.value.length
+})
+const rhythmRateDelta = computed(() => {
+  if (!previousRangeStart.value) return 0
+  return rhythmCompletionRate.value - previousRhythmCompletionRate.value
 })
 
 // 详情面板的"上下条"导航
@@ -1796,6 +1842,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-chart-meta strong { color: var(--text); font-size: 16px; font-variant-numeric: tabular-nums; }
 .review-chart-meta small { color: var(--text-muted); font-size: 10px; }
 .review-chart-note { margin: 0 0 10px; padding: 6px 10px; border-radius: 8px; background: color-mix(in srgb, var(--accent-soft) 50%, transparent); color: var(--accent-strong); font-size: 11px; }
+.review-chart-note__btn { display: inline-flex; align-items: center; min-height: 24px; margin: 0 2px; padding: 0 8px; border: 0; border-radius: 6px; background: var(--surface); color: var(--accent-strong); font: inherit; font-size: 10.5px; font-weight: 650; cursor: pointer; }
+.review-chart-note__btn:hover { background: var(--accent-soft); }
 .review-chart > div.is-today > i > b { background: linear-gradient(180deg, var(--accent), var(--accent-strong)); box-shadow: 0 0 0 2px var(--accent-soft); }
 .review-chart > div.is-today small { color: var(--accent-strong); font-weight: 700; }
 .review-chart > div.is-empty > i { background: transparent; }
