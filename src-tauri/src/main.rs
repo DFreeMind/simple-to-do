@@ -3381,6 +3381,21 @@ fn select_image() -> Option<String> {
         .map(|path| path.to_string_lossy().to_string())
 }
 
+// 导出文件：弹原生"另存为"对话框，把内容写入用户选择的位置。
+// 支持 csv / markdown / text 三种类型，返回写入后的绝对路径。
+#[tauri::command]
+fn save_text_file(default_name: String, content: String, file_kind: String) -> Result<String, String> {
+    let mut dialog = rfd::FileDialog::new().set_file_name(&default_name);
+    dialog = match file_kind.as_str() {
+        "csv" => dialog.add_filter("CSV", &["csv"]),
+        "markdown" => dialog.add_filter("Markdown", &["md", "markdown"]),
+        _ => dialog.add_filter("文本", &["txt"]),
+    };
+    let path = dialog.save_file().ok_or_else(|| "已取消保存".to_string())?;
+    fs::write(&path, content).map_err(|err| format!("写入文件失败: {err}"))?;
+    Ok(path.to_string_lossy().to_string())
+}
+
 #[tauri::command]
 fn read_image(file_path: String) -> Result<Option<String>, String> {
     let path = PathBuf::from(file_path);
@@ -4493,6 +4508,7 @@ fn main() {
             restore_data_backup,
             select_image,
             read_image,
+            save_text_file,
             import_image,
             import_profile_avatar,
             cleanup_profile_avatars,
