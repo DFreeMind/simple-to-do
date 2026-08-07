@@ -470,10 +470,16 @@
               </dl>
             </section>
             <section class="review-detail-section">
-              <header><Activity :size="16" /><h3>响应过程</h3></header>
+              <header><Activity :size="16" /><h3>响应过程</h3><span class="review-detail-section__count">{{ rhythmTimeline(detail.item).length }} 个节点</span></header>
               <ol class="review-timeline">
-                <li><i class="is-started"></i><div><strong>提醒到期</strong><span>{{ formatFullDateTime(detail.item.triggeredAt) }}</span></div></li>
-                <li><i class="is-finished"></i><div><strong>{{ rhythmActionLabel(detail.item.action) }}</strong><span>{{ formatFullDateTime(detail.item.resolvedAt) }}</span><small>{{ formatResponseTime(detail.item.responseSeconds) }}后处理</small></div></li>
+                <li v-for="(event, index) in rhythmTimeline(detail.item)" :key="`${event.type}-${event.at}-${index}`">
+                  <i :class="`is-${event.type}`"></i>
+                  <div>
+                    <strong>{{ rhythmEventLabel(event) }}</strong>
+                    <span>{{ formatFullDateTime(event.at) }}</span>
+                    <small v-if="rhythmEventDescription(event)">{{ rhythmEventDescription(event) }}</small>
+                  </div>
+                </li>
               </ol>
             </section>
           </template>
@@ -1070,6 +1076,22 @@ function phaseLabel(phase) { return phase === 'long-break' ? '长休息' : phase
 function resultLabel(result) { return result === 'completed' ? '已完成' : result === 'abandoned' ? '已放弃' : '被中断' }
 function rhythmActionLabel(action) { return ({ completed: '已完成', snoozed: '已延后', 'skipped-today': '今天跳过', dismissed: '稍后处理', 'natural-break': '自然离席' }[action] || '已处理') }
 function triggerTypeLabel(type) { return ({ interval: '间隔提醒', 'fixed-time': '固定时刻', 'active-duration': '连续活跃' }[type] || '节律提醒') }
+function rhythmTimeline(item) {
+  // 新记录有完整 timeline；老数据兜底为触发 + 处理两个节点
+  if (Array.isArray(item.timeline) && item.timeline.length) return item.timeline
+  return [
+    { type: 'triggered', at: item.triggeredAt, snoozeMinutes: null, responseSeconds: 0 },
+    { type: item.action === 'skipped-today' ? 'skipped' : item.action, at: item.resolvedAt, snoozeMinutes: null, responseSeconds: 0 }
+  ]
+}
+function rhythmEventLabel(event) {
+  return ({ triggered: '提醒到期', snoozed: '延后提醒', completed: '处理完成', skipped: '跳过提醒', dismissed: '稍后处理', 'natural-break': '自然离席' }[event.type] || '状态变化')
+}
+function rhythmEventDescription(event) {
+  if (event.type === 'snoozed' && event.snoozeMinutes) return `延后 ${event.snoozeMinutes} 分钟`
+  if (event.type === 'completed' && event.responseSeconds) return `${formatResponseTime(event.responseSeconds)} 后处理`
+  return ''
+}
 function focusPauseCount(item) { return (item.timeline || []).filter(event => event.type === 'paused').length }
 function focusPausedSeconds(item) { return (item.timeline || []).reduce((total, event) => total + (['resumed', 'finished'].includes(event.type) ? Number(event.pausedSeconds) || 0 : 0), 0) }
 function focusWallSeconds(item) { return Math.max(0, Math.round((new Date(item.finishedAt).getTime() - new Date(item.startedAt).getTime()) / 1000)) }
@@ -1457,6 +1479,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-timeline li:not(:last-child)::before { position: absolute; top: 13px; bottom: -2px; left: 5px; width: 1px; background: var(--divider-soft); content: ''; }
 .review-timeline li > i { position: relative; z-index: 1; width: 11px; height: 11px; margin-top: 4px; border: 2px solid var(--surface); border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .review-timeline li > i.is-paused { background: #d69c42; box-shadow: 0 0 0 1px #d69c42; }
+.review-timeline li > i.is-snoozed { background: #d69c42; box-shadow: 0 0 0 1px #d69c42; }
+.review-timeline li > i.is-skipped { background: #89918f; box-shadow: 0 0 0 1px #89918f; }
+.review-timeline li > i.is-dismissed { background: #89918f; box-shadow: 0 0 0 1px #89918f; }
+.review-timeline li > i.is-natural-break { background: #6a9bc3; box-shadow: 0 0 0 1px #6a9bc3; }
 .review-timeline li > i.is-duration-adjusted, .review-timeline li > i.is-task-changed { background: #6b91b4; box-shadow: 0 0 0 1px #6b91b4; }
 .review-timeline li > i.is-finished { background: #677b75; box-shadow: 0 0 0 1px #677b75; }
 .review-timeline li > div { display: grid; gap: 2px; }

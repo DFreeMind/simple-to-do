@@ -1895,8 +1895,37 @@ export const useTaskStore = defineStore('task', () => {
       resolvedAt: rawHistory.resolvedAt,
       action,
       responseSeconds: Math.max(0, Math.min(24 * 60 * 60, Math.round(Number(rawHistory.responseSeconds) || 0))),
-      snoozeMinutes: action === 'snoozed' ? Math.max(1, Math.min(24 * 60, Math.round(Number(rawHistory.snoozeMinutes) || 5))) : null
+      snoozeMinutes: action === 'snoozed' ? Math.max(1, Math.min(24 * 60, Math.round(Number(rawHistory.snoozeMinutes) || 5))) : null,
+      timeline: normalizeRhythmTimeline(rawHistory.timeline, {
+        triggeredAt: rawHistory.triggeredAt,
+        resolvedAt: rawHistory.resolvedAt,
+        action,
+        snoozeMinutes: rawHistory.snoozeMinutes
+      })
     }
+  }
+
+  // 节律时间线：优先用新记录的完整事件序列；老记录没有 timeline 时按触发/处理两个节点兜底
+  function normalizeRhythmTimeline(rawTimeline, fallback) {
+    const EVENT_TYPES = ['triggered', 'snoozed', 'completed', 'skipped', 'dismissed', 'natural-break']
+    if (Array.isArray(rawTimeline) && rawTimeline.length) {
+      return rawTimeline
+        .filter(event => event && typeof event === 'object' && isValidIsoDate(event.at) && EVENT_TYPES.includes(event.type))
+        .map(event => ({
+          type: event.type,
+          at: event.at,
+          snoozeMinutes: event.type === 'snoozed' ? Math.max(1, Math.min(24 * 60, Math.round(Number(event.snoozeMinutes) || 5))) : null,
+          responseSeconds: Math.max(0, Math.min(24 * 60 * 60, Math.round(Number(event.responseSeconds) || 0)))
+        }))
+        .sort((a, b) => new Date(a.at) - new Date(b.at))
+        .slice(-50)
+    }
+    // 老数据兜底：两节点（skipped-today 归一到 skipped，保持与白名单一致）
+    const resolvedType = fallback.action === 'skipped-today' ? 'skipped' : (EVENT_TYPES.includes(fallback.action) ? fallback.action : 'dismissed')
+    const list = []
+    if (isValidIsoDate(fallback.triggeredAt)) list.push({ type: 'triggered', at: fallback.triggeredAt, snoozeMinutes: null, responseSeconds: 0 })
+    if (isValidIsoDate(fallback.resolvedAt)) list.push({ type: resolvedType, at: fallback.resolvedAt, snoozeMinutes: null, responseSeconds: 0 })
+    return list
   }
 
   function normalizeRhythmReminder(rawReminder = {}, index = 0) {
@@ -2854,6 +2883,26 @@ export const useTaskStore = defineStore('task', () => {
     if (!reminder || !isValidIsoDate(reminder.pendingSince)) return false
     const resolvedAt = nowIso()
     const triggeredAt = reminder.pendingSince
+    // 节律时间线：触发 → （可选）延后 → 最终处理。延后发生的时刻在 snooze 时传入
+    const timeline = [
+      { type: 'triggered', at: triggeredAt, snoozeMinutes: null, responseSeconds: 0 }
+    ]
+    if (action === 'snoozed') {
+      const snoozeAt = details.snoozeAt && isValidIsoDate(details.snoozeAt) ? details.snoozeAt : resolvedAt
+      timeline.push({
+        type: 'snoozed',
+        at: snoozeAt,
+        snoozeMinutes: Math.max(1, Math.round(Number(details.snoozeMinutes) || 5)),
+        responseSeconds: 0
+      })
+    }
+    const resolvedType = action === 'skipped-today' ? 'skipped' : action
+    timeline.push({
+      type: resolvedType,
+      at: resolvedAt,
+      snoozeMinutes: null,
+      responseSeconds: Math.max(0, Math.round((new Date(resolvedAt).getTime() - new Date(triggeredAt).getTime()) / 1000))
+    })
     clock.value.rhythm.history.unshift({
       id: genId(),
       reminderId: reminder.id,
@@ -2864,7 +2913,8 @@ export const useTaskStore = defineStore('task', () => {
       resolvedAt,
       action,
       responseSeconds: Math.max(0, Math.round((new Date(resolvedAt).getTime() - new Date(triggeredAt).getTime()) / 1000)),
-      snoozeMinutes: action === 'snoozed' ? Math.max(1, Math.round(Number(details.snoozeMinutes) || 5)) : null
+      snoozeMinutes: action === 'snoozed' ? Math.max(1, Math.round(Number(details.snoozeMinutes) || 5)) : null,
+      timeline
     })
     clock.value.rhythm.history = clock.value.rhythm.history.slice(0, MAX_RHYTHM_HISTORY)
     return true
@@ -2895,7 +2945,7 @@ export const useTaskStore = defineStore('task', () => {
     const reminder = clock.value.rhythm.reminders.find(item => item.id === reminderId)
     if (!reminder) return false
     const snoozeMinutes = Math.max(1, Number(minutes) || 5)
-    appendRhythmHistory(reminder, 'snoozed', { snoozeMinutes })
+    appendRhythmHistory(reminder, 'snoozed', { snoozeMinutes, snoozeAt: nowIso() })
     reminder.snoozedUntil = new Date(Date.now() + snoozeMinutes * 60 * 1000).toISOString()
     reminder.lastNotifiedAt = null
     reminder.pendingSince = null
