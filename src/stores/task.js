@@ -2505,6 +2505,13 @@ export const useTaskStore = defineStore('task', () => {
     return true
   }
 
+  function updateRhythmNote(historyId, note) {
+    const item = clock.value.rhythm.history.find(i => i.id === historyId)
+    if (!item) return false
+    item.note = String(note || '').trim().slice(0, 2000)
+    return true
+  }
+
   function undoDeleteHistory() {
     const pending = pendingUndo.value
     if (!pending) return false
@@ -3608,6 +3615,7 @@ export const useTaskStore = defineStore('task', () => {
     startRhythmReminderNow,
     deleteRhythmHistory,
     batchDeleteRhythmHistory,
+    updateRhythmNote,
     handleRhythmElapsedFromNative,
     finishFocus,
     completeFocusSessionFromNative,

@@ -145,38 +145,112 @@
             </div>
           </article>
 
-          <article class="review-card review-rhythm-card">
-            <header><div><span>节律执行</span><h2>提醒之后发生了什么</h2></div><BellRing :size="19" /></header>
-            <div v-if="rhythmEntries.length" class="review-rhythm-actions">
-              <div v-for="item in rhythmActionSummary" :key="item.action">
-                <span><i :class="`is-${item.action}`"></i>{{ item.label }}</span>
-                <strong>{{ item.count }}</strong>
-                <b><i :style="{ width: `${item.percent}%` }"></i></b>
+          <article class="review-card review-rhythm-card" :class="{ 'is-collapsed': !rhythmEntries.length }">
+            <header>
+              <div>
+                <span>节律执行</span>
+                <h2 v-if="rhythmEntries.length">提醒之后发生了什么</h2>
+                <p v-else class="review-rhythm-card__empty-line">{{ selectedRangeLabel }} 还没有节律处理记录</p>
               </div>
-            </div>
-            <p v-else class="review-card__empty">本周期还没有节律处理记录。新处理的完成、延后和跳过会显示在这里。</p>
-            <div v-if="rhythmEntries.length" class="review-rhythm-buckets">
-              <div class="review-rhythm-bucket">
-                <h4>响应速度</h4>
-                <ul>
-                  <li v-for="b in rhythmResponseBuckets" :key="b.id" :class="{ 'is-active': b.count > 0 }">
-                    <span>{{ b.label }}</span>
-                    <strong>{{ b.count }}</strong>
-                    <i :style="{ width: `${b.percent}%` }" :title="`${b.percent}%`"></i>
-                  </li>
-                </ul>
+              <BellRing :size="19" />
+            </header>
+            <template v-if="rhythmEntries.length">
+              <div class="review-rhythm-actions">
+                <div v-for="item in rhythmActionSummary" :key="item.action">
+                  <span><i :class="`is-${item.action}`"></i>{{ item.label }}</span>
+                  <strong>{{ item.count }}</strong>
+                  <b><i :style="{ width: `${item.percent}%` }"></i></b>
+                </div>
               </div>
-              <div class="review-rhythm-bucket">
-                <h4>提醒时段</h4>
-                <ul>
-                  <li v-for="b in rhythmHourBuckets" :key="b.id" :class="{ 'is-active': b.count > 0 }">
-                    <span>{{ b.label }}</span>
-                    <strong>{{ b.count }}</strong>
-                    <i :style="{ width: `${b.percent}%` }" :title="`${b.percent}%`"></i>
-                  </li>
-                </ul>
+              <div class="review-rhythm-buckets">
+                <div class="review-rhythm-bucket">
+                  <header>
+                    <h4>响应速度</h4>
+                    <button type="button" class="review-rhythm-bucket__adjust" :aria-expanded="customBucketsOpen" @click="customBucketsOpen = !customBucketsOpen">
+                      <SlidersHorizontal :size="12" />自定义分桶
+                    </button>
+                  </header>
+                  <Transition name="review-range-fade">
+                    <div v-if="customBucketsOpen" class="review-rhythm-bucket__custom">
+                      <label><span>快</span><input v-model.number="bucketFast" type="number" min="0" max="999" /> 秒内</label>
+                      <label><span>中</span><input v-model.number="bucketMedium" type="number" min="1" max="999" /> 秒内</label>
+                      <label><span>慢</span><input v-model.number="bucketSlow" type="number" min="2" max="9999" /> 秒内</label>
+                      <button type="button" @click="resetBuckets">恢复</button>
+                    </div>
+                  </Transition>
+                  <ul>
+                    <li v-for="b in rhythmResponseBuckets" :key="b.id" :class="{ 'is-active': b.count > 0 }">
+                      <span>{{ b.label }}</span>
+                      <strong>{{ b.count }}</strong>
+                      <i :style="{ width: `${b.percent}%` }" :title="`${b.percent}%`"></i>
+                    </li>
+                  </ul>
+                  <table class="sr-only" aria-label="节律响应速度明细">
+                    <caption>{{ selectedRangeLabel }} 节律响应速度分布</caption>
+                    <thead><tr><th scope="col">分段</th><th scope="col">次数</th><th scope="col">占比</th></tr></thead>
+                    <tbody>
+                      <tr v-for="b in rhythmResponseBuckets" :key="b.id">
+                        <th scope="row">{{ b.label }}</th>
+                        <td>{{ b.count }}</td>
+                        <td>{{ b.percent }}%</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="review-rhythm-bucket">
+                  <h4>提醒时段</h4>
+                  <ul>
+                    <li v-for="b in rhythmHourBuckets" :key="b.id" :class="{ 'is-active': b.count > 0 }">
+                      <span>{{ b.label }}</span>
+                      <strong>{{ b.count }}</strong>
+                      <i :style="{ width: `${b.percent}%` }" :title="`${b.percent}%`"></i>
+                    </li>
+                  </ul>
+                  <table class="sr-only" aria-label="节律提醒时段明细">
+                    <caption>{{ selectedRangeLabel }} 节律提醒时段分布</caption>
+                    <thead><tr><th scope="col">时段</th><th scope="col">次数</th><th scope="col">占比</th></tr></thead>
+                    <tbody>
+                      <tr v-for="b in rhythmHourBuckets" :key="b.id">
+                        <th scope="row">{{ b.label }}</th>
+                        <td>{{ b.count }}</td>
+                        <td>{{ b.percent }}%</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+              <div class="review-rhythm-weekday">
+                <h4>工作日 vs 周末</h4>
+                <div class="review-rhythm-weekday__bar" :title="`工作日 ${rhythmWeekdaySummary.weekday.count} 次（${rhythmWeekdaySummary.weekday.percent}%），周末 ${rhythmWeekdaySummary.weekend.count} 次（${rhythmWeekdaySummary.weekend.percent}%）`">
+                  <i class="is-weekday" :style="{ width: `${rhythmWeekdaySummary.weekday.percent}%` }">
+                    <span v-if="rhythmWeekdaySummary.weekday.count">{{ rhythmWeekdaySummary.weekday.count }}</span>
+                  </i>
+                  <i class="is-weekend" :style="{ width: `${rhythmWeekdaySummary.weekend.percent}%` }">
+                    <span v-if="rhythmWeekdaySummary.weekend.count">{{ rhythmWeekdaySummary.weekend.count }}</span>
+                  </i>
+                </div>
+                <p>
+                  <span><i class="is-weekday"></i>工作日 {{ rhythmWeekdaySummary.weekday.count }} 次 · 完成 {{ rhythmWeekdaySummary.weekday.completionRate }}%</span>
+                  <span><i class="is-weekend"></i>周末 {{ rhythmWeekdaySummary.weekend.count }} 次 · 完成 {{ rhythmWeekdaySummary.weekend.completionRate }}%</span>
+                </p>
+                <table class="sr-only" aria-label="节律工作日与周末对比">
+                  <caption>{{ selectedRangeLabel }} 工作日 vs 周末</caption>
+                  <thead><tr><th scope="col">分组</th><th scope="col">次数</th><th scope="col">完成率</th></tr></thead>
+                  <tbody>
+                    <tr>
+                      <th scope="row">工作日</th>
+                      <td>{{ rhythmWeekdaySummary.weekday.count }}</td>
+                      <td>{{ rhythmWeekdaySummary.weekday.completionRate }}%</td>
+                    </tr>
+                    <tr>
+                      <th scope="row">周末</th>
+                      <td>{{ rhythmWeekdaySummary.weekend.count }}</td>
+                      <td>{{ rhythmWeekdaySummary.weekend.completionRate }}%</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </template>
           </article>
         </section>
 
@@ -273,7 +347,7 @@
           <p>试试切换到"全部"或更宽的时间范围。</p>
           <button type="button" @click="range = 'all'">查看全部历史</button>
         </div>
-        <div v-else-if="focusFilterCount && !filteredFocusRecords.length" class="review-empty review-empty--inline">
+        <div v-else-if="focusFilterCount && !filteredFocusRecords.length" class="review-empty review-empty--empty-filter">
           <span><Search :size="22" /></span>
           <strong>没有匹配的专注记录</strong>
           <p>当前筛选条件下没有结果。可以重置筛选试试。</p>
@@ -365,7 +439,7 @@
           <p>试试切换到"全部"或更宽的时间范围。新处理的完成、延后和跳过会显示在这里。</p>
           <button type="button" @click="range = 'all'">查看全部历史</button>
         </div>
-        <div v-else-if="rhythmFilterCount && !filteredRhythmRecords.length" class="review-empty review-empty--inline">
+        <div v-else-if="rhythmFilterCount && !filteredRhythmRecords.length" class="review-empty review-empty--empty-filter">
           <span><Search :size="22" /></span>
           <strong>没有匹配的节律记录</strong>
           <p>当前筛选条件下没有结果。可以重置筛选试试。</p>
@@ -399,6 +473,7 @@
             <span class="review-record-meta"><strong>{{ rhythmActionLabel(item.action) }}</strong><small>{{ formatResponseTime(item.responseSeconds) }}响应</small></span>
             <span class="review-record-actions">
               <button type="button" aria-label="查看节律详情" title="查看详情" @click="openDetail('rhythm', item)"><Eye :size="16" /></button>
+              <button type="button" aria-label="查看提醒规则" title="查看提醒规则" @click="openRhythmRuleFromRow(item)"><ExternalLink :size="16" /></button>
               <button class="is-danger" type="button" aria-label="删除节律记录" title="删除记录" @click="deleteRhythmRecord(item)"><Trash2 :size="16" /></button>
             </span>
           </article>
@@ -517,7 +592,11 @@
               <div><span>延后时长</span><strong>{{ detail.item.snoozeMinutes ? `${detail.item.snoozeMinutes} 分钟` : '未延后' }}</strong></div>
             </div>
             <section class="review-detail-section">
-              <header><BellRing :size="16" /><h3>提醒信息</h3></header>
+              <header>
+                <BellRing :size="16" />
+                <h3>提醒信息</h3>
+                <button type="button" class="review-detail-edit" @click="openRhythmRule"><ExternalLink :size="13" />查看规则</button>
+              </header>
               <dl class="review-detail-fields">
                 <div><dt>触发方式</dt><dd>{{ triggerTypeLabel(detail.item.triggerType) }}</dd></div>
                 <div><dt>触发规则</dt><dd>{{ detail.item.triggerLabel || '未记录' }}</dd></div>
@@ -536,6 +615,37 @@
                   </div>
                 </li>
               </ol>
+            </section>
+            <section class="review-detail-section">
+              <header>
+                <FileText :size="16" />
+                <h3>备注</h3>
+                <button v-if="!editingNote" type="button" class="review-detail-edit" @click="startEditNote"><Pencil :size="13" />{{ detail.item.note ? '编辑' : '添加' }}</button>
+                <button v-else type="button" class="review-detail-edit" @click="cancelEditNote"><X :size="13" />取消</button>
+              </header>
+              <div v-if="!editingNote">
+                <p v-if="detail.item.note" class="review-detail-note">{{ detail.item.note }}</p>
+                <p v-else class="review-detail-note review-detail-note--empty">还没有备注。点击右上角"添加"可以记录当时的上下文。</p>
+              </div>
+              <div v-else class="review-detail-note-edit">
+                <textarea
+                  ref="noteTextareaRef"
+                  v-model="noteDraft"
+                  rows="4"
+                  maxlength="2000"
+                  :placeholder="'记录这次提醒响应的背景、当时的处理思路或下次想怎么改...'"
+                  @keydown.meta.enter="saveEditNote"
+                  @keydown.ctrl.enter="saveEditNote"
+                  @keydown.esc="cancelEditNote"
+                ></textarea>
+                <div class="review-detail-note-edit__actions">
+                  <small>{{ noteDraft.length }} / 2000</small>
+                  <div>
+                    <button type="button" @click="cancelEditNote">取消</button>
+                    <button type="button" class="review-detail-note-save" :disabled="!noteDraft.trim()" @click="saveEditNote">保存</button>
+                  </div>
+                </div>
+              </div>
             </section>
           </template>
 
@@ -558,12 +668,41 @@
       @confirm="confirmDialog.onConfirm"
       @cancel="confirmDialog.visible = false"
     />
+
+    <Teleport to="body">
+      <Transition name="review-shortcuts-fade">
+        <div v-if="shortcutsPanelOpen" class="review-shortcuts" role="dialog" aria-modal="true" aria-labelledby="review-shortcuts-title" @click.self="shortcutsPanelOpen = false">
+          <aside class="review-shortcuts__panel">
+            <header>
+              <h2 id="review-shortcuts-title"><Keyboard :size="16" />键盘快捷键</h2>
+              <button type="button" class="review-shortcuts__close" aria-label="关闭快捷键面板" @click="shortcutsPanelOpen = false"><X :size="18" /></button>
+            </header>
+            <ul>
+              <li><kbd>Alt</kbd>+<kbd>1</kbd><span>切换到综合概览</span></li>
+              <li><kbd>Alt</kbd>+<kbd>2</kbd><span>切换到专注记录</span></li>
+              <li><kbd>Alt</kbd>+<kbd>3</kbd><span>切换到节律记录</span></li>
+              <li><kbd>/</kbd><span>聚焦搜索框（管理 tab）</span></li>
+              <li><kbd>R</kbd><span>打开自定义日期范围</span></li>
+              <li><kbd>↑</kbd><span>详情面板：上一条</span></li>
+              <li><kbd>↓</kbd><span>详情面板：下一条</span></li>
+              <li><kbd>Esc</kbd><span>关闭详情/对话框/快捷键面板</span></li>
+              <li><kbd>?</kbd><span>显示/隐藏本面板</span></li>
+            </ul>
+            <footer><small>在输入框、文本域和 select 中时，快捷键不会触发，避免误操作。</small></footer>
+          </aside>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <button v-if="activeTab === 'overview'" type="button" class="review-shortcuts-trigger" aria-label="显示键盘快捷键" title="显示键盘快捷键（按 ?）" @click="shortcutsPanelOpen = true">
+      <Keyboard :size="14" />
+    </button>
   </main>
 </template>
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { Activity, ArrowLeft, ArrowRight, BarChart3, BellRing, Calendar, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock3, Coffee, Download, Eye, FileText, History, Lightbulb, Pencil, Play, RotateCcw, Search, SlidersHorizontal, Sparkles, Timer, Trash2, TrendingDown, TrendingUp, X } from 'lucide-vue-next'
+import { Activity, ArrowLeft, ArrowRight, BarChart3, BellRing, Calendar, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock3, Coffee, Download, ExternalLink, Eye, FileText, History, Keyboard, Lightbulb, Pencil, Play, RotateCcw, Search, SlidersHorizontal, Sparkles, Timer, Trash2, TrendingDown, TrendingUp, X } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import { saveTextFile } from '@/services/platform'
 import FocusRewardBadge from './FocusRewardBadge.vue'
@@ -849,13 +988,55 @@ const rhythmActionSummary = computed(() => {
   })
 })
 
-// 响应时间分桶：< 30s / 30s-2min / 2-5min / 5min+
+// 响应时间分桶：用户可在「自定义分桶」里改阈值，默认 1 / 5 / 15 分钟
+const DEFAULT_BUCKET_FAST = 60
+const DEFAULT_BUCKET_MEDIUM = 300
+const DEFAULT_BUCKET_SLOW = 900
+const REVIEW_BUCKET_PREFS_KEY = 'simple-todo.review-bucket-prefs.v1'
+function loadBucketPrefs() {
+  if (typeof window === 'undefined' || !window.localStorage) return { fast: DEFAULT_BUCKET_FAST, medium: DEFAULT_BUCKET_MEDIUM, slow: DEFAULT_BUCKET_SLOW }
+  try {
+    const raw = window.localStorage.getItem(REVIEW_BUCKET_PREFS_KEY)
+    if (!raw) return { fast: DEFAULT_BUCKET_FAST, medium: DEFAULT_BUCKET_MEDIUM, slow: DEFAULT_BUCKET_SLOW }
+    const parsed = JSON.parse(raw)
+    return {
+      fast: Math.max(1, Number(parsed.fast) || DEFAULT_BUCKET_FAST),
+      medium: Math.max(2, Number(parsed.medium) || DEFAULT_BUCKET_MEDIUM),
+      slow: Math.max(3, Number(parsed.slow) || DEFAULT_BUCKET_SLOW)
+    }
+  } catch { return { fast: DEFAULT_BUCKET_FAST, medium: DEFAULT_BUCKET_MEDIUM, slow: DEFAULT_BUCKET_SLOW } }
+}
+const bucketPrefs = loadBucketPrefs()
+const bucketFast = ref(bucketPrefs.fast)
+const bucketMedium = ref(bucketPrefs.medium)
+const bucketSlow = ref(bucketPrefs.slow)
+const customBucketsOpen = ref(false)
+function resetBuckets() {
+  bucketFast.value = DEFAULT_BUCKET_FAST
+  bucketMedium.value = DEFAULT_BUCKET_MEDIUM
+  bucketSlow.value = DEFAULT_BUCKET_SLOW
+}
+watch([bucketFast, bucketMedium, bucketSlow], ([fast, medium, slow]) => {
+  if (typeof window === 'undefined' || !window.localStorage) return
+  try {
+    window.localStorage.setItem(REVIEW_BUCKET_PREFS_KEY, JSON.stringify({ fast, medium, slow }))
+  } catch { /* 配额超限不影响功能 */ }
+})
+
 const rhythmResponseBuckets = computed(() => {
+  const fast = Math.max(1, Number(bucketFast.value) || DEFAULT_BUCKET_FAST)
+  const medium = Math.max(fast + 1, Number(bucketMedium.value) || DEFAULT_BUCKET_MEDIUM)
+  const slow = Math.max(medium + 1, Number(bucketSlow.value) || DEFAULT_BUCKET_SLOW)
+  function fmt(seconds) {
+    if (seconds < 60) return `${seconds} 秒内`
+    if (seconds < 3600) return `${Math.round(seconds / 60)} 分钟内`
+    return `${(seconds / 3600).toFixed(1)} 小时内`
+  }
   const buckets = [
-    { id: 'fast', label: '30 秒内', min: 0, max: 30, count: 0 },
-    { id: 'normal', label: '30 秒 – 2 分钟', min: 30, max: 120, count: 0 },
-    { id: 'slow', label: '2 – 5 分钟', min: 120, max: 300, count: 0 },
-    { id: 'verySlow', label: '5 分钟以上', min: 300, max: Infinity, count: 0 }
+    { id: 'fast', label: fmt(fast), min: 0, max: fast, count: 0 },
+    { id: 'normal', label: `${fmt(medium - fast).replace('内', '')} – ${fmt(medium)}`, min: fast, max: medium, count: 0 },
+    { id: 'slow', label: `${fmt(slow - medium).replace('内', '')} – ${fmt(slow)}`, min: medium, max: slow, count: 0 },
+    { id: 'verySlow', label: `${fmt(slow)}以上`, min: slow, max: Infinity, count: 0 }
   ]
   rhythmEntries.value.forEach(item => {
     const s = Math.max(0, item.responseSeconds || 0)
@@ -885,6 +1066,27 @@ const rhythmHourBuckets = computed(() => {
   })
   const total = rhythmEntries.value.length
   return buckets.map(b => ({ ...b, percent: total ? Math.round(b.count / total * 100) : 0 }))
+})
+
+// 工作日 vs 周末对比
+function isWeekend(dateValue) {
+  const d = new Date(dateValue)
+  const day = d.getDay()
+  return day === 0 || day === 6
+}
+const rhythmWeekdaySummary = computed(() => {
+  const weekday = { count: 0, completed: 0 }
+  const weekend = { count: 0, completed: 0 }
+  rhythmEntries.value.forEach(item => {
+    const bucket = isWeekend(item.triggeredAt) ? weekend : weekday
+    bucket.count += 1
+    if (['completed', 'natural-break'].includes(item.action)) bucket.completed += 1
+  })
+  const total = rhythmEntries.value.length
+  return {
+    weekday: { ...weekday, percent: total ? Math.round(weekday.count / total * 100) : 0, completionRate: weekday.count ? Math.round(weekday.completed / weekday.count * 100) : 0 },
+    weekend: { ...weekend, percent: total ? Math.round(weekend.count / total * 100) : 0, completionRate: weekend.count ? Math.round(weekend.completed / weekend.count * 100) : 0 }
+  }
 })
 
 // 上一周期对比：用于"vs 上周期"指标
@@ -1435,11 +1637,23 @@ function cancelEditNote() {
   noteDraft.value = ''
 }
 function saveEditNote() {
-  if (!detail.value || detail.value.kind !== 'focus') return
-  if (!noteDraft.value.trim()) return
-  store.updateFocusNote(detail.value.item.id, noteDraft.value.trim())
+  if (!detail.value || !noteDraft.value.trim()) return
+  if (detail.value.kind === 'focus') store.updateFocusNote(detail.value.item.id, noteDraft.value.trim())
+  else store.updateRhythmNote(detail.value.item.id, noteDraft.value.trim())
   // detail.value.item 是 store 内的同一引用，应该会响应式更新
   editingNote.value = false
+}
+function openRhythmRule() {
+  // 切到节律模块，让用户能编辑提醒规则；关闭详情避免数据混合
+  closeDetail()
+  store.setClockView('rhythm')
+}
+function openRhythmRuleFromRow(item) {
+  // 行内"查看规则"：保留当前管理 tab 状态，跳到节律模块
+  store.setClockView('rhythm')
+  if (item?.reminderTitle) {
+    store.showNotice(`已跳到节律提醒，可在「${item.reminderTitle}」的配置中查看完整规则`, 'info')
+  }
 }
 function resetFocusFilters() { focusSearch.value = ''; focusResult.value = 'all'; focusPhase.value = 'all'; focusPause.value = 'all'; focusSort.value = 'newest' }
 function resetRhythmFilters() { rhythmSearch.value = ''; rhythmAction.value = 'all'; rhythmTrigger.value = 'all'; rhythmSort.value = 'newest' }
@@ -1501,18 +1715,36 @@ function deleteDetail() {
   else deleteRhythmRecord(detail.value.item)
 }
 
-// 键盘快捷键：Alt+1/2/3 切 tab；详情面板 ↑/↓ 切上一条/下一条；Esc 关闭
+// 键盘快捷键：Alt+1/2/3 切 tab；详情面板 ↑/↓ 切上一条/下一条；Esc 关闭；
+// / 聚焦搜索框；? 显示快捷键面板；r 切到自定义范围
+const shortcutsPanelOpen = ref(false)
+const searchInputRef = ref(null)
+function focusSearchInput() {
+  if (activeTab.value === 'overview') return
+  const selector = activeTab.value === 'focus' ? 'input[placeholder*="任务"]' : 'input[placeholder*="提醒"]'
+  const el = workspaceRef.value?.querySelector(selector)
+  if (el && typeof el.focus === 'function') {
+    el.focus()
+    el.select?.()
+  }
+}
 function handleKeydown(event) {
   const tag = (event.target?.tagName || '').toLowerCase()
   const isInput = tag === 'input' || tag === 'textarea' || tag === 'select'
-  if (event.key === 'Escape' && detail.value) { closeDetail(); return }
-  if (event.key === 'Escape' && confirmDialog.visible) { confirmDialog.visible = false; return }
+  if (event.key === 'Escape') {
+    if (shortcutsPanelOpen.value) { shortcutsPanelOpen.value = false; return }
+    if (detail.value) { closeDetail(); return }
+    if (confirmDialog.visible) { confirmDialog.visible = false; return }
+  }
   if (isInput) return
   if (event.altKey && !event.ctrlKey && !event.metaKey) {
     if (event.key === '1') { event.preventDefault(); selectTab('overview'); return }
     if (event.key === '2') { event.preventDefault(); selectTab('focus'); return }
     if (event.key === '3') { event.preventDefault(); selectTab('rhythm'); return }
   }
+  if (event.key === '/' && activeTab.value !== 'overview') { event.preventDefault(); focusSearchInput(); return }
+  if (event.key === '?' || (event.shiftKey && event.key === '/')) { event.preventDefault(); shortcutsPanelOpen.value = !shortcutsPanelOpen.value; return }
+  if (event.key.toLowerCase() === 'r' && !event.altKey && !event.ctrlKey && !event.metaKey) { event.preventDefault(); range.value = 'custom'; return }
   if (detail.value) {
     if (event.key === 'ArrowUp' && hasPrevDetail.value) { event.preventDefault(); goPrevDetail(); return }
     if (event.key === 'ArrowDown' && hasNextDetail.value) { event.preventDefault(); goNextDetail(); return }
@@ -1655,7 +1887,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-record-list button { display: grid; width: 100%; min-height: 58px; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 11px; padding: 8px 10px; border: 1px solid transparent; border-radius: 11px; color: var(--text-muted); text-align: left; transition: border-color var(--transition-fast), background var(--transition-fast); }
 .review-record-list button:hover { border-color: var(--divider-soft); background: var(--surface-muted); }
 .review-record-table { overflow: hidden; border: 1px solid var(--divider-soft); border-radius: 13px; }
-.review-record-table__head, .review-record-row { display: grid; grid-template-columns: 28px minmax(200px, 1fr) 118px 96px 78px; align-items: center; }
+.review-record-table__head, .review-record-row { display: grid; grid-template-columns: 28px minmax(200px, 1fr) 118px 96px 112px; align-items: center; }
 .review-record-table__head { min-height: 34px; padding: 0 8px; border-bottom: 1px solid var(--divider-soft); background: var(--surface-muted); color: var(--text-muted); font-size: 10px; font-weight: 680; }
 .review-record-table__head span:nth-child(n + 3) { text-align: right; }
 .review-record-check { display: grid; place-items: center; }
@@ -1822,14 +2054,40 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 /* 范围控件已抽到 ReviewRangeControl 组件，原有的双层按钮与自定义面板样式不再使用 */
 
 /* 新增：分层空状态 */
-.review-empty--empty-range { background: var(--surface-muted); border-color: var(--divider-soft); }
-.review-empty--empty-range > span { color: var(--accent-strong); }
+.review-empty--zero { border-style: dashed; background: linear-gradient(145deg, color-mix(in srgb, var(--accent-soft) 50%, var(--surface)) 0%, var(--surface) 100%); }
+.review-empty--zero > span { color: var(--accent-strong); }
+.review-empty--empty-range { background: var(--surface-muted); border-color: var(--divider-soft); border-style: solid; }
+.review-empty--empty-range > span { color: #5d89b0; }
+.review-empty--empty-filter { background: var(--surface); border-style: solid; border-color: var(--divider-soft); }
+.review-empty--empty-filter > span { color: var(--text-muted); background: var(--surface-muted); box-shadow: none; }
 .review-empty__actions { display: flex; gap: 10px; }
 .review-empty__actions button { display: inline-flex; min-height: 40px; align-items: center; gap: 6px; padding: 0 14px; border-radius: 10px; font-size: 12px; font-weight: 680; }
 .review-empty__actions button:not(.review-empty__primary) { background: var(--surface); border: 1px solid var(--divider-soft); color: var(--text); }
 .review-empty--inline { width: 100%; max-width: 100%; margin: 16px 0; padding: 32px 18px; }
 .review-empty--inline > span { width: 44px; height: 44px; }
 .review-empty--inline button { display: inline-flex; min-height: 36px; align-items: center; gap: 6px; padding: 0 14px; border-radius: 10px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 680; }
+
+/* 节律卡空数据时折叠为细条 */
+.review-rhythm-card.is-collapsed { padding: 14px 18px; }
+.review-rhythm-card.is-collapsed > header { padding: 0; }
+.review-rhythm-card.is-collapsed > header > div { gap: 0; }
+.review-rhythm-card__empty-line { margin: 0; color: var(--text-muted); font-size: 12px; }
+
+/* 键盘快捷键面板 */
+.review-shortcuts { position: fixed; z-index: var(--z-sheet); inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(9, 18, 16, .48); }
+.review-shortcuts__panel { display: grid; width: min(440px, 100%); gap: 14px; padding: 22px 24px; border-radius: 16px; background: var(--surface); box-shadow: 0 24px 60px rgba(8, 24, 20, .28); }
+.review-shortcuts__panel header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.review-shortcuts__panel h2 { display: inline-flex; align-items: center; gap: 8px; margin: 0; color: var(--text); font-size: 16px; letter-spacing: -.02em; }
+.review-shortcuts__close { display: grid; width: 32px; height: 32px; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--text-muted); cursor: pointer; }
+.review-shortcuts__close:hover { background: var(--surface-muted); color: var(--text); }
+.review-shortcuts__panel ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.review-shortcuts__panel li { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 12px; padding: 6px 10px; border-radius: 8px; background: var(--surface-muted); font-size: 12px; color: var(--text); }
+.review-shortcuts__panel li kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; border: 1px solid var(--divider-soft); border-bottom-width: 2px; border-radius: 5px; background: var(--surface); color: var(--text); font: inherit; font-size: 11px; font-weight: 600; margin-right: 2px; }
+.review-shortcuts__panel footer { color: var(--text-muted); font-size: 10.5px; line-height: 1.5; }
+.review-shortcuts-trigger { position: fixed; right: 18px; bottom: 18px; display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--divider-soft); border-radius: 999px; background: var(--surface); color: var(--text-muted); box-shadow: 0 6px 18px var(--text-7-fallback); cursor: pointer; opacity: .8; transition: opacity var(--transition-fast), color var(--transition-fast); z-index: 5; }
+.review-shortcuts-trigger:hover { opacity: 1; color: var(--accent-strong); }
+.review-shortcuts-fade-enter-active, .review-shortcuts-fade-leave-active { transition: opacity .18s ease; }
+.review-shortcuts-fade-enter-from, .review-shortcuts-fade-leave-to { opacity: 0; }
 
 /* 新增：指标卡 - 图标 + vs 上周期对比标 */
 .review-metric__label { display: inline-flex; align-items: center; gap: 5px; color: var(--text-muted); font-size: 11px; }
@@ -1854,7 +2112,26 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 
 /* 新增：节律执行卡 - 响应速度 / 时段分布 */
 .review-rhythm-buckets { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 18px; }
-.review-rhythm-bucket h4 { margin: 0 0 8px; color: var(--text-muted); font-size: 10.5px; font-weight: 700; letter-spacing: .04em; }
+.review-rhythm-bucket h4 { margin: 0; color: var(--text-muted); font-size: 10.5px; font-weight: 700; letter-spacing: .04em; }
+.review-rhythm-bucket > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.review-rhythm-bucket__adjust { display: inline-flex; align-items: center; gap: 3px; min-height: 24px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: var(--text-muted); font: inherit; font-size: 10px; font-weight: 600; cursor: pointer; }
+.review-rhythm-bucket__adjust:hover { background: var(--surface-muted); color: var(--accent-strong); }
+.review-rhythm-bucket__custom { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 8px; padding: 8px 10px; border: 1px solid var(--divider-soft); border-radius: 9px; background: var(--surface-muted); font-size: 10.5px; }
+.review-rhythm-bucket__custom label { display: inline-flex; align-items: center; gap: 4px; color: var(--text-muted); }
+.review-rhythm-bucket__custom input { width: 56px; min-height: 24px; padding: 0 6px; border: 1px solid var(--divider-soft); border-radius: 6px; background: var(--surface); color: var(--text); font: inherit; font-size: 11px; text-align: right; }
+.review-rhythm-bucket__custom input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.review-rhythm-bucket__custom button { display: inline-flex; align-items: center; min-height: 24px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: var(--text-muted); font: inherit; font-size: 10.5px; font-weight: 600; cursor: pointer; }
+.review-rhythm-bucket__custom button:hover { color: var(--accent-strong); background: var(--accent-soft); }
+.review-rhythm-weekday { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--divider-soft); }
+.review-rhythm-weekday h4 { margin: 0 0 8px; color: var(--text-muted); font-size: 10.5px; font-weight: 700; letter-spacing: .04em; }
+.review-rhythm-weekday__bar { display: flex; height: 18px; overflow: hidden; border-radius: 9px; background: var(--surface-muted); }
+.review-rhythm-weekday__bar i { display: flex; align-items: center; justify-content: center; min-width: 0; font-size: 10px; font-weight: 600; color: #fff; transition: width .25s ease; }
+.review-rhythm-weekday__bar i.is-weekday { background: var(--accent); }
+.review-rhythm-weekday__bar i.is-weekend { background: #6a9bc3; }
+.review-rhythm-weekday p { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 8px 0 0; color: var(--text-muted); font-size: 10.5px; }
+.review-rhythm-weekday p i { display: inline-block; width: 8px; height: 8px; margin-right: 4px; border-radius: 50%; vertical-align: middle; }
+.review-rhythm-weekday p i.is-weekday { background: var(--accent); }
+.review-rhythm-weekday p i.is-weekend { background: #6a9bc3; }
 .review-rhythm-bucket ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .review-rhythm-bucket li { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; opacity: .55; }
 .review-rhythm-bucket li.is-active { opacity: 1; }
