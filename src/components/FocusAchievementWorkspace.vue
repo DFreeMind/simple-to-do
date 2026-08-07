@@ -54,6 +54,18 @@
             </label>
           </header>
           <div class="achievement-year__landscape" aria-label="年度十二个月花田">
+            <span class="achievement-year__sky" aria-hidden="true">
+              <span class="achievement-year__bird" />
+              <span class="achievement-year__bird achievement-year__bird--two" />
+            </span>
+            <span class="achievement-year__hills" aria-hidden="true">
+              <span class="achievement-year__hill achievement-year__hill--back" />
+              <span class="achievement-year__hill achievement-year__hill--front" />
+              <span class="achievement-year__tree achievement-year__tree--left" />
+              <span class="achievement-year__tree achievement-year__tree--right" />
+              <span class="achievement-year__bush achievement-year__bush--a" />
+              <span class="achievement-year__bush achievement-year__bush--b" />
+            </span>
             <button
               v-for="month in yearMonths"
               :key="month.index"
@@ -63,9 +75,18 @@
               @click="selectedMonth = month.index"
             >
               <span class="achievement-year__month">{{ month.index + 1 }} 月</span>
-              <FocusPlant v-if="month.entries.length" :species-id="month.speciesId" :stage="month.stage" />
-              <span v-else class="achievement-soil" aria-hidden="true"></span>
-              <small>{{ month.entries.length ? `${month.entries.length} 天` : '静待生长' }}</small>
+              <!-- 年格用 'standard' 尺寸：所有月都展示完整玻璃罩，无数据月是空罩子 -->
+              <FocusTerrarium
+                class="achievement-year__terrarium"
+                size="standard"
+                :species-id="month.speciesId"
+                :stage="month.stage"
+                :highlight="selectedMonth === month.index"
+              />
+              <small>
+                <Leaf :size="11" />
+                <span>{{ month.entries.length ? `${month.entries.length} 天` : '静待生长' }}</span>
+              </small>
             </button>
           </div>
         </section>
@@ -101,12 +122,17 @@
               v-for="cell in monthCells"
               :key="cell.date"
               type="button"
-              :class="{ grown: cell.entry, future: cell.date > todayKey }"
+              :class="{ grown: cell.entry, future: cell.date > todayKey, active: cell.date === todayKey }"
               :title="cell.entry ? `${cell.date} · ${stageName(cell.entry.stage)} · ${cell.entry.growthMinutes}/${cell.entry.goalMinutes} 分钟` : `${cell.date} · 没有专注成长`"
             >
-              <span>{{ cell.day }}</span>
-              <FocusPlant v-if="cell.entry" :species-id="cell.entry.speciesId" :stage="cell.entry.stage" />
-              <i v-else></i>
+              <span class="achievement-month__day">{{ cell.day }}</span>
+              <FocusTerrarium
+                class="achievement-month__terrarium"
+                :size="cell.entry ? terrariumSizeFor(cell.entry.stage) : 'empty'"
+                :species-id="cell.entry ? cell.entry.speciesId : 'daisy'"
+                :stage="cell.entry ? cell.entry.stage : 'seed'"
+                :highlight="cell.date === todayKey"
+              />
             </button>
           </div>
         </section>
@@ -395,6 +421,22 @@ import {
 import FocusPlant from './FocusPlant.vue'
 import FocusRewardBadge from './FocusRewardBadge.vue'
 import FocusSpeciesPreview from './FocusSpeciesPreview.vue'
+import FocusTerrarium from './FocusTerrarium.vue'
+
+// 阶段 id → 温室尺寸档位
+// empty: 无罩（基础花田位）；small: 幼苗温室；medium: 成长温室；large: 盛放温室
+const TERRARIUM_SIZE_BY_STAGE = {
+  seed: 'empty',
+  sprout: 'small',
+  leaves: 'small',
+  bud: 'medium',
+  opening: 'medium',
+  bloom: 'large'
+}
+
+function terrariumSizeFor(stageId) {
+  return TERRARIUM_SIZE_BY_STAGE[stageId] || 'small'
+}
 import camelliaStageBackdrop from '@/assets/focus-garden/stage-backgrounds/camellia.png'
 import cosmosStageBackdrop from '@/assets/focus-garden/stage-backgrounds/cosmos.png'
 import daisyStageBackdrop from '@/assets/focus-garden/stage-backgrounds/daisy.png'
@@ -732,24 +774,162 @@ onBeforeUnmount(cancelGrowthReplay)
 .achievement-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
 .achievement-section-heading span { color: var(--accent-strong); font-size: 10px; font-weight: 750; letter-spacing: .08em; }.achievement-section-heading h2 { margin: 3px 0; color: var(--text); font-size: 18px; letter-spacing: -.02em; }.achievement-section-heading p { margin: 0; color: var(--text-muted); font-size: 11px; }
 .achievement-section-heading label { display: flex; align-items: center; gap: 7px; color: var(--text-muted); font-size: 11px; }.achievement-section-heading select { min-height: 30px; padding: 0 28px 0 8px; border: 1px solid var(--divider-soft); border-radius: 8px; background: var(--surface-muted); color: var(--text); }
-.achievement-year__landscape { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin-top: 16px; padding: 15px; border-radius: 15px; background: linear-gradient(#eef7f4 0 25%, #e3eee2 25% 67%, #cbd9bd 67%); }
-.achievement-year__landscape button { position: relative; display: grid; align-content: center; justify-items: center; min-width: 0; min-height: 130px; padding: 22px 3px 22px; border: 0; border-radius: 12px; color: var(--text-muted); cursor: pointer; transition: background-color .15s ease; }
-.achievement-year__landscape button:hover { background: rgba(255,255,255,.55); }
-.achievement-year__landscape button.active { background: var(--surface); box-shadow: 0 6px 18px rgba(36, 85, 73, .12), 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent); }
-.achievement-year__landscape .focus-plant { width: 72px; height: 72px; }
-/* 月份与天数标签：绝对定位的 pill，浮在花朵上方；强制不换行避免"静待生长"被截成两行 */
+/* 年格"专注风景"整体：使用浅绿山丘风景作为背景，6 列网格 */
+.achievement-year__landscape {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+  padding: 22px 14px 18px;
+  border-radius: 18px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, #eaf2e0 0%, #e1ecd5 50%, #d2e0c0 100%);
+}
+/* 左右下角叶子装饰（设计图左右下角各有小叶丛） */
+.achievement-year__landscape::before,
+.achievement-year__landscape::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  width: 80px;
+  height: 60px;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    radial-gradient(ellipse at 20% 70%, #9cbf80 0 14px, transparent 16px),
+    radial-gradient(ellipse at 55% 80%, #b5d09a 0 10px, transparent 12px),
+    radial-gradient(ellipse at 85% 60%, #87a86c 0 12px, transparent 14px);
+  opacity: .5;
+}
+.achievement-year__landscape::before { left: 0; transform: scaleX(-1); }
+.achievement-year__landscape::after { right: 0; }
+/* 山丘与树的远景（z-index 0，terrarium cell z-index 1 覆盖在上面） */
+.achievement-year__hills { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+.achievement-year__hill { position: absolute; left: -15%; right: -15%; border-radius: 50% 50% 0 0 / 100% 100% 0 0; }
+.achievement-year__hill--back { top: 55%; height: 70%; background: rgba(184, 207, 162, .42); }
+.achievement-year__hill--front { top: 65%; right: -30%; left: 30%; height: 65%; background: rgba(166, 192, 140, .38); }
+/* 树缩小并降低不透明度，避免遮住空格子。位置放网格左右两侧外缘 */
+.achievement-year__tree {
+  position: absolute;
+  bottom: 14%;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 60%, #b5d09a 0%, #8fb87a 70%, #7aa468 100%);
+  box-shadow: inset 0 -4px 8px rgba(0, 0, 0, .08);
+  opacity: .5;
+}
+.achievement-year__tree::before { content: ''; position: absolute; bottom: -6px; left: 50%; width: 5px; height: 10px; transform: translateX(-50%); background: #8a7250; border-radius: 2px; }
+.achievement-year__tree--left { left: -2%; bottom: 38%; }
+.achievement-year__tree--right { right: -2%; bottom: 38%; transform: scale(.85); }
+.achievement-year__bush { position: absolute; bottom: 12%; width: 30px; height: 18px; border-radius: 50%; background: rgba(127, 165, 100, .42); }
+.achievement-year__bush--a { left: 8%; }
+.achievement-year__bush--b { right: 8%; transform: scale(.8); }
+/* 飞鸟：放顶部天空区 */
+.achievement-year__sky { position: absolute; top: 6%; left: 0; right: 0; height: 16%; pointer-events: none; z-index: 0; }
+.achievement-year__bird { position: absolute; top: 30%; left: 32%; width: 16px; height: 8px; }
+.achievement-year__bird::before, .achievement-year__bird::after { content: ''; position: absolute; top: 0; width: 8px; height: 8px; border-top: 1.4px solid #6f8a5a; border-right: 1.4px solid #6f8a5a; border-radius: 50%; }
+.achievement-year__bird::before { left: 0; transform: rotate(-45deg); }
+.achievement-year__bird::after { right: 0; transform: rotate(135deg); }
+.achievement-year__bird--two { top: 60%; left: auto; right: 26%; transform: scale(.7); }
+
+/* cell 按钮：月份 pill 在上，温室居中，底部"🌱 静待生长/N天" pill */
+.achievement-year__landscape button {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  align-items: center;
+  justify-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 168px;
+  padding: 8px 4px 10px;
+  border: 0;
+  border-radius: 14px;
+  color: var(--text-muted);
+  cursor: pointer;
+  background: rgba(255, 255, 255, .42);
+  z-index: 1;
+  transition: transform .15s ease, background-color .15s ease;
+}
+.achievement-year__landscape button:hover { transform: translateY(-2px); }
+.achievement-year__landscape button.active { transform: translateY(-2px); }
+.achievement-year__terrarium { width: 100%; height: 100%; }
 .achievement-year__landscape .achievement-year__month,
-.achievement-year__landscape button > small { position: absolute; left: 50%; z-index: 2; padding: 1px 8px; border-radius: 999px; background: rgba(255,255,255,.88); color: var(--text); line-height: 1.5; white-space: nowrap; box-shadow: 0 1px 2px rgba(36, 85, 73, .06); }
-.achievement-year__landscape .achievement-year__month { top: 6px; transform: translateX(-50%); font-size: 10px; font-weight: 700; letter-spacing: .02em; }
-.achievement-year__landscape button > small { bottom: 6px; transform: translateX(-50%); color: var(--text-muted); font-size: 9px; }
-.achievement-year__landscape button.active .achievement-year__month,
-.achievement-year__landscape button.active > small { background: #fff; }
-/* 空格子里的"土壤"改为更优雅的细线 + 圆点，呼应"等待萌芽" */
-.achievement-soil { width: 38px; height: 0; margin: 0; border-top: 1.5px dashed color-mix(in srgb, #8a7250 50%, transparent); opacity: .72; }
+.achievement-year__landscape button > small {
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .92);
+  color: var(--text);
+  line-height: 1.4;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(36, 85, 73, .08);
+  z-index: 2;
+}
+.achievement-year__landscape .achievement-year__month { font-size: 10.5px; font-weight: 700; letter-spacing: .02em; }
+.achievement-year__landscape button > small { color: var(--text-muted); font-size: 10px; padding: 2px 9px; }
+.achievement-year__landscape button > small :deep(svg) { color: #6f9a5a; }
+/* 激活态：底色变成更亮的浅绿，月/天 pill 变绿底白字 */
+.achievement-year__landscape button.active {
+  background: rgba(255, 255, 255, .9);
+  box-shadow:
+    0 8px 22px rgba(36, 85, 73, .12),
+    0 0 0 1.5px color-mix(in srgb, #6f9a5a 50%, transparent);
+}
+.achievement-year__landscape button.active .achievement-year__month {
+  background: #6f9a5a;
+  color: #fff;
+}
+.achievement-year__landscape button.active > small {
+  background: #6f9a5a;
+  color: #fff;
+}
+.achievement-year__landscape button.active > small :deep(svg) { color: #fff; }
+/* 空格子：让底座更轻，未占月份不放大按钮高度 */
+.achievement-year__landscape button.empty { min-height: 168px; }
 .achievement-summary { padding: 17px; }.achievement-summary > header,.achievement-unlock > header { display: flex; justify-content: space-between; color: var(--accent-strong); font-size: 11px; font-weight: 700; }.achievement-summary dl { display: grid; gap: 0; margin: 12px 0 0; }.achievement-summary dl div { display: flex; justify-content: space-between; gap: 10px; padding: 12px 0; border-top: 1px solid var(--divider-soft); }.achievement-summary dt { color: var(--text-muted); font-size: 11px; }.achievement-summary dd { margin: 0; color: var(--text); font-size: 15px; font-weight: 750; }
-.achievement-month { padding: 18px; }.achievement-month__nav { display: flex; gap: 5px; }.achievement-month__nav button { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid var(--divider-soft); border-radius: 8px; color: var(--text-muted); cursor: pointer; }.achievement-month__nav button:hover { color: var(--accent-strong); background: var(--accent-soft); }.achievement-month__stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; margin-top: 14px; }.achievement-month__stats div { display: grid; gap: 4px; padding: 8px 9px; border: 1px solid var(--divider-soft); border-radius: 10px; background: var(--surface-muted); }.achievement-month__stats small { color: var(--text-muted); font-size: 9px; }.achievement-month__stats strong { overflow: hidden; color: var(--text); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-.achievement-month__weekdays,.achievement-month__grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }.achievement-month__weekdays { margin: 14px 0 5px; }.achievement-month__weekdays span { color: var(--text-muted); font-size: 9px; text-align: center; }
-.achievement-month__grid button { position: relative; display: grid; min-height: 72px; place-items: center; padding: 3px; overflow: hidden; border: 1px solid var(--divider-soft); border-radius: 9px; background: var(--surface-muted); color: var(--text-muted); cursor: default; }.achievement-month__grid button > span { position: absolute; top: 4px; left: 6px; font-size: 9px; }.achievement-month__grid .focus-plant { width: 55px; margin: -4px 0 -16px; }.achievement-month__grid button > i { width: 28px; height: 7px; margin-top: 20px; border-radius: 50%; background: #ad9275; opacity: .36; }.achievement-month__grid button.future { opacity: .52; }.achievement-month__blank { min-height: 72px; }
+.achievement-month { padding: 18px; }.achievement-month__nav { display: flex; gap: 5px; }.achievement-month__nav button { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid var(--divider-soft); border-radius: 8px; color: var(--text-muted); cursor: pointer; }.achievement-month__nav button:hover { color: var(--accent-strong); background: var(--accent-soft); }
+/* 月格统计卡：右上角小绿叶 + 浅边框，与设计图保持一致 */
+.achievement-month__stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; margin-top: 14px; }
+.achievement-month__stats div { position: relative; display: grid; gap: 4px; padding: 10px 12px 12px; border: 1px solid var(--divider-soft); border-radius: 12px; background: var(--surface); }
+.achievement-month__stats div::after { content: ''; position: absolute; top: 8px; right: 8px; width: 14px; height: 14px; background: radial-gradient(circle at 30% 70%, #b8d09c 0 50%, transparent 51%), linear-gradient(135deg, transparent 45%, #88b572 45% 55%, transparent 55%), linear-gradient(45deg, transparent 45%, #88b572 45% 55%, transparent 55%); opacity: .55; }
+.achievement-month__stats small { color: var(--text-muted); font-size: 10px; }
+.achievement-month__stats strong { overflow: hidden; color: var(--text); font-size: 14px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.achievement-month__weekdays,.achievement-month__grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.achievement-month__weekdays { margin: 14px 0 6px; }
+.achievement-month__weekdays span { color: var(--text-muted); font-size: 10px; text-align: center; font-weight: 600; }
+/* 月格子：每个 cell 都是温室。日期数字在左上角，温室居中。 */
+.achievement-month__grid button {
+  position: relative;
+  display: grid;
+  min-height: 92px;
+  place-items: center;
+  padding: 14px 4px 4px;
+  overflow: hidden;
+  border: 1px solid var(--divider-soft);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: default;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.achievement-month__grid button:hover { transform: translateY(-1px); }
+.achievement-month__grid button.future { opacity: .5; }
+.achievement-month__day { position: absolute; top: 4px; left: 7px; font-size: 10px; color: var(--text-muted); font-weight: 600; }
+.achievement-month__terrarium { width: 100%; height: 100%; }
+.achievement-month__blank { min-height: 92px; }
+/* 当日高亮：底色变浅绿，边框变绿，罩子也会变绿（在 terrarium--highlight 里） */
+.achievement-month__grid button.active {
+  background: color-mix(in srgb, #c5dda6 35%, var(--surface));
+  box-shadow: 0 0 0 2px color-mix(in srgb, #6f9a5a 65%, transparent), 0 6px 14px rgba(36, 85, 73, .1);
+}
+.achievement-month__grid button.active .achievement-month__day { color: #4f7842; font-weight: 700; }
 .achievement-unlock { display: grid; justify-items: center; padding: 17px; text-align: center; }.achievement-unlock > header { width: 100%; }.achievement-unlock .focus-plant { width: 100px; margin: -6px 0 -4px; }.achievement-unlock :deep(.focus-species-preview) { width: 132px; height: 132px; margin: 8px 0; border: 1px solid var(--divider-soft); border-radius: 18px; box-shadow: 0 8px 20px rgba(42,71,62,.08); }.achievement-unlock h3 { margin: 0; color: var(--text); font-size: 17px; }.achievement-unlock p { margin: 4px 0 10px; color: var(--text-muted); font-size: 11px; line-height: 1.5; }.achievement-progress { width: 100%; height: 7px; overflow: hidden; border-radius: 999px; background: var(--surface-muted); }.achievement-progress i { display: block; height: 100%; border-radius: inherit; background: var(--accent); }.achievement-unlock__complete { display: grid; justify-items: center; gap: 5px; margin: 24px 0 10px; color: var(--accent); }.achievement-unlock__complete strong { color: var(--text); font-size: 13px; }
 .achievement-recent { padding: 18px; }.achievement-recent .achievement-section-heading > button { align-self: center; display: inline-flex; align-items: center; gap: 3px; color: var(--accent-strong); font-size: 11px; cursor: pointer; }.achievement-recent__list { display: grid; gap: 7px; margin-top: 13px; }.achievement-recent__list article { display: grid; grid-template-columns: 36px 1fr auto; align-items: center; gap: 9px; padding: 9px; border-radius: 11px; background: var(--surface-muted); }.achievement-recent__list article > span { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 50%; background: var(--accent-soft); color: var(--accent-strong); }.achievement-recent__list article div { display: grid; gap: 2px; }.achievement-recent__list strong { color: var(--text); font-size: 12px; }.achievement-recent__list small,.achievement-recent__list time { color: var(--text-muted); font-size: 9px; }.achievement-empty { display: grid; justify-items: center; gap: 6px; margin-top: 18px; padding: 22px; border-radius: 12px; background: var(--surface-muted); color: var(--accent); text-align: center; }.achievement-empty p { max-width: 280px; margin: 0; color: var(--text-muted); font-size: 11px; line-height: 1.55; }
 .achievement-species { display: grid; gap: 16px; }
