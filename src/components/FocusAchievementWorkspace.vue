@@ -70,9 +70,12 @@
               v-for="month in yearMonths"
               :key="month.index"
               type="button"
-              :class="{ active: selectedMonth === month.index, empty: !month.entries.length }"
+              :class="[
+                { active: selectedMonth === month.index, empty: !month.entries.length },
+                `achievement-year__season--${seasonOf(month.index)}`
+              ]"
               :aria-label="`${month.index + 1} 月，${month.entries.length} 个成长日`"
-              @click="selectedMonth = month.index"
+              @click="goToMonth(month.index)"
             >
               <span class="achievement-year__month">{{ month.index + 1 }} 月</span>
               <!-- 年格用 'standard' 尺寸：所有月都展示完整玻璃罩，无数据月是空罩子 -->
@@ -87,6 +90,10 @@
                 <Leaf :size="11" />
                 <span>{{ month.entries.length ? `${month.entries.length} 天` : '静待生长' }}</span>
               </small>
+              <!-- drill down 提示，hover 时显示 -->
+              <span class="achievement-year__drill" aria-hidden="true">
+                <ArrowRight :size="13" />
+              </span>
             </button>
           </div>
         </section>
@@ -425,9 +432,9 @@
 </template>
 
 <script setup>
-import { computed, defineAsyncComponent, onBeforeUnmount, ref } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, ref } from 'vue'
 import { motion as Motion } from 'motion-v'
-import { Archive, BookOpen, CalendarDays, Check, ChevronLeft, ChevronRight, Flame, Flower2, Leaf, LockKeyhole, Pause, Play, Sparkles, Sprout, Timer, TimerReset, Trees, Trophy } from 'lucide-vue-next'
+import { Archive, ArrowRight, BookOpen, CalendarDays, Check, ChevronLeft, ChevronRight, Flame, Flower2, Leaf, LockKeyhole, Pause, Play, Sparkles, Sprout, Timer, TimerReset, Trees, Trophy } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import {
   FOCUS_GARDEN_COLLECTIONS,
@@ -687,6 +694,20 @@ function shiftMonth(delta) {
   selectedYear.value = date.getFullYear()
   selectedMonth.value = date.getMonth()
 }
+// 年格 drill down：点月份后切换 + 滚到月格
+function goToMonth(monthIndex) {
+  selectedMonth.value = monthIndex
+  nextTick(() => {
+    document.querySelector('.achievement-month')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+}
+// 月份 → 季节：3-5 春 / 6-8 夏 / 9-11 秋 / 12-2 冬
+function seasonOf(monthIndex) {
+  if (monthIndex >= 2 && monthIndex <= 4) return 'spring'
+  if (monthIndex >= 5 && monthIndex <= 7) return 'summer'
+  if (monthIndex >= 8 && monthIndex <= 10) return 'autumn'
+  return 'winter'
+}
 function formatShortDate(value) {
   if (!value) return ''
   const date = new Date(value)
@@ -874,10 +895,29 @@ onBeforeUnmount(cancelGrowthReplay)
   cursor: pointer;
   background: rgba(255, 255, 255, .42);
   z-index: 1;
-  transition: transform .15s ease, background-color .15s ease;
+  transition: transform .15s ease, background-color .15s ease, box-shadow .15s ease;
   /* 抑制点击/键盘聚焦时的浏览器默认黑框 */
   outline: none;
 }
+/* 顶部季节色条（用 ::before 避免被 active 态的 box-shadow 覆盖） */
+.achievement-year__landscape button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 12px;
+  right: 12px;
+  height: 2px;
+  border-radius: 0 0 6px 6px;
+  background: var(--season-accent, transparent);
+  pointer-events: none;
+  transition: background-color .2s ease, height .2s ease;
+}
+.achievement-year__landscape button.active::before { height: 3px; left: 0; right: 0; border-radius: 14px 14px 0 0; }
+/* 季节色调：春嫩 / 夏浓 / 秋暖 / 冬冷 */
+.achievement-year__season--spring { --season-accent: #b8d09c; background: rgba(232, 244, 220, .55); }
+.achievement-year__season--summer { --season-accent: #6f9a5a; background: rgba(220, 234, 204, .55); }
+.achievement-year__season--autumn { --season-accent: #c8a872; background: rgba(244, 232, 210, .55); }
+.achievement-year__season--winter { --season-accent: #a8b8c4; background: rgba(228, 232, 236, .55); }
 .achievement-year__landscape button:focus,
 .achievement-year__landscape button:focus-visible,
 .achievement-year__landscape button *:focus,
@@ -922,6 +962,31 @@ onBeforeUnmount(cancelGrowthReplay)
 .achievement-year__landscape button.active > small :deep(svg) { color: #fff; }
 /* 空格子：让底座更轻，未占月份不放大按钮高度 */
 .achievement-year__landscape button.empty { min-height: 168px; }
+/* drill down 提示：右上角小箭头，hover/active 时显示 */
+.achievement-year__drill {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-muted);
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity .15s ease, transform .15s ease, color .15s ease, background-color .15s ease;
+  pointer-events: none;
+  z-index: 2;
+}
+.achievement-year__landscape button:hover .achievement-year__drill,
+.achievement-year__landscape button.active .achievement-year__drill {
+  opacity: 1;
+  transform: translateX(0);
+}
+.achievement-year__landscape button:hover .achievement-year__drill { color: var(--accent-strong); background: var(--accent-soft); }
+.achievement-year__landscape button.active .achievement-year__drill { color: #fff; background: #6f9a5a; }
 .achievement-summary { padding: 17px; }.achievement-summary > header,.achievement-unlock > header { display: flex; justify-content: space-between; color: var(--accent-strong); font-size: 11px; font-weight: 700; }.achievement-summary dl { display: grid; gap: 0; margin: 12px 0 0; }.achievement-summary dl div { display: flex; justify-content: space-between; gap: 10px; padding: 12px 0; border-top: 1px solid var(--divider-soft); }.achievement-summary dt { color: var(--text-muted); font-size: 11px; }.achievement-summary dd { margin: 0; color: var(--text); font-size: 15px; font-weight: 750; }
 .achievement-month { padding: 18px; }.achievement-month__nav { display: flex; gap: 5px; }.achievement-month__nav button { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid var(--divider-soft); border-radius: 8px; color: var(--text-muted); cursor: pointer; }.achievement-month__nav button:hover { color: var(--accent-strong); background: var(--accent-soft); }
 /* 月格统计条：横向紧凑数据条（替代原来的 4 个等宽卡），垂直高度从 ~80px 压到 ~36px */
