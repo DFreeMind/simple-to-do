@@ -333,13 +333,7 @@
       <section v-else-if="activeTab === 'focus'" class="review-card review-records">
         <header class="review-management-header">
           <div class="review-management-title">
-            <button type="button" @click="selectTab('overview')" title="返回综合概览"><ArrowLeft :size="16" />返回</button>
-            <nav class="review-breadcrumb" aria-label="面包屑导航">
-              <button type="button" @click="selectTab('overview')">综合概览</button>
-              <ChevronRight :size="11" />
-              <span aria-current="page">专注记录</span>
-            </nav>
-            <div><span>专注记录管理</span><h2>查找和管理每一段投入</h2><p>筛选、统计和列表使用同一数据口径。</p></div>
+            <span>专注记录管理</span><h2>查找和管理每一段投入</h2><p>筛选、统计和列表使用同一数据口径。</p>
           </div>
           <div class="review-management-actions">
             <div class="review-export-menu">
@@ -364,6 +358,7 @@
           </header>
           <div class="review-range-wrap">
             <ReviewRangeControl
+              compact
               :range="range"
               :custom-start="customStart"
               :custom-end="customEnd"
@@ -441,13 +436,7 @@
       <section v-else class="review-card review-records">
         <header class="review-management-header">
           <div class="review-management-title">
-            <button type="button" @click="selectTab('overview')" title="返回综合概览"><ArrowLeft :size="16" />返回</button>
-            <nav class="review-breadcrumb" aria-label="面包屑导航">
-              <button type="button" @click="selectTab('overview')">综合概览</button>
-              <ChevronRight :size="11" />
-              <span aria-current="page">节律记录</span>
-            </nav>
-            <div><span>节律记录管理</span><h2>查找和管理每一次提醒响应</h2><p>筛选、统计和列表使用同一数据口径。</p></div>
+            <span>节律记录管理</span><h2>查找和管理每一次提醒响应</h2><p>筛选、统计和列表使用同一数据口径。</p>
           </div>
           <div class="review-management-actions">
             <div class="review-export-menu">
@@ -472,6 +461,7 @@
           </header>
           <div class="review-range-wrap">
             <ReviewRangeControl
+              compact
               :range="range"
               :custom-start="customStart"
               :custom-end="customEnd"
@@ -771,7 +761,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { Activity, ArrowLeft, ArrowRight, BarChart3, BellRing, Calendar, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock3, Coffee, Download, ExternalLink, Eye, FileText, History, Keyboard, Lightbulb, Pencil, Play, RotateCcw, Search, SlidersHorizontal, Sparkles, Timer, Trash2, TrendingDown, TrendingUp, X } from 'lucide-vue-next'
+import { Activity, ArrowRight, BarChart3, BellRing, Calendar, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock3, Coffee, Download, ExternalLink, Eye, FileText, History, Keyboard, Lightbulb, Pencil, Play, RotateCcw, Search, SlidersHorizontal, Sparkles, Timer, Trash2, TrendingDown, TrendingUp, X } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import { saveTextFile } from '@/services/platform'
 import FocusRewardBadge from './FocusRewardBadge.vue'
@@ -2124,14 +2114,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-card__empty { margin: 0; padding: 34px 16px; color: var(--text-muted); font-size: 12px; line-height: 1.6; text-align: center; }
 .review-records > header { align-items: end; }
 .review-records > header p { margin: 1px 0 0; color: var(--text-muted); font-size: 11px; }
-.review-card > header > .review-management-title { display: flex; min-width: 0; align-items: center; gap: 14px; }
-.review-management-title > button { display: inline-flex; min-height: 40px; flex: 0 0 auto; align-items: center; gap: 6px; padding: 0 12px; border-right: 1px solid var(--divider-soft); color: var(--accent-strong); font-size: 11px; font-weight: 700; }
-.review-management-title > button:hover { border-radius: 9px; background: var(--accent-soft); }
-.review-management-title > div { display: grid; min-width: 0; gap: 3px; }
-.review-breadcrumb { display: inline-flex; align-items: center; gap: 4px; min-width: 0; margin: 2px 0 0; font-size: 10.5px; color: var(--text-muted); }
-.review-breadcrumb button { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
-.review-breadcrumb button:hover { color: var(--accent-strong); text-decoration: underline; }
-.review-breadcrumb span { color: var(--text); font-weight: 600; }
+.review-card > header > .review-management-title { display: grid; min-width: 0; align-content: start; gap: 3px; }
+.review-management-title > span { color: var(--accent-strong); font-size: 10px; font-weight: 750; letter-spacing: .05em; }
 .review-management-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 10px; }
 .review-management-actions small { color: var(--text-muted); font-size: 11px; white-space: nowrap; }
 .review-summary-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 12px; }
@@ -2151,7 +2135,25 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-filters { display: grid; grid-template-columns: minmax(220px, 1.4fr) repeat(4, minmax(0, 1fr)) auto; align-items: center; gap: 8px; margin: 0; padding: 0; }
 .review-filters label { display: flex; width: 100%; height: 34px; align-items: center; gap: 7px; padding: 0 10px; border: 1px solid var(--divider-soft); border-radius: 8px; background: var(--surface); color: var(--text-muted); }
 .review-filters input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; font-size: 12px; }
-.review-filters select { width: 100%; min-width: 0; height: 34px; padding: 0 8px; border: 1px solid var(--divider-soft); border-radius: 8px; outline: none; background: var(--surface); color: var(--text); font: inherit; font-size: 11px; }
+.review-filters select {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 26px 0 10px;
+  border: 1px solid var(--divider-soft);
+  border-radius: 9px;
+  outline: none;
+  background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23687674' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 9px center;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background-color var(--transition-fast);
+}
+.review-filters select:hover { border-color: var(--border-strong); }
 .review-filters label:focus-within, .review-filters select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .review-filter-reset { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; gap: 5px; padding: 0 14px; border: 0; border-radius: 8px; background: transparent; color: var(--accent-strong); font-size: 11px; font-weight: 680; white-space: nowrap; }
 .review-filter-reset:hover { background: var(--accent-soft); }
@@ -2326,7 +2328,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
   .review-filters { grid-template-columns: 1fr 1fr; }
   .review-filters label { grid-column: 1 / -1; }
 }
-@media (max-width: 680px) { .review-workspace { padding: 14px; }.review-header { display: grid; gap: 14px; }.review-range, .review-tabs { overflow-x: auto; }.review-tabs button { white-space: nowrap; }.review-metrics { grid-template-columns: 1fr 1fr; }.review-metric { min-height: 88px; padding: 12px; }.review-recent__header { display: grid !important; }.review-recent-switch { width: 100%; }.review-recent-switch button { flex: 1; }.review-recent__footer { display: grid; }.review-recent__footer > div { display: grid; grid-template-columns: 1fr 1fr; }.review-card > header > .review-management-title { display: grid; }.review-management-title > button { width: max-content; border-right: 0; }.review-filter-panel > header { align-items: flex-start; }.review-filters { grid-template-columns: 1fr; }.review-filter-summary { grid-template-columns: 1fr 1fr; }.review-pagination { flex-wrap: wrap; justify-content: space-between; }.review-detail-hero { grid-template-columns: 1fr; }.review-detail-hero__window { justify-content: space-between; }.review-detail-summary { grid-template-columns: 1fr; } }
+@media (max-width: 680px) { .review-workspace { padding: 14px; }.review-header { display: grid; gap: 14px; }.review-range, .review-tabs { overflow-x: auto; }.review-tabs button { white-space: nowrap; }.review-metrics { grid-template-columns: 1fr 1fr; }.review-metric { min-height: 88px; padding: 12px; }.review-recent__header { display: grid !important; }.review-recent-switch { width: 100%; }.review-recent-switch button { flex: 1; }.review-recent__footer { display: grid; }.review-recent__footer > div { display: grid; grid-template-columns: 1fr 1fr; }.review-card > header > .review-management-title { display: grid; }.review-filter-panel > header { align-items: flex-start; }.review-filters { grid-template-columns: 1fr; }.review-filter-summary { grid-template-columns: 1fr 1fr; }.review-pagination { flex-wrap: wrap; justify-content: space-between; }.review-detail-hero { grid-template-columns: 1fr; }.review-detail-hero__window { justify-content: space-between; }.review-detail-summary { grid-template-columns: 1fr; } }
 /* 新增：本期亮点洞察 */
 .review-insights { display: grid; gap: clamp(8px, 1.2vw, 12px); margin-bottom: clamp(10px, 1.4vw, 16px); padding: clamp(12px, 1.6vw, 16px); border: 1px solid var(--accent-34-fallback); border-radius: 16px; background: linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 70%, var(--surface)) 0%, var(--surface) 100%); }
 .review-insights > header { display: flex; align-items: center; gap: 7px; color: var(--accent-strong); }

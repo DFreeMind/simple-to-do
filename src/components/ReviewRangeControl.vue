@@ -1,29 +1,31 @@
 <template>
   <div class="review-range-control">
-    <div ref="rowRef" class="review-range-control__row" role="group" aria-label="时间范围">
-      <button
-        v-for="option in presetOptions"
-        :key="option.id"
-        type="button"
-        class="review-range-control__chip"
-        :class="{ active: range === option.id }"
-        :title="option.hint"
-        @click="selectRange(option.id)"
-      >
-        {{ option.label }}
-      </button>
+    <div ref="rowRef" class="review-range-control__row" :class="{ 'is-compact': compact }" role="group" aria-label="时间范围">
+      <template v-if="!compact">
+        <button
+          v-for="option in presetOptions"
+          :key="option.id"
+          type="button"
+          class="review-range-control__chip"
+          :class="{ active: range === option.id }"
+          :title="option.hint"
+          @click="selectRange(option.id)"
+        >
+          {{ option.label }}
+        </button>
+      </template>
       <button
         ref="customTriggerRef"
         type="button"
         class="review-range-control__chip review-range-control__chip--custom"
-        :class="{ active: range === 'custom', open: popoverOpen }"
+        :class="{ active: range === 'custom', open: popoverOpen, 'is-compact': compact }"
         :aria-expanded="popoverOpen"
         :aria-haspopup="true"
         :title="customHint"
         @click="toggleCustom"
       >
         <Calendar :size="12" />
-        <span>{{ customButtonLabel }}</span>
+        <span>{{ compact ? compactLabel : customButtonLabel }}</span>
         <ChevronDown :size="11" :class="{ 'is-open': popoverOpen }" />
       </button>
     </div>
@@ -170,7 +172,9 @@ const WEEK_DAYS = ['一', '二', '三', '四', '五', '六', '日']
 const props = defineProps({
   range: { type: String, required: true },
   customStart: { type: String, default: '' },
-  customEnd: { type: String, default: '' }
+  customEnd: { type: String, default: '' },
+  // compact 模式：只显示一个"当前范围"触发按钮（默认近 7 天），点击弹出完整选择面板
+  compact: { type: Boolean, default: false }
 })
 const emit = defineEmits(['update:range', 'update:customStart', 'update:customEnd'])
 
@@ -194,6 +198,12 @@ const customButtonLabel = computed(() => {
 })
 
 const customHint = computed(() => '点击选择起止日期或快捷预设')
+
+// compact 模式：触发按钮直接显示当前范围标签
+const compactLabel = computed(() => {
+  if (props.range === 'custom') return customButtonLabel.value
+  return RANGE_OPTIONS.find(o => o.id === props.range)?.label || '自定义'
+})
 
 const startDisplay = computed(() => props.customStart || '点选日期')
 const endDisplay = computed(() => props.customEnd || '点选日期')
@@ -249,6 +259,16 @@ function toggleCustom() {
 
 function openPopover() {
   if (popoverOpen.value) return
+  // compact 模式：把当前预设范围转成 custom 起止日期，
+  // 让弹层内的快捷高亮、日历范围与当前选择保持一致，可继续微调
+  if (props.compact && props.range !== 'custom' && props.range !== 'all') {
+    const preset = presetDateRange(props.range)
+    if (preset) {
+      emit('update:customStart', preset.start)
+      emit('update:customEnd', preset.end)
+    }
+    emit('update:range', 'custom')
+  }
   // 已有自定义范围时，日历定位到开始日所在月；同时恢复"继续选"的状态
   if (props.customStart) {
     const d = parseKey(props.customStart)
@@ -259,6 +279,29 @@ function openPopover() {
   popoverOpen.value = true
   if (props.range !== 'custom') emit('update:range', 'custom')
   nextTick(() => popoverRef.value?.focus?.())
+}
+
+// 预设 id → 起止日期（与 FocusHistoryWorkspace.rangeStart 语义一致）
+function presetDateRange(id) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  if (id === 'today') return { start: formatDateKey(today), end: formatDateKey(today) }
+  if (id === 'thisWeek') {
+    // 周日为一周开始
+    const start = new Date(today)
+    start.setDate(start.getDate() - today.getDay())
+    return { start: formatDateKey(start), end: formatDateKey(today) }
+  }
+  if (id === 'thisMonth') {
+    const start = new Date(today.getFullYear(), today.getMonth(), 1)
+    return { start: formatDateKey(start), end: formatDateKey(today) }
+  }
+  if (id === '7d') {
+    const start = new Date(today)
+    start.setDate(start.getDate() - 6)
+    return { start: formatDateKey(start), end: formatDateKey(today) }
+  }
+  return null
 }
 
 function closePopover() {
@@ -452,6 +495,14 @@ onBeforeUnmount(() => {
   background: var(--surface-muted);
 }
 
+/* compact：无容器外壳，直接呈现单个触发按钮 */
+.review-range-control__row.is-compact {
+  display: inline-block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
 .review-range-control__chip {
   display: inline-flex;
   align-items: center;
@@ -487,6 +538,31 @@ onBeforeUnmount(() => {
 }
 .review-range-control__chip--custom svg { color: currentColor; transition: transform var(--transition-fast); }
 .review-range-control__chip--custom .is-open { transform: rotate(180deg); }
+
+/* compact 触发按钮：与筛选面板中的搜索框/下拉同高同质感 */
+.review-range-control__chip--custom.is-compact {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--divider-soft);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 650;
+  box-shadow: none;
+  transition: border-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+}
+.review-range-control__chip--custom.is-compact:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+  background: var(--surface);
+}
+.review-range-control__chip--custom.is-compact.active,
+.review-range-control__chip--custom.is-compact.open {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
 
 /* popover（组件内渲染 + position: fixed，脱离文档流不挤压内容，
    且完整继承 .app 上的主题 CSS 变量，随主题切换自动变色） */
