@@ -172,14 +172,21 @@
           <header class="review-recent__header">
             <div><span>最近发生</span><h2>专注与节律时间线</h2><p>{{ selectedRangeLabel }}的数据，与上方统计使用相同时间范围</p></div>
             <div class="review-recent-switch" role="group" aria-label="筛选最近记录类型">
-              <button v-for="option in recentKindOptions" :key="option.id" type="button" :class="{ active: recentKind === option.id }" @click="recentKind = option.id">{{ option.label }}</button>
+              <button v-for="option in recentKindOptions" :key="option.id" type="button" :class="{ active: recentKind === option.id }" @click="setRecentKind(option.id)">{{ option.label }}</button>
             </div>
           </header>
-          <div v-if="recentRecords.length" class="review-recent-list">
-            <article v-for="record in recentRecords" :key="`${record.kind}-${record.item.id}`" class="review-recent-row">
+          <div v-if="recentVisibleRecords.length" class="review-recent-list">
+            <article v-for="record in recentVisibleRecords" :key="`${record.kind}-${record.item.id}`" class="review-recent-row" :class="{ 'is-selected': isRecentSelected(record) }">
+              <label class="review-record-check" @click.stop>
+                <input type="checkbox" :checked="isRecentSelected(record)" :aria-label="`选择${recordTitle(record)}`" @change="toggleRecentSelect(record)" />
+              </label>
               <button class="review-record-open" type="button" @click="openDetail(record.kind, record.item)">
                 <span class="review-record-icon" :class="`is-${record.kind}`"><Timer v-if="record.kind === 'focus'" :size="17" /><BellRing v-else :size="17" /></span>
-                <span class="review-record-main"><strong>{{ recordTitle(record) }}</strong><small>{{ record.kind === 'focus' ? profileName(record.item.profileId, record.item) : triggerTypeLabel(record.item.triggerType) }}</small></span>
+                <span class="review-record-main"><strong>{{ recordTitle(record) }}</strong><small>
+                  <span v-if="record.kind === 'focus'" class="review-record-chip">{{ profileName(record.item.profileId, record.item) }}</span>
+                  <span v-else class="review-record-chip">{{ triggerTypeLabel(record.item.triggerType) }}</span>
+                  <span v-if="record.kind === 'focus' && record.item.timeline?.some(e => e.type === 'paused')" class="review-record-chip review-record-chip--quiet">含暂停</span>
+                </small></span>
               </button>
               <span class="review-record-time">
                 <strong>{{ formatShortDate(record.at) }}</strong>
@@ -187,15 +194,23 @@
               </span>
               <span class="review-record-meta"><strong>{{ record.kind === 'focus' ? formatCompactDuration(record.item.elapsedSeconds) : rhythmActionLabel(record.item.action) }}</strong><small>{{ record.kind === 'focus' ? resultLabel(record.item.result) : `${formatResponseTime(record.item.responseSeconds)}响应` }}</small></span>
               <span class="review-record-actions">
-                <button type="button" :aria-label="`查看${record.kind === 'focus' ? '专注' : '节律'}详情`" title="查看详情" @click="openDetail(record.kind, record.item)"><Eye :size="16" /></button>
-                <button class="is-danger" type="button" :aria-label="`删除${record.kind === 'focus' ? '专注' : '节律'}记录`" title="删除记录" @click="deleteRecord(record)"><Trash2 :size="16" /></button>
+                <button type="button" :aria-label="`查看${record.kind === 'focus' ? '专注' : '节律'}详情`" title="查看详情" @click="openDetail(record.kind, record.item)"><Eye :size="16" /><span class="sr-only">查看</span></button>
+                <button class="is-danger" type="button" :aria-label="`删除${record.kind === 'focus' ? '专注' : '节律'}记录`" title="删除记录" @click="deleteRecord(record)"><Trash2 :size="16" /><span class="sr-only">删除</span></button>
               </span>
             </article>
           </div>
           <p v-else class="review-card__empty">当前范围没有{{ recentKind === 'focus' ? '专注' : recentKind === 'rhythm' ? '节律' : '' }}记录。试试切换"全部/仅专注/仅节律"。</p>
           <footer class="review-recent__footer">
-            <span>显示最近 {{ recentRecords.length }} 条，完整历史支持筛选和分页管理</span>
-            <div>
+            <div v-if="recentShownCount < recentRecords.length" class="review-recent__more">
+              <button type="button" class="review-cta" @click="loadMoreRecent"><ChevronDown :size="14" /><span>显示更多（还有 {{ recentRecords.length - recentShownCount }} 条）</span></button>
+            </div>
+            <span v-else>共 {{ recentRecords.length }} 条</span>
+            <div v-if="recentSelectionCount" class="review-recent__batch">
+              <span>已选 {{ recentSelectionCount }} 条</span>
+              <button type="button" @click="clearRecentSelection">取消选择</button>
+              <button type="button" class="is-danger" @click="batchDeleteRecent"><Trash2 :size="14" />批量删除</button>
+            </div>
+            <div class="review-recent__actions">
               <button type="button" class="review-cta" @click="selectTab('focus')"><span>管理专注记录</span><ChevronRight :size="14" /></button>
               <button type="button" class="review-cta" @click="selectTab('rhythm')"><span>管理节律记录</span><ChevronRight :size="14" /></button>
             </div>
@@ -997,7 +1012,48 @@ const insights = computed(() => {
 const recentRecords = computed(() => [
   ...focusHistory.value.map(item => ({ kind: 'focus', item, at: item.finishedAt })),
   ...rhythmHistory.value.map(item => ({ kind: 'rhythm', item, at: item.resolvedAt }))
-].filter(record => recentKind.value === 'all' || record.kind === recentKind.value).sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 8))
+].filter(record => recentKind.value === 'all' || record.kind === recentKind.value).sort((a, b) => new Date(b.at) - new Date(a.at)))
+// 概览默认显示前 8 条，提供"显示更多"展开剩余
+const RECENT_PAGE_SIZE = 8
+const recentShownCount = ref(RECENT_PAGE_SIZE)
+const recentVisibleRecords = computed(() => recentRecords.value.slice(0, recentShownCount.value))
+const recentSelectionCount = computed(() => {
+  let n = 0
+  selectedFocusIds.value.forEach(() => { n += 1 })
+  selectedRhythmIds.value.forEach(() => { n += 1 })
+  // 概览只显示当前可见的前 N 条，选中只在 visible 子集里计
+  return recentVisibleRecords.value.reduce((total, record) => {
+    const set = record.kind === 'focus' ? selectedFocusIds.value : selectedRhythmIds.value
+    return total + (set.has(record.item.id) ? 1 : 0)
+  }, 0)
+})
+function isRecentSelected(record) {
+  const set = record.kind === 'focus' ? selectedFocusIds.value : selectedRhythmIds.value
+  return set.has(record.item.id)
+}
+function toggleRecentSelect(record) {
+  if (record.kind === 'focus') toggleFocusSelect(record.item.id)
+  else toggleRhythmSelect(record.item.id)
+}
+function clearRecentSelection() {
+  // 只清掉当前可见的选中，不影响管理 tab 里其他页的选中
+  const visibleFocusIds = new Set(recentVisibleRecords.value.filter(r => r.kind === 'focus').map(r => r.item.id))
+  const visibleRhythmIds = new Set(recentVisibleRecords.value.filter(r => r.kind === 'rhythm').map(r => r.item.id))
+  const nextFocus = new Set(selectedFocusIds.value)
+  visibleFocusIds.forEach(id => nextFocus.delete(id))
+  selectedFocusIds.value = nextFocus
+  const nextRhythm = new Set(selectedRhythmIds.value)
+  visibleRhythmIds.forEach(id => nextRhythm.delete(id))
+  selectedRhythmIds.value = nextRhythm
+}
+function loadMoreRecent() {
+  recentShownCount.value = Math.min(recentRecords.value.length, recentShownCount.value + RECENT_PAGE_SIZE)
+}
+function setRecentKind(id) {
+  recentKind.value = id
+  // 切换类型时重置"显示更多"展开位置
+  recentShownCount.value = RECENT_PAGE_SIZE
+}
 const filteredFocusRecords = computed(() => focusHistory.value.filter(item => {
   if (focusResult.value === 'completed' && item.result !== 'completed') return false
   if (focusResult.value === 'unfinished' && item.result === 'completed') return false
@@ -1105,6 +1161,34 @@ function batchDeleteRhythm() {
     }
   })
 }
+// 概览"最近发生"的批量删除：只针对当前可见的选中条目
+function batchDeleteRecent() {
+  const focusIds = []
+  const rhythmIds = []
+  recentVisibleRecords.value.forEach(record => {
+    const set = record.kind === 'focus' ? selectedFocusIds.value : selectedRhythmIds.value
+    if (set.has(record.item.id)) {
+      if (record.kind === 'focus') focusIds.push(record.item.id)
+      else rhythmIds.push(record.item.id)
+    }
+  })
+  if (!focusIds.length && !rhythmIds.length) return
+  const total = focusIds.length + rhythmIds.length
+  openConfirm({
+    title: `删除 ${total} 条记录`,
+    message: `确认删除"最近发生"中选中的 ${total} 条记录吗？删除后可在 7 秒内撤销。`,
+    details: [
+      { label: '影响范围', value: focusIds.length && rhythmIds.length ? `专注 ${focusIds.length} 条 + 节律 ${rhythmIds.length} 条` : `记录 × ${total}` }
+    ],
+    type: 'danger',
+    confirmText: '批量删除',
+    onConfirm: () => {
+      if (focusIds.length) store.batchDeleteFocusHistory(focusIds)
+      if (rhythmIds.length) store.batchDeleteRhythmHistory(rhythmIds)
+      clearRecentSelection()
+    }
+  })
+}
 
 // 数据导出：把当前筛选结果导出为 CSV（带 BOM，Excel/WPS 打开中文不乱码）
 function csvEscape(value) {
@@ -1202,7 +1286,7 @@ async function exportFocusReport() {
   }
 }
 
-watch([range], () => { focusPage.value = 1; rhythmPage.value = 1 })
+watch([range], () => { focusPage.value = 1; rhythmPage.value = 1; recentShownCount.value = RECENT_PAGE_SIZE })
 watch([focusSearch, focusResult, focusPhase, focusPause, focusSort, focusPageSize], () => { focusPage.value = 1 })
 watch([rhythmSearch, rhythmAction, rhythmTrigger, rhythmSort, rhythmPageSize], () => { rhythmPage.value = 1 })
 watch(focusPageCount, count => { focusPage.value = Math.min(focusPage.value, count) })
@@ -1470,15 +1554,27 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-recent-switch button:hover { color: var(--text); }
 .review-recent-switch button.active { background: var(--surface); color: var(--accent-strong); box-shadow: 0 2px 6px var(--text-7-fallback); }
 .review-recent-list { overflow: hidden; margin-top: 14px; border: 1px solid var(--divider-soft); border-radius: 13px; }
-.review-recent-row { display: grid; min-height: 66px; grid-template-columns: minmax(250px, 1fr) 148px 105px 80px; align-items: center; padding: 0 10px; border-bottom: 1px solid var(--divider-soft); transition: background var(--transition-fast), box-shadow var(--transition-fast); position: relative; }
+.review-recent-row { display: grid; min-height: 66px; grid-template-columns: 24px minmax(250px, 1fr) 148px 105px 80px; align-items: center; padding: 0 10px; border-bottom: 1px solid var(--divider-soft); transition: background var(--transition-fast), box-shadow var(--transition-fast); position: relative; }
 .review-recent-row:last-child { border-bottom: 0; }
 .review-recent-row:hover { background: var(--surface-muted); }
 .review-recent-row:hover .review-record-actions { opacity: 1; }
+.review-recent-row.is-selected { background: color-mix(in srgb, var(--accent-soft) 55%, var(--surface)); box-shadow: inset 3px 0 0 var(--accent); }
+.review-record-chip { display: inline-flex; align-items: center; margin-right: 4px; padding: 1px 6px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-strong); font-size: 10px; font-weight: 600; }
+.review-record-chip--quiet { background: var(--surface-muted); color: var(--text-muted); }
 .review-record-actions { display: flex; justify-content: flex-end; gap: 3px; opacity: .55; transition: opacity var(--transition-fast); }
-.review-recent__footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; color: var(--text-muted); font-size: 10px; }
-.review-recent__footer > div { display: flex; gap: 5px; }
-.review-recent__footer button { display: inline-flex; min-height: 36px; align-items: center; gap: 4px; padding: 0 10px; border-radius: 8px; color: var(--accent-strong); font-size: 10px; font-weight: 680; }
-.review-recent__footer button:hover { background: var(--accent-soft); }
+.review-recent__footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding-top: 12px; color: var(--text-muted); font-size: 10px; }
+.review-recent__more { display: flex; }
+.review-recent__more button { display: inline-flex; min-height: 32px; align-items: center; gap: 4px; padding: 0 12px; border-radius: 8px; color: var(--text-muted); font-size: 11px; font-weight: 650; }
+.review-recent__more button:hover { background: var(--surface-muted); color: var(--accent-strong); }
+.review-recent__batch { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--accent-20-border-fallback); border-radius: 9px; background: color-mix(in srgb, var(--accent-soft) 60%, var(--surface)); color: var(--text); font-size: 11px; }
+.review-recent__batch > span strong { color: var(--accent-strong); font-variant-numeric: tabular-nums; }
+.review-recent__batch button { display: inline-flex; align-items: center; gap: 4px; min-height: 28px; padding: 0 10px; border: 0; border-radius: 7px; background: var(--surface); color: var(--text-muted); font: inherit; font-size: 11px; font-weight: 650; cursor: pointer; }
+.review-recent__batch button:hover { background: var(--surface-muted); color: var(--text); }
+.review-recent__batch button.is-danger { background: #fff0ef; color: var(--danger); }
+.review-recent__batch button.is-danger:hover { background: #ffe3e0; }
+.review-recent__actions { display: flex; gap: 5px; margin-left: auto; }
+.review-recent__actions button { display: inline-flex; min-height: 36px; align-items: center; gap: 4px; padding: 0 10px; border-radius: 8px; color: var(--accent-strong); font-size: 10px; font-weight: 680; }
+.review-recent__actions button:hover { background: var(--accent-soft); }
 .review-card__empty { margin: 0; padding: 34px 16px; color: var(--text-muted); font-size: 12px; line-height: 1.6; text-align: center; }
 .review-records > header { align-items: end; }
 .review-records > header p { margin: 1px 0 0; color: var(--text-muted); font-size: 11px; }
