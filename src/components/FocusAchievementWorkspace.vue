@@ -824,7 +824,28 @@ onBeforeUnmount(cancelGrowthReplay)
 </script>
 
 <style scoped>
-.achievement-workspace { width: 100%; min-height: 0; padding: 24px; overflow: auto; background: radial-gradient(circle at 14% 0, var(--accent-soft), transparent 26%), var(--main-bg); }
+.achievement-workspace {
+  width: 100%;
+  min-height: 0;
+  padding: 24px;
+  overflow: auto;
+  background: radial-gradient(circle at 14% 0, var(--accent-soft), transparent 26%), var(--main-bg);
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-muted-26-fallback) transparent;
+  scrollbar-gutter: stable;
+}
+.achievement-workspace::-webkit-scrollbar { width: 6px; height: 6px; }
+.achievement-workspace::-webkit-scrollbar-track { background: transparent; }
+.achievement-workspace::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--text-muted-26-fallback);
+  background-clip: padding-box;
+}
+.achievement-workspace:hover::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  background-clip: padding-box;
+}
 /* Windows WebView 会给未显式设置背景的 button 加灰底；成就页同样需要重置。 */
 .achievement-workspace :where(button) { background: transparent; }
 .achievement-shell { display: grid; gap: 16px; width: min(1180px, 100%); margin: 0 auto; }

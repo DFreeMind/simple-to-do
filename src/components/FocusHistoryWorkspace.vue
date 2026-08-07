@@ -512,7 +512,28 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 </script>
 
 <style scoped>
-.review-workspace { align-content: start; justify-items: stretch; overflow: auto; padding: clamp(18px, 2.6vw, 34px); background: radial-gradient(circle at 80% 0, var(--accent-soft), transparent 32%), var(--surface-muted); }
+.review-workspace {
+  align-content: start;
+  justify-items: stretch;
+  overflow: auto;
+  padding: clamp(18px, 2.6vw, 34px);
+  background: radial-gradient(circle at 80% 0, var(--accent-soft), transparent 32%), var(--surface-muted);
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-muted-26-fallback, rgba(104, 118, 116, 0.26)) transparent;
+  scrollbar-gutter: stable;
+}
+.review-workspace::-webkit-scrollbar { width: 6px; height: 6px; }
+.review-workspace::-webkit-scrollbar-track { background: transparent; }
+.review-workspace::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--text-muted-26-fallback, rgba(104, 118, 116, 0.26));
+  background-clip: padding-box;
+}
+.review-workspace:hover::-webkit-scrollbar-thumb {
+  background: var(--text-muted, #687674);
+  background-clip: padding-box;
+}
 .review-shell { width: min(100%, 1120px); margin: 0 auto; }
 .review-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding: 4px 2px 18px; }
 .review-header .eyebrow { margin: 0 0 5px; color: var(--accent-strong); font-size: 11px; font-weight: 750; letter-spacing: .08em; }
@@ -641,7 +662,33 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-empty p { max-width: 350px; margin: 8px 0 18px; color: var(--text-muted); font-size: 13px; line-height: 1.65; }
 .review-empty button { display: inline-flex; min-height: 40px; align-items: center; gap: 6px; padding: 0 14px; border-radius: 10px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 680; }
 .review-detail-backdrop { position: fixed; z-index: var(--z-sheet); inset: 0; display: flex; justify-content: flex-end; background: rgba(9, 18, 16, .48); }
-.review-detail { display: flex; width: min(520px, calc(100vw - 24px)); height: 100%; flex-direction: column; overflow: auto; border-left: 1px solid var(--border); background-color: var(--surface, #fff); box-shadow: -24px 0 64px rgba(8, 24, 20, .28); isolation: isolate; opacity: 1; }
+.review-detail {
+  display: flex;
+  width: min(520px, calc(100vw - 24px));
+  height: 100%;
+  flex-direction: column;
+  overflow: auto;
+  border-left: 1px solid var(--border);
+  background-color: var(--surface, #fff);
+  box-shadow: -24px 0 64px rgba(8, 24, 20, .28);
+  isolation: isolate;
+  opacity: 1;
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-muted-26-fallback, rgba(104, 118, 116, 0.26)) transparent;
+  scrollbar-gutter: stable;
+}
+.review-detail::-webkit-scrollbar { width: 6px; height: 6px; }
+.review-detail::-webkit-scrollbar-track { background: transparent; }
+.review-detail::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--text-muted-26-fallback, rgba(104, 118, 116, 0.26));
+  background-clip: padding-box;
+}
+.review-detail:hover::-webkit-scrollbar-thumb {
+  background: var(--text-muted, #687674);
+  background-clip: padding-box;
+}
 .review-detail > header { position: sticky; z-index: 2; top: 0; display: flex; min-height: 92px; align-items: center; justify-content: space-between; gap: 16px; padding: 17px 20px; border-bottom: 1px solid var(--divider-soft); background: var(--surface); }
 .review-detail-heading { display: flex; min-width: 0; align-items: center; gap: 12px; }
 .review-detail-heading__icon { display: grid; width: 44px; height: 44px; flex: 0 0 auto; place-items: center; border-radius: 13px; }

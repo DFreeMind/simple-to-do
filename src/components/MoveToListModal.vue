@@ -483,7 +483,8 @@ watch(() => props.visible, (visible) => {
   min-width: 0;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: #e5e7eb transparent;
+  scrollbar-color: var(--text-muted-26-fallback, rgba(104, 118, 116, 0.26)) transparent;
+  scrollbar-gutter: stable;
 
   &::-webkit-scrollbar {
     width: 6px;
@@ -494,8 +495,15 @@ watch(() => props.visible, (visible) => {
   }
 
   &::-webkit-scrollbar-thumb {
-    background-color: #e5e7eb;
-    border-radius: 3px;
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: var(--text-muted-26-fallback, rgba(104, 118, 116, 0.26));
+    background-clip: padding-box;
+  }
+
+  &:hover::-webkit-scrollbar-thumb {
+    background: var(--text-muted, #687674);
+    background-clip: padding-box;
   }
 }
 
