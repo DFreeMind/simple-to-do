@@ -733,18 +733,19 @@ onBeforeUnmount(cancelGrowthReplay)
 .achievement-section-heading span { color: var(--accent-strong); font-size: 10px; font-weight: 750; letter-spacing: .08em; }.achievement-section-heading h2 { margin: 3px 0; color: var(--text); font-size: 18px; letter-spacing: -.02em; }.achievement-section-heading p { margin: 0; color: var(--text-muted); font-size: 11px; }
 .achievement-section-heading label { display: flex; align-items: center; gap: 7px; color: var(--text-muted); font-size: 11px; }.achievement-section-heading select { min-height: 30px; padding: 0 28px 0 8px; border: 1px solid var(--divider-soft); border-radius: 8px; background: var(--surface-muted); color: var(--text); }
 .achievement-year__landscape { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin-top: 16px; padding: 15px; border-radius: 15px; background: linear-gradient(#eef7f4 0 25%, #e3eee2 25% 67%, #cbd9bd 67%); }
-.achievement-year__landscape button { position: relative; display: grid; justify-items: center; min-width: 0; min-height: 130px; padding: 5px 3px 7px; border: 0; border-radius: 12px; color: var(--text-muted); cursor: pointer; }
+.achievement-year__landscape button { position: relative; display: grid; align-content: center; justify-items: center; min-width: 0; min-height: 130px; padding: 22px 3px 22px; border: 0; border-radius: 12px; color: var(--text-muted); cursor: pointer; transition: background-color .15s ease; }
 .achievement-year__landscape button:hover { background: rgba(255,255,255,.55); }
 .achievement-year__landscape button.active { background: var(--surface); box-shadow: 0 6px 18px rgba(36, 85, 73, .12), 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent); }
-.achievement-year__landscape .focus-plant { width: 82px; height: 82px; margin: -10px 0 -6px; }
-/* 月份与天数标签改为绝对定位的 pill，浮在花朵上方，避免被盛放阶段的 4 朵花顶端遮住 */
+.achievement-year__landscape .focus-plant { width: 72px; height: 72px; }
+/* 月份与天数标签：绝对定位的 pill，浮在花朵上方；强制不换行避免"静待生长"被截成两行 */
 .achievement-year__landscape .achievement-year__month,
-.achievement-year__landscape button > small { position: absolute; left: 50%; z-index: 2; padding: 1px 7px; border-radius: 999px; background: rgba(255,255,255,.88); color: var(--text); line-height: 1.45; }
-.achievement-year__landscape .achievement-year__month { top: 5px; transform: translateX(-50%); font-size: 10px; font-weight: 700; }
-.achievement-year__landscape button > small { bottom: 5px; transform: translateX(-50%); color: var(--text-muted); font-size: 9px; }
+.achievement-year__landscape button > small { position: absolute; left: 50%; z-index: 2; padding: 1px 8px; border-radius: 999px; background: rgba(255,255,255,.88); color: var(--text); line-height: 1.5; white-space: nowrap; box-shadow: 0 1px 2px rgba(36, 85, 73, .06); }
+.achievement-year__landscape .achievement-year__month { top: 6px; transform: translateX(-50%); font-size: 10px; font-weight: 700; letter-spacing: .02em; }
+.achievement-year__landscape button > small { bottom: 6px; transform: translateX(-50%); color: var(--text-muted); font-size: 9px; }
 .achievement-year__landscape button.active .achievement-year__month,
 .achievement-year__landscape button.active > small { background: #fff; }
-.achievement-soil { width: 54px; height: 14px; margin: 44px 0 17px; border-radius: 50%; background: #9d7d5e; box-shadow: inset 0 4px 0 rgba(255,255,255,.12); opacity: .62; }
+/* 空格子里的"土壤"改为更优雅的细线 + 圆点，呼应"等待萌芽" */
+.achievement-soil { width: 38px; height: 0; margin: 0; border-top: 1.5px dashed color-mix(in srgb, #8a7250 50%, transparent); opacity: .72; }
 .achievement-summary { padding: 17px; }.achievement-summary > header,.achievement-unlock > header { display: flex; justify-content: space-between; color: var(--accent-strong); font-size: 11px; font-weight: 700; }.achievement-summary dl { display: grid; gap: 0; margin: 12px 0 0; }.achievement-summary dl div { display: flex; justify-content: space-between; gap: 10px; padding: 12px 0; border-top: 1px solid var(--divider-soft); }.achievement-summary dt { color: var(--text-muted); font-size: 11px; }.achievement-summary dd { margin: 0; color: var(--text); font-size: 15px; font-weight: 750; }
 .achievement-month { padding: 18px; }.achievement-month__nav { display: flex; gap: 5px; }.achievement-month__nav button { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid var(--divider-soft); border-radius: 8px; color: var(--text-muted); cursor: pointer; }.achievement-month__nav button:hover { color: var(--accent-strong); background: var(--accent-soft); }.achievement-month__stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; margin-top: 14px; }.achievement-month__stats div { display: grid; gap: 4px; padding: 8px 9px; border: 1px solid var(--divider-soft); border-radius: 10px; background: var(--surface-muted); }.achievement-month__stats small { color: var(--text-muted); font-size: 9px; }.achievement-month__stats strong { overflow: hidden; color: var(--text); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .achievement-month__weekdays,.achievement-month__grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }.achievement-month__weekdays { margin: 14px 0 5px; }.achievement-month__weekdays span { color: var(--text-muted); font-size: 9px; text-align: center; }
