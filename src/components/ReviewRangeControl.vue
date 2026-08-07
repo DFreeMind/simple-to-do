@@ -30,33 +30,20 @@
       </button>
     </div>
 
-    <Transition name="review-range-pop">
-      <div
-        v-if="popoverOpen"
-        ref="popoverRef"
-        class="review-range-popover"
-        :style="popoverStyle"
-        role="dialog"
-        aria-label="选择时间范围"
-        tabindex="-1"
-        @click.stop
-      >
-          <header class="review-range-popover__head">
-            <div class="review-range-popover__title">
-              <span class="review-range-popover__badge"><Calendar :size="13" /></span>
-              <div>
-                <strong>选择时间范围</strong>
-                <small>先选开始日期，再选结束日期</small>
-              </div>
-            </div>
-            <button type="button" class="review-range-popover__close" aria-label="关闭" @click="closePopover">
-              <X :size="14" />
-            </button>
-          </header>
-
+    <Teleport to=".app">
+      <Transition name="review-range-pop">
+        <div
+          v-if="popoverOpen"
+          ref="popoverRef"
+          class="review-range-popover"
+          :style="popoverStyle"
+          role="dialog"
+          aria-label="选择时间范围"
+          tabindex="-1"
+          @click.stop
+        >
           <div class="review-range-popover__body">
             <section class="review-range-popover__shortcuts">
-              <h4>快捷</h4>
               <div class="review-range-popover__chips">
                 <button
                   v-for="item in POPOVER_SHORTCUTS"
@@ -142,13 +129,14 @@
             </div>
           </footer>
         </div>
-    </Transition>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Calendar, ChevronDown, ChevronLeft, ChevronRight, RotateCcw, X } from 'lucide-vue-next'
+import { Calendar, ChevronDown, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-vue-next'
 
 // 顶部只展示最常用的 5 个预设，剩余放进 popover 的快捷区
 // 选 5 个的依据：进入概览/管理页后用户最常切的"日 / 周 / 月 / 全部"
@@ -160,12 +148,11 @@ const RANGE_OPTIONS = [
   { id: 'thisMonth', label: '本月', hint: '本月 1 日至今' },
   { id: 'all', label: '全部', hint: '所有历史记录' }
 ]
+// 弹层快捷只保留最常用的 4 个，避免占过多空间
 const POPOVER_SHORTCUTS = [
   { id: 'today', days: 1, label: '今日' },
-  { id: 'yesterday', days: 2, label: '昨日' },
   { id: '7d', days: 7, label: '近 7 天' },
-  { id: '30d', days: 30, label: '近 30 天' },
-  { id: '90d', days: 90, label: '近 90 天' }
+  { id: '30d', days: 30, label: '近 30 天' }
 ]
 const WEEK_DAYS = ['一', '二', '三', '四', '五', '六', '日']
 
@@ -579,43 +566,8 @@ onBeforeUnmount(() => {
   opacity: 1;
 }
 
-/* 头部：淡 accent 渐变底 + 图标徽章 */
-.review-range-popover__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 16px 12px;
-  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 8%, var(--surface)), var(--surface) 70%);
-  border-bottom: 1px solid var(--divider-soft);
-}
-.review-range-popover__title { display: flex; align-items: center; gap: 10px; }
-.review-range-popover__badge {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
-  color: var(--accent-strong);
-}
-.review-range-popover__title > div { display: grid; gap: 1px; }
-.review-range-popover__title strong { color: var(--text); font-size: 13px; font-weight: 700; letter-spacing: -.01em; }
-.review-range-popover__title small { color: var(--text-muted); font-size: 10.5px; }
-.review-range-popover__close {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-.review-range-popover__close:hover { background: var(--surface-muted); color: var(--text); }
-
-.review-range-popover__body { display: grid; gap: 13px; padding: 14px 16px 4px; }
+/* 无头部，直接进入内容区：快捷 + 日期槽 + 日历 + 底部操作 */
+.review-range-popover__body { display: grid; gap: 12px; padding: 14px 16px 4px; }
 
 .review-range-popover__shortcuts h4 {
   margin: 0 0 7px;

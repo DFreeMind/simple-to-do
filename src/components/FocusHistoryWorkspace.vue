@@ -331,24 +331,6 @@
       </template>
 
       <section v-else-if="activeTab === 'focus'" class="review-card review-records">
-        <header class="review-management-header">
-          <div class="review-management-title">
-            <span>专注记录管理</span><h2>查找和管理每一段投入</h2><p>筛选、统计和列表使用同一数据口径。</p>
-          </div>
-          <div class="review-management-actions">
-            <div class="review-export-menu">
-              <button type="button" class="review-export-btn" :class="{ active: exportMenuOpen.focus }" :aria-expanded="exportMenuOpen.focus" aria-haspopup="menu" @click.stop="toggleExportMenu('focus')">
-                <Download :size="14" />导出
-                <ChevronDown :size="12" />
-              </button>
-              <div v-if="exportMenuOpen.focus" class="review-export-menu__panel" role="menu">
-                <button type="button" role="menuitem" @click="exportFocusCsv(); closeAllExportMenus()">CSV（Excel 打开）</button>
-                <button type="button" role="menuitem" @click="exportFocusJson(); closeAllExportMenus()">JSON（开发者用）</button>
-              </div>
-            </div>
-            <small>{{ formatCount(filteredFocusRecords.length) }} 条</small>
-          </div>
-        </header>
         <div class="review-filter-panel">
           <div class="review-filters">
             <ReviewRangeControl
@@ -361,10 +343,10 @@
               @update:custom-end="customEnd = $event"
             />
             <label><Search :size="16" /><span class="sr-only">搜索专注记录</span><input v-model.trim="focusSearch" type="search" placeholder="搜索任务、方式或备注" /></label>
-            <select v-model="focusResult" aria-label="筛选专注结果"><option value="all">全部结果</option><option value="completed">已完成</option><option value="unfinished">中断或放弃</option></select>
-            <select v-model="focusPhase" aria-label="筛选专注类型"><option value="all">专注与休息</option><option value="focus">仅专注</option><option value="break">仅休息</option></select>
-            <select v-model="focusPause" aria-label="筛选暂停情况"><option value="all">全部暂停情况</option><option value="paused">有暂停</option><option value="unpaused">无暂停</option></select>
-            <select v-model="focusSort" aria-label="专注记录排序"><option value="newest">最新在前</option><option value="oldest">最早在前</option><option value="longest">时长从长到短</option></select>
+            <ReviewSelect v-model="focusResult" :options="FOCUS_RESULT_OPTIONS" aria-label="筛选专注结果" />
+            <ReviewSelect v-model="focusPhase" :options="FOCUS_PHASE_OPTIONS" aria-label="筛选专注类型" />
+            <ReviewSelect v-model="focusPause" :options="FOCUS_PAUSE_OPTIONS" aria-label="筛选暂停情况" />
+            <ReviewSelect v-model="focusSort" :options="FOCUS_SORT_OPTIONS" aria-label="专注记录排序" />
             <button v-if="focusFilterCount" class="review-filter-reset" type="button" @click="resetFocusFilters"><RotateCcw :size="14" />重置筛选</button>
           </div>
         </div>
@@ -386,6 +368,18 @@
           <div><span>有效时长</span><strong>{{ formatDuration(filteredFocusSeconds) }}</strong></div>
           <div><span>完成率</span><strong>{{ filteredFocusCompletionRate }}%</strong></div>
           <div><span>暂停情况</span><strong>{{ filteredFocusPauseCount }} 次 · {{ formatDuration(filteredFocusPausedSeconds) }}</strong></div>
+          <div class="review-filter-summary__export">
+            <div class="review-export-menu">
+              <button type="button" class="review-export-btn" :class="{ active: exportMenuOpen.focus }" :aria-expanded="exportMenuOpen.focus" aria-haspopup="menu" @click.stop="toggleExportMenu('focus')">
+                <Download :size="14" />导出
+                <ChevronDown :size="12" />
+              </button>
+              <div v-if="exportMenuOpen.focus" class="review-export-menu__panel" role="menu">
+                <button type="button" role="menuitem" @click="exportFocusCsv(); closeAllExportMenus()">CSV（Excel 打开）</button>
+                <button type="button" role="menuitem" @click="exportFocusJson(); closeAllExportMenus()">JSON（开发者用）</button>
+              </div>
+            </div>
+          </div>
         </div>
         <div v-if="focusSelectionCount" class="review-batch-bar" role="toolbar" aria-label="批量操作">
           <span>已选 <strong>{{ focusSelectionCount }}</strong> 条专注记录</span>
@@ -417,7 +411,7 @@
         <p v-else class="review-card__empty">没有符合当前筛选条件的专注记录。</p>
         <footer v-if="filteredFocusRecords.length" class="review-pagination">
           <span>第 {{ focusPageStart }}–{{ focusPageEnd }} 条，共 {{ formatCount(filteredFocusRecords.length) }} 条</span>
-          <label>每页 <select v-model.number="focusPageSize" aria-label="每页专注记录数"><option v-for="size in pageSizes" :key="size" :value="size">{{ size }}</option></select> 条</label>
+          <label>每页 <ReviewSelect :model-value="String(focusPageSize)" :options="PAGE_SIZE_OPTIONS" aria-label="每页专注记录数" :menu-width="76" @update:model-value="focusPageSize = Number($event)" /> 条</label>
           <div>
             <button type="button" aria-label="上一页" :disabled="focusPage === 1" @click="focusPage--"><ChevronLeft :size="16" /></button>
             <strong>{{ focusPage }} / {{ focusPageCount }}</strong>
@@ -427,24 +421,6 @@
       </section>
 
       <section v-else class="review-card review-records">
-        <header class="review-management-header">
-          <div class="review-management-title">
-            <span>节律记录管理</span><h2>查找和管理每一次提醒响应</h2><p>筛选、统计和列表使用同一数据口径。</p>
-          </div>
-          <div class="review-management-actions">
-            <div class="review-export-menu">
-              <button type="button" class="review-export-btn" :class="{ active: exportMenuOpen.rhythm }" :aria-expanded="exportMenuOpen.rhythm" aria-haspopup="menu" @click.stop="toggleExportMenu('rhythm')">
-                <Download :size="14" />导出
-                <ChevronDown :size="12" />
-              </button>
-              <div v-if="exportMenuOpen.rhythm" class="review-export-menu__panel" role="menu">
-                <button type="button" role="menuitem" @click="exportRhythmCsv(); closeAllExportMenus()">CSV（Excel 打开）</button>
-                <button type="button" role="menuitem" @click="exportRhythmJson(); closeAllExportMenus()">JSON（开发者用）</button>
-              </div>
-            </div>
-            <small>{{ formatCount(filteredRhythmRecords.length) }} 条</small>
-          </div>
-        </header>
         <div class="review-filter-panel">
           <div class="review-filters">
             <ReviewRangeControl
@@ -457,9 +433,9 @@
               @update:custom-end="customEnd = $event"
             />
             <label><Search :size="16" /><span class="sr-only">搜索节律记录</span><input v-model.trim="rhythmSearch" type="search" placeholder="搜索提醒名称" /></label>
-            <select v-model="rhythmAction" aria-label="筛选节律处理结果"><option value="all">全部结果</option><option value="completed">已完成</option><option value="snoozed">已延后</option><option value="skipped">跳过或关闭</option></select>
-            <select v-model="rhythmTrigger" aria-label="筛选节律触发方式"><option value="all">全部触发方式</option><option value="interval">间隔提醒</option><option value="fixed-time">固定时刻</option><option value="active-duration">连续活跃</option></select>
-            <select v-model="rhythmSort" aria-label="节律记录排序"><option value="newest">最新在前</option><option value="oldest">最早在前</option><option value="slowest">响应最慢在前</option></select>
+            <ReviewSelect v-model="rhythmAction" :options="RHYTHM_ACTION_OPTIONS" aria-label="筛选节律处理结果" />
+            <ReviewSelect v-model="rhythmTrigger" :options="RHYTHM_TRIGGER_OPTIONS" aria-label="筛选节律触发方式" />
+            <ReviewSelect v-model="rhythmSort" :options="RHYTHM_SORT_OPTIONS" aria-label="节律记录排序" />
             <button v-if="rhythmFilterCount" class="review-filter-reset" type="button" @click="resetRhythmFilters"><RotateCcw :size="14" />重置</button>
           </div>
         </div>
@@ -481,6 +457,18 @@
           <div><span>完成或离席</span><strong>{{ filteredRhythmCompletionRate }}%</strong></div>
           <div><span>平均响应</span><strong>{{ formatResponseTime(filteredRhythmResponseAverage) }}</strong></div>
           <div><span>延后次数</span><strong>{{ filteredRhythmSnoozeCount }} 次</strong></div>
+          <div class="review-filter-summary__export">
+            <div class="review-export-menu">
+              <button type="button" class="review-export-btn" :class="{ active: exportMenuOpen.rhythm }" :aria-expanded="exportMenuOpen.rhythm" aria-haspopup="menu" @click.stop="toggleExportMenu('rhythm')">
+                <Download :size="14" />导出
+                <ChevronDown :size="12" />
+              </button>
+              <div v-if="exportMenuOpen.rhythm" class="review-export-menu__panel" role="menu">
+                <button type="button" role="menuitem" @click="exportRhythmCsv(); closeAllExportMenus()">CSV（Excel 打开）</button>
+                <button type="button" role="menuitem" @click="exportRhythmJson(); closeAllExportMenus()">JSON（开发者用）</button>
+              </div>
+            </div>
+          </div>
         </div>
         <div v-if="rhythmSelectionCount" class="review-batch-bar" role="toolbar" aria-label="批量操作">
           <span>已选 <strong>{{ rhythmSelectionCount }}</strong> 条节律记录</span>
@@ -513,7 +501,7 @@
         <p v-else class="review-card__empty">还没有节律历史。现有提醒配置会保留，新处理结果将从现在开始记录。</p>
         <footer v-if="filteredRhythmRecords.length" class="review-pagination">
           <span>第 {{ rhythmPageStart }}–{{ rhythmPageEnd }} 条，共 {{ formatCount(filteredRhythmRecords.length) }} 条</span>
-          <label>每页 <select v-model.number="rhythmPageSize" aria-label="每页节律记录数"><option v-for="size in pageSizes" :key="size" :value="size">{{ size }}</option></select> 条</label>
+          <label>每页 <ReviewSelect :model-value="String(rhythmPageSize)" :options="PAGE_SIZE_OPTIONS" aria-label="每页节律记录数" :menu-width="76" @update:model-value="rhythmPageSize = Number($event)" /> 条</label>
           <div>
             <button type="button" aria-label="上一页" :disabled="rhythmPage === 1" @click="rhythmPage--"><ChevronLeft :size="16" /></button>
             <strong>{{ rhythmPage }} / {{ rhythmPageCount }}</strong>
@@ -753,6 +741,7 @@ import { saveTextFile } from '@/services/platform'
 import FocusRewardBadge from './FocusRewardBadge.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
 import ReviewRangeControl from './ReviewRangeControl.vue'
+import ReviewSelect from './ReviewSelect.vue'
 import {
   formatDuration,
   formatCompactDuration,
@@ -767,6 +756,45 @@ import {
 const store = useTaskStore()
 const workspaceRef = ref(null)
 const detailRef = ref(null)
+
+// 自绘下拉的选项（ReviewSelect 用，替换原生 select 以获得一致外观）
+const FOCUS_RESULT_OPTIONS = [
+  { value: 'all', label: '全部结果' },
+  { value: 'completed', label: '已完成' },
+  { value: 'unfinished', label: '中断或放弃' }
+]
+const FOCUS_PHASE_OPTIONS = [
+  { value: 'all', label: '专注与休息' },
+  { value: 'focus', label: '仅专注' },
+  { value: 'break', label: '仅休息' }
+]
+const FOCUS_PAUSE_OPTIONS = [
+  { value: 'all', label: '全部暂停情况' },
+  { value: 'paused', label: '有暂停' },
+  { value: 'unpaused', label: '无暂停' }
+]
+const FOCUS_SORT_OPTIONS = [
+  { value: 'newest', label: '最新在前' },
+  { value: 'oldest', label: '最早在前' },
+  { value: 'longest', label: '时长从长到短' }
+]
+const RHYTHM_ACTION_OPTIONS = [
+  { value: 'all', label: '全部结果' },
+  { value: 'completed', label: '已完成' },
+  { value: 'snoozed', label: '已延后' },
+  { value: 'skipped', label: '跳过或关闭' }
+]
+const RHYTHM_TRIGGER_OPTIONS = [
+  { value: 'all', label: '全部触发方式' },
+  { value: 'interval', label: '间隔提醒' },
+  { value: 'fixed-time', label: '固定时刻' },
+  { value: 'active-duration', label: '连续活跃' }
+]
+const RHYTHM_SORT_OPTIONS = [
+  { value: 'newest', label: '最新在前' },
+  { value: 'oldest', label: '最早在前' },
+  { value: 'slowest', label: '响应最慢在前' }
+]
 
 // 筛选状态：尝试从 localStorage 恢复上次选择。仅持久化稳定的偏好类状态（不含临时分页）
 const REVIEW_PREFS_KEY = 'simple-todo.review-prefs.v1'
@@ -862,6 +890,7 @@ watch([range, activeTab, recentKind, focusResult, focusPhase, focusPause, focusS
 })
 const noteTextareaRef = ref(null)
 const pageSizes = [25, 50, 100]
+const PAGE_SIZE_OPTIONS = pageSizes.map(size => ({ value: String(size), label: String(size) }))
 // 范围选项：label 用于 selectedRangeLabel 计算属性展示，
 // 但 UI 渲染已统一交给 ReviewRangeControl 组件。
 // 这里只保留 selectedRange 实际读到的 id / days 字段。
@@ -2098,12 +2127,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-recent__actions button { display: inline-flex; min-height: 36px; align-items: center; gap: 4px; padding: 0 10px; border-radius: 8px; color: var(--accent-strong); font-size: 10px; font-weight: 680; }
 .review-recent__actions button:hover { background: var(--accent-soft); }
 .review-card__empty { margin: 0; padding: 34px 16px; color: var(--text-muted); font-size: 12px; line-height: 1.6; text-align: center; }
-.review-records > header { align-items: end; }
-.review-records > header p { margin: 1px 0 0; color: var(--text-muted); font-size: 11px; }
-.review-card > header > .review-management-title { display: grid; min-width: 0; align-content: start; gap: 3px; }
-.review-management-title > span { color: var(--accent-strong); font-size: 10px; font-weight: 750; letter-spacing: .05em; }
-.review-management-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 10px; }
-.review-management-actions small { color: var(--text-muted); font-size: 11px; white-space: nowrap; }
+.review-records > .review-filter-panel { margin-top: 0; }
 .review-summary-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 12px; }
 .review-export-btn { display: inline-flex; min-height: 34px; align-items: center; gap: 5px; padding: 0 12px; border: 1px solid var(--divider-soft); border-radius: 9px; background: var(--surface); color: var(--accent-strong); font: inherit; font-size: 11.5px; font-weight: 650; cursor: pointer; transition: border-color var(--transition-fast), background var(--transition-fast); }
 .review-export-btn:hover, .review-export-btn.active { border-color: var(--accent); background: var(--accent-soft); }
@@ -2115,32 +2139,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; padding: 0; }
 .review-filters label { display: flex; flex: 1 1 190px; min-width: 150px; height: 34px; align-items: center; gap: 7px; padding: 0 10px; border: 1px solid var(--divider-soft); border-radius: 9px; background: var(--surface); color: var(--text-muted); }
 .review-filters input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; font-size: 12px; }
-.review-filters select {
-  appearance: none;
-  -webkit-appearance: none;
-  flex: 0 0 auto;
-  width: auto;
-  max-width: 160px;
-  min-width: 0;
-  height: 34px;
-  padding: 0 26px 0 10px;
-  border: 1px solid var(--divider-soft);
-  border-radius: 9px;
-  outline: none;
-  background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23687674' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 9px center;
-  color: var(--text);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 550;
-  cursor: pointer;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background-color var(--transition-fast);
-}
-.review-filters select:hover { border-color: var(--border-strong); }
-.review-filters label:focus-within, .review-filters select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.review-filters label:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .review-filter-reset { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; gap: 5px; padding: 0 14px; border: 0; border-radius: 8px; background: transparent; color: var(--accent-strong); font-size: 11px; font-weight: 680; white-space: nowrap; }
 .review-filter-reset:hover { background: var(--accent-soft); }
 .review-filter-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 16px; min-height: 30px; padding: 5px 12px; margin: 0 0 10px; border: 1px solid var(--divider-soft); border-radius: 9px; background: var(--surface); }
 .review-filter-summary > div { display: inline-flex; align-items: baseline; gap: 4px; }
+.review-filter-summary__export { display: inline-flex; margin-left: auto; }
+.review-filter-summary__export .review-export-menu { display: inline-flex; }
 .review-filter-summary span { color: var(--text-muted); font-size: 10.5px; }
 .review-filter-summary strong { overflow: hidden; color: var(--text); font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
 .review-record-list { display: grid; gap: 5px; margin-top: 12px; }
@@ -2187,7 +2192,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-record-actions button.is-danger:hover { color: var(--danger); }
 .review-pagination { display: flex; min-height: 48px; align-items: center; justify-content: flex-end; gap: 14px; margin-top: 10px; color: var(--text-muted); font-size: 10px; }
 .review-pagination label { display: inline-flex; align-items: center; gap: 5px; }
-.review-pagination select { height: 30px; border: 1px solid var(--divider-soft); border-radius: 7px; background: var(--surface); color: var(--text); font: inherit; }
 .review-pagination > div { display: flex; align-items: center; gap: 6px; }
 .review-pagination button { display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid var(--divider-soft); border-radius: 8px; color: var(--text); }
 .review-pagination button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-strong); }
@@ -2309,7 +2313,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 @media (max-width: 900px) {
   .review-filters label { flex-basis: 100%; }
 }
-@media (max-width: 680px) { .review-workspace { padding: 14px; }.review-header { display: grid; gap: 14px; }.review-range, .review-tabs { overflow-x: auto; }.review-tabs button { white-space: nowrap; }.review-metrics { grid-template-columns: 1fr 1fr; }.review-metric { min-height: 88px; padding: 12px; }.review-recent__header { display: grid !important; }.review-recent-switch { width: 100%; }.review-recent-switch button { flex: 1; }.review-recent__footer { display: grid; }.review-recent__footer > div { display: grid; grid-template-columns: 1fr 1fr; }.review-card > header > .review-management-title { display: grid; }.review-filters label { flex-basis: 100%; }.review-filter-summary { gap: 4px 10px; }.review-pagination { flex-wrap: wrap; justify-content: space-between; }.review-detail-hero { grid-template-columns: 1fr; }.review-detail-hero__window { justify-content: space-between; }.review-detail-summary { grid-template-columns: 1fr; } }
+@media (max-width: 680px) { .review-workspace { padding: 14px; }.review-header { display: grid; gap: 14px; }.review-range, .review-tabs { overflow-x: auto; }.review-tabs button { white-space: nowrap; }.review-metrics { grid-template-columns: 1fr 1fr; }.review-metric { min-height: 88px; padding: 12px; }.review-recent__header { display: grid !important; }.review-recent-switch { width: 100%; }.review-recent-switch button { flex: 1; }.review-recent__footer { display: grid; }.review-recent__footer > div { display: grid; grid-template-columns: 1fr 1fr; }.review-filters label { flex-basis: 100%; }.review-filter-summary { gap: 4px 10px; }.review-pagination { flex-wrap: wrap; justify-content: space-between; }.review-detail-hero { grid-template-columns: 1fr; }.review-detail-hero__window { justify-content: space-between; }.review-detail-summary { grid-template-columns: 1fr; } }
 /* 新增：本期亮点洞察 */
 .review-insights { display: grid; gap: clamp(8px, 1.2vw, 12px); margin-bottom: clamp(10px, 1.4vw, 16px); padding: clamp(12px, 1.6vw, 16px); border: 1px solid var(--accent-34-fallback); border-radius: 16px; background: linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 70%, var(--surface)) 0%, var(--surface) 100%); }
 .review-insights > header { display: flex; align-items: center; gap: 7px; color: var(--accent-strong); }
