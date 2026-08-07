@@ -8,24 +8,14 @@
           <p>专注记录推进，节律记录你如何停下来。点击任意记录可查看完整详情。</p>
         </div>
         <div class="review-range-block">
-          <div class="review-range review-range--shortcut" role="group" aria-label="时间范围快捷">
-            <button v-for="option in ranges.filter(item => item.kind === 'shortcut')" :key="option.id" type="button" :class="{ active: range === option.id }" @click="range = option.id">
-              {{ option.label }}
-            </button>
-          </div>
-          <div class="review-range review-range--window" role="group" aria-label="时间范围窗口">
-            <button v-for="option in ranges.filter(item => !item.kind && item.kind !== 'custom')" :key="option.id" type="button" :class="{ active: range === option.id }" @click="range = option.id">
-              {{ option.label }}
-            </button>
-            <button type="button" :class="{ active: range === 'custom' }" :aria-expanded="range === 'custom'" @click="toggleCustomRange">自定义</button>
-          </div>
-        </div>
-        <div v-if="range === 'custom'" class="review-custom-range" role="group" aria-label="自定义日期范围">
-          <label><span>开始</span><input type="date" v-model="customStart" :max="customEnd || undefined" aria-label="开始日期" @change="normalizeCustomRange" /></label>
-          <span class="review-custom-range__sep">至</span>
-          <label><span>结束</span><input type="date" v-model="customEnd" :min="customStart || undefined" aria-label="结束日期" @change="normalizeCustomRange" /></label>
-          <button type="button" class="review-custom-range__apply" :disabled="!customStart || !customEnd" @click="customPanelOpen = false">应用</button>
-          <button type="button" class="review-custom-range__clear" @click="resetCustomRange">恢复近 7 天</button>
+          <ReviewRangeControl
+            :range="range"
+            :custom-start="customStart"
+            :custom-end="customEnd"
+            @update:range="range = $event"
+            @update:custom-start="customStart = $event"
+            @update:custom-end="customEnd = $event"
+          />
         </div>
       </header>
 
@@ -228,27 +218,26 @@
           <header>
             <span><SlidersHorizontal :size="15" />筛选与排序</span>
             <div class="review-filter-meta">
-              <label class="review-filter-range"><span>范围</span>
-                <select :value="range" aria-label="时间范围" @change="range = $event.target.value">
-                  <optgroup label="快捷">
-                    <option v-for="option in ranges.filter(item => item.kind === 'shortcut')" :key="option.id" :value="option.id">{{ option.label }}</option>
-                  </optgroup>
-                  <optgroup label="窗口">
-                    <option v-for="option in ranges.filter(item => !item.kind)" :key="option.id" :value="option.id">{{ option.label }}</option>
-                  </optgroup>
-                  <option value="custom">自定义</option>
-                </select>
-              </label>
               <small>{{ focusFilterCount ? `已启用 ${focusFilterCount} 项条件` : '当前显示全部专注记录' }}</small>
             </div>
           </header>
+          <div class="review-range-wrap">
+            <ReviewRangeControl
+              :range="range"
+              :custom-start="customStart"
+              :custom-end="customEnd"
+              @update:range="range = $event"
+              @update:custom-start="customStart = $event"
+              @update:custom-end="customEnd = $event"
+            />
+          </div>
           <div class="review-filters">
             <label><Search :size="16" /><span class="sr-only">搜索专注记录</span><input v-model.trim="focusSearch" type="search" placeholder="搜索任务、方式或备注" /></label>
             <select v-model="focusResult" aria-label="筛选专注结果"><option value="all">全部结果</option><option value="completed">已完成</option><option value="unfinished">中断或放弃</option></select>
             <select v-model="focusPhase" aria-label="筛选专注类型"><option value="all">专注与休息</option><option value="focus">仅专注</option><option value="break">仅休息</option></select>
             <select v-model="focusPause" aria-label="筛选暂停情况"><option value="all">全部暂停情况</option><option value="paused">有暂停</option><option value="unpaused">无暂停</option></select>
             <select v-model="focusSort" aria-label="专注记录排序"><option value="newest">最新在前</option><option value="oldest">最早在前</option><option value="longest">时长从长到短</option></select>
-            <button v-if="focusFilterCount" class="review-filter-reset" type="button" @click="resetFocusFilters"><RotateCcw :size="14" />重置</button>
+            <button v-if="focusFilterCount" class="review-filter-reset" type="button" @click="resetFocusFilters"><RotateCcw :size="14" />重置筛选</button>
           </div>
         </div>
         <div v-if="!focusHistory.length" class="review-empty review-empty--inline">
@@ -322,20 +311,19 @@
           <header>
             <span><SlidersHorizontal :size="15" />筛选与排序</span>
             <div class="review-filter-meta">
-              <label class="review-filter-range"><span>范围</span>
-                <select :value="range" aria-label="时间范围" @change="range = $event.target.value">
-                  <optgroup label="快捷">
-                    <option v-for="option in ranges.filter(item => item.kind === 'shortcut')" :key="option.id" :value="option.id">{{ option.label }}</option>
-                  </optgroup>
-                  <optgroup label="窗口">
-                    <option v-for="option in ranges.filter(item => !item.kind)" :key="option.id" :value="option.id">{{ option.label }}</option>
-                  </optgroup>
-                  <option value="custom">自定义</option>
-                </select>
-              </label>
               <small>{{ rhythmFilterCount ? `已启用 ${rhythmFilterCount} 项条件` : '当前显示全部节律记录' }}</small>
             </div>
           </header>
+          <div class="review-range-wrap">
+            <ReviewRangeControl
+              :range="range"
+              :custom-start="customStart"
+              :custom-end="customEnd"
+              @update:range="range = $event"
+              @update:custom-start="customStart = $event"
+              @update:custom-end="customEnd = $event"
+            />
+          </div>
           <div class="review-filters">
             <label><Search :size="16" /><span class="sr-only">搜索节律记录</span><input v-model.trim="rhythmSearch" type="search" placeholder="搜索提醒名称" /></label>
             <select v-model="rhythmAction" aria-label="筛选节律处理结果"><option value="all">全部结果</option><option value="completed">已完成</option><option value="snoozed">已延后</option><option value="skipped">跳过或关闭</option></select>
@@ -553,6 +541,7 @@ import { useTaskStore } from '@/stores/task'
 import { saveTextFile } from '@/services/platform'
 import FocusRewardBadge from './FocusRewardBadge.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
+import ReviewRangeControl from './ReviewRangeControl.vue'
 import {
   formatDuration,
   formatCompactDuration,
@@ -626,7 +615,6 @@ const rhythmPageSize = ref(reviewPrefs.rhythmPageSize)
 function isoToday() { return dateKey(new Date()) }
 const customStart = ref(reviewPrefs.customStart || (() => { const d = new Date(); d.setDate(d.getDate() - 6); return dateKey(d) })())
 const customEnd = ref(reviewPrefs.customEnd || isoToday())
-const customPanelOpen = ref(false)
 const detail = ref(null)
 const detailIndex = ref(-1) // 详情面板当前记录在筛选后列表中的位置，用于上下条导航
 const noteDraft = ref('')
@@ -663,16 +651,19 @@ watch([range, activeTab, recentKind, focusResult, focusPhase, focusPause, focusS
 })
 const noteTextareaRef = ref(null)
 const pageSizes = [25, 50, 100]
+// 范围选项：label 仍保留在 store/计算属性中用于展示，
+// 但 UI 渲染已统一交给 ReviewRangeControl 组件。
+// 仅保留 selectedRange 所需的 id/days/custom 字段。
 const ranges = [
-  { id: 'today', label: '今日', days: 1, kind: 'shortcut' },
-  { id: 'yesterday', label: '昨日', days: 2, kind: 'shortcut' },
-  { id: 'thisWeek', label: '本周', days: 7, kind: 'shortcut' },
-  { id: 'thisMonth', label: '本月', days: 30, kind: 'shortcut' },
+  { id: 'today', label: '今日', days: 1 },
+  { id: 'yesterday', label: '昨日', days: 2 },
+  { id: 'thisWeek', label: '本周', days: 7 },
+  { id: 'thisMonth', label: '本月', days: 30 },
   { id: '7d', label: '近 7 天', days: 7 },
   { id: '30d', label: '近 30 天', days: 30 },
   { id: '90d', label: '近 90 天', days: 90 },
   { id: 'all', label: '全部', days: null },
-  { id: 'custom', label: '自定义', days: null, kind: 'custom' }
+  { id: 'custom', label: '自定义', days: null }
 ]
 const recentKindOptions = [{ id: 'all', label: '全部' }, { id: 'focus', label: '仅专注' }, { id: 'rhythm', label: '仅节律' }]
 
@@ -1216,8 +1207,8 @@ watch([focusSearch, focusResult, focusPhase, focusPause, focusSort, focusPageSiz
 watch([rhythmSearch, rhythmAction, rhythmTrigger, rhythmSort, rhythmPageSize], () => { rhythmPage.value = 1 })
 watch(focusPageCount, count => { focusPage.value = Math.min(focusPage.value, count) })
 watch(rhythmPageCount, count => { rhythmPage.value = Math.min(rhythmPage.value, count) })
-// tab 切换时，detail 列表会变，需要重新定位
-watch(activeTab, () => { if (detail.value) syncDetailIndex() })
+// tab 切换由 selectTab 统一处理：scrollTo top + 关闭详情面板。
+// 跨 tab 切到不同记录类型时，上下条导航列表会变化，索性关掉比"重新定位"更安全。
 
 function dateKey(value) { const date = value instanceof Date ? value : new Date(value); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` }
 function focusTitle(item) { return item.taskTitle || store.activeTasks.find(task => task.id === item.taskId)?.title || phaseLabel(item.phase) }
@@ -1322,30 +1313,6 @@ function saveEditNote() {
 }
 function resetFocusFilters() { focusSearch.value = ''; focusResult.value = 'all'; focusPhase.value = 'all'; focusPause.value = 'all'; focusSort.value = 'newest' }
 function resetRhythmFilters() { rhythmSearch.value = ''; rhythmAction.value = 'all'; rhythmTrigger.value = 'all'; rhythmSort.value = 'newest' }
-function toggleCustomRange() {
-  if (range.value === 'custom') {
-    // 再次点击自定义：收起面板并切回近 7 天
-    range.value = '7d'
-    customPanelOpen.value = false
-    return
-  }
-  range.value = 'custom'
-  customPanelOpen.value = true
-}
-function normalizeCustomRange() {
-  // 开始晚于结束则交换，避免出现空范围
-  if (customStart.value && customEnd.value && customStart.value > customEnd.value) {
-    const tmp = customStart.value
-    customStart.value = customEnd.value
-    customEnd.value = tmp
-  }
-}
-function resetCustomRange() {
-  const d = new Date()
-  d.setDate(d.getDate() - 6)
-  customStart.value = dateKey(d)
-  customEnd.value = dateKey(new Date())
-}
 
 function openConfirm({ title, message, details, type, confirmText, onConfirm }) {
   confirmDialog.title = title
@@ -1454,16 +1421,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-header .eyebrow { margin: 0 0 5px; color: var(--accent-strong); font-size: 11px; font-weight: 750; letter-spacing: .08em; }
 .review-header h1 { margin: 0; color: var(--text); font-size: clamp(26px, 3vw, 34px); letter-spacing: -.045em; line-height: 1.18; }
 .review-header > div > p:last-child { margin: 8px 0 0; color: var(--text-muted); font-size: 13px; }
-.review-range { display: inline-flex; flex: 0 0 auto; gap: 2px; padding: 3px; border: 1px solid var(--divider-soft); border-radius: 11px; background: var(--surface-muted); }
-.review-range button { min-height: 34px; padding: 0 11px; border-radius: 8px; color: var(--text-muted); font-size: 12px; font-weight: 650; }
-.review-range button:hover { color: var(--text); }
-.review-range button.active { background: var(--surface); box-shadow: 0 2px 7px var(--text-7-fallback); color: var(--accent-strong); }
+.review-range-block { display: flex; justify-content: flex-end; }
 .review-tabs { display: flex; gap: 5px; margin-bottom: 13px; padding: 5px; border: 1px solid var(--divider-soft); border-radius: 14px; background-color: var(--surface); }
 .review-tabs button { display: inline-flex; min-height: 42px; align-items: center; gap: 7px; padding: 0 13px; border-radius: 10px; color: var(--text-muted); font-size: 12px; font-weight: 680; }
 .review-tabs button:hover { color: var(--text); background: var(--surface-muted); }
 .review-tabs button.active { color: var(--accent-strong); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent-20-border-fallback); }
 .review-tabs button span { min-width: 18px; padding: 2px 5px; border-radius: 999px; background: var(--surface); color: var(--text-muted); font-size: 9px; text-align: center; }
-.review-tabs button:focus-visible, .review-range button:focus-visible, .review-record-list button:focus-visible, .review-detail button:focus-visible { outline: 3px solid var(--accent-20-border-fallback); outline-offset: 2px; }
+.review-tabs button:focus-visible, .review-record-list button:focus-visible, .review-detail button:focus-visible { outline: 3px solid var(--accent-20-border-fallback); outline-offset: 2px; }
 .review-summary > header p { margin: 0; color: var(--text-muted); font-size: 10px; }
 .review-metrics { display: grid; grid-template-columns: 1.25fr repeat(3, minmax(150px, .75fr)); gap: 1px; margin-top: 14px; overflow: hidden; border: 1px solid var(--divider-soft); border-radius: 13px; background: var(--divider-soft); }
 .review-metric, .review-card { border: 1px solid var(--divider-soft); border-radius: 18px; background: var(--surface); box-shadow: 0 10px 26px var(--text-4-fallback); }
@@ -1533,8 +1497,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-filter-panel > header > span svg { color: var(--accent-strong); }
 .review-filter-panel > header > small { color: var(--text-muted); font-size: 10px; }
 .review-filter-meta { display: flex; align-items: center; gap: 10px; }
-.review-filter-range { display: inline-flex; align-items: center; gap: 5px; color: var(--text-muted); font-size: 10px; }
-.review-filter-range select { min-height: 24px; padding: 0 6px; border: 1px solid var(--divider-soft); border-radius: 7px; background: var(--surface); color: var(--text); font: inherit; font-size: 10.5px; }
+.review-range-wrap { margin: 0 0 10px; }
 .review-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; padding: 0; }
 .review-filters label { display: flex; width: 100%; max-width: 300px; height: 34px; align-items: center; gap: 7px; padding: 0 10px; border: 1px solid var(--divider-soft); border-radius: 8px; background: var(--surface); color: var(--text-muted); }
 .review-filters input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; font-size: 12px; }
@@ -1714,22 +1677,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-insight strong { color: var(--text); font-size: 13px; line-height: 1.4; }
 .review-insight small { display: block; margin-top: 2px; color: var(--text-muted); font-size: 11px; line-height: 1.45; }
 
-/* 新增：范围快捷 + 窗口切换的分组 */
-.review-range-block { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
-.review-range--shortcut button { min-height: 28px; padding: 0 9px; font-size: 11px; }
-.review-range--window button { min-height: 28px; padding: 0 9px; font-size: 11px; }
-.review-range { display: inline-flex; flex: 0 0 auto; }
-/* 自定义日期范围面板 */
-.review-custom-range { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--divider-soft); border-radius: 11px; background: var(--surface); margin-top: 4px; }
-.review-custom-range label { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: 11px; }
-.review-custom-range input[type="date"] { min-height: 32px; padding: 0 8px; border: 1px solid var(--divider-soft); border-radius: 8px; background: var(--surface-muted); color: var(--text); font: inherit; font-size: 12px; }
-.review-custom-range input[type="date"]:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-.review-custom-range__sep { color: var(--text-muted); font-size: 11px; }
-.review-custom-range__apply { min-height: 32px; padding: 0 14px; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font: inherit; font-size: 12px; font-weight: 680; cursor: pointer; }
-.review-custom-range__apply:hover:not(:disabled) { background: var(--accent-strong); }
-.review-custom-range__apply:disabled { opacity: .5; cursor: not-allowed; }
-.review-custom-range__clear { min-height: 32px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--text-muted); font: inherit; font-size: 11.5px; cursor: pointer; }
-.review-custom-range__clear:hover { color: var(--accent-strong); background: var(--accent-soft); }
+/* 范围控件已抽到 ReviewRangeControl 组件，原有的双层按钮与自定义面板样式不再使用 */
 
 /* 新增：分层空状态 */
 .review-empty--empty-range { background: var(--surface-muted); border-color: var(--divider-soft); }
