@@ -71,7 +71,7 @@
         <template v-else-if="speciesId === 'cosmos'">
           <path d="M79 145C70 119 60 91 58 67" stroke-width="2.5" />
           <path v-if="stageIndex >= 3" d="M82 142c9-28 22-50 20-68" stroke-width="2.4" />
-          <path v-if="stageIndex === 5" d="M76 121C61 111 48 104 36 100" stroke-width="2" />
+          <path v-if="stageIndex === 5" d="M78 122C70 112 64 104 80 96" stroke-width="2" />
         </template>
         <template v-else-if="speciesId === 'poppy'">
           <path v-if="stageIndex >= 3" d="M77 146C62 120 58 91 65 67" stroke-width="2.8" />
@@ -364,10 +364,10 @@ const daisyBlooms = computed(() => (
 ))
 // 初绽阶段 (stage 4) 与盛放 (stage 5) 都需要让花朵簇的视觉重心贴近 viewBox 中线。
 // 之前第二朵花固定在 (49, 65) 偏左 31 单位，导致年格 / 月格里 8 月类花视觉上整体偏左。
-// 调整：初绽改为主 + 左右对称的小三角；盛放微调侧花位置，让整簇更对称。
+// 调整：初绽改为主 + 左右对称的小三角；盛放把"飘到左下"的小花改回中线下方，让整簇更对称。
 const cosmosBlooms = computed(() => (
   stageIndex.value === 5
-    ? [{ x: 80, y: 44, scale: .78, rotate: 2 }, { x: 56, y: 64, scale: .66, rotate: -12 }, { x: 104, y: 74, scale: .62, rotate: 12 }, { x: 36, y: 100, scale: .4, rotate: -18 }]
+    ? [{ x: 80, y: 44, scale: .74, rotate: 2 }, { x: 58, y: 62, scale: .64, rotate: -12 }, { x: 102, y: 70, scale: .6, rotate: 12 }, { x: 80, y: 96, scale: .38, rotate: -4 }]
     : [{ x: 80, y: 48, scale: .7, rotate: 0 }, { x: 60, y: 70, scale: .5, rotate: -10 }, { x: 100, y: 72, scale: .5, rotate: 10 }]
 ))
 const poppyBlooms = computed(() => (
