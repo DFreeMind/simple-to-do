@@ -350,13 +350,7 @@
           </div>
         </header>
         <div class="review-filter-panel">
-          <header>
-            <span><SlidersHorizontal :size="15" />筛选与排序</span>
-            <div class="review-filter-meta">
-              <small>{{ focusFilterCount ? `已启用 ${focusFilterCount} 项条件` : '当前显示全部专注记录' }}</small>
-            </div>
-          </header>
-          <div class="review-range-wrap">
+          <div class="review-filters">
             <ReviewRangeControl
               compact
               :range="range"
@@ -366,8 +360,6 @@
               @update:custom-start="customStart = $event"
               @update:custom-end="customEnd = $event"
             />
-          </div>
-          <div class="review-filters">
             <label><Search :size="16" /><span class="sr-only">搜索专注记录</span><input v-model.trim="focusSearch" type="search" placeholder="搜索任务、方式或备注" /></label>
             <select v-model="focusResult" aria-label="筛选专注结果"><option value="all">全部结果</option><option value="completed">已完成</option><option value="unfinished">中断或放弃</option></select>
             <select v-model="focusPhase" aria-label="筛选专注类型"><option value="all">专注与休息</option><option value="focus">仅专注</option><option value="break">仅休息</option></select>
@@ -389,6 +381,7 @@
           <button type="button" @click="resetFocusFilters"><RotateCcw :size="13" />重置筛选</button>
         </div>
         <div class="review-filter-summary" aria-label="当前筛选的专注统计">
+          <div v-if="focusFilterCount"><span>已启用</span><strong>{{ focusFilterCount }} 项条件</strong></div>
           <div><span>匹配记录</span><strong>{{ formatCount(filteredFocusRecords.length) }} 条</strong></div>
           <div><span>有效时长</span><strong>{{ formatDuration(filteredFocusSeconds) }}</strong></div>
           <div><span>完成率</span><strong>{{ filteredFocusCompletionRate }}%</strong></div>
@@ -453,13 +446,7 @@
           </div>
         </header>
         <div class="review-filter-panel">
-          <header>
-            <span><SlidersHorizontal :size="15" />筛选与排序</span>
-            <div class="review-filter-meta">
-              <small>{{ rhythmFilterCount ? `已启用 ${rhythmFilterCount} 项条件` : '当前显示全部节律记录' }}</small>
-            </div>
-          </header>
-          <div class="review-range-wrap">
+          <div class="review-filters">
             <ReviewRangeControl
               compact
               :range="range"
@@ -469,8 +456,6 @@
               @update:custom-start="customStart = $event"
               @update:custom-end="customEnd = $event"
             />
-          </div>
-          <div class="review-filters">
             <label><Search :size="16" /><span class="sr-only">搜索节律记录</span><input v-model.trim="rhythmSearch" type="search" placeholder="搜索提醒名称" /></label>
             <select v-model="rhythmAction" aria-label="筛选节律处理结果"><option value="all">全部结果</option><option value="completed">已完成</option><option value="snoozed">已延后</option><option value="skipped">跳过或关闭</option></select>
             <select v-model="rhythmTrigger" aria-label="筛选节律触发方式"><option value="all">全部触发方式</option><option value="interval">间隔提醒</option><option value="fixed-time">固定时刻</option><option value="active-duration">连续活跃</option></select>
@@ -491,6 +476,7 @@
           <button type="button" @click="resetRhythmFilters"><RotateCcw :size="13" />重置筛选</button>
         </div>
         <div class="review-filter-summary" aria-label="当前筛选的节律统计">
+          <div v-if="rhythmFilterCount"><span>已启用</span><strong>{{ rhythmFilterCount }} 项条件</strong></div>
           <div><span>匹配记录</span><strong>{{ formatCount(filteredRhythmRecords.length) }} 条</strong></div>
           <div><span>完成或离席</span><strong>{{ filteredRhythmCompletionRate }}%</strong></div>
           <div><span>平均响应</span><strong>{{ formatResponseTime(filteredRhythmResponseAverage) }}</strong></div>
@@ -2125,20 +2111,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-export-menu__panel { position: absolute; right: 0; top: calc(100% + 4px); z-index: 4; min-width: 220px; padding: 4px; border: 1px solid var(--divider-soft); border-radius: 9px; background: var(--surface); box-shadow: 0 12px 30px var(--text-7-fallback); }
 .review-export-menu__panel button { display: block; width: 100%; padding: 8px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--text); text-align: left; font: inherit; font-size: 12px; cursor: pointer; }
 .review-export-menu__panel button:hover { background: var(--accent-soft); color: var(--accent-strong); }
-.review-filter-panel { margin: 14px 0 10px; padding: 10px; border: 1px solid var(--divider-soft); border-radius: 13px; background: var(--surface-muted); }
-.review-filter-panel > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 2px 8px; }
-.review-filter-panel > header > span { display: inline-flex; align-items: center; gap: 6px; color: var(--text); font-size: 11px; font-weight: 700; }
-.review-filter-panel > header > span svg { color: var(--accent-strong); }
-.review-filter-panel > header > small { color: var(--text-muted); font-size: 10px; }
-.review-filter-meta { display: flex; align-items: center; gap: 10px; }
-.review-range-wrap { margin: 0 0 10px; }
-.review-filters { display: grid; grid-template-columns: minmax(220px, 1.4fr) repeat(4, minmax(0, 1fr)) auto; align-items: center; gap: 8px; margin: 0; padding: 0; }
-.review-filters label { display: flex; width: 100%; height: 34px; align-items: center; gap: 7px; padding: 0 10px; border: 1px solid var(--divider-soft); border-radius: 8px; background: var(--surface); color: var(--text-muted); }
+.review-filter-panel { margin: 12px 0 8px; padding: 8px; border: 1px solid var(--divider-soft); border-radius: 12px; background: var(--surface-muted); }
+.review-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; padding: 0; }
+.review-filters label { display: flex; flex: 1 1 190px; min-width: 150px; height: 34px; align-items: center; gap: 7px; padding: 0 10px; border: 1px solid var(--divider-soft); border-radius: 9px; background: var(--surface); color: var(--text-muted); }
 .review-filters input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; font-size: 12px; }
 .review-filters select {
   appearance: none;
   -webkit-appearance: none;
-  width: 100%;
+  flex: 0 0 auto;
+  width: auto;
+  max-width: 160px;
   min-width: 0;
   height: 34px;
   padding: 0 26px 0 10px;
@@ -2157,10 +2139,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-filters label:focus-within, .review-filters select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .review-filter-reset { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; gap: 5px; padding: 0 14px; border: 0; border-radius: 8px; background: transparent; color: var(--accent-strong); font-size: 11px; font-weight: 680; white-space: nowrap; }
 .review-filter-reset:hover { background: var(--accent-soft); }
-.review-filter-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
-.review-filter-summary > div { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--divider-soft); border-radius: 11px; background: var(--surface); }
-.review-filter-summary span { color: var(--text-muted); font-size: 10px; }
-.review-filter-summary strong { overflow: hidden; color: var(--text); font-size: 13px; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+.review-filter-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 16px; min-height: 30px; padding: 5px 12px; margin: 0 0 10px; border: 1px solid var(--divider-soft); border-radius: 9px; background: var(--surface); }
+.review-filter-summary > div { display: inline-flex; align-items: baseline; gap: 4px; }
+.review-filter-summary span { color: var(--text-muted); font-size: 10.5px; }
+.review-filter-summary strong { overflow: hidden; color: var(--text); font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
 .review-record-list { display: grid; gap: 5px; margin-top: 12px; }
 .review-record-list button { display: grid; width: 100%; min-height: 58px; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 11px; padding: 8px 10px; border: 1px solid transparent; border-radius: 11px; color: var(--text-muted); text-align: left; transition: border-color var(--transition-fast), background var(--transition-fast); }
 .review-record-list button:hover { border-color: var(--divider-soft); background: var(--surface-muted); }
@@ -2325,10 +2307,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-detail-close:hover { background: var(--accent-strong); }
 @media (max-width: 900px) { .review-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }.review-overview-grid { grid-template-columns: 1fr; }.review-record-table, .review-recent-list { overflow-x: auto; }.review-record-table__head, .review-record-row, .review-recent-row { min-width: 720px; } }
 @media (max-width: 900px) {
-  .review-filters { grid-template-columns: 1fr 1fr; }
-  .review-filters label { grid-column: 1 / -1; }
+  .review-filters label { flex-basis: 100%; }
 }
-@media (max-width: 680px) { .review-workspace { padding: 14px; }.review-header { display: grid; gap: 14px; }.review-range, .review-tabs { overflow-x: auto; }.review-tabs button { white-space: nowrap; }.review-metrics { grid-template-columns: 1fr 1fr; }.review-metric { min-height: 88px; padding: 12px; }.review-recent__header { display: grid !important; }.review-recent-switch { width: 100%; }.review-recent-switch button { flex: 1; }.review-recent__footer { display: grid; }.review-recent__footer > div { display: grid; grid-template-columns: 1fr 1fr; }.review-card > header > .review-management-title { display: grid; }.review-filter-panel > header { align-items: flex-start; }.review-filters { grid-template-columns: 1fr; }.review-filter-summary { grid-template-columns: 1fr 1fr; }.review-pagination { flex-wrap: wrap; justify-content: space-between; }.review-detail-hero { grid-template-columns: 1fr; }.review-detail-hero__window { justify-content: space-between; }.review-detail-summary { grid-template-columns: 1fr; } }
+@media (max-width: 680px) { .review-workspace { padding: 14px; }.review-header { display: grid; gap: 14px; }.review-range, .review-tabs { overflow-x: auto; }.review-tabs button { white-space: nowrap; }.review-metrics { grid-template-columns: 1fr 1fr; }.review-metric { min-height: 88px; padding: 12px; }.review-recent__header { display: grid !important; }.review-recent-switch { width: 100%; }.review-recent-switch button { flex: 1; }.review-recent__footer { display: grid; }.review-recent__footer > div { display: grid; grid-template-columns: 1fr 1fr; }.review-card > header > .review-management-title { display: grid; }.review-filters label { flex-basis: 100%; }.review-filter-summary { gap: 4px 10px; }.review-pagination { flex-wrap: wrap; justify-content: space-between; }.review-detail-hero { grid-template-columns: 1fr; }.review-detail-hero__window { justify-content: space-between; }.review-detail-summary { grid-template-columns: 1fr; } }
 /* 新增：本期亮点洞察 */
 .review-insights { display: grid; gap: clamp(8px, 1.2vw, 12px); margin-bottom: clamp(10px, 1.4vw, 16px); padding: clamp(12px, 1.6vw, 16px); border: 1px solid var(--accent-34-fallback); border-radius: 16px; background: linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 70%, var(--surface)) 0%, var(--surface) 100%); }
 .review-insights > header { display: flex; align-items: center; gap: 7px; color: var(--accent-strong); }
