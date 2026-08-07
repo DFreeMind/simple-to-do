@@ -36,38 +36,64 @@
           class="review-range-popover"
           :style="popoverStyle"
           role="dialog"
-          aria-label="自定义日期范围"
+          aria-label="选择时间范围"
           @click.stop
         >
           <header class="review-range-popover__head">
-            <span>选择日期范围</span>
+            <div>
+              <strong>选择时间范围</strong>
+              <small>快捷预设或自定义起止日期</small>
+            </div>
             <button type="button" class="review-range-popover__close" aria-label="关闭" @click="closePopover">
               <X :size="14" />
             </button>
           </header>
-          <div class="review-range-popover__shortcuts">
-            <button v-for="item in POPOVER_SHORTCUTS" :key="item.id" type="button" @click="applyShortcut(item.days)">
-              近 {{ item.days }} 天
-            </button>
-            <button type="button" @click="applyShortcut(null)">全部</button>
-          </div>
+
           <div class="review-range-popover__body">
-            <label>
-              <span>开始</span>
-              <input type="date" :value="customStart" :max="customEnd || undefined" aria-label="开始日期" @change="onStartChange" />
-            </label>
-            <span class="review-range-popover__sep" aria-hidden="true">→</span>
-            <label>
-              <span>结束</span>
-              <input type="date" :value="customEnd" :min="customStart || undefined" aria-label="结束日期" @change="onEndChange" />
-            </label>
+            <section class="review-range-popover__shortcuts">
+              <h4>快捷</h4>
+              <div class="review-range-popover__chips">
+                <button
+                  v-for="item in POPOVER_SHORTCUTS"
+                  :key="item.id"
+                  type="button"
+                  :class="{ active: isShortcutActive(item) }"
+                  @click="applyShortcut(item.days)"
+                >
+                  {{ item.label }}
+                </button>
+                <button
+                  type="button"
+                  :class="{ active: range === 'all' }"
+                  @click="applyShortcut(null)"
+                >
+                  全部
+                </button>
+              </div>
+            </section>
+
+            <section class="review-range-popover__custom">
+              <h4>自定义日期</h4>
+              <div class="review-range-popover__inputs">
+                <label>
+                  <span>开始</span>
+                  <input type="date" :value="customStart" :max="customEnd || undefined" aria-label="开始日期" @change="onStartChange" />
+                </label>
+                <span class="review-range-popover__arrow" aria-hidden="true">→</span>
+                <label>
+                  <span>结束</span>
+                  <input type="date" :value="customEnd" :min="customStart || undefined" aria-label="结束日期" @change="onEndChange" />
+                </label>
+              </div>
+              <p class="review-range-popover__hint">日期变化会立刻应用；超过 60 天的范围仅显示最近 60 天的趋势。</p>
+            </section>
           </div>
+
           <footer class="review-range-popover__foot">
-            <small>日期变化会立刻应用，超过 60 天的范围仅显示最近 60 天的趋势。</small>
-            <div>
-              <button type="button" class="review-range-popover__reset" :disabled="!customStart && !customEnd" @click="resetCustom">重置</button>
-              <button type="button" class="review-range-popover__done" @click="closePopover">完成</button>
-            </div>
+            <button type="button" class="review-range-popover__reset" :disabled="!customStart && !customEnd" @click="resetCustom">
+              <RotateCcw :size="12" />重置为近 7 天
+            </button>
+            <button type="button" class="review-range-popover__done" @click="closePopover">完成</button>
           </footer>
         </div>
       </Transition>
@@ -79,21 +105,22 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Calendar, ChevronDown, RotateCcw, X } from 'lucide-vue-next'
 
-// 单一来源：所有页面共享同一份范围选项与提示。
+// 顶部只展示最常用的 5 个预设，剩余放进 popover 的快捷区
+// 选 5 个的依据：进入概览/管理页后用户最常切的"日 / 周 / 月 / 全部"
+// 加上"近 7 天"作为对照（与本周并列存在，让用户能区分自然周 vs 滚动 7 天）
 const RANGE_OPTIONS = [
   { id: 'today', label: '今日', hint: '今天 0 点到当前' },
-  { id: 'yesterday', label: '昨日', hint: '昨天全天' },
   { id: 'thisWeek', label: '本周', hint: '本周日至今（自然周）' },
-  { id: 'thisMonth', label: '本月', hint: '本月 1 日至今' },
   { id: '7d', label: '近 7 天', hint: '包含今天，向前滚动 7 天' },
-  { id: '30d', label: '近 30 天', hint: '包含今天，向前滚动 30 天' },
-  { id: '90d', label: '近 90 天', hint: '包含今天，向前滚动 90 天' },
+  { id: 'thisMonth', label: '本月', hint: '本月 1 日至今' },
   { id: 'all', label: '全部', hint: '所有历史记录' }
 ]
 const POPOVER_SHORTCUTS = [
-  { id: '7d', days: 7 },
-  { id: '30d', days: 30 },
-  { id: '90d', days: 90 }
+  { id: 'today', days: 1, label: '今日' },
+  { id: 'yesterday', days: 2, label: '昨日' },
+  { id: '7d', days: 7, label: '近 7 天' },
+  { id: '30d', days: 30, label: '近 30 天' },
+  { id: '90d', days: 90, label: '近 90 天' }
 ]
 
 const props = defineProps({
@@ -108,7 +135,6 @@ const rowRef = ref(null)
 const customTriggerRef = ref(null)
 const popoverRef = ref(null)
 const popoverOpen = ref(false)
-// 触发器位置（视口坐标），用于 popover 定位
 const triggerRect = ref({ left: 0, top: 0, width: 0, bottom: 0 })
 
 const customButtonLabel = computed(() => {
@@ -119,18 +145,17 @@ const customButtonLabel = computed(() => {
   return `${props.customStart.slice(5)} – ${props.customEnd.slice(5)}`
 })
 
-const customHint = computed(() => '选择起止日期查看任意时间段')
+const customHint = computed(() => '点击选择起止日期或快捷预设')
 
-// 计算 popover 位置：相对视口（fixed），与触发器左对齐
 const popoverStyle = computed(() => {
   if (!triggerRect.value.width) return { visibility: 'hidden' }
-  const margin = 8
-  const popoverWidth = 320
-  const desiredLeft = triggerRect.value.left
-  // 防止超出视口右侧
+  const margin = 12
+  const popoverWidth = 380
+  const desiredLeft = triggerRect.value.left + triggerRect.value.width - popoverWidth
   const maxLeft = (typeof window !== 'undefined' ? window.innerWidth : 1024) - popoverWidth - margin
-  const left = Math.max(margin, Math.min(desiredLeft, maxLeft))
-  const top = triggerRect.value.bottom + 6
+  const minLeft = margin
+  const left = Math.max(minLeft, Math.min(desiredLeft, maxLeft))
+  const top = triggerRect.value.bottom + 8
   return { left: `${left}px`, top: `${top}px`, width: `${popoverWidth}px` }
 })
 
@@ -152,7 +177,6 @@ function openPopover() {
   if (popoverOpen.value) return
   updateTriggerRect()
   popoverOpen.value = true
-  // 进入自定义模式（如果还没在）
   if (props.range !== 'custom') emit('update:range', 'custom')
   nextTick(() => {
     const firstInput = popoverRef.value?.querySelector('input[type="date"]')
@@ -171,6 +195,7 @@ function updateTriggerRect() {
   triggerRect.value = { left: rect.left, top: rect.top, width: rect.width, bottom: rect.bottom }
 }
 
+// "近 N 天"快捷：自动设置 customStart/customEnd
 function applyShortcut(days) {
   if (days === null) {
     emit('update:range', 'all')
@@ -186,13 +211,23 @@ function applyShortcut(days) {
   closePopover()
 }
 
+// 判断当前 custom 范围是否对应某个"近 N 天"快捷，用于高亮
+function isShortcutActive(item) {
+  if (props.range !== 'custom') return false
+  if (!props.customStart || !props.customEnd) return false
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const start = new Date(props.customStart + 'T00:00:00')
+  const diffDays = Math.round((today - start) / 86400000) + 1
+  return diffDays === item.days
+}
+
 function onStartChange(event) {
   const value = event.target.value
   if (!value) {
     emit('update:customStart', '')
     return
   }
-  // 开始晚于结束：自动交换
   if (props.customEnd && value > props.customEnd) {
     emit('update:customStart', props.customEnd)
     emit('update:customEnd', value)
@@ -232,7 +267,6 @@ function formatDateKey(date) {
   return `${y}-${m}-${d}`
 }
 
-// 外部点击关闭
 function handleDocClick(event) {
   if (!popoverOpen.value) return
   const trigger = customTriggerRef.value
@@ -338,21 +372,25 @@ onBeforeUnmount(() => {
   position: fixed;
   z-index: 50;
   display: grid;
-  gap: 10px;
-  padding: 12px 14px;
+  gap: 12px;
+  padding: 16px 18px;
   border: 1px solid var(--divider-soft);
-  border-radius: 12px;
-  background: var(--surface);
-  box-shadow: 0 16px 40px var(--text-7-fallback), 0 2px 6px var(--text-7-fallback);
+  border-radius: 14px;
+  background: var(--surface, #fff);
+  box-shadow: 0 24px 56px rgba(8, 24, 20, .22), 0 4px 12px rgba(8, 24, 20, .12);
+  /* 保证不透明：覆盖可能的半透明变量 */
+  opacity: 1;
 }
 
 .review-range-popover__head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 8px;
+  gap: 12px;
 }
-.review-range-popover__head > span { color: var(--accent-strong); font-size: 11px; font-weight: 700; letter-spacing: .04em; }
+.review-range-popover__head > div { display: grid; gap: 2px; }
+.review-range-popover__head strong { color: var(--text); font-size: 13px; font-weight: 700; letter-spacing: -.01em; }
+.review-range-popover__head small { color: var(--text-muted); font-size: 11px; }
 .review-range-popover__close {
   display: grid; place-items: center;
   width: 24px; height: 24px;
@@ -362,51 +400,93 @@ onBeforeUnmount(() => {
 }
 .review-range-popover__close:hover { background: var(--surface-muted); color: var(--text); }
 
-.review-range-popover__shortcuts { display: flex; flex-wrap: wrap; gap: 4px; }
-.review-range-popover__shortcuts button {
-  min-height: 24px;
-  padding: 0 10px;
-  border: 0; border-radius: 6px;
-  background: var(--surface-muted);
-  color: var(--text-muted);
-  font: inherit; font-size: 10.5px; font-weight: 600;
-  cursor: pointer;
-}
-.review-range-popover__shortcuts button:hover { background: var(--accent-soft); color: var(--accent-strong); }
+.review-range-popover__body { display: grid; gap: 14px; }
 
-.review-range-popover__body { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 6px; }
-.review-range-popover__body label { display: grid; gap: 3px; color: var(--text-muted); font-size: 10px; }
-.review-range-popover__body input[type="date"] {
-  min-height: 30px;
-  padding: 0 8px;
-  border: 1px solid var(--divider-soft);
+.review-range-popover__shortcuts h4,
+.review-range-popover__custom h4 {
+  margin: 0 0 7px;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+
+.review-range-popover__chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.review-range-popover__chips button {
+  min-height: 28px;
+  padding: 0 12px;
+  border: 1px solid transparent;
   border-radius: 7px;
+  background: var(--surface-muted);
+  color: var(--text);
+  font: inherit; font-size: 11.5px; font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+.review-range-popover__chips button:hover {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+.review-range-popover__chips button.active {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.review-range-popover__inputs { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 6px; }
+.review-range-popover__inputs label { display: grid; gap: 4px; color: var(--text-muted); font-size: 10px; }
+.review-range-popover__inputs input[type="date"] {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--divider-soft);
+  border-radius: 8px;
   background: var(--surface-muted);
   color: var(--text);
   font: inherit;
   font-size: 12px;
 }
-.review-range-popover__body input[type="date"]:focus {
+.review-range-popover__inputs input[type="date"]:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
-.review-range-popover__sep { color: var(--text-muted); font-size: 12px; }
+.review-range-popover__arrow { color: var(--text-muted); font-size: 14px; padding-bottom: 8px; }
 
-.review-range-popover__foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.review-range-popover__foot small { color: var(--text-muted); font-size: 10px; line-height: 1.4; }
-.review-range-popover__foot > div { display: flex; gap: 4px; flex-shrink: 0; }
-.review-range-popover__reset, .review-range-popover__done {
-  min-height: 26px;
-  padding: 0 10px;
-  border: 0; border-radius: 6px;
-  font: inherit; font-size: 10.5px; font-weight: 600;
+.review-range-popover__hint { margin: 8px 0 0; color: var(--text-muted); font-size: 10.5px; line-height: 1.5; }
+
+.review-range-popover__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px solid var(--divider-soft);
+  margin-top: -2px;
+  padding-top: 12px;
+}
+.review-range-popover__reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 0; border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit; font-size: 11.5px; font-weight: 600;
   cursor: pointer;
 }
-.review-range-popover__reset { background: transparent; color: var(--text-muted); }
 .review-range-popover__reset:hover:not(:disabled) { background: var(--surface-muted); color: var(--text); }
 .review-range-popover__reset:disabled { opacity: .5; cursor: not-allowed; }
-.review-range-popover__done { background: var(--accent); color: #fff; }
+.review-range-popover__done {
+  min-height: 30px;
+  padding: 0 16px;
+  border: 0; border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit; font-size: 11.5px; font-weight: 650;
+  cursor: pointer;
+}
 .review-range-popover__done:hover { background: var(--accent-strong); }
 
 .review-range-pop-enter-active, .review-range-pop-leave-active { transition: opacity .14s ease, transform .14s ease; }
