@@ -835,12 +835,13 @@ onBeforeUnmount(cancelGrowthReplay)
 .achievement-year__bird::after { right: 0; transform: rotate(135deg); }
 .achievement-year__bird--two { top: 60%; left: auto; right: 26%; transform: scale(.7); }
 
-/* cell 按钮：月份 pill 在上，温室居中，底部"🌱 静待生长/N天" pill */
+/* cell 按钮：月份 pill 在上，温室在中间行底对齐，底部"🌱 静待生长/N天" pill
+   align-items: end 让罩子底座固定贴住底 pill 上沿，避免不同 stage 高度不同导致底座漂移 */
 .achievement-year__landscape button {
   position: relative;
   display: grid;
   grid-template-rows: auto 1fr auto;
-  align-items: center;
+  align-items: end;
   justify-items: center;
   gap: 4px;
   min-width: 0;
@@ -853,9 +854,16 @@ onBeforeUnmount(cancelGrowthReplay)
   background: rgba(255, 255, 255, .42);
   z-index: 1;
   transition: transform .15s ease, background-color .15s ease;
+  /* 抑制点击/键盘聚焦时的浏览器默认黑框 */
+  outline: none;
 }
+.achievement-year__landscape button:focus,
+.achievement-year__landscape button:focus-visible,
+.achievement-year__landscape button *:focus,
+.achievement-year__landscape button *:focus-visible { outline: none; }
 .achievement-year__landscape button:hover { transform: translateY(-2px); }
-.achievement-year__landscape button.active { transform: translateY(-2px); }
+/* active 不再加 transform，避免底座与同行其他 cell 错开 2px；底色 + 描边已经能区分 */
+.achievement-year__landscape button.active { transform: none; }
 .achievement-year__terrarium { width: 100%; height: 100%; }
 .achievement-year__landscape .achievement-year__month,
 .achievement-year__landscape button > small {
@@ -904,14 +912,15 @@ onBeforeUnmount(cancelGrowthReplay)
 .achievement-month__weekdays,.achievement-month__grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
 .achievement-month__weekdays { margin: 14px 0 6px; }
 .achievement-month__weekdays span { color: var(--text-muted); font-size: 10px; text-align: center; font-weight: 600; }
-/* 月格子：每个 cell 都是温室。日期数字在左上角，温室居中。 */
+/* 月格子：每个 cell 都是温室。日期数字在左上角，温室底对齐到 cell 底部。
+   关键：align-items: flex-end 让所有 stage 高度的罩子底座贴到 cell 底（y 一致） */
 .achievement-month__grid button {
   position: relative;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
   min-height: 144px;
-  padding: 18px 4px 6px;
+  padding: 22px 4px 6px;
   overflow: hidden;
   border: 1px solid var(--divider-soft);
   border-radius: 12px;
@@ -919,7 +928,13 @@ onBeforeUnmount(cancelGrowthReplay)
   color: var(--text-muted);
   cursor: default;
   transition: transform .15s ease, box-shadow .15s ease;
+  /* 抑制点击/键盘聚焦时的浏览器默认黑框 */
+  outline: none;
 }
+.achievement-month__grid button:focus,
+.achievement-month__grid button:focus-visible,
+.achievement-month__grid button *:focus,
+.achievement-month__grid button *:focus-visible { outline: none; }
 .achievement-month__grid button:hover { transform: translateY(-1px); }
 .achievement-month__grid button.future { opacity: .5; }
 .achievement-month__day { position: absolute; top: 5px; left: 8px; font-size: 10px; color: var(--text-muted); font-weight: 600; }

@@ -476,7 +476,11 @@ const pressTarget = computed(() => (
   transform-box: fill-box;
   transform-origin: 50% 84%;
   will-change: transform;
+  /* 关键：抑制 SVG 自身/宿主 button 点击/键盘聚焦时的浏览器默认黑框 outline */
+  outline: none !important;
 }
+.focus-plant:focus,
+.focus-plant:focus-visible { outline: none !important; }
 .focus-plant--thumbnail { filter: saturate(.94); }
 .focus-plant--diorama { filter: saturate(1.02) drop-shadow(0 10px 10px rgba(49, 95, 75, .10)); }
 .focus-plant--hero { filter: saturate(1.06) drop-shadow(0 14px 16px rgba(49, 95, 75, .14)); }

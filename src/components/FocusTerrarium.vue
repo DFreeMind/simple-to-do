@@ -50,13 +50,21 @@ const hasPlant = computed(() => Boolean(props.speciesId) && props.stage && props
 /* 温室固定尺寸，不随父容器拉伸；父容器用 flex/grid 居中即可 */
 .terrarium {
   position: relative;
-  display: inline-block;
+  display: block;
   width: var(--terrarium-total-width, 60px);
   height: var(--terrarium-total-height, 73px);
   isolation: isolate;
   color: #8a7e5e;
-  vertical-align: bottom;
+  /* 关键：裁掉超出罩子的植物 SVG 内容 */
+  overflow: hidden;
+  border-radius: 8px;
+  /* 抑制 SVG 自身的焦点黑框 */
+  outline: none;
 }
+.terrarium:focus,
+.terrarium:focus-visible,
+.terrarium *:focus,
+.terrarium *:focus-visible { outline: none; }
 
 /* ========== 玻璃罩 ========== */
 .terrarium__dome {
@@ -136,21 +144,24 @@ const hasPlant = computed(() => Boolean(props.speciesId) && props.stage && props
   transform: translateX(-50%);
 }
 
-/* ========== 罩内植物（绝对定位，从罩底向上生长，固定高度） ========== */
+/* ========== 罩内植物（绝对定位，flex 容器让 SVG 底对齐到罩底） ========== */
 .terrarium__plant {
   position: absolute;
   left: 50%;
-  bottom: var(--terrarium-base-height, 11px);
+  bottom: var(--terrarium-base-height, 12px);
   transform: translateX(-50%);
   width: var(--terrarium-plant-width, 50px);
   height: var(--terrarium-plant-height, 50px);
   z-index: 3;
-  display: block;
-  overflow: visible;
+  display: flex;
+  align-items: flex-end;     /* SVG 高度 auto 时底对齐 → 植物"坐"在底座上 */
+  justify-content: center;
+  overflow: hidden;          /* 截掉可能冒出去的茎叶 */
+  pointer-events: none;
 }
 .terrarium__plant :deep(.focus-plant) {
   width: 100%;
-  height: 100%;
+  height: auto;              /* 保持 viewBox 比例，SVG 自动收缩 */
   display: block;
 }
 
@@ -190,18 +201,30 @@ const hasPlant = computed(() => Boolean(props.speciesId) && props.stage && props
 .terrarium__leaf--right { right: -7px; transform: rotate(25deg) scaleX(-1); }
 
 /* ========== 尺寸变体（固定像素值，不依赖父容器） ========== */
-/* 基础花田位（empty）：无罩，仅底座 */
+/* 基础花田位（empty）：保留"幽灵罩子"占位，让底座 y 与幼苗温室底座 y 对齐
+   设计图里空格子也画了很淡的虚线罩子轮廓（表示"这里未来会长植物"），所以这里把罩子设为
+   visibility: hidden → 淡虚线显示，不要直接 display:none，否则罩子几何信息丢失 */
 .terrarium--empty {
-  --terrarium-total-width: 56px;
-  --terrarium-total-height: 12px;
-  --terrarium-width: 0px;
-  --terrarium-height: 0px;
-  --terrarium-base-width: 56px;
+  --terrarium-total-width: 62px;
+  --terrarium-total-height: 88px;
+  --terrarium-width: 56px;
+  --terrarium-height: 76px;
+  --terrarium-base-width: 62px;
   --terrarium-base-height: 12px;
   --terrarium-plant-width: 0px;
   --terrarium-plant-height: 0px;
 }
-.terrarium--empty .terrarium__dome { display: none; }
+.terrarium--empty .terrarium__dome {
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, #f5efde 22%, transparent) 0%,
+      color-mix(in srgb, #efe7cf 30%, transparent) 100%);
+  border-color: color-mix(in srgb, #b9c89e 35%, transparent);
+}
+.terrarium--empty .terrarium__dome::after { opacity: .2; }
+.terrarium--empty .terrarium__dome-shine { opacity: .35; }
+.terrarium--empty .terrarium__dome-star::before,
+.terrarium--empty .terrarium__dome-star::after { opacity: .45; }
 .terrarium--empty .terrarium__plant { display: none; }
 
 /* 幼苗温室（small）：小罩，适合 sprout/leaves */
@@ -254,15 +277,16 @@ const hasPlant = computed(() => Boolean(props.speciesId) && props.stage && props
 
 /* ========== 高亮卡（active）：罩内变绿、底座变绿、边线变实绿 ========== */
 .terrarium--highlight .terrarium__dome {
-  border-color: color-mix(in srgb, #6f9a5a 70%, transparent);
+  /* 边线：原 70% 太重（看起来发黑），降到 45% 让虚线与绿色背景融合 */
+  border-color: color-mix(in srgb, #6f9a5a 45%, transparent);
   background:
     linear-gradient(180deg,
       color-mix(in srgb, #c7d9b2 70%, transparent) 0%,
       color-mix(in srgb, #b5cda0 80%, transparent) 100%);
+  /* 取消 0 0 0 2px 的硬环（这就是用户看到的"黑边框"），只保留内部光泽 */
   box-shadow:
     inset 0 6px 10px -6px rgba(255, 255, 255, .85),
-    inset 0 -2px 4px -2px rgba(0, 0, 0, .04),
-    0 0 0 2px color-mix(in srgb, #6f9a5a 28%, transparent);
+    inset 0 -2px 4px -2px rgba(0, 0, 0, .04);
 }
 .terrarium--highlight .terrarium__dome-star::before,
 .terrarium--highlight .terrarium__dome-star::after { background: #6f9a5a; }
