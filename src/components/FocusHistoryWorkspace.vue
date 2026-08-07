@@ -65,7 +65,7 @@
         </section>
 
         <section class="review-card review-summary" aria-label="本周期概览">
-          <header><div><span>数据摘要</span><h2>{{ selectedRange.label }}的专注与节律</h2><p>下面的趋势和最近记录使用同一时间范围</p></div><small>{{ focusEntries.length + rhythmEntries.length }} 条记录</small></header>
+          <header><div><span>数据摘要</span><h2>{{ selectedRange.label }}的专注与节律</h2><p>下面的趋势和最近记录使用同一时间范围</p></div><div class="review-summary-actions"><small>{{ focusEntries.length + rhythmEntries.length }} 条记录</small><button type="button" class="review-export-btn" title="导出当前范围为 Markdown 报告" @click="exportFocusReport"><Download :size="14" />导出报告</button></div></header>
           <div class="review-metrics">
             <article class="review-metric review-metric--primary">
               <span class="review-metric__label"><Timer :size="13" />有效专注</span>
@@ -1056,6 +1056,50 @@ function exportRhythmCsv() {
   downloadTextFile(csv, `节律记录-${dateKey(new Date())}.csv`, 'text/csv;charset=utf-8')
   store.showNotice(`已导出 ${records.length} 条节律记录`, 'success')
 }
+// Markdown 周报：当前范围的数据摘要 + 洞察 + 最近记录，方便汇报 / 记录到笔记工具
+function exportFocusReport() {
+  const lines = []
+  lines.push(`# 专注回顾报告（${selectedRange.label}）`)
+  lines.push('')
+  lines.push(`> 生成时间：${formatFullDateTime(new Date())}`)
+  lines.push('')
+  lines.push('## 概览')
+  lines.push('')
+  lines.push(`- **有效专注**：${formatDuration(totalFocusSeconds)}（${focusEntries.length} 段 · ${focusActiveDays} 天有投入）`)
+  lines.push(`- **完成率**：${focusCompletionRate}%（${completedFocusEntries.length} 段自然完成）`)
+  lines.push(`- **暂停**：${totalPauseCount} 次，累计 ${formatDuration(totalPausedSeconds)}`)
+  lines.push(`- **节律响应**：${rhythmEntries.length} 次，完成或自然离席 ${rhythmCompletionRate}%`)
+  if (previousRangeStart.value && previousFocusSeconds.value > 0) {
+    lines.push(`- **对比上周期**：${focusSecondsDelta.value >= 0 ? '↑' : '↓'}${Math.abs(focusSecondsDelta.value)}%`)
+  }
+  lines.push('')
+  if (insights.value.length) {
+    lines.push('## 本期亮点')
+    lines.push('')
+    insights.value.forEach(item => lines.push(`- **${item.text}**${item.detail ? `：${item.detail}` : ''}`))
+    lines.push('')
+  }
+  if (recentRecords.value.length) {
+    lines.push('## 最近记录')
+    lines.push('')
+    lines.push('| 时间 | 类型 | 内容 | 结果 |')
+    lines.push('| --- | --- | --- | --- |')
+    recentRecords.value.slice(0, 12).forEach(record => {
+      const type = record.kind === 'focus' ? '专注' : '节律'
+      const content = recordTitle(record)
+      const result = record.kind === 'focus'
+        ? `${formatCompactDuration(record.item.elapsedSeconds)} · ${resultLabel(record.item.result)}`
+        : `${rhythmActionLabel(record.item.action)} · ${formatResponseTime(record.item.responseSeconds)}`
+      lines.push(`| ${formatShortDate(record.at)} | ${type} | ${content.replace(/\|/g, '\\|')} | ${result} |`)
+    })
+    lines.push('')
+  }
+  lines.push('---')
+  lines.push('由易简清单自动生成')
+  const markdown = lines.join('\n')
+  downloadTextFile(markdown, `专注回顾报告-${dateKey(new Date())}.md`, 'text/markdown;charset=utf-8')
+  store.showNotice('报告已导出为 Markdown', 'success')
+}
 
 watch([range], () => { focusPage.value = 1; rhythmPage.value = 1 })
 watch([focusSearch, focusResult, focusPhase, focusPause, focusSort, focusPageSize], () => { focusPage.value = 1 })
@@ -1346,6 +1390,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-management-title > div { display: grid; min-width: 0; gap: 3px; }
 .review-management-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 10px; }
 .review-management-actions small { color: var(--text-muted); font-size: 11px; white-space: nowrap; }
+.review-summary-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 12px; }
 .review-export-btn { display: inline-flex; min-height: 34px; align-items: center; gap: 5px; padding: 0 12px; border: 1px solid var(--divider-soft); border-radius: 9px; background: var(--surface); color: var(--accent-strong); font: inherit; font-size: 11.5px; font-weight: 650; cursor: pointer; transition: border-color var(--transition-fast), background var(--transition-fast); }
 .review-export-btn:hover { border-color: var(--accent); background: var(--accent-soft); }
 .review-filter-panel { margin: 16px 0 12px; padding: 10px; border: 1px solid var(--divider-soft); border-radius: 13px; background: var(--surface-muted); }
