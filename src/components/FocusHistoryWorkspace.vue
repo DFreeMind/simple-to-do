@@ -551,7 +551,7 @@
                 <div><dt>专注方式</dt><dd>{{ profileName(detail.item.profileId, detail.item) }}</dd></div>
                 <div><dt>阶段</dt><dd>{{ detail.item.phase === 'focus' ? '专注' : phaseLabel(detail.item.phase) }}</dd></div>
                 <div><dt>结束结果</dt><dd>{{ resultLabel(detail.item.result) }}</dd></div>
-                <div><dt>关联任务</dt><dd>{{ detail.item.taskTitle || '未关联任务' }}</dd></div>
+                <div><dt>关联任务</dt><dd><button v-if="detail.item.taskId" type="button" class="review-detail-task-link" @click="openLinkedTask(detail.item)">{{ detail.item.taskTitle || '打开任务' }}<ExternalLink :size="12" /></button><span v-else>未关联任务</span></dd></div>
               </dl>
             </section>
             <section class="review-detail-section">
@@ -1922,6 +1922,15 @@ function openRhythmRuleFromRow(item) {
     store.showNotice(`已跳到节律提醒，可在「${item.reminderTitle}」的配置中查看完整规则`, 'info')
   }
 }
+function openLinkedTask(item) {
+  // 从专注详情跳回任务工作台：切到任务模块、打开全部视图并选中关联任务
+  const task = store.activeTasks.find(t => t.id === item.taskId)
+  closeDetail()
+  store.setActiveModule('tasks')
+  store.setView('inbox')
+  store.selectTask(item.taskId)
+  if (task) store.showNotice(`已打开任务「${task.title}」`, 'info')
+}
 function resetFocusFilters() { focusSearch.value = ''; focusResult.value = 'all'; focusPhase.value = 'all'; focusPause.value = 'all'; focusSort.value = 'newest' }
 function resetRhythmFilters() { rhythmSearch.value = ''; rhythmAction.value = 'all'; rhythmTrigger.value = 'all'; rhythmSort.value = 'newest' }
 
@@ -2303,10 +2312,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-detail-fields > div { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--divider-soft); }
 .review-detail-fields dt { color: var(--text-muted); font-size: 11px; }
 .review-detail-fields dd { margin: 0; color: var(--text); font-size: 11px; text-align: right; }
+.review-detail-task-link { display: inline-flex; align-items: center; gap: 4px; color: var(--accent-strong); font: inherit; font-size: 11px; font-weight: 650; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--accent) 35%, transparent); text-underline-offset: 2px; transition: text-decoration-color var(--transition-fast); }
+.review-detail-task-link:hover { text-decoration-color: var(--accent-strong); }
+.review-detail-task-link svg { flex-shrink: 0; }
 .review-detail > footer { position: sticky; z-index: 2; bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; padding: 14px 20px; border-top: 1px solid var(--divider-soft); background-color: var(--surface, #fff); box-shadow: 0 -8px 20px var(--text-4-fallback); }
 .review-detail > footer button { display: inline-flex; min-height: 42px; align-items: center; justify-content: center; gap: 6px; padding: 0 13px; border-radius: 10px; font-size: 12px; font-weight: 680; }
-.review-detail-delete { color: #ad5555; }
-.review-detail-delete:hover { background: #fff0ef; }
+.review-detail-delete { background: #fbf0ef; color: #b05757; border: 1px solid rgba(176, 87, 87, .16); }
+.review-detail-delete:hover { background: #f7e3e0; border-color: rgba(176, 87, 87, .3); color: #a04949; }
 .review-detail-close { min-width: 86px; background: var(--accent); color: #fff; }
 .review-detail-close:hover { background: var(--accent-strong); }
 @media (max-width: 900px) { .review-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }.review-overview-grid { grid-template-columns: 1fr; }.review-record-table, .review-recent-list { overflow-x: auto; }.review-record-table__head, .review-record-row, .review-recent-row { min-width: 720px; } }

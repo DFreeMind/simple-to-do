@@ -114,6 +114,8 @@ button {
   border: 0;
   color: inherit;
   cursor: pointer;
+  /* 未显式声明背景的按钮默认透明，避免露出浏览器默认灰底（#efefef） */
+  background: transparent;
 }
 
 button:disabled {
