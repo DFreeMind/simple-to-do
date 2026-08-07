@@ -72,8 +72,8 @@ const hasPlant = computed(() => Boolean(props.speciesId) && props.stage && props
   border-bottom: 0;
   background:
     linear-gradient(180deg,
-      color-mix(in srgb, #f5efde 55%, transparent) 0%,
-      color-mix(in srgb, #efe7cf 70%, transparent) 100%);
+      color-mix(in srgb, #f5efde 40%, transparent) 0%,
+      color-mix(in srgb, #efe7cf 55%, transparent) 100%);
   box-shadow:
     inset 0 6px 10px -6px rgba(255, 255, 255, .75),
     inset 0 -2px 4px -2px rgba(0, 0, 0, .03);
@@ -89,10 +89,11 @@ const hasPlant = computed(() => Boolean(props.speciesId) && props.stage && props
   bottom: 8%;
   border-top-left-radius: 999px;
   border-top-right-radius: 999px;
-  border: .8px dashed color-mix(in srgb, #c5d3a8 65%, transparent);
+  border: .8px dashed color-mix(in srgb, #c5d3a8 55%, transparent);
   border-bottom: 0;
-  opacity: .55;
+  opacity: .45;
   pointer-events: none;
+  z-index: 1;
 }
 .terrarium__dome-shine {
   position: absolute;
@@ -143,7 +144,7 @@ const hasPlant = computed(() => Boolean(props.speciesId) && props.stage && props
   transform: translateX(-50%);
   width: var(--terrarium-plant-width, 50px);
   height: var(--terrarium-plant-height, 50px);
-  z-index: 0;
+  z-index: 3;
   display: block;
   overflow: visible;
 }

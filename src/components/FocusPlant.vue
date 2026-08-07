@@ -192,6 +192,13 @@
         <path d="M-14-17C-8-7-5 7 0 20M15-18C8-7 5 8 0 20" fill="none" stroke="#fff" stroke-width="1.3" opacity=".24" />
       </g>
 
+      <g v-else-if="stageIndex === 3 && speciesId === 'cosmos'" class="focus-plant__bud" transform="translate(80 67)">
+        <!-- 花苞：绿色花托 + 粉色尖端 -->
+        <ellipse cx="0" cy="0" rx="9" ry="11" :fill="palette.leaf" />
+        <ellipse cx="0" cy="-4" rx="5" ry="7" :fill="palette.petal" />
+        <ellipse cx="0" cy="-7" rx="3" ry="4" :fill="palette.petalLight" />
+      </g>
+
       <g v-else-if="stageIndex >= 4 && speciesId === 'cosmos'" class="focus-plant__flower">
         <g v-for="(bloom, bloomIndex) in cosmosBlooms" :key="bloomIndex" :transform="`translate(${bloom.x} ${bloom.y}) scale(${bloom.scale}) rotate(${bloom.rotate})`">
           <path v-for="angle in [0, 45, 90, 135, 180, 225, 270, 315]" :key="angle" d="M0 0C-7-7-8-20-3-27L0-23l3-4c5 7 4 20-3 27Z" :fill="bloomIndex % 2 ? palette.petalLight : `url(#${uid}-petal)`" :transform="`rotate(${angle}) scale(${stageIndex === 5 ? 1 : .76})`" />
