@@ -45,7 +45,7 @@
               <span class="review-range-popover__badge"><Calendar :size="13" /></span>
               <div>
                 <strong>选择时间范围</strong>
-                <small>点选起止日期，或使用下方快捷</small>
+                <small>先选开始日期，再选结束日期</small>
               </div>
             </div>
             <button type="button" class="review-range-popover__close" aria-label="关闭" @click="closePopover">
@@ -73,6 +73,24 @@
                 >
                   全部
                 </button>
+              </div>
+            </section>
+
+            <section class="review-range-popover__dates" aria-label="已选范围">
+              <div class="review-range-popover__date-slot" :class="{ picking: picking === 'start', filled: !!customStart }">
+                <span class="review-range-popover__date-slot-label">
+                  开始日期
+                  <em v-if="picking === 'start'">选择中</em>
+                </span>
+                <span class="review-range-popover__date-slot-value" :class="{ placeholder: !customStart }">{{ startDisplay }}</span>
+              </div>
+              <span class="review-range-popover__date-arrow" aria-hidden="true">→</span>
+              <div class="review-range-popover__date-slot" :class="{ picking: picking === 'end', filled: !!customEnd }">
+                <span class="review-range-popover__date-slot-label">
+                  结束日期
+                  <em v-if="picking === 'end'">选择中</em>
+                </span>
+                <span class="review-range-popover__date-slot-value" :class="{ placeholder: !customEnd }">{{ endDisplay }}</span>
               </div>
             </section>
 
@@ -104,6 +122,9 @@
                   {{ cell.date.getDate() }}
                 </button>
               </div>
+              <p class="review-range-popover__cal-hint" :class="{ show: !!picking }">
+                {{ picking === 'start' ? '在日历中选择开始日期' : '在日历中选择结束日期' }}
+              </p>
             </section>
           </div>
 
@@ -163,6 +184,8 @@ const popoverOpen = ref(false)
 const triggerRect = ref({ left: 0, top: 0, width: 0, bottom: 0 })
 const viewDate = ref(new Date())
 const hoverDate = ref(null)
+// 当前在选哪个端点：'start' | 'end' | null（null 表示两端已选，再点即重选）
+const picking = ref('start')
 
 const customButtonLabel = computed(() => {
   if (props.range !== 'custom') return '自定义'
@@ -174,15 +197,19 @@ const customButtonLabel = computed(() => {
 
 const customHint = computed(() => '点击选择起止日期或快捷预设')
 
-const viewTitle = computed(() => `${viewDate.value.getFullYear()}年${viewDate.value.getMonth() + 1}月`)
+const startDisplay = computed(() => props.customStart || '点选日期')
+const endDisplay = computed(() => props.customEnd || '点选日期')
 
 const selectionLabel = computed(() => {
-  const s = props.customStart ? props.customStart.slice(5) : ''
-  const e = props.customEnd ? props.customEnd.slice(5) : ''
+  const s = props.customStart
+  const e = props.customEnd
   if (s && e) return `${s} – ${e}`
   if (s) return `${s} 起`
-  return '未选择'
+  if (e) return `至 ${e}`
+  return '未选择范围'
 })
+
+const viewTitle = computed(() => `${viewDate.value.getFullYear()}年${viewDate.value.getMonth() + 1}月`)
 
 // 生成 6 行 × 7 列的月历网格（周一起始，含上下月补位）
 const calendarCells = computed(() => {
@@ -224,11 +251,12 @@ function toggleCustom() {
 
 function openPopover() {
   if (popoverOpen.value) return
-  // 已有自定义范围时，日历定位到开始日所在月
+  // 已有自定义范围时，日历定位到开始日所在月；同时恢复"继续选"的状态
   if (props.customStart) {
     const d = parseKey(props.customStart)
     if (d) viewDate.value = new Date(d.getFullYear(), d.getMonth(), 1)
   }
+  picking.value = !props.customStart ? 'start' : (!props.customEnd ? 'end' : null)
   updateTriggerRect()
   popoverOpen.value = true
   if (props.range !== 'custom') emit('update:range', 'custom')
@@ -247,7 +275,7 @@ function updateTriggerRect() {
   triggerRect.value = { left: rect.left, top: rect.top, width: rect.width, bottom: rect.bottom }
 }
 
-// "近 N 天"快捷：自动设置 customStart/customEnd
+// "近 N 天"快捷：自动设置 customStart/customEnd，范围完整，语义不变
 function applyShortcut(days) {
   if (days === null) {
     emit('update:range', 'all')
@@ -274,23 +302,29 @@ function isShortcutActive(item) {
   return diffDays === item.days
 }
 
-// 日历点选：第一次点设开始，第二次点设结束（早于开始则交换），第三次起重新开始
+// 点选始终围绕"范围"：选开始 → 选结束（早于开始自动交换）→ 再点重选
 function onDateClick(date) {
   const key = formatDateKey(date)
-  const startKey = props.customStart
-  const endKey = props.customEnd
-  if (!startKey || (startKey && endKey)) {
-    emit('update:customStart', key)
-    emit('update:customEnd', '')
-  } else if (key < startKey) {
-    emit('update:customStart', key)
-    emit('update:customEnd', startKey)
-  } else {
-    emit('update:customEnd', key)
-  }
   if (props.range !== 'custom') emit('update:range', 'custom')
   // 点击补位日期时跟随切换月份，方便连续选择
   viewDate.value = new Date(date.getFullYear(), date.getMonth(), 1)
+
+  if (picking.value === 'end' && props.customStart) {
+    if (key < props.customStart) {
+      // 结束早于开始：交换两端，保持范围语义
+      emit('update:customStart', key)
+      emit('update:customEnd', props.customStart)
+    } else {
+      emit('update:customEnd', key)
+    }
+    picking.value = null
+    return
+  }
+
+  // 选开始（含两端已选后重新开始）：清掉旧结束，重新进入"选结束"
+  emit('update:customStart', key)
+  emit('update:customEnd', '')
+  picking.value = 'end'
 }
 
 function moveMonth(delta) {
@@ -304,6 +338,7 @@ function resetCustom() {
   emit('update:customStart', formatDateKey(weekAgo))
   emit('update:customEnd', formatDateKey(today))
   viewDate.value = new Date(weekAgo.getFullYear(), weekAgo.getMonth(), 1)
+  picking.value = null
 }
 
 function dayClass(cell) {
@@ -326,9 +361,9 @@ function inSelectedRange(key) {
   return key > props.customStart && key < props.customEnd
 }
 
-// 已选开始、未选结束时，hover 悬停日期之间的范围预览
+// 已选开始、正在选结束时，hover 悬停日期之间的范围预览
 function inPreviewRange(key) {
-  if (!props.customStart || props.customEnd || !hoverDate.value) return false
+  if (picking.value !== 'end' || !props.customStart || props.customEnd || !hoverDate.value) return false
   const hoverKey = formatDateKey(hoverDate.value)
   if (hoverKey < props.customStart) return key >= hoverKey && key <= props.customStart
   return key >= props.customStart && key <= hoverKey
@@ -505,10 +540,9 @@ onBeforeUnmount(() => {
 }
 .review-range-popover__close:hover { background: var(--surface-muted); color: var(--text); }
 
-.review-range-popover__body { display: grid; gap: 14px; padding: 14px 16px 4px; }
+.review-range-popover__body { display: grid; gap: 13px; padding: 14px 16px 4px; }
 
-.review-range-popover__shortcuts h4,
-.review-range-popover__calendar h4 {
+.review-range-popover__shortcuts h4 {
   margin: 0 0 7px;
   color: var(--text-muted);
   font-size: 10.5px;
@@ -521,7 +555,7 @@ onBeforeUnmount(() => {
   min-height: 28px;
   padding: 0 12px;
   border: 1px solid transparent;
-  border-radius: 7px;
+  border-radius: 8px;
   background: var(--surface-muted);
   color: var(--text);
   font: inherit;
@@ -540,8 +574,66 @@ onBeforeUnmount(() => {
   border-color: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
+/* 开始 / 结束 双日期槽：始终以"范围"呈现 */
+.review-range-popover__dates {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 8px;
+  align-items: center;
+}
+.review-range-popover__date-slot {
+  display: grid;
+  gap: 3px;
+  padding: 7px 10px;
+  border: 1px solid var(--divider-soft);
+  border-radius: 10px;
+  background: var(--surface-muted);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+}
+.review-range-popover__date-slot.filled { background: var(--surface); }
+.review-range-popover__date-slot.picking {
+  border-color: var(--accent);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.review-range-popover__date-slot-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: var(--text-muted);
+}
+.review-range-popover__date-slot.picking .review-range-popover__date-slot-label { color: var(--accent-strong); }
+.review-range-popover__date-slot-label em {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 8.5px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: .03em;
+}
+.review-range-popover__date-slot-value {
+  font-size: 12.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.review-range-popover__date-slot-value.placeholder {
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 11.5px;
+}
+.review-range-popover__date-arrow { color: var(--text-muted); padding-bottom: 10px; }
+
 /* 自绘迷你日历 */
-.review-range-popover__calendar { display: grid; gap: 8px; padding-bottom: 12px; }
+.review-range-popover__calendar { display: grid; gap: 8px; padding-bottom: 13px; }
 .review-range-popover__cal-head { display: flex; align-items: center; justify-content: space-between; }
 .review-range-popover__cal-head strong { color: var(--text); font-size: 12.5px; font-weight: 700; letter-spacing: -.01em; }
 .review-range-popover__cal-nav {
@@ -585,33 +677,55 @@ onBeforeUnmount(() => {
   font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
+  transition: background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
 }
-.review-range-popover__cal-day:hover { background: var(--accent-soft); color: var(--accent-strong); }
+.review-range-popover__cal-day:hover {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(23, 33, 31, .08);
+}
 .review-range-popover__cal-day.is-outside { color: var(--text-muted); opacity: .4; }
-.review-range-popover__cal-day.is-today { color: var(--accent-strong); }
-.review-range-popover__cal-day.is-today::after {
-  content: '';
-  position: absolute;
-  bottom: 3px;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--accent);
+
+/* 今天：accent 内描边 + 深色文字，保证可辨识 */
+.review-range-popover__cal-day.is-today {
+  color: var(--accent-strong);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
 }
+.review-range-popover__cal-day.is-today:hover { box-shadow: inset 0 0 0 1.5px var(--accent), 0 2px 6px rgba(23, 33, 31, .08); }
+
+/* 中间范围 / hover 预览：淡青绿填充 */
 .review-range-popover__cal-day.is-range,
 .review-range-popover__cal-day.is-preview {
   background: var(--accent-soft);
   color: var(--accent-strong);
 }
-.review-range-popover__cal-day.is-selected {
-  background: var(--accent);
-  color: #fff;
-  box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 40%, transparent);
+.review-range-popover__cal-day.is-range.is-today,
+.review-range-popover__cal-day.is-preview.is-today {
+  box-shadow: inset 0 0 0 1.5px var(--accent);
 }
-.review-range-popover__cal-day.is-selected:hover { background: var(--accent-strong); color: #fff; }
-.review-range-popover__cal-day.is-selected.is-today::after { background: #fff; }
+
+/* 选中端点：深青绿实底白字，对比度足够 */
+.review-range-popover__cal-day.is-selected {
+  background: var(--accent-strong);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(31, 111, 104, .35);
+}
+.review-range-popover__cal-day.is-selected:hover {
+  background: var(--accent-strong);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(31, 111, 104, .4);
+}
 .review-range-popover__cal-day.is-selected.is-outside { opacity: 1; }
+
+.review-range-popover__cal-hint {
+  margin: 0;
+  min-height: 15px;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  text-align: center;
+}
 
 /* 底部操作条 */
 .review-range-popover__foot {
@@ -636,16 +750,20 @@ onBeforeUnmount(() => {
   font-size: 11px;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .review-range-popover__selection.empty { color: var(--text-muted); font-weight: 500; }
 .review-range-popover__selection-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--accent-strong);
+  flex-shrink: 0;
 }
 .review-range-popover__selection.empty .review-range-popover__selection-dot { background: var(--text-7-fallback); }
-.review-range-popover__actions { display: flex; align-items: center; gap: 6px; }
+.review-range-popover__actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .review-range-popover__reset {
   display: inline-flex;
   align-items: center;
@@ -668,14 +786,14 @@ onBeforeUnmount(() => {
   padding: 0 16px;
   border: 0;
   border-radius: 8px;
-  background: var(--accent);
+  background: var(--accent-strong);
   color: #fff;
   font: inherit;
   font-size: 11.5px;
   font-weight: 650;
   cursor: pointer;
 }
-.review-range-popover__done:hover { background: var(--accent-strong); }
+.review-range-popover__done:hover { background: var(--accent); }
 
 .review-range-pop-enter-active, .review-range-pop-leave-active { transition: opacity .14s ease, transform .14s ease; }
 .review-range-pop-enter-from, .review-range-pop-leave-to { opacity: 0; transform: translateY(-4px); }
