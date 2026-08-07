@@ -28,18 +28,17 @@
       </button>
     </div>
 
-    <Teleport to="body">
-      <Transition name="review-range-pop">
-        <div
-          v-if="popoverOpen"
-          ref="popoverRef"
-          class="review-range-popover"
-          :style="popoverStyle"
-          role="dialog"
-          aria-label="选择时间范围"
-          tabindex="-1"
-          @click.stop
-        >
+    <Transition name="review-range-pop">
+      <div
+        v-if="popoverOpen"
+        ref="popoverRef"
+        class="review-range-popover"
+        :style="popoverStyle"
+        role="dialog"
+        aria-label="选择时间范围"
+        tabindex="-1"
+        @click.stop
+      >
           <header class="review-range-popover__head">
             <div class="review-range-popover__title">
               <span class="review-range-popover__badge"><Calendar :size="13" /></span>
@@ -141,8 +140,7 @@
             </div>
           </footer>
         </div>
-      </Transition>
-    </Teleport>
+    </Transition>
   </div>
 </template>
 
@@ -490,10 +488,11 @@ onBeforeUnmount(() => {
 .review-range-control__chip--custom svg { color: currentColor; transition: transform var(--transition-fast); }
 .review-range-control__chip--custom .is-open { transform: rotate(180deg); }
 
-/* popover（Teleport 到 body，position: fixed，不透明白底） */
+/* popover（组件内渲染 + position: fixed，脱离文档流不挤压内容，
+   且完整继承 .app 上的主题 CSS 变量，随主题切换自动变色） */
 .review-range-popover {
   position: fixed;
-  z-index: 50;
+  z-index: 1100;
   display: grid;
   width: 400px;
   overflow: hidden;
