@@ -2016,11 +2016,14 @@ export const useTaskStore = defineStore('task', () => {
 
   function normalizeFocusHistory(rawHistory, profiles = focusProfiles.value) {
     if (!rawHistory || typeof rawHistory !== 'object' || Array.isArray(rawHistory)) return null
-    const profileId = profiles.find(item => item.id === rawHistory.profileId)?.id || null
-    if (!profileId || !isValidIsoDate(rawHistory.finishedAt)) return null
+    if (!isValidIsoDate(rawHistory.finishedAt)) return null
+    // profileId 校验放宽：专注方式被删除时仍保留记录，用快照名兜底，避免整条历史丢失
+    const profileId = profiles.find(item => item.id === rawHistory.profileId)?.id || (rawHistory.profileId ? String(rawHistory.profileId) : null)
+    const profileName = String(rawHistory.profileName || '').trim().slice(0, 40) || profiles.find(item => item.id === profileId)?.name || ''
     return {
       id: String(rawHistory.id || genId()),
       profileId,
+      profileName,
       taskId: tasks.value.some(task => !task.deleted && task.id === rawHistory.taskId) ? rawHistory.taskId : null,
       taskTitle: String(rawHistory.taskTitle || '').trim().slice(0, 240),
       startedAt: isValidIsoDate(rawHistory.startedAt) ? rawHistory.startedAt : rawHistory.finishedAt,
@@ -2331,6 +2334,7 @@ export const useTaskStore = defineStore('task', () => {
     clock.value.history.unshift({
       id: genId(),
       profileId: session.profileId,
+      profileName: focusProfiles.value.find(item => item.id === session.profileId)?.name || '',
       taskId: session.taskId,
       taskTitle,
       startedAt: session.createdAt,
@@ -2426,6 +2430,40 @@ export const useTaskStore = defineStore('task', () => {
     return true
   }
 
+  // 批量删除：一次删多条，undo 时按原索引批量插回
+  function batchDeleteFocusHistory(historyIds) {
+    const ids = new Set(historyIds)
+    if (!ids.size) return false
+    const removed = []
+    clock.value.history = clock.value.history.filter((item, index) => {
+      if (ids.has(item.id)) { removed.push({ record: item, index }); return false }
+      return true
+    })
+    if (!removed.length) return false
+    recalculateTodayGarden()
+    pendingUndo.value = { kind: 'focus', batch: removed, createdAt: Date.now() }
+    showNotice(`已删除 ${removed.length} 条专注记录`, 'info', {
+      action: { label: '撤销', onClick: () => undoDeleteHistory() }
+    })
+    return true
+  }
+
+  function batchDeleteRhythmHistory(historyIds) {
+    const ids = new Set(historyIds)
+    if (!ids.size) return false
+    const removed = []
+    clock.value.rhythm.history = clock.value.rhythm.history.filter((item, index) => {
+      if (ids.has(item.id)) { removed.push({ record: item, index }); return false }
+      return true
+    })
+    if (!removed.length) return false
+    pendingUndo.value = { kind: 'rhythm', batch: removed, createdAt: Date.now() }
+    showNotice(`已删除 ${removed.length} 条节律记录`, 'info', {
+      action: { label: '撤销', onClick: () => undoDeleteHistory() }
+    })
+    return true
+  }
+
   function deleteRhythmHistory(historyId) {
     const list = clock.value.rhythm.history
     const index = list.findIndex(item => item.id === historyId)
@@ -2446,7 +2484,17 @@ export const useTaskStore = defineStore('task', () => {
       pendingUndo.value = null
       return false
     }
-    if (pending.kind === 'focus') {
+    if (pending.batch) {
+      // 批量恢复：按原索引从大到小插回，保证相对顺序和位置
+      const records = pending.batch.slice().sort((a, b) => b.index - a.index)
+      const list = pending.kind === 'focus' ? clock.value.history : clock.value.rhythm.history
+      records.forEach(({ record, index }) => {
+        const insertAt = Math.min(index, list.length)
+        list.splice(insertAt, 0, record)
+      })
+      if (pending.kind === 'focus') recalculateTodayGarden()
+      showNotice(`已恢复 ${records.length} 条记录`, 'success')
+    } else if (pending.kind === 'focus') {
       const insertAt = Math.min(pending.index, clock.value.history.length)
       // splice(insertAt, 0, record) 是插入而不是替换，保留原位置的元素
       clock.value.history.splice(insertAt, 0, pending.record)
@@ -3509,10 +3557,12 @@ export const useTaskStore = defineStore('task', () => {
     adjustRhythmReminderTiming,
     startRhythmReminderNow,
     deleteRhythmHistory,
+    batchDeleteRhythmHistory,
     handleRhythmElapsedFromNative,
     finishFocus,
     completeFocusSessionFromNative,
     deleteFocusHistory,
+    batchDeleteFocusHistory,
     updateFocusNote,
     undoDeleteHistory,
     clearFocusHistoryBefore,
