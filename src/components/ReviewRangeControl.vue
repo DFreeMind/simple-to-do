@@ -37,12 +37,16 @@
           :style="popoverStyle"
           role="dialog"
           aria-label="选择时间范围"
+          tabindex="-1"
           @click.stop
         >
           <header class="review-range-popover__head">
-            <div>
-              <strong>选择时间范围</strong>
-              <small>快捷预设或自定义起止日期</small>
+            <div class="review-range-popover__title">
+              <span class="review-range-popover__badge"><Calendar :size="13" /></span>
+              <div>
+                <strong>选择时间范围</strong>
+                <small>点选起止日期，或使用下方快捷</small>
+              </div>
             </div>
             <button type="button" class="review-range-popover__close" aria-label="关闭" @click="closePopover">
               <X :size="14" />
@@ -72,28 +76,48 @@
               </div>
             </section>
 
-            <section class="review-range-popover__custom">
-              <h4>自定义日期</h4>
-              <div class="review-range-popover__inputs">
-                <label>
-                  <span>开始</span>
-                  <input type="date" :value="customStart" :max="customEnd || undefined" aria-label="开始日期" @change="onStartChange" />
-                </label>
-                <span class="review-range-popover__arrow" aria-hidden="true">→</span>
-                <label>
-                  <span>结束</span>
-                  <input type="date" :value="customEnd" :min="customStart || undefined" aria-label="结束日期" @change="onEndChange" />
-                </label>
+            <section class="review-range-popover__calendar">
+              <div class="review-range-popover__cal-head">
+                <button type="button" class="review-range-popover__cal-nav" aria-label="上个月" @click="moveMonth(-1)">
+                  <ChevronLeft :size="14" />
+                </button>
+                <strong>{{ viewTitle }}</strong>
+                <button type="button" class="review-range-popover__cal-nav" aria-label="下个月" @click="moveMonth(1)">
+                  <ChevronRight :size="14" />
+                </button>
               </div>
-              <p class="review-range-popover__hint">日期变化会立刻应用；超过 60 天的范围仅显示最近 60 天的趋势。</p>
+              <div class="review-range-popover__cal-grid" role="grid" aria-label="日期选择">
+                <span v-for="w in WEEK_DAYS" :key="w" class="review-range-popover__cal-weekday">{{ w }}</span>
+                <button
+                  v-for="(cell, i) in calendarCells"
+                  :key="i"
+                  type="button"
+                  role="gridcell"
+                  class="review-range-popover__cal-day"
+                  :class="dayClass(cell)"
+                  :aria-label="ariaDay(cell)"
+                  :aria-selected="isEndpoint(formatDateKey(cell.date))"
+                  @mouseenter="hoverDate = cell.date"
+                  @mouseleave="hoverDate = null"
+                  @click="onDateClick(cell.date)"
+                >
+                  {{ cell.date.getDate() }}
+                </button>
+              </div>
             </section>
           </div>
 
           <footer class="review-range-popover__foot">
-            <button type="button" class="review-range-popover__reset" :disabled="!customStart && !customEnd" @click="resetCustom">
-              <RotateCcw :size="12" />重置为近 7 天
-            </button>
-            <button type="button" class="review-range-popover__done" @click="closePopover">完成</button>
+            <span class="review-range-popover__selection" :class="{ empty: !customStart && !customEnd }">
+              <span class="review-range-popover__selection-dot" />
+              {{ selectionLabel }}
+            </span>
+            <div class="review-range-popover__actions">
+              <button type="button" class="review-range-popover__reset" :disabled="!customStart && !customEnd" title="重置为近 7 天" @click="resetCustom">
+                <RotateCcw :size="12" />重置
+              </button>
+              <button type="button" class="review-range-popover__done" @click="closePopover">完成</button>
+            </div>
           </footer>
         </div>
       </Transition>
@@ -103,7 +127,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Calendar, ChevronDown, RotateCcw, X } from 'lucide-vue-next'
+import { Calendar, ChevronDown, ChevronLeft, ChevronRight, RotateCcw, X } from 'lucide-vue-next'
 
 // 顶部只展示最常用的 5 个预设，剩余放进 popover 的快捷区
 // 选 5 个的依据：进入概览/管理页后用户最常切的"日 / 周 / 月 / 全部"
@@ -122,6 +146,7 @@ const POPOVER_SHORTCUTS = [
   { id: '30d', days: 30, label: '近 30 天' },
   { id: '90d', days: 90, label: '近 90 天' }
 ]
+const WEEK_DAYS = ['一', '二', '三', '四', '五', '六', '日']
 
 const props = defineProps({
   range: { type: String, required: true },
@@ -136,6 +161,8 @@ const customTriggerRef = ref(null)
 const popoverRef = ref(null)
 const popoverOpen = ref(false)
 const triggerRect = ref({ left: 0, top: 0, width: 0, bottom: 0 })
+const viewDate = ref(new Date())
+const hoverDate = ref(null)
 
 const customButtonLabel = computed(() => {
   if (props.range !== 'custom') return '自定义'
@@ -147,10 +174,35 @@ const customButtonLabel = computed(() => {
 
 const customHint = computed(() => '点击选择起止日期或快捷预设')
 
+const viewTitle = computed(() => `${viewDate.value.getFullYear()}年${viewDate.value.getMonth() + 1}月`)
+
+const selectionLabel = computed(() => {
+  const s = props.customStart ? props.customStart.slice(5) : ''
+  const e = props.customEnd ? props.customEnd.slice(5) : ''
+  if (s && e) return `${s} – ${e}`
+  if (s) return `${s} 起`
+  return '未选择'
+})
+
+// 生成 6 行 × 7 列的月历网格（周一起始，含上下月补位）
+const calendarCells = computed(() => {
+  const y = viewDate.value.getFullYear()
+  const m = viewDate.value.getMonth()
+  const offset = (new Date(y, m, 1).getDay() + 6) % 7
+  const daysInMonth = new Date(y, m + 1, 0).getDate()
+  const prevDays = new Date(y, m, 0).getDate()
+  const cells = []
+  for (let i = offset - 1; i >= 0; i--) cells.push({ date: new Date(y, m - 1, prevDays - i), inMonth: false })
+  for (let d = 1; d <= daysInMonth; d++) cells.push({ date: new Date(y, m, d), inMonth: true })
+  const rest = 42 - cells.length
+  for (let d = 1; d <= rest; d++) cells.push({ date: new Date(y, m + 1, d), inMonth: false })
+  return cells
+})
+
 const popoverStyle = computed(() => {
   if (!triggerRect.value.width) return { visibility: 'hidden' }
   const margin = 12
-  const popoverWidth = 380
+  const popoverWidth = 400
   const desiredLeft = triggerRect.value.left + triggerRect.value.width - popoverWidth
   const maxLeft = (typeof window !== 'undefined' ? window.innerWidth : 1024) - popoverWidth - margin
   const minLeft = margin
@@ -166,26 +218,26 @@ function selectRange(id) {
 }
 
 function toggleCustom() {
-  if (popoverOpen.value) {
-    closePopover()
-  } else {
-    openPopover()
-  }
+  if (popoverOpen.value) closePopover()
+  else openPopover()
 }
 
 function openPopover() {
   if (popoverOpen.value) return
+  // 已有自定义范围时，日历定位到开始日所在月
+  if (props.customStart) {
+    const d = parseKey(props.customStart)
+    if (d) viewDate.value = new Date(d.getFullYear(), d.getMonth(), 1)
+  }
   updateTriggerRect()
   popoverOpen.value = true
   if (props.range !== 'custom') emit('update:range', 'custom')
-  nextTick(() => {
-    const firstInput = popoverRef.value?.querySelector('input[type="date"]')
-    firstInput?.focus?.()
-  })
+  nextTick(() => popoverRef.value?.focus?.())
 }
 
 function closePopover() {
   popoverOpen.value = false
+  hoverDate.value = null
 }
 
 function updateTriggerRect() {
@@ -222,34 +274,27 @@ function isShortcutActive(item) {
   return diffDays === item.days
 }
 
-function onStartChange(event) {
-  const value = event.target.value
-  if (!value) {
-    emit('update:customStart', '')
-    return
-  }
-  if (props.customEnd && value > props.customEnd) {
-    emit('update:customStart', props.customEnd)
-    emit('update:customEnd', value)
+// 日历点选：第一次点设开始，第二次点设结束（早于开始则交换），第三次起重新开始
+function onDateClick(date) {
+  const key = formatDateKey(date)
+  const startKey = props.customStart
+  const endKey = props.customEnd
+  if (!startKey || (startKey && endKey)) {
+    emit('update:customStart', key)
+    emit('update:customEnd', '')
+  } else if (key < startKey) {
+    emit('update:customStart', key)
+    emit('update:customEnd', startKey)
   } else {
-    emit('update:customStart', value)
+    emit('update:customEnd', key)
   }
   if (props.range !== 'custom') emit('update:range', 'custom')
+  // 点击补位日期时跟随切换月份，方便连续选择
+  viewDate.value = new Date(date.getFullYear(), date.getMonth(), 1)
 }
 
-function onEndChange(event) {
-  const value = event.target.value
-  if (!value) {
-    emit('update:customEnd', '')
-    return
-  }
-  if (props.customStart && value < props.customStart) {
-    emit('update:customStart', value)
-    emit('update:customEnd', props.customStart)
-  } else {
-    emit('update:customEnd', value)
-  }
-  if (props.range !== 'custom') emit('update:range', 'custom')
+function moveMonth(delta) {
+  viewDate.value = new Date(viewDate.value.getFullYear(), viewDate.value.getMonth() + delta, 1)
 }
 
 function resetCustom() {
@@ -258,6 +303,49 @@ function resetCustom() {
   weekAgo.setDate(weekAgo.getDate() - 6)
   emit('update:customStart', formatDateKey(weekAgo))
   emit('update:customEnd', formatDateKey(today))
+  viewDate.value = new Date(weekAgo.getFullYear(), weekAgo.getMonth(), 1)
+}
+
+function dayClass(cell) {
+  const key = formatDateKey(cell.date)
+  const cls = []
+  if (!cell.inMonth) cls.push('is-outside')
+  if (isToday(key)) cls.push('is-today')
+  if (isEndpoint(key)) cls.push('is-selected')
+  else if (inSelectedRange(key)) cls.push('is-range')
+  else if (inPreviewRange(key)) cls.push('is-preview')
+  return cls
+}
+
+function isEndpoint(key) {
+  return !!key && (key === props.customStart || key === props.customEnd)
+}
+
+function inSelectedRange(key) {
+  if (!props.customStart || !props.customEnd) return false
+  return key > props.customStart && key < props.customEnd
+}
+
+// 已选开始、未选结束时，hover 悬停日期之间的范围预览
+function inPreviewRange(key) {
+  if (!props.customStart || props.customEnd || !hoverDate.value) return false
+  const hoverKey = formatDateKey(hoverDate.value)
+  if (hoverKey < props.customStart) return key >= hoverKey && key <= props.customStart
+  return key >= props.customStart && key <= hoverKey
+}
+
+function isToday(key) {
+  return key === formatDateKey(new Date())
+}
+
+function ariaDay(cell) {
+  const d = cell.date
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
+}
+
+function parseKey(key) {
+  const [y, m, d] = key.split('-').map(Number)
+  return new Date(y, m - 1, d)
 }
 
 function formatDateKey(date) {
@@ -367,43 +455,60 @@ onBeforeUnmount(() => {
 .review-range-control__chip--custom svg { color: currentColor; transition: transform var(--transition-fast); }
 .review-range-control__chip--custom .is-open { transform: rotate(180deg); }
 
-/* popover（Teleport 到 body，position: fixed） */
+/* popover（Teleport 到 body，position: fixed，不透明白底） */
 .review-range-popover {
   position: fixed;
   z-index: 50;
   display: grid;
-  gap: 12px;
-  padding: 16px 18px;
+  width: 400px;
+  overflow: hidden;
   border: 1px solid var(--divider-soft);
-  border-radius: 14px;
+  border-radius: 16px;
   background: var(--surface, #fff);
   box-shadow: 0 24px 56px rgba(8, 24, 20, .22), 0 4px 12px rgba(8, 24, 20, .12);
-  /* 保证不透明：覆盖可能的半透明变量 */
   opacity: 1;
 }
 
+/* 头部：淡 accent 渐变底 + 图标徽章 */
 .review-range-popover__head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
+  padding: 14px 16px 12px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 8%, var(--surface)), var(--surface) 70%);
+  border-bottom: 1px solid var(--divider-soft);
 }
-.review-range-popover__head > div { display: grid; gap: 2px; }
-.review-range-popover__head strong { color: var(--text); font-size: 13px; font-weight: 700; letter-spacing: -.01em; }
-.review-range-popover__head small { color: var(--text-muted); font-size: 11px; }
+.review-range-popover__title { display: flex; align-items: center; gap: 10px; }
+.review-range-popover__badge {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  color: var(--accent-strong);
+}
+.review-range-popover__title > div { display: grid; gap: 1px; }
+.review-range-popover__title strong { color: var(--text); font-size: 13px; font-weight: 700; letter-spacing: -.01em; }
+.review-range-popover__title small { color: var(--text-muted); font-size: 10.5px; }
 .review-range-popover__close {
-  display: grid; place-items: center;
-  width: 24px; height: 24px;
-  border: 0; border-radius: 6px;
-  background: transparent; color: var(--text-muted);
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
   cursor: pointer;
 }
 .review-range-popover__close:hover { background: var(--surface-muted); color: var(--text); }
 
-.review-range-popover__body { display: grid; gap: 14px; }
+.review-range-popover__body { display: grid; gap: 14px; padding: 14px 16px 4px; }
 
 .review-range-popover__shortcuts h4,
-.review-range-popover__custom h4 {
+.review-range-popover__calendar h4 {
   margin: 0 0 7px;
   color: var(--text-muted);
   font-size: 10.5px;
@@ -419,7 +524,9 @@ onBeforeUnmount(() => {
   border-radius: 7px;
   background: var(--surface-muted);
   color: var(--text);
-  font: inherit; font-size: 11.5px; font-weight: 600;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
   cursor: pointer;
   transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
 }
@@ -433,58 +540,139 @@ onBeforeUnmount(() => {
   border-color: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
-.review-range-popover__inputs { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 6px; }
-.review-range-popover__inputs label { display: grid; gap: 4px; color: var(--text-muted); font-size: 10px; }
-.review-range-popover__inputs input[type="date"] {
-  min-height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--divider-soft);
+/* 自绘迷你日历 */
+.review-range-popover__calendar { display: grid; gap: 8px; padding-bottom: 12px; }
+.review-range-popover__cal-head { display: flex; align-items: center; justify-content: space-between; }
+.review-range-popover__cal-head strong { color: var(--text); font-size: 12.5px; font-weight: 700; letter-spacing: -.01em; }
+.review-range-popover__cal-nav {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.review-range-popover__cal-nav:hover { background: var(--surface-muted); color: var(--text); }
+
+.review-range-popover__cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.review-range-popover__cal-weekday {
+  display: grid;
+  place-items: center;
+  height: 22px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .02em;
+}
+.review-range-popover__cal-day {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 32px;
+  border: 0;
   border-radius: 8px;
-  background: var(--surface-muted);
+  background: transparent;
   color: var(--text);
   font: inherit;
-  font-size: 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
 }
-.review-range-popover__inputs input[type="date"]:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+.review-range-popover__cal-day:hover { background: var(--accent-soft); color: var(--accent-strong); }
+.review-range-popover__cal-day.is-outside { color: var(--text-muted); opacity: .4; }
+.review-range-popover__cal-day.is-today { color: var(--accent-strong); }
+.review-range-popover__cal-day.is-today::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
 }
-.review-range-popover__arrow { color: var(--text-muted); font-size: 14px; padding-bottom: 8px; }
+.review-range-popover__cal-day.is-range,
+.review-range-popover__cal-day.is-preview {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+.review-range-popover__cal-day.is-selected {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.review-range-popover__cal-day.is-selected:hover { background: var(--accent-strong); color: #fff; }
+.review-range-popover__cal-day.is-selected.is-today::after { background: #fff; }
+.review-range-popover__cal-day.is-selected.is-outside { opacity: 1; }
 
-.review-range-popover__hint { margin: 8px 0 0; color: var(--text-muted); font-size: 10.5px; line-height: 1.5; }
-
+/* 底部操作条 */
 .review-range-popover__foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding-top: 4px;
+  padding: 12px 16px;
   border-top: 1px solid var(--divider-soft);
-  margin-top: -2px;
-  padding-top: 12px;
+  background: var(--surface-muted);
 }
+.review-range-popover__selection {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--divider-soft);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.review-range-popover__selection.empty { color: var(--text-muted); font-weight: 500; }
+.review-range-popover__selection-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.review-range-popover__selection.empty .review-range-popover__selection-dot { background: var(--text-7-fallback); }
+.review-range-popover__actions { display: flex; align-items: center; gap: 6px; }
 .review-range-popover__reset {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   min-height: 30px;
   padding: 0 12px;
-  border: 0; border-radius: 8px;
+  border: 0;
+  border-radius: 8px;
   background: transparent;
   color: var(--text-muted);
-  font: inherit; font-size: 11.5px; font-weight: 600;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
   cursor: pointer;
 }
-.review-range-popover__reset:hover:not(:disabled) { background: var(--surface-muted); color: var(--text); }
+.review-range-popover__reset:hover:not(:disabled) { background: var(--surface); color: var(--text); }
 .review-range-popover__reset:disabled { opacity: .5; cursor: not-allowed; }
 .review-range-popover__done {
   min-height: 30px;
   padding: 0 16px;
-  border: 0; border-radius: 8px;
+  border: 0;
+  border-radius: 8px;
   background: var(--accent);
   color: #fff;
-  font: inherit; font-size: 11.5px; font-weight: 650;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 650;
   cursor: pointer;
 }
 .review-range-popover__done:hover { background: var(--accent-strong); }
