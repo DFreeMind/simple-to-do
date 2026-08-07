@@ -81,11 +81,20 @@
     <div
       v-if="store.notice"
       class="app-toast"
-      :class="`app-toast--${store.notice.type}`"
+      :class="[
+        `app-toast--${store.notice.type}`,
+        { 'app-toast--with-action': store.notice.action }
+      ]"
       role="status"
       aria-live="polite"
     >
-      {{ store.notice.message }}
+      <span class="app-toast__message">{{ store.notice.message }}</span>
+      <button
+        v-if="store.notice.action"
+        type="button"
+        class="app-toast__action"
+        @click="handleToastAction"
+      >{{ store.notice.action.label }}</button>
     </div>
     </template>
   </div>
@@ -398,8 +407,21 @@ onBeforeUnmount(() => {
 
 watch(() => store.notice?.id, (id) => {
   if (!id) return
+  // 带 action 的提示条延长停留时间，给用户足够的撤销窗口
+  const ttl = store.notice?.action ? 7000 : 3200
   window.setTimeout(() => {
     if (store.notice?.id === id) store.clearNotice()
-  }, 3200)
+  }, ttl)
 })
+
+function handleToastAction() {
+  const action = store.notice?.action
+  if (!action) return
+  // 先清掉提示再执行回调，避免回调里 showNotice 把当前 action 提示覆盖
+  const callback = action.onClick
+  store.clearNotice()
+  if (typeof callback === 'function') {
+    try { callback() } catch (error) { console.error('[App] notice action 回调执行失败:', error) }
+  }
+}
 </script>

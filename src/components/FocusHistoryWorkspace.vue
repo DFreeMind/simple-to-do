@@ -7,10 +7,17 @@
           <h1>看见投入，也看见恢复</h1>
           <p>专注记录推进，节律记录你如何停下来。点击任意记录可查看完整详情。</p>
         </div>
-        <div class="review-range" role="group" aria-label="回顾时间范围">
-          <button v-for="option in ranges" :key="option.id" type="button" :class="{ active: range === option.id }" @click="range = option.id">
-            {{ option.label }}
-          </button>
+        <div class="review-range-block">
+          <div class="review-range review-range--shortcut" role="group" aria-label="时间范围快捷">
+            <button v-for="option in ranges.filter(item => item.kind === 'shortcut')" :key="option.id" type="button" :class="{ active: range === option.id }" @click="range = option.id">
+              {{ option.label }}
+            </button>
+          </div>
+          <div class="review-range review-range--window" role="group" aria-label="时间范围窗口">
+            <button v-for="option in ranges.filter(item => !item.kind)" :key="option.id" type="button" :class="{ active: range === option.id }" @click="range = option.id">
+              {{ option.label }}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -22,34 +29,67 @@
         </button>
       </nav>
 
-      <section v-if="!focusHistory.length && !rhythmHistory.length" class="review-empty">
+      <section v-if="!store.focusHistory.length && !store.rhythmHistory.length" class="review-empty review-empty--zero">
         <span><History :size="25" /></span>
         <strong>还没有可回顾的记录</strong>
         <p>完成一段专注或处理一次节律提醒后，这里会保存真实发生的过程。</p>
         <button type="button" @click="store.setClockView('focus')"><Play :size="15" fill="currentColor" />开始专注</button>
       </section>
 
+      <section v-else-if="activeTab === 'overview' && !focusEntries.length && !rhythmEntries.length" class="review-empty review-empty--empty-range">
+        <span><Calendar :size="25" /></span>
+        <strong>{{ selectedRange.label }} 还没有记录</strong>
+        <p>试试切换到"全部"或更宽的时间范围，或者开始一段新的专注。</p>
+        <div class="review-empty__actions">
+          <button type="button" @click="range = 'all'">查看全部历史</button>
+          <button type="button" class="review-empty__primary" @click="store.setClockView('focus')"><Play :size="14" fill="currentColor" />开始专注</button>
+        </div>
+      </section>
+
       <template v-else-if="activeTab === 'overview'">
+        <section v-if="insights.length" class="review-insights" aria-label="本周期亮点">
+          <header>
+            <Lightbulb :size="15" />
+            <span>本期亮点</span>
+            <small>基于当前{{ selectedRange.label }}的数据自动生成</small>
+          </header>
+          <div class="review-insights__list">
+            <div v-for="(item, idx) in insights" :key="idx" :class="['review-insight', `is-${item.type}`]">
+              <span class="review-insight__icon"><component :is="item.icon" :size="16" /></span>
+              <div>
+                <strong>{{ item.text }}</strong>
+                <small v-if="item.detail">{{ item.detail }}</small>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section class="review-card review-summary" aria-label="本周期概览">
           <header><div><span>数据摘要</span><h2>{{ selectedRange.label }}的专注与节律</h2><p>下面的趋势和最近记录使用同一时间范围</p></div><small>{{ focusEntries.length + rhythmEntries.length }} 条记录</small></header>
           <div class="review-metrics">
             <article class="review-metric review-metric--primary">
-              <span>有效专注</span>
-              <strong>{{ formatDuration(totalFocusSeconds) }}</strong>
+              <span class="review-metric__label"><Timer :size="13" />有效专注</span>
+              <strong :aria-label="`${selectedRange.label}累计有效专注 ${formatDuration(totalFocusSeconds)}`">{{ formatDuration(totalFocusSeconds) }}</strong>
               <small>{{ focusEntries.length }} 段 · {{ focusActiveDays }} 天有投入</small>
+              <span v-if="previousRangeStart && focusSecondsDelta" :class="['review-metric__delta', focusSecondsDelta > 0 ? 'is-up' : 'is-down']" :title="`与上一周期对比（${previousRangeStart.days} 天）`">
+                {{ focusSecondsDelta > 0 ? '↑' : focusSecondsDelta < 0 ? '↓' : '持平' }}{{ Math.abs(focusSecondsDelta) }}%
+              </span>
             </article>
             <article class="review-metric">
-              <span>专注完成率</span>
+              <span class="review-metric__label"><BarChart3 :size="13" />专注完成率</span>
               <strong>{{ focusCompletionRate }}%</strong>
               <small>{{ completedFocusEntries.length }} 段自然完成</small>
+              <span v-if="previousRangeStart && completionRateDelta" :class="['review-metric__delta', completionRateDelta > 0 ? 'is-up' : 'is-down']" :title="`与上一周期对比`">
+                {{ completionRateDelta > 0 ? '↑' : completionRateDelta < 0 ? '↓' : '持平' }}{{ Math.abs(completionRateDelta) }}pp
+              </span>
             </article>
             <article class="review-metric">
-              <span>暂停</span>
+              <span class="review-metric__label"><Activity :size="13" />暂停</span>
               <strong>{{ totalPauseCount }} 次</strong>
               <small>累计 {{ formatDuration(totalPausedSeconds) }}</small>
             </article>
             <article class="review-metric review-metric--rhythm">
-              <span>节律响应</span>
+              <span class="review-metric__label"><BellRing :size="13" />节律响应</span>
               <strong>{{ rhythmEntries.length }} 次</strong>
               <small>{{ rhythmCompletionRate }}% 完成或自然离席</small>
             </article>
@@ -60,14 +100,38 @@
           <article class="review-card">
             <header>
               <div><span>专注趋势</span><h2>{{ trendTitle }}</h2></div>
-              <strong>{{ formatCompactDuration(totalFocusSeconds) }}</strong>
+              <div class="review-chart-meta">
+                <strong>{{ formatCompactDuration(totalFocusSeconds) }}</strong>
+                <small v-if="trendAverage" :title="`只统计有投入的天数（共 ${trendDays.filter(d => d.seconds > 0).length} 天）`">日均 {{ formatCompactDuration(trendAverage) }}</small>
+              </div>
             </header>
-            <div class="review-chart" :style="{ gridTemplateColumns: `repeat(${trendDays.length}, minmax(0, 1fr))` }" role="img" :aria-label="`${trendTitle}，共 ${formatDuration(totalFocusSeconds)}`">
-              <div v-for="day in trendDays" :key="day.key" :title="`${day.label}：${formatDuration(day.seconds)}`">
+            <p v-if="trendTruncated" class="review-chart-note">记录超过 {{ TREND_HARD_CAP }} 天，仅显示最近 {{ trendDaysCount }} 天。试试缩短时间范围看完整曲线。</p>
+            <div class="review-chart" :style="{ gridTemplateColumns: `repeat(${trendDays.length}, minmax(0, 1fr))` }">
+              <div v-for="day in trendDays" :key="day.key" :class="{ 'is-today': day.isToday, 'is-empty': !day.seconds }" :title="`${day.label}：${formatDuration(day.seconds)}${day.isToday ? '（今日）' : ''}`">
                 <span>{{ day.seconds ? formatCompactDuration(day.seconds) : '' }}</span>
-                <i><b :style="{ height: `${Math.max(day.seconds ? 8 : 2, day.seconds / trendMax * 100)}%` }"></b></i>
+                <i>
+                  <b v-if="day.seconds" :style="{ height: `${Math.max(8, day.seconds / trendMax * 100)}%` }"></b>
+                  <b v-else class="review-chart__placeholder"></b>
+                </i>
                 <small>{{ day.shortLabel }}</small>
               </div>
+            </div>
+            <table class="sr-only" aria-label="每日专注时长明细">
+              <caption>每日专注时长（最近 {{ trendDays.length }} 天）</caption>
+              <thead><tr><th scope="col">日期</th><th scope="col">投入</th></tr></thead>
+              <tbody>
+                <tr v-for="day in trendDays" :key="day.key">
+                  <th scope="row">{{ day.label }}{{ day.isToday ? '（今日）' : '' }}</th>
+                  <td>{{ day.seconds ? formatDuration(day.seconds) : '无投入' }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <div v-if="trendAverage" class="review-chart-axis" aria-hidden="true">
+              <span>0</span>
+              <i :style="{ '--line': `${Math.min(100, trendAverage / trendMax * 100)}%` }">
+                <b :title="`平均线 ${formatCompactDuration(trendAverage)}`">日均</b>
+              </i>
+              <span>{{ formatCompactDuration(trendMax) }}</span>
             </div>
           </article>
 
@@ -81,6 +145,28 @@
               </div>
             </div>
             <p v-else class="review-card__empty">本周期还没有节律处理记录。新处理的完成、延后和跳过会显示在这里。</p>
+            <div v-if="rhythmEntries.length" class="review-rhythm-buckets">
+              <div class="review-rhythm-bucket">
+                <h4>响应速度</h4>
+                <ul>
+                  <li v-for="b in rhythmResponseBuckets" :key="b.id" :class="{ 'is-active': b.count > 0 }">
+                    <span>{{ b.label }}</span>
+                    <strong>{{ b.count }}</strong>
+                    <i :style="{ width: `${b.percent}%` }" :title="`${b.percent}%`"></i>
+                  </li>
+                </ul>
+              </div>
+              <div class="review-rhythm-bucket">
+                <h4>提醒时段</h4>
+                <ul>
+                  <li v-for="b in rhythmHourBuckets" :key="b.id" :class="{ 'is-active': b.count > 0 }">
+                    <span>{{ b.label }}</span>
+                    <strong>{{ b.count }}</strong>
+                    <i :style="{ width: `${b.percent}%` }" :title="`${b.percent}%`"></i>
+                  </li>
+                </ul>
+              </div>
+            </div>
           </article>
         </section>
 
@@ -108,12 +194,12 @@
               </span>
             </article>
           </div>
-          <p v-else class="review-card__empty">当前范围没有记录。</p>
+          <p v-else class="review-card__empty">当前范围没有{{ recentKind === 'focus' ? '专注' : recentKind === 'rhythm' ? '节律' : '' }}记录。试试切换"全部/仅专注/仅节律"。</p>
           <footer class="review-recent__footer">
             <span>显示最近 {{ recentRecords.length }} 条，完整历史支持筛选和分页管理</span>
             <div>
-              <button type="button" @click="selectTab('focus')">管理专注记录 <ChevronRight :size="14" /></button>
-              <button type="button" @click="selectTab('rhythm')">管理节律记录 <ChevronRight :size="14" /></button>
+              <button type="button" class="review-cta" @click="selectTab('focus')"><span>管理专注记录</span><ChevronRight :size="14" /></button>
+              <button type="button" class="review-cta" @click="selectTab('rhythm')"><span>管理节律记录</span><ChevronRight :size="14" /></button>
             </div>
           </footer>
         </section>
@@ -137,6 +223,18 @@
             <select v-model="focusSort" aria-label="专注记录排序"><option value="newest">最新在前</option><option value="oldest">最早在前</option><option value="longest">时长从长到短</option></select>
             <button v-if="focusFilterCount" class="review-filter-reset" type="button" @click="resetFocusFilters"><RotateCcw :size="14" />重置</button>
           </div>
+        </div>
+        <div v-if="!focusHistory.length" class="review-empty review-empty--inline">
+          <span><Timer :size="22" /></span>
+          <strong>{{ selectedRange.label }} 还没有专注记录</strong>
+          <p>试试切换到"全部"或更宽的时间范围。</p>
+          <button type="button" @click="range = 'all'">查看全部历史</button>
+        </div>
+        <div v-else-if="focusFilterCount && !filteredFocusRecords.length" class="review-empty review-empty--inline">
+          <span><Search :size="22" /></span>
+          <strong>没有匹配的专注记录</strong>
+          <p>当前筛选条件下没有结果。可以重置筛选试试。</p>
+          <button type="button" @click="resetFocusFilters"><RotateCcw :size="13" />重置筛选</button>
         </div>
         <div class="review-filter-summary" aria-label="当前筛选的专注统计">
           <div><span>匹配记录</span><strong>{{ formatCount(filteredFocusRecords.length) }} 条</strong></div>
@@ -189,6 +287,18 @@
             <button v-if="rhythmFilterCount" class="review-filter-reset" type="button" @click="resetRhythmFilters"><RotateCcw :size="14" />重置</button>
           </div>
         </div>
+        <div v-if="!rhythmHistory.length" class="review-empty review-empty--inline">
+          <span><BellRing :size="22" /></span>
+          <strong>{{ selectedRange.label }} 还没有节律记录</strong>
+          <p>试试切换到"全部"或更宽的时间范围。新处理的完成、延后和跳过会显示在这里。</p>
+          <button type="button" @click="range = 'all'">查看全部历史</button>
+        </div>
+        <div v-else-if="rhythmFilterCount && !filteredRhythmRecords.length" class="review-empty review-empty--inline">
+          <span><Search :size="22" /></span>
+          <strong>没有匹配的节律记录</strong>
+          <p>当前筛选条件下没有结果。可以重置筛选试试。</p>
+          <button type="button" @click="resetRhythmFilters"><RotateCcw :size="13" />重置筛选</button>
+        </div>
         <div class="review-filter-summary" aria-label="当前筛选的节律统计">
           <div><span>匹配记录</span><strong>{{ formatCount(filteredRhythmRecords.length) }} 条</strong></div>
           <div><span>完成或离席</span><strong>{{ filteredRhythmCompletionRate }}%</strong></div>
@@ -224,8 +334,9 @@
     </div>
 
     <Teleport to=".app">
+      <Transition name="review-detail-fade">
       <div v-if="detail" class="review-detail-backdrop" @click.self="closeDetail">
-        <aside class="review-detail" role="dialog" aria-modal="true" :aria-labelledby="detail.kind === 'focus' ? 'focus-detail-title' : 'rhythm-detail-title'">
+        <aside ref="detailRef" class="review-detail" role="dialog" aria-modal="true" :aria-labelledby="detail.kind === 'focus' ? 'focus-detail-title' : 'rhythm-detail-title'">
           <header class="review-detail-header">
             <div class="review-detail-heading">
               <span class="review-detail-heading__icon" :class="`is-${detail.kind}`"><Timer v-if="detail.kind === 'focus'" :size="19" /><BellRing v-else :size="19" /></span>
@@ -235,7 +346,11 @@
                 <p>{{ detail.kind === 'focus' ? `${formatShortDate(detail.item.finishedAt)} · ${formatTimeRange(detail.item.startedAt, detail.item.finishedAt)}` : `${formatShortDate(detail.item.triggeredAt)} · ${formatClock(detail.item.triggeredAt)} → ${formatClock(detail.item.resolvedAt)}` }}</p>
               </div>
             </div>
-            <button type="button" aria-label="关闭详情" title="关闭" @click="closeDetail"><X :size="19" /></button>
+            <div class="review-detail-header__actions">
+              <button v-if="hasPrevDetail || hasNextDetail" type="button" class="review-detail-nav" :disabled="!hasPrevDetail" aria-label="上一条" title="上一条（↑）" @click="goPrevDetail"><ChevronUp :size="16" /></button>
+              <button v-if="hasPrevDetail || hasNextDetail" type="button" class="review-detail-nav" :disabled="!hasNextDetail" aria-label="下一条" title="下一条（↓）" @click="goNextDetail"><ChevronDown :size="16" /></button>
+              <button type="button" aria-label="关闭详情" title="关闭（Esc）" @click="closeDetail"><X :size="19" /></button>
+            </div>
           </header>
 
           <template v-if="detail.kind === 'focus'">
@@ -271,9 +386,36 @@
               </ol>
               <div v-else class="review-detail-legacy"><History :size="18" /><p><strong>这是早期记录</strong><span>当时尚未采集暂停时间线，因此只能展示开始、结束和有效时长，无法准确反推暂停过程。</span></p></div>
             </section>
-            <section v-if="detail.item.note" class="review-detail-section">
-              <header><FileText :size="16" /><h3>结束备注</h3></header>
-              <p class="review-detail-note">{{ detail.item.note }}</p>
+            <section class="review-detail-section">
+              <header>
+                <FileText :size="16" />
+                <h3>结束备注</h3>
+                <button v-if="!editingNote" type="button" class="review-detail-edit" @click="startEditNote"><Pencil :size="13" />{{ detail.item.note ? '编辑' : '添加' }}</button>
+                <button v-else type="button" class="review-detail-edit" @click="cancelEditNote"><X :size="13" />取消</button>
+              </header>
+              <div v-if="!editingNote">
+                <p v-if="detail.item.note" class="review-detail-note">{{ detail.item.note }}</p>
+                <p v-else class="review-detail-note review-detail-note--empty">还没有备注。点击右上角"添加"可以补充当时的想法或上下文。</p>
+              </div>
+              <div v-else class="review-detail-note-edit">
+                <textarea
+                  ref="noteTextareaRef"
+                  v-model="noteDraft"
+                  rows="4"
+                  maxlength="2000"
+                  :placeholder="'记录这次专注的背景、心得或待改进...'"
+                  @keydown.meta.enter="saveEditNote"
+                  @keydown.ctrl.enter="saveEditNote"
+                  @keydown.esc="cancelEditNote"
+                ></textarea>
+                <div class="review-detail-note-edit__actions">
+                  <small>{{ noteDraft.length }} / 2000</small>
+                  <div>
+                    <button type="button" @click="cancelEditNote">取消</button>
+                    <button type="button" class="review-detail-note-save" :disabled="!noteDraft.trim()" @click="saveEditNote">保存</button>
+                  </div>
+                </div>
+              </div>
             </section>
           </template>
 
@@ -314,18 +456,42 @@
           </footer>
         </aside>
       </div>
+      </Transition>
     </Teleport>
+
+    <ConfirmDialog
+      :visible="confirmDialog.visible"
+      :title="confirmDialog.title"
+      :message="confirmDialog.message"
+      :details="confirmDialog.details"
+      :type="confirmDialog.type"
+      :confirm-text="confirmDialog.confirmText"
+      @confirm="confirmDialog.onConfirm"
+      @cancel="confirmDialog.visible = false"
+    />
   </main>
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Activity, ArrowLeft, ArrowRight, BellRing, ChevronLeft, ChevronRight, Clock3, Coffee, Eye, FileText, History, Play, RotateCcw, Search, SlidersHorizontal, Timer, Trash2, X } from 'lucide-vue-next'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { Activity, ArrowLeft, ArrowRight, BarChart3, BellRing, Calendar, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock3, Coffee, Eye, FileText, History, Lightbulb, Pencil, Play, RotateCcw, Search, SlidersHorizontal, Sparkles, Timer, Trash2, TrendingDown, TrendingUp, X } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import FocusRewardBadge from './FocusRewardBadge.vue'
+import ConfirmDialog from './ConfirmDialog.vue'
+import {
+  formatDuration,
+  formatCompactDuration,
+  formatShortDate,
+  formatFullDateTime,
+  formatClock,
+  formatTimeRange,
+  formatResponseTime,
+  formatCount
+} from '@/utils/reviewFormatters'
 
 const store = useTaskStore()
 const workspaceRef = ref(null)
+const detailRef = ref(null)
 const range = ref('7d')
 const activeTab = ref('overview')
 const recentKind = ref('all')
@@ -343,15 +509,57 @@ const rhythmPage = ref(1)
 const focusPageSize = ref(25)
 const rhythmPageSize = ref(25)
 const detail = ref(null)
+const detailIndex = ref(-1) // 详情面板当前记录在筛选后列表中的位置，用于上下条导航
+const noteDraft = ref('')
+const editingNote = ref(false)
+const noteTextareaRef = ref(null)
 const pageSizes = [25, 50, 100]
-const ranges = [{ id: '7d', label: '近 7 天', days: 7 }, { id: '30d', label: '近 30 天', days: 30 }, { id: '90d', label: '近 90 天', days: 90 }, { id: 'all', label: '全部', days: null }]
+const ranges = [
+  { id: 'today', label: '今日', days: 1, kind: 'shortcut' },
+  { id: 'yesterday', label: '昨日', days: 2, kind: 'shortcut' },
+  { id: 'thisWeek', label: '本周', days: 7, kind: 'shortcut' },
+  { id: 'thisMonth', label: '本月', days: 30, kind: 'shortcut' },
+  { id: '7d', label: '近 7 天', days: 7 },
+  { id: '30d', label: '近 30 天', days: 30 },
+  { id: '90d', label: '近 90 天', days: 90 },
+  { id: 'all', label: '全部', days: null }
+]
 const recentKindOptions = [{ id: 'all', label: '全部' }, { id: 'focus', label: '仅专注' }, { id: 'rhythm', label: '仅节律' }]
+
+// 替换 window.confirm 的弹窗状态
+const confirmDialog = reactive({
+  visible: false,
+  title: '',
+  message: '',
+  details: [],
+  type: 'danger',
+  confirmText: '删除',
+  onConfirm: () => {}
+})
 
 const selectedRange = computed(() => ranges.find(item => item.id === range.value) || ranges[0])
 const rangeStart = computed(() => {
   if (!selectedRange.value.days) return null
   const date = new Date()
   date.setHours(0, 0, 0, 0)
+  // today/yesterday/thisWeek/thisMonth 各按语义起点计算，与"近 N 天"的滚动窗口不同
+  const id = selectedRange.value.id
+  if (id === 'today') return date
+  if (id === 'yesterday') {
+    const start = new Date(date)
+    start.setDate(start.getDate() - 1)
+    return start
+  }
+  if (id === 'thisWeek') {
+    // 周日为一周开始；与国内日历习惯一致（i18n 后续可加设置项）
+    const day = date.getDay()
+    const start = new Date(date)
+    start.setDate(start.getDate() - day)
+    return start
+  }
+  if (id === 'thisMonth') {
+    return new Date(date.getFullYear(), date.getMonth(), 1)
+  }
   date.setDate(date.getDate() - selectedRange.value.days + 1)
   return date
 })
@@ -372,19 +580,50 @@ const tabs = computed(() => [
   { id: 'focus', label: '专注记录', icon: Timer, count: focusHistory.value.length },
   { id: 'rhythm', label: '节律记录', icon: BellRing, count: rhythmEntries.value.length }
 ])
+// 趋势图：天数根据 range 决定。'all' 时封顶 60 天，避免画布塞爆；超过封顶会显示提示
+const TREND_HARD_CAP = 60
+const trendDaysCount = computed(() => {
+  if (selectedRange.value.days) return Math.min(TREND_HARD_CAP, selectedRange.value.days)
+  return TREND_HARD_CAP
+})
 const trendDays = computed(() => {
-  const days = selectedRange.value.days || 30
+  const days = trendDaysCount.value
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const start = new Date(today)
+  start.setDate(start.getDate() - days + 1)
   return Array.from({ length: days }, (_, index) => {
-    const date = new Date()
-    date.setHours(0, 0, 0, 0)
-    date.setDate(date.getDate() - days + index + 1)
+    const date = new Date(start)
+    date.setDate(start.getDate() + index)
     const key = dateKey(date)
     const seconds = focusEntries.value.filter(item => dateKey(item.finishedAt) === key).reduce((total, item) => total + item.elapsedSeconds, 0)
-    return { key, seconds, label: new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', weekday: 'short' }).format(date), shortLabel: days <= 7 ? `周${'日一二三四五六'[date.getDay()]}` : `${date.getMonth() + 1}/${date.getDate()}` }
+    return {
+      key,
+      seconds,
+      date,
+      isToday: key === dateKey(today),
+      label: new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', weekday: 'short' }).format(date),
+      shortLabel: days <= 7 ? `周${'日一二三四五六'[date.getDay()]}` : `${date.getMonth() + 1}/${date.getDate()}`
+    }
   })
 })
 const trendMax = computed(() => Math.max(...trendDays.value.map(item => item.seconds), 1))
-const trendTitle = computed(() => selectedRange.value.id === '7d' ? '这一周的投入节奏' : selectedRange.value.id === 'all' ? '最近 30 天的投入节奏' : `${selectedRange.value.label}投入变化`)
+const trendAverage = computed(() => {
+  const activeDays = trendDays.value.filter(item => item.seconds > 0)
+  if (!activeDays.length) return 0
+  return Math.round(activeDays.reduce((t, i) => t + i.seconds, 0) / activeDays.length)
+})
+const trendTitle = computed(() => {
+  const id = selectedRange.value.id
+  if (id === 'all') return `最近 ${trendDaysCount.value} 天的投入节奏（更早数据未在图中显示）`
+  if (id === '7d' || id === 'thisWeek') return '这一周的投入节奏'
+  if (id === 'today') return '今天的投入分布'
+  if (id === 'yesterday') return '昨日的投入分布'
+  if (id === 'thisMonth') return '本月的投入节奏'
+  return `${selectedRange.value.label}的投入变化`
+})
+// "全部"模式下数据被截断时，给用户一个明确提示而不是默默显示最近 60 天
+const trendTruncated = computed(() => selectedRange.value.days === null && (store.focusHistory.length || 0) > TREND_HARD_CAP * 2)
 const rhythmActionSummary = computed(() => {
   const definitions = [
     { action: 'completed', label: '完成 / 自然离席', matches: item => ['completed', 'natural-break'].includes(item.action) },
@@ -395,6 +634,166 @@ const rhythmActionSummary = computed(() => {
     const count = rhythmEntries.value.filter(item.matches).length
     return { ...item, count, percent: rhythmEntries.value.length ? Math.round(count / rhythmEntries.value.length * 100) : 0 }
   })
+})
+
+// 响应时间分桶：< 30s / 30s-2min / 2-5min / 5min+
+const rhythmResponseBuckets = computed(() => {
+  const buckets = [
+    { id: 'fast', label: '30 秒内', min: 0, max: 30, count: 0 },
+    { id: 'normal', label: '30 秒 – 2 分钟', min: 30, max: 120, count: 0 },
+    { id: 'slow', label: '2 – 5 分钟', min: 120, max: 300, count: 0 },
+    { id: 'verySlow', label: '5 分钟以上', min: 300, max: Infinity, count: 0 }
+  ]
+  rhythmEntries.value.forEach(item => {
+    const s = Math.max(0, item.responseSeconds || 0)
+    const target = buckets.find(b => s >= b.min && s < b.max) || buckets[buckets.length - 1]
+    target.count += 1
+  })
+  const total = rhythmEntries.value.length
+  return buckets.map(b => ({ ...b, percent: total ? Math.round(b.count / total * 100) : 0 }))
+})
+
+// 按时段分布（4 个时段：晨 6-12、午 12-18、晚 18-24、夜 0-6）
+const rhythmHourBuckets = computed(() => {
+  const buckets = [
+    { id: 'morning', label: '晨间 6–12', range: [6, 12], count: 0 },
+    { id: 'afternoon', label: '午后 12–18', range: [12, 18], count: 0 },
+    { id: 'evening', label: '傍晚 18–24', range: [18, 24], count: 0 },
+    { id: 'night', label: '深夜 0–6', range: [0, 6], count: 0 }
+  ]
+  rhythmEntries.value.forEach(item => {
+    const hour = new Date(item.triggeredAt).getHours()
+    const target = buckets.find(b => {
+      const [from, to] = b.range
+      if (from < to) return hour >= from && hour < to
+      return hour >= from || hour < to
+    })
+    if (target) target.count += 1
+  })
+  const total = rhythmEntries.value.length
+  return buckets.map(b => ({ ...b, percent: total ? Math.round(b.count / total * 100) : 0 }))
+})
+
+// 上一周期对比：用于"vs 上周期"指标
+const previousRangeStart = computed(() => {
+  if (!rangeStart.value) return null
+  const start = rangeStart.value
+  const end = new Date()
+  const days = Math.max(1, Math.round((end - start) / 86400000) + 1)
+  const prevEnd = new Date(start)
+  prevEnd.setDate(prevEnd.getDate() - 1)
+  prevEnd.setHours(23, 59, 59, 999)
+  const prevStart = new Date(prevEnd)
+  prevStart.setDate(prevStart.getDate() - days + 1)
+  prevStart.setHours(0, 0, 0, 0)
+  return { start: prevStart, end: prevEnd, days }
+})
+const previousFocusEntries = computed(() => {
+  if (!previousRangeStart.value) return []
+  const { start, end } = previousRangeStart.value
+  return store.focusHistory.filter(item => {
+    if (item.phase !== 'focus') return false
+    const t = new Date(item.finishedAt).getTime()
+    return t >= start.getTime() && t <= end.getTime()
+  })
+})
+const previousFocusSeconds = computed(() => previousFocusEntries.value.reduce((t, i) => t + i.elapsedSeconds, 0))
+const focusSecondsDelta = computed(() => {
+  if (!previousRangeStart.value) return 0
+  if (previousFocusSeconds.value === 0) return totalFocusSeconds.value > 0 ? 100 : 0
+  return Math.round((totalFocusSeconds.value - previousFocusSeconds.value) / previousFocusSeconds.value * 100)
+})
+const previousActiveDays = computed(() => new Set(previousFocusEntries.value.map(i => dateKey(i.finishedAt))).size)
+const focusActiveDaysDelta = computed(() => {
+  if (!previousRangeStart.value) return 0
+  return focusActiveDays.value - previousActiveDays.value
+})
+const completionRateDelta = computed(() => {
+  if (!previousRangeStart.value) return 0
+  const prevRate = previousFocusEntries.value.length
+    ? Math.round(previousFocusEntries.value.filter(i => i.result === 'completed').length / previousFocusEntries.value.length * 100)
+    : 0
+  return focusCompletionRate.value - prevRate
+})
+
+// 详情面板的"上下条"导航
+const detailList = computed(() => {
+  if (activeTab.value === 'focus') return filteredFocusRecords.value
+  if (activeTab.value === 'rhythm') return filteredRhythmRecords.value
+  return []
+})
+const hasPrevDetail = computed(() => detailList.value.length > 0 && detailIndex.value > 0)
+const hasNextDetail = computed(() => detailList.value.length > 0 && detailIndex.value < detailList.value.length - 1)
+
+// 洞察卡片：自动从数据中生成 1-3 条高亮信息
+const insights = computed(() => {
+  const result = []
+  if (!focusEntries.value.length && !rhythmEntries.value.length) return result
+
+  // 亮点 1：相比上周期的时间变化
+  if (previousRangeStart.value && previousFocusSeconds.value > 0) {
+    if (focusSecondsDelta.value >= 20) {
+      result.push({
+        type: 'positive',
+        icon: TrendingUp,
+        text: `比上周期多专注了 ${Math.abs(focusSecondsDelta.value)}%`,
+        detail: `新增 ${formatCompactDuration(totalFocusSeconds.value - previousFocusSeconds.value)}`
+      })
+    } else if (focusSecondsDelta.value <= -20) {
+      result.push({
+        type: 'caution',
+        icon: TrendingDown,
+        text: `比上周期少了 ${Math.abs(focusSecondsDelta.value)}%`,
+        detail: `少了 ${formatCompactDuration(previousFocusSeconds.value - totalFocusSeconds.value)}`
+      })
+    }
+  }
+
+  // 亮点 2：单次最长专注
+  if (focusEntries.value.length) {
+    const longest = focusEntries.value.reduce((max, item) => item.elapsedSeconds > max.elapsedSeconds ? item : max, focusEntries.value[0])
+    if (longest.elapsedSeconds >= 25 * 60) {
+      result.push({
+        type: 'positive',
+        icon: Sparkles,
+        text: `最长一次专注 ${formatCompactDuration(longest.elapsedSeconds)}`,
+        detail: focusTitle(longest)
+      })
+    }
+  }
+
+  // 亮点 3：完成率
+  if (focusEntries.value.length >= 5) {
+    if (focusCompletionRate.value >= 80) {
+      result.push({
+        type: 'positive',
+        icon: Activity,
+        text: `完成率 ${focusCompletionRate.value}%`,
+        detail: '高于 80% 表示很稳定的投入节奏'
+      })
+    } else if (focusCompletionRate.value < 40) {
+      result.push({
+        type: 'caution',
+        icon: Activity,
+        text: `完成率仅 ${focusCompletionRate.value}%`,
+        detail: '可考虑把专注目标设小一点'
+      })
+    }
+  }
+
+  // 亮点 4：节律响应
+  if (rhythmEntries.value.length >= 3) {
+    if (rhythmCompletionRate.value >= 80) {
+      result.push({
+        type: 'positive',
+        icon: BellRing,
+        text: `节律响应率 ${rhythmCompletionRate.value}%`,
+        detail: `平均 ${formatResponseTime(rhythmEntries.value.reduce((t, i) => t + i.responseSeconds, 0) / rhythmEntries.value.length)} 处理`
+      })
+    }
+  }
+
+  return result.slice(0, 3)
 })
 const recentRecords = computed(() => [
   ...focusHistory.value.map(item => ({ kind: 'focus', item, at: item.finishedAt })),
@@ -443,10 +842,13 @@ const rhythmPageEnd = computed(() => Math.min(rhythmPage.value * rhythmPageSize.
 const pagedFocusRecords = computed(() => filteredFocusRecords.value.slice(focusPageStart.value - 1, focusPageEnd.value))
 const pagedRhythmRecords = computed(() => filteredRhythmRecords.value.slice(rhythmPageStart.value - 1, rhythmPageEnd.value))
 
-watch([range, focusSearch, focusResult, focusPhase, focusPause, focusSort, focusPageSize], () => { focusPage.value = 1 })
-watch([range, rhythmSearch, rhythmAction, rhythmTrigger, rhythmSort, rhythmPageSize], () => { rhythmPage.value = 1 })
+watch([range], () => { focusPage.value = 1; rhythmPage.value = 1 })
+watch([focusSearch, focusResult, focusPhase, focusPause, focusSort, focusPageSize], () => { focusPage.value = 1 })
+watch([rhythmSearch, rhythmAction, rhythmTrigger, rhythmSort, rhythmPageSize], () => { rhythmPage.value = 1 })
 watch(focusPageCount, count => { focusPage.value = Math.min(focusPage.value, count) })
 watch(rhythmPageCount, count => { rhythmPage.value = Math.min(rhythmPage.value, count) })
+// tab 切换时，detail 列表会变，需要重新定位
+watch(activeTab, () => { if (detail.value) syncDetailIndex() })
 
 function dateKey(value) { const date = value instanceof Date ? value : new Date(value); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` }
 function focusTitle(item) { return item.taskTitle || store.activeTasks.find(task => task.id === item.taskId)?.title || phaseLabel(item.phase) }
@@ -455,14 +857,6 @@ function phaseLabel(phase) { return phase === 'long-break' ? '长休息' : phase
 function resultLabel(result) { return result === 'completed' ? '已完成' : result === 'abandoned' ? '已放弃' : '被中断' }
 function rhythmActionLabel(action) { return ({ completed: '已完成', snoozed: '已延后', 'skipped-today': '今天跳过', dismissed: '稍后处理', 'natural-break': '自然离席' }[action] || '已处理') }
 function triggerTypeLabel(type) { return ({ interval: '间隔提醒', 'fixed-time': '固定时刻', 'active-duration': '连续活跃' }[type] || '节律提醒') }
-function formatDuration(seconds) { const value = Math.max(0, Math.round(Number(seconds) || 0)); const minutes = Math.round(value / 60); if (value > 0 && value < 60) return `${value} 秒`; return minutes >= 60 ? `${Math.floor(minutes / 60)} 小时${minutes % 60 ? ` ${minutes % 60} 分钟` : ''}` : `${minutes} 分钟` }
-function formatCompactDuration(seconds) { const minutes = Math.round((Number(seconds) || 0) / 60); return minutes >= 60 ? `${Math.floor(minutes / 60)}小时${minutes % 60 ? `${minutes % 60}分` : ''}` : `${minutes}分` }
-function formatShortDate(value) { return new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', weekday: 'short' }).format(new Date(value)) }
-function formatFullDateTime(value) { return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(value)) }
-function formatClock(value) { return new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(new Date(value)) }
-function formatTimeRange(start, end) { return `${formatClock(start)}–${formatClock(end)}` }
-function formatResponseTime(seconds) { const value = Math.max(0, Number(seconds) || 0); return value < 60 ? `${Math.round(value)} 秒` : `${Math.round(value / 60)} 分钟` }
-function formatCount(value) { return new Intl.NumberFormat('zh-CN').format(Number(value) || 0) }
 function focusPauseCount(item) { return (item.timeline || []).filter(event => event.type === 'paused').length }
 function focusPausedSeconds(item) { return (item.timeline || []).reduce((total, event) => total + (['resumed', 'finished'].includes(event.type) ? Number(event.pausedSeconds) || 0 : 0), 0) }
 function focusWallSeconds(item) { return Math.max(0, Math.round((new Date(item.finishedAt).getTime() - new Date(item.startedAt).getTime()) / 1000)) }
@@ -475,37 +869,145 @@ function focusEventDescription(event) {
   return ''
 }
 function recordTitle(record) { return record.kind === 'focus' ? focusTitle(record.item) : record.item.reminderTitle }
+function syncDetailIndex() {
+  if (!detail.value) { detailIndex.value = -1; return }
+  const list = detailList.value
+  const idx = list.findIndex(i => i.id === detail.value.item.id)
+  detailIndex.value = idx
+}
+
 async function selectTab(tabId) {
-  workspaceRef.value?.scrollTo({ top: 0, behavior: 'auto' })
+  if (activeTab.value === tabId) return
   activeTab.value = tabId
+  // 单一入口的滚动复位，避免双重 scrollTo 造成视觉抖动
   await nextTick()
   workspaceRef.value?.scrollTo({ top: 0, behavior: 'auto' })
+  detail.value = null
 }
-function openDetail(kind, item) { detail.value = { kind, item } }
-function closeDetail() { detail.value = null }
+function openDetail(kind, item) {
+  // 从概览页点开时，自动切到对应的管理 tab，让 prev/next 导航能在完整筛选列表里走
+  if (activeTab.value === 'overview') activeTab.value = kind
+  detail.value = { kind, item }
+  editingNote.value = false
+  noteDraft.value = ''
+  syncDetailIndex()
+  nextTick(() => focusFirstInDetail())
+}
+function closeDetail() { detail.value = null; detailIndex.value = -1 }
+function goPrevDetail() {
+  if (!hasPrevDetail.value) return
+  detailIndex.value -= 1
+  const prev = detailList.value[detailIndex.value]
+  detail.value = { kind: activeTab.value, item: prev }
+  nextTick(() => focusFirstInDetail())
+}
+function goNextDetail() {
+  if (!hasNextDetail.value) return
+  detailIndex.value += 1
+  const next = detailList.value[detailIndex.value]
+  detail.value = { kind: activeTab.value, item: next }
+  nextTick(() => focusFirstInDetail())
+}
+function focusFirstInDetail() {
+  // 简单 focus trap：把焦点移到详情面板的第一个可聚焦元素
+  const root = detailRef.value
+  if (!root) return
+  const target = root.querySelector('button, [href], [tabindex]:not([tabindex="-1"])')
+  if (target && typeof target.focus === 'function') target.focus()
+}
+function startEditNote() {
+  noteDraft.value = detail.value?.item?.note || ''
+  editingNote.value = true
+  nextTick(() => noteTextareaRef.value?.focus())
+}
+function cancelEditNote() {
+  editingNote.value = false
+  noteDraft.value = ''
+}
+function saveEditNote() {
+  if (!detail.value || detail.value.kind !== 'focus') return
+  if (!noteDraft.value.trim()) return
+  store.updateFocusNote(detail.value.item.id, noteDraft.value.trim())
+  // detail.value.item 是 store 内的同一引用，应该会响应式更新
+  editingNote.value = false
+}
 function resetFocusFilters() { focusSearch.value = ''; focusResult.value = 'all'; focusPhase.value = 'all'; focusPause.value = 'all'; focusSort.value = 'newest' }
 function resetRhythmFilters() { rhythmSearch.value = ''; rhythmAction.value = 'all'; rhythmTrigger.value = 'all'; rhythmSort.value = 'newest' }
+
+function openConfirm({ title, message, details, type, confirmText, onConfirm }) {
+  confirmDialog.title = title
+  confirmDialog.message = message
+  confirmDialog.details = details || []
+  confirmDialog.type = type || 'danger'
+  confirmDialog.confirmText = confirmText || '删除'
+  confirmDialog.onConfirm = () => {
+    confirmDialog.visible = false
+    onConfirm()
+  }
+  confirmDialog.visible = true
+}
+
 function deleteFocusRecord(item) {
-  if (!window.confirm(`删除“${focusTitle(item)}”这条专注记录吗？此操作无法撤销。`)) return
-  store.deleteFocusHistory(item.id)
-  if (detail.value?.kind === 'focus' && detail.value.item.id === item.id) closeDetail()
+  openConfirm({
+    title: '删除专注记录',
+    message: `确认删除"${focusTitle(item)}"这段专注记录吗？删除后可在 7 秒内撤销。`,
+    details: [
+      { label: '日期', value: formatShortDate(item.finishedAt) },
+      { label: '时长', value: formatDuration(item.elapsedSeconds) },
+      { label: '结果', value: resultLabel(item.result) }
+    ],
+    type: 'danger',
+    confirmText: '删除',
+    onConfirm: () => {
+      store.deleteFocusHistory(item.id)
+      if (detail.value?.kind === 'focus' && detail.value.item.id === item.id) closeDetail()
+    }
+  })
 }
 function deleteRhythmRecord(item) {
-  if (!window.confirm(`删除“${item.reminderTitle}”这条节律记录吗？此操作无法撤销。`)) return
-  store.deleteRhythmHistory(item.id)
-  if (detail.value?.kind === 'rhythm' && detail.value.item.id === item.id) closeDetail()
+  openConfirm({
+    title: '删除节律记录',
+    message: `确认删除"${item.reminderTitle}"这条节律响应记录吗？删除后可在 7 秒内撤销。`,
+    details: [
+      { label: '提醒', value: formatShortDate(item.triggeredAt) },
+      { label: '响应', value: formatResponseTime(item.responseSeconds) },
+      { label: '处理', value: rhythmActionLabel(item.action) }
+    ],
+    type: 'danger',
+    confirmText: '删除',
+    onConfirm: () => {
+      store.deleteRhythmHistory(item.id)
+      if (detail.value?.kind === 'rhythm' && detail.value.item.id === item.id) closeDetail()
+    }
+  })
 }
 function deleteRecord(record) {
   if (record.kind === 'focus') deleteFocusRecord(record.item)
   else deleteRhythmRecord(record.item)
 }
 function deleteDetail() {
-  if (!detail.value || !window.confirm('删除这条记录吗？此操作无法撤销。')) return
-  if (detail.value.kind === 'focus') store.deleteFocusHistory(detail.value.item.id)
-  else store.deleteRhythmHistory(detail.value.item.id)
-  closeDetail()
+  if (!detail.value) return
+  if (detail.value.kind === 'focus') deleteFocusRecord(detail.value.item)
+  else deleteRhythmRecord(detail.value.item)
 }
-function handleKeydown(event) { if (event.key === 'Escape' && detail.value) closeDetail() }
+
+// 键盘快捷键：Alt+1/2/3 切 tab；详情面板 ↑/↓ 切上一条/下一条；Esc 关闭
+function handleKeydown(event) {
+  const tag = (event.target?.tagName || '').toLowerCase()
+  const isInput = tag === 'input' || tag === 'textarea' || tag === 'select'
+  if (event.key === 'Escape' && detail.value) { closeDetail(); return }
+  if (event.key === 'Escape' && confirmDialog.visible) { confirmDialog.visible = false; return }
+  if (isInput) return
+  if (event.altKey && !event.ctrlKey && !event.metaKey) {
+    if (event.key === '1') { event.preventDefault(); selectTab('overview'); return }
+    if (event.key === '2') { event.preventDefault(); selectTab('focus'); return }
+    if (event.key === '3') { event.preventDefault(); selectTab('rhythm'); return }
+  }
+  if (detail.value) {
+    if (event.key === 'ArrowUp' && hasPrevDetail.value) { event.preventDefault(); goPrevDetail(); return }
+    if (event.key === 'ArrowDown' && hasNextDetail.value) { event.preventDefault(); goNextDetail(); return }
+  }
+}
 
 onMounted(() => window.addEventListener('keydown', handleKeydown))
 onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
@@ -591,9 +1093,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-recent-switch button:hover { color: var(--text); }
 .review-recent-switch button.active { background: var(--surface); color: var(--accent-strong); box-shadow: 0 2px 6px var(--text-7-fallback); }
 .review-recent-list { overflow: hidden; margin-top: 14px; border: 1px solid var(--divider-soft); border-radius: 13px; }
-.review-recent-row { display: grid; min-height: 66px; grid-template-columns: minmax(250px, 1fr) 148px 105px 80px; align-items: center; padding: 0 10px; border-bottom: 1px solid var(--divider-soft); transition: background var(--transition-fast); }
+.review-recent-row { display: grid; min-height: 66px; grid-template-columns: minmax(250px, 1fr) 148px 105px 80px; align-items: center; padding: 0 10px; border-bottom: 1px solid var(--divider-soft); transition: background var(--transition-fast), box-shadow var(--transition-fast); position: relative; }
 .review-recent-row:last-child { border-bottom: 0; }
 .review-recent-row:hover { background: var(--surface-muted); }
+.review-recent-row:hover .review-record-actions { opacity: 1; }
+.review-record-actions { display: flex; justify-content: flex-end; gap: 3px; opacity: .55; transition: opacity var(--transition-fast); }
 .review-recent__footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; color: var(--text-muted); font-size: 10px; }
 .review-recent__footer > div { display: flex; gap: 5px; }
 .review-recent__footer button { display: inline-flex; min-height: 36px; align-items: center; gap: 4px; padding: 0 10px; border-radius: 8px; color: var(--accent-strong); font-size: 10px; font-weight: 680; }
@@ -735,7 +1239,20 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-detail-legacy p { display: grid; gap: 3px; margin: 0; }
 .review-detail-legacy strong { font-size: 12px; }
 .review-detail-legacy span { font-size: 11px; line-height: 1.55; }
-.review-detail-note { margin: 0; padding: 13px; border-radius: 11px; background: var(--surface-muted); color: var(--text); font-size: 12px; line-height: 1.65; }
+.review-detail-note { margin: 0; padding: 13px; border-radius: 11px; background: var(--surface-muted); color: var(--text); font-size: 12px; line-height: 1.65; white-space: pre-wrap; word-break: break-word; }
+.review-detail-note--empty { color: var(--text-muted); font-style: italic; }
+.review-detail-edit { display: inline-flex; align-items: center; gap: 3px; margin-left: auto; padding: 4px 8px; border: 0; border-radius: 7px; background: transparent; color: var(--text-muted); font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; transition: background var(--transition-fast), color var(--transition-fast); }
+.review-detail-edit:hover { background: var(--surface-muted); color: var(--accent-strong); }
+.review-detail-note-edit { display: grid; gap: 8px; }
+.review-detail-note-edit textarea { width: 100%; min-height: 90px; padding: 10px 12px; border: 1px solid var(--divider-soft); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; font-size: 12px; line-height: 1.55; resize: vertical; }
+.review-detail-note-edit textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.review-detail-note-edit__actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.review-detail-note-edit__actions small { color: var(--text-muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.review-detail-note-edit__actions > div { display: flex; gap: 6px; }
+.review-detail-note-edit__actions button { display: inline-flex; align-items: center; min-height: 30px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--surface-muted); color: var(--text); font: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer; }
+.review-detail-note-save { background: var(--accent); color: #fff; }
+.review-detail-note-save:hover:not(:disabled) { background: var(--accent-strong); }
+.review-detail-note-save:disabled { opacity: .5; cursor: not-allowed; }
 .review-detail-fields { display: grid; margin: 0; }
 .review-detail-fields > div { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--divider-soft); }
 .review-detail-fields dt { color: var(--text-muted); font-size: 11px; }
@@ -748,5 +1265,82 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-detail-close:hover { background: var(--accent-strong); }
 @media (max-width: 900px) { .review-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }.review-overview-grid { grid-template-columns: 1fr; }.review-record-table, .review-recent-list { overflow-x: auto; }.review-record-table__head, .review-record-row, .review-recent-row { min-width: 720px; } }
 @media (max-width: 680px) { .review-workspace { padding: 14px; }.review-header { display: grid; gap: 14px; }.review-range, .review-tabs { overflow-x: auto; }.review-tabs button { white-space: nowrap; }.review-metrics { grid-template-columns: 1fr 1fr; }.review-metric { min-height: 88px; padding: 12px; }.review-recent__header { display: grid !important; }.review-recent-switch { width: 100%; }.review-recent-switch button { flex: 1; }.review-recent__footer { display: grid; }.review-recent__footer > div { display: grid; grid-template-columns: 1fr 1fr; }.review-card > header > .review-management-title { display: grid; }.review-management-title > button { width: max-content; border-right: 0; }.review-filter-panel > header { align-items: flex-start; }.review-filters { display: grid; grid-template-columns: 1fr; }.review-filters select { width: 100%; }.review-filter-summary { grid-template-columns: 1fr 1fr; }.review-pagination { flex-wrap: wrap; justify-content: space-between; }.review-detail-hero { grid-template-columns: 1fr; }.review-detail-hero__window { justify-content: space-between; }.review-detail-summary { grid-template-columns: 1fr; } }
-@media (prefers-reduced-motion: reduce) { .review-chart b { transition: none; } }
+/* 新增：本期亮点洞察 */
+.review-insights { display: grid; gap: 10px; margin-bottom: 12px; padding: 14px 16px; border: 1px solid var(--accent-34-fallback); border-radius: 16px; background: linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 70%, var(--surface)) 0%, var(--surface) 100%); }
+.review-insights > header { display: flex; align-items: center; gap: 7px; color: var(--accent-strong); }
+.review-insights > header > span { font-size: 12px; font-weight: 750; letter-spacing: .04em; }
+.review-insights > header > small { margin-left: auto; color: var(--text-muted); font-size: 11px; font-weight: 500; }
+.review-insights__list { display: grid; gap: 8px; }
+.review-insight { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--surface); }
+.review-insight__icon { display: grid; width: 32px; height: 32px; flex: 0 0 auto; place-items: center; border-radius: 10px; }
+.review-insight.is-positive .review-insight__icon { background: var(--accent-soft); color: var(--accent-strong); }
+.review-insight.is-caution .review-insight__icon { background: #fff0e1; color: #b6741a; }
+.review-insight strong { color: var(--text); font-size: 13px; line-height: 1.4; }
+.review-insight small { display: block; margin-top: 2px; color: var(--text-muted); font-size: 11px; line-height: 1.45; }
+
+/* 新增：范围快捷 + 窗口切换的分组 */
+.review-range-block { display: grid; gap: 6px; }
+.review-range--shortcut button { min-height: 30px; padding: 0 10px; font-size: 11.5px; }
+.review-range--window button { min-height: 30px; padding: 0 10px; font-size: 11.5px; }
+
+/* 新增：分层空状态 */
+.review-empty--empty-range { background: var(--surface-muted); border-color: var(--divider-soft); }
+.review-empty--empty-range > span { color: var(--accent-strong); }
+.review-empty__actions { display: flex; gap: 10px; }
+.review-empty__actions button { display: inline-flex; min-height: 40px; align-items: center; gap: 6px; padding: 0 14px; border-radius: 10px; font-size: 12px; font-weight: 680; }
+.review-empty__actions button:not(.review-empty__primary) { background: var(--surface); border: 1px solid var(--divider-soft); color: var(--text); }
+.review-empty--inline { width: 100%; max-width: 100%; margin: 16px 0; padding: 32px 18px; }
+.review-empty--inline > span { width: 44px; height: 44px; }
+.review-empty--inline button { display: inline-flex; min-height: 36px; align-items: center; gap: 6px; padding: 0 14px; border-radius: 10px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 680; }
+
+/* 新增：指标卡 - 图标 + vs 上周期对比标 */
+.review-metric__label { display: inline-flex; align-items: center; gap: 5px; color: var(--text-muted); font-size: 11px; }
+.review-metric__delta { display: inline-flex; align-items: center; gap: 3px; margin-top: 4px; padding: 2px 7px; border-radius: 999px; font-size: 10px; font-weight: 680; font-variant-numeric: tabular-nums; width: fit-content; }
+.review-metric__delta.is-up { background: var(--accent-soft); color: var(--accent-strong); }
+.review-metric__delta.is-down { background: #fff0e1; color: #b6741a; }
+
+/* 新增：趋势图 - 今日高亮 + 平均线 + y 轴刻度 */
+.review-chart-meta { display: grid; gap: 2px; text-align: right; }
+.review-chart-meta strong { color: var(--text); font-size: 16px; font-variant-numeric: tabular-nums; }
+.review-chart-meta small { color: var(--text-muted); font-size: 10px; }
+.review-chart-note { margin: 0 0 10px; padding: 6px 10px; border-radius: 8px; background: color-mix(in srgb, var(--accent-soft) 50%, transparent); color: var(--accent-strong); font-size: 11px; }
+.review-chart > div.is-today > i > b { background: linear-gradient(180deg, var(--accent), var(--accent-strong)); box-shadow: 0 0 0 2px var(--accent-soft); }
+.review-chart > div.is-today small { color: var(--accent-strong); font-weight: 700; }
+.review-chart > div.is-empty > i { background: transparent; }
+.review-chart__placeholder { display: block; width: 1px; height: 1px; background: var(--divider-soft); }
+.review-chart-axis { position: relative; display: flex; align-items: center; justify-content: space-between; margin-top: 4px; height: 18px; color: var(--text-muted); font-size: 9px; }
+.review-chart-axis > i { position: absolute; left: 0; right: 0; top: 50%; height: 0; border-top: 1px dashed var(--accent); pointer-events: none; }
+.review-chart-axis > i > b { position: absolute; right: 0; top: -16px; padding: 1px 5px; border-radius: 4px; background: var(--surface); color: var(--accent-strong); font-size: 9px; font-weight: 600; transform: translateX(calc(50% - var(--line, 50%))); }
+
+/* 新增：节律执行卡 - 响应速度 / 时段分布 */
+.review-rhythm-buckets { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 18px; }
+.review-rhythm-bucket h4 { margin: 0 0 8px; color: var(--text-muted); font-size: 10.5px; font-weight: 700; letter-spacing: .04em; }
+.review-rhythm-bucket ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.review-rhythm-bucket li { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; opacity: .55; }
+.review-rhythm-bucket li.is-active { opacity: 1; }
+.review-rhythm-bucket li span { color: var(--text); font-size: 11px; }
+.review-rhythm-bucket li strong { color: var(--text); font-size: 11px; font-variant-numeric: tabular-nums; }
+.review-rhythm-bucket li i { grid-column: 1 / -1; display: block; height: 4px; border-radius: 999px; background: var(--surface-muted); }
+.review-rhythm-bucket li i::after { content: ''; display: block; height: 100%; border-radius: inherit; background: #6a9bc3; }
+
+/* 新增：详情面板 - 上一条/下一条 + 关闭动画 */
+.review-detail-header__actions { display: flex; align-items: center; gap: 6px; }
+.review-detail-nav { display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid var(--divider-soft); border-radius: 9px; background: transparent; color: var(--text-muted); }
+.review-detail-nav:hover:not(:disabled) { background: var(--surface-muted); color: var(--text); }
+.review-detail-nav:disabled { cursor: default; opacity: .35; }
+.review-detail-fade-enter-active, .review-detail-fade-leave-active { transition: opacity .18s ease; }
+.review-detail-fade-enter-active .review-detail, .review-detail-fade-leave-active .review-detail { transition: transform .22s cubic-bezier(.16, 1, .3, 1); }
+.review-detail-fade-enter-from, .review-detail-fade-leave-to { opacity: 0; }
+.review-detail-fade-enter-from .review-detail, .review-detail-fade-leave-to .review-detail { transform: translateX(24px); }
+
+/* 新增：最近记录跳管理按钮 - 强化引导 */
+.review-cta { display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px; border-radius: 8px; background: var(--accent-soft); color: var(--accent-strong); font-size: 12px; font-weight: 650; }
+.review-cta:hover { background: color-mix(in srgb, var(--accent-soft) 50%, var(--accent)); }
+.review-cta > span { line-height: 1; }
+
+@media (max-width: 900px) {
+  .review-rhythm-buckets { grid-template-columns: 1fr; gap: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) { .review-chart b, .review-detail-fade-enter-active, .review-detail-fade-leave-active { transition: none; } }
 </style>

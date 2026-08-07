@@ -311,6 +311,7 @@ export const useTaskStore = defineStore('task', () => {
   const dataLoadError = ref('')
   const isSaving = ref(false)
   const notice = ref(null)
+  const pendingUndo = ref(null) // { kind: 'focus' | 'rhythm', record, index, createdAt }
   const focusCelebration = ref(null)
   const settings = ref({ ...DEFAULT_SETTINGS })
   const clock = ref(normalizeClock(DEFAULT_CLOCK))
@@ -692,8 +693,9 @@ export const useTaskStore = defineStore('task', () => {
     return task.myDayDate === todayKey.value
   }
 
-  function showNotice(message, type = 'info') {
-    notice.value = { id: genId(), message, type }
+  function showNotice(message, type = 'info', options = {}) {
+    const { action } = options
+    notice.value = { id: genId(), message, type, action: action || null }
   }
 
   function clearNotice() {
@@ -2406,9 +2408,57 @@ export const useTaskStore = defineStore('task', () => {
   function deleteFocusHistory(historyId) {
     const index = clock.value.history.findIndex(item => item.id === historyId)
     if (index < 0) return false
-    clock.value.history.splice(index, 1)
+    const [removed] = clock.value.history.splice(index, 1)
     recalculateTodayGarden()
-    showNotice('专注记录已删除', 'info')
+    // 软删除：把原记录和原位置暂存，撤销时按原位置插回，保持时序和聚合统计稳定
+    pendingUndo.value = { kind: 'focus', record: removed, index, createdAt: Date.now() }
+    showNotice('专注记录已删除', 'info', {
+      action: { label: '撤销', onClick: () => undoDeleteHistory() }
+    })
+    return true
+  }
+
+  function updateFocusNote(historyId, note) {
+    const item = clock.value.history.find(i => i.id === historyId)
+    if (!item) return false
+    item.note = String(note || '').trim().slice(0, 2000)
+    showNotice('备注已更新', 'success')
+    return true
+  }
+
+  function deleteRhythmHistory(historyId) {
+    const list = clock.value.rhythm.history
+    const index = list.findIndex(item => item.id === historyId)
+    if (index < 0) return false
+    const [removed] = list.splice(index, 1)
+    pendingUndo.value = { kind: 'rhythm', record: removed, index, createdAt: Date.now() }
+    showNotice('节律记录已删除', 'info', {
+      action: { label: '撤销', onClick: () => undoDeleteHistory() }
+    })
+    return true
+  }
+
+  function undoDeleteHistory() {
+    const pending = pendingUndo.value
+    if (!pending) return false
+    // 过期（>10s）就不恢复，避免和外部状态长时间漂移
+    if (Date.now() - pending.createdAt > 10000) {
+      pendingUndo.value = null
+      return false
+    }
+    if (pending.kind === 'focus') {
+      const insertAt = Math.min(pending.index, clock.value.history.length)
+      // splice(insertAt, 0, record) 是插入而不是替换，保留原位置的元素
+      clock.value.history.splice(insertAt, 0, pending.record)
+      recalculateTodayGarden()
+      showNotice('已恢复专注记录', 'success')
+    } else if (pending.kind === 'rhythm') {
+      const list = clock.value.rhythm.history
+      const insertAt = Math.min(pending.index, list.length)
+      list.splice(insertAt, 0, pending.record)
+      showNotice('已恢复节律记录', 'success')
+    }
+    pendingUndo.value = null
     return true
   }
 
@@ -2965,14 +3015,6 @@ export const useTaskStore = defineStore('task', () => {
     return true
   }
 
-  function deleteRhythmHistory(historyId) {
-    const index = clock.value.rhythm.history.findIndex(item => item.id === historyId)
-    if (index < 0) return false
-    clock.value.rhythm.history.splice(index, 1)
-    showNotice('节律记录已删除', 'info')
-    return true
-  }
-
   function normalizeGroups(rawGroups) {
     const source = Array.isArray(rawGroups) && rawGroups.length ? rawGroups : DEFAULT_GROUPS
     return source.map((group, index) => ({
@@ -3471,6 +3513,8 @@ export const useTaskStore = defineStore('task', () => {
     finishFocus,
     completeFocusSessionFromNative,
     deleteFocusHistory,
+    updateFocusNote,
+    undoDeleteHistory,
     clearFocusHistoryBefore,
     clearFocusHistoryForDay,
     testReminderNotification,

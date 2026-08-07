@@ -9638,7 +9638,10 @@ body.is-resizing {
   left: 50%;
   bottom: 26px;
   z-index: 1200;
-  max-width: min(420px, calc(100vw - 40px));
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(480px, calc(100vw - 40px));
   padding: 10px 14px;
   border-radius: var(--radius-md);
   background: #1f2937;
@@ -9646,6 +9649,38 @@ body.is-resizing {
   box-shadow: var(--shadow-popover);
   transform: translateX(-50%);
   pointer-events: none;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.app-toast--with-action {
+  pointer-events: auto;
+  padding-right: 8px;
+}
+
+.app-toast__message {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-toast__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  &:hover { background: rgba(255, 255, 255, 0.28); }
+  &:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.6); outline-offset: 2px; }
 }
 
 .app-toast--success {
