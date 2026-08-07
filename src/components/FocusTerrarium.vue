@@ -13,6 +13,10 @@
     <span v-if="hasPlant" class="terrarium__plant">
       <FocusPlant :species-id="speciesId" :stage="effectiveStage" />
     </span>
+    <!-- 空格子"等待种子"占位（视觉锚点，避免空 cell 视觉上太空） -->
+    <span v-else class="terrarium__seed" aria-hidden="true">
+      <Seed :size="14" />
+    </span>
     <!-- 木质底座 + 两侧小叶 -->
     <span class="terrarium__base">
       <span class="terrarium__base-disk" />
@@ -24,7 +28,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { Leaf } from 'lucide-vue-next'
+import { Leaf, Sprout as Seed } from 'lucide-vue-next'
 import FocusPlant from './FocusPlant.vue'
 
 const props = defineProps({
@@ -145,6 +149,28 @@ const hasPlant = computed(() => Boolean(props.speciesId) && props.stage && props
 }
 
 /* ========== 罩内植物（绝对定位，flex 容器让 SVG 底对齐到罩底） ========== */
+/* 空格子"种子"占位：放在罩底中央，颜色淡而不抢戏 */
+.terrarium__seed {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--terrarium-base-height, 12px) + 4px);
+  transform: translateX(-50%);
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: color-mix(in srgb, #b8d09c 38%, transparent);
+  color: #6f9a5a;
+  z-index: 2;
+  pointer-events: none;
+  opacity: .8;
+}
+.terrarium--highlight .terrarium__seed {
+  background: color-mix(in srgb, #82a86a 50%, transparent);
+  color: #4f7842;
+  opacity: 1;
+}
 .terrarium__plant {
   position: absolute;
   left: 50%;

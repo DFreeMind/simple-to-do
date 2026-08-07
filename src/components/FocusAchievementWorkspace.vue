@@ -110,10 +110,29 @@
             </div>
           </header>
           <div class="achievement-month__stats" aria-label="本月成长统计">
-            <div><small>成长日</small><strong>{{ selectedMonthSummary.days }} 天</strong></div>
-            <div><small>投入时间</small><strong>{{ durationHuman(selectedMonthSummary.minutes) }}</strong></div>
-            <div><small>完整盛放</small><strong>{{ selectedMonthSummary.blooms }} 朵</strong></div>
-            <div><small>花种数</small><strong>{{ selectedMonthSummary.species }} 种</strong></div>
+            <span class="achievement-month__stat">
+              <Sprout :size="14" class="achievement-month__stat-icon" />
+              <small>成长日</small>
+              <strong>{{ selectedMonthSummary.days }} 天</strong>
+            </span>
+            <span class="achievement-month__stat-divider" aria-hidden="true" />
+            <span class="achievement-month__stat">
+              <Timer :size="14" class="achievement-month__stat-icon" />
+              <small>投入时间</small>
+              <strong :title="durationHuman(selectedMonthSummary.minutes)">{{ durationHuman(selectedMonthSummary.minutes) }}</strong>
+            </span>
+            <span class="achievement-month__stat-divider" aria-hidden="true" />
+            <span class="achievement-month__stat">
+              <Flower2 :size="14" class="achievement-month__stat-icon" />
+              <small>完整盛放</small>
+              <strong>{{ selectedMonthSummary.blooms }} 朵</strong>
+            </span>
+            <span class="achievement-month__stat-divider" aria-hidden="true" />
+            <span class="achievement-month__stat">
+              <Trees :size="14" class="achievement-month__stat-icon" />
+              <small>花种数</small>
+              <strong>{{ selectedMonthSummary.species }} 种</strong>
+            </span>
           </div>
           <div class="achievement-month__weekdays" aria-hidden="true"><span v-for="day in ['一','二','三','四','五','六','日']" :key="day">{{ day }}</span></div>
           <div class="achievement-month__grid">
@@ -408,7 +427,7 @@
 <script setup>
 import { computed, defineAsyncComponent, onBeforeUnmount, ref } from 'vue'
 import { motion as Motion } from 'motion-v'
-import { Archive, BookOpen, CalendarDays, Check, ChevronLeft, ChevronRight, Flame, Flower2, Leaf, LockKeyhole, Pause, Play, Sparkles, Sprout, TimerReset, Trophy } from 'lucide-vue-next'
+import { Archive, BookOpen, CalendarDays, Check, ChevronLeft, ChevronRight, Flame, Flower2, Leaf, LockKeyhole, Pause, Play, Sparkles, Sprout, Timer, TimerReset, Trees, Trophy } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import {
   FOCUS_GARDEN_COLLECTIONS,
@@ -765,8 +784,10 @@ onBeforeUnmount(cancelGrowthReplay)
 .achievement-header__today .focus-plant { width: 68px; margin: -14px 0 -16px; }
 .achievement-header__today span { display: grid; gap: 2px; }.achievement-header__today small { color: var(--text-muted); font-size: 10px; }.achievement-header__today strong { color: var(--text); font-size: 12px; }
 .achievement-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border: 1px solid var(--divider-soft); border-radius: 14px; background: var(--surface); }
-.achievement-tabs button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 38px; border: 0; border-radius: 10px; color: var(--text-muted); font: inherit; font-size: 13px; cursor: pointer; }
-.achievement-tabs button:hover { color: var(--accent-strong); background: var(--accent-soft); }.achievement-tabs button.active { color: var(--accent-strong); background: var(--accent-soft); font-weight: 700; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent); }
+.achievement-tabs button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 38px; border: 0; border-radius: 10px; color: var(--text-muted); font: inherit; font-size: 13px; cursor: pointer; transition: color .15s ease, background-color .15s ease, transform .15s ease; }
+.achievement-tabs button:hover { color: var(--accent-strong); background: color-mix(in srgb, var(--accent-soft) 70%, transparent); }
+.achievement-tabs button:not(.active):hover { transform: translateY(-1px); }
+.achievement-tabs button.active { color: var(--accent-strong); background: var(--accent-soft); font-weight: 700; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent); }
 .card-surface { border: 1px solid var(--divider-soft); border-radius: 18px; background: var(--surface); box-shadow: 0 10px 28px rgba(36, 85, 73, .045); }
 .achievement-field { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(230px, .75fr); gap: 14px; align-items: start; }
 .field-hero { position: relative; display: grid; grid-column: 1 / -1; grid-template-columns: minmax(0, 1.35fr) minmax(180px, .7fr) minmax(190px, .78fr); align-items: center; gap: 18px; min-height: 216px; padding: 22px 24px; overflow: hidden; border-color: color-mix(in srgb, #a7bd86 26%, var(--divider-soft)); background: linear-gradient(112deg, color-mix(in srgb, #eff5e4 68%, var(--surface)), var(--surface) 54%, color-mix(in srgb, #f7f1dc 52%, var(--surface))); }.field-hero::after { position: absolute; right: 24%; bottom: -88px; width: 260px; height: 150px; border-radius: 50%; background: color-mix(in srgb, #b6ce9b 18%, transparent); content: ''; pointer-events: none; }.field-hero__copy,.field-hero__plant,.field-hero__progress { position: relative; z-index: 1; }.field-hero__copy > span { color: var(--accent-strong); font-size: 10px; font-weight: 800; letter-spacing: .08em; }.field-hero__copy h2 { max-width: 430px; margin: 5px 0 6px; color: var(--text); font-size: 24px; letter-spacing: -.045em; line-height: 1.2; }.field-hero__copy > p { max-width: 460px; margin: 0; color: var(--text-muted); font-size: 11px; line-height: 1.65; }.field-hero__facts { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 16px; }.field-hero__facts div { display: grid; gap: 3px; min-width: 86px; padding: 8px 10px; border: 1px solid color-mix(in srgb, #9bb27b 22%, var(--divider-soft)); border-radius: 10px; background: rgba(255,255,255,.52); }.field-hero__facts small { color: var(--text-muted); font-size: 9px; }.field-hero__facts strong { color: var(--text); font-size: 12px; }.field-hero__plant { display: grid; justify-items: center; align-self: stretch; align-content: center; }.field-hero__plant > div { display: grid; width: 160px; height: 148px; place-items: end center; border-radius: 50% 50% 42% 42%; background: radial-gradient(ellipse at center bottom, rgba(183,205,145,.62), transparent 68%); }.field-hero__plant .focus-plant { width: 146px; margin: -12px 0 -25px; }.field-hero__plant > span { display: grid; gap: 3px; margin-top: 5px; text-align: center; }.field-hero__plant small { color: var(--text-muted); font-size: 9px; }.field-hero__plant strong { color: var(--text); font-size: 11px; }.field-hero__progress { display: grid; align-content: center; gap: 7px; padding: 15px; border: 1px solid color-mix(in srgb, #9bb27b 25%, var(--divider-soft)); border-radius: 14px; background: rgba(255,255,255,.5); }.field-hero__progress > span { color: var(--text-muted); font-size: 10px; }.field-hero__progress > strong { color: var(--text); font-size: 18px; }.field-hero__progress > i { height: 7px; overflow: hidden; border-radius: 99px; background: var(--surface-muted); }.field-hero__progress > i b { display: block; height: 100%; border-radius: inherit; background: #9aaf73; }.field-hero__progress > small { color: var(--text-muted); font-size: 9px; }.field-hero__progress button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 34px; margin-top: 4px; border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--divider-soft)); border-radius: 9px; background: var(--accent-soft); color: var(--accent-strong); font-size: 10px; font-weight: 700; cursor: pointer; }.field-hero__progress button:hover { border-color: color-mix(in srgb, var(--accent) 34%, var(--divider-soft)); background: color-mix(in srgb, var(--accent-soft) 72%, var(--surface)); }
@@ -903,12 +924,26 @@ onBeforeUnmount(cancelGrowthReplay)
 .achievement-year__landscape button.empty { min-height: 168px; }
 .achievement-summary { padding: 17px; }.achievement-summary > header,.achievement-unlock > header { display: flex; justify-content: space-between; color: var(--accent-strong); font-size: 11px; font-weight: 700; }.achievement-summary dl { display: grid; gap: 0; margin: 12px 0 0; }.achievement-summary dl div { display: flex; justify-content: space-between; gap: 10px; padding: 12px 0; border-top: 1px solid var(--divider-soft); }.achievement-summary dt { color: var(--text-muted); font-size: 11px; }.achievement-summary dd { margin: 0; color: var(--text); font-size: 15px; font-weight: 750; }
 .achievement-month { padding: 18px; }.achievement-month__nav { display: flex; gap: 5px; }.achievement-month__nav button { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid var(--divider-soft); border-radius: 8px; color: var(--text-muted); cursor: pointer; }.achievement-month__nav button:hover { color: var(--accent-strong); background: var(--accent-soft); }
-/* 月格统计卡：右上角小绿叶 + 浅边框，与设计图保持一致 */
-.achievement-month__stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; margin-top: 14px; }
-.achievement-month__stats div { position: relative; display: grid; gap: 4px; padding: 10px 12px 12px; border: 1px solid var(--divider-soft); border-radius: 12px; background: var(--surface); }
-.achievement-month__stats div::after { content: ''; position: absolute; top: 8px; right: 8px; width: 14px; height: 14px; background: radial-gradient(circle at 30% 70%, #b8d09c 0 50%, transparent 51%), linear-gradient(135deg, transparent 45%, #88b572 45% 55%, transparent 55%), linear-gradient(45deg, transparent 45%, #88b572 45% 55%, transparent 55%); opacity: .55; }
-.achievement-month__stats small { color: var(--text-muted); font-size: 10px; }
-.achievement-month__stats strong { overflow: hidden; color: var(--text); font-size: 14px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+/* 月格统计条：横向紧凑数据条（替代原来的 4 个等宽卡），垂直高度从 ~80px 压到 ~36px */
+.achievement-month__stats {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 12px;
+  padding: 8px 14px;
+  border: 1px solid var(--divider-soft);
+  border-radius: 12px;
+  background: color-mix(in srgb, #eff5e4 32%, var(--surface));
+}
+.achievement-month__stat { display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; }
+.achievement-month__stat-icon { color: #6f9a5a; align-self: center; flex: none; }
+.achievement-month__stat small { color: var(--text-muted); font-size: 10px; letter-spacing: .02em; }
+.achievement-month__stat strong {
+  overflow: hidden; max-width: 14ch; color: var(--text); font-size: 12.5px; font-weight: 750;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.achievement-month__stat-divider { width: 1px; height: 12px; background: color-mix(in srgb, var(--divider-soft) 80%, transparent); flex: none; }
 .achievement-month__weekdays,.achievement-month__grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
 .achievement-month__weekdays { margin: 14px 0 6px; }
 .achievement-month__weekdays span { color: var(--text-muted); font-size: 10px; text-align: center; font-weight: 600; }
