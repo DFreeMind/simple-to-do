@@ -99,12 +99,40 @@
         </section>
 
         <aside class="achievement-summary card-surface" aria-label="专注成长摘要">
-          <header><span>累计成长</span><Leaf :size="18" /></header>
+          <header><span>成长仪表</span><Leaf :size="18" /></header>
+          <!-- 环形图：当前等级进度，中心显示累计专注 -->
+          <div class="achievement-summary__ring" :title="`距离${nextGrowthRank ? nextGrowthRank.name : '盛放花田'}还差 ${nextGrowthRank ? nextGrowthRank.threshold - store.focusGardenTotals.totalMinutes : 0} 分钟`">
+            <svg viewBox="0 0 64 64" aria-hidden="true">
+              <circle cx="32" cy="32" r="27" class="achievement-summary__ring-track" />
+              <circle cx="32" cy="32" r="27" class="achievement-summary__ring-fill" :style="{ '--p': growthRankProgress }" />
+            </svg>
+            <div>
+              <small>累计专注</small>
+              <strong>{{ durationHuman(store.focusGardenTotals.totalMinutes) }}</strong>
+              <em>距离 {{ nextGrowthRank ? nextGrowthRank.name : '盛放花田' }} {{ nextGrowthRank ? `${Math.max(0, nextGrowthRank.threshold - store.focusGardenTotals.totalMinutes)} 分` : '已达成' }}</em>
+            </div>
+          </div>
           <dl>
-            <div><dt>有效专注</dt><dd>{{ durationHuman(store.focusGardenTotals.totalMinutes) }}</dd></div>
-            <div><dt>完整盛放</dt><dd>{{ store.focusGardenTotals.bloomCount }} 朵</dd></div>
-            <div><dt>已培养花种</dt><dd>{{ store.focusGardenTotals.speciesCount }} 种</dd></div>
-            <div><dt>已获得徽章</dt><dd>{{ unlockedAchievements.length }} 枚</dd></div>
+            <div>
+              <span class="achievement-summary__icon"><Flower2 :size="14" /></span>
+              <dt>完整盛放</dt>
+              <dd>{{ store.focusGardenTotals.bloomCount }} 朵</dd>
+            </div>
+            <div>
+              <span class="achievement-summary__icon"><Trees :size="14" /></span>
+              <dt>已培养花种</dt>
+              <dd>{{ store.focusGardenTotals.speciesCount }} 种</dd>
+            </div>
+            <div>
+              <span class="achievement-summary__icon"><Trophy :size="14" /></span>
+              <dt>已获得徽章</dt>
+              <dd>{{ unlockedAchievements.length }} 枚</dd>
+            </div>
+            <div>
+              <span class="achievement-summary__icon"><Flame :size="14" /></span>
+              <dt>最长连续</dt>
+              <dd>{{ store.focusGardenTotals.longestStreak }} 天</dd>
+            </div>
           </dl>
         </aside>
 
@@ -163,25 +191,28 @@
           </div>
         </section>
 
-        <aside class="achievement-unlock card-surface">
-          <template v-if="nextSpecies">
-            <header><span>下一个解锁</span><LockKeyhole :size="17" /></header>
-            <FocusSpeciesPreview :species-id="nextSpecies.id" :alt="`${nextSpecies.name}盛放预览`" />
-            <h3>{{ nextSpecies.name }}</h3>
-            <p>再专注 {{ Math.max(0, nextSpecies.unlockMinutes - store.focusGardenTotals.totalMinutes) }} 分钟即可解锁。</p>
-            <div class="achievement-progress"><i :style="{ width: `${nextSpeciesProgress}%` }"></i></div>
-          </template>
-          <template v-else>
-            <header><span>花种收集</span><Check :size="17" /></header>
-            <div class="achievement-unlock__complete"><Flower2 :size="32" /><strong>当前花种已全部解锁</strong><p>继续种下每天真实的进度。</p></div>
-          </template>
-        </aside>
-
-        <section class="achievement-recent card-surface">
+        <section class="achievement-trail card-surface">
           <header class="achievement-section-heading">
-            <div><span>近期获得</span><h2>成长徽章</h2></div>
+            <div><span>近期足迹</span><h2>成长徽章</h2></div>
             <button type="button" @click="activeTab = 'badges'">查看全部 <ChevronRight :size="14" /></button>
           </header>
+          <!-- 下一个花种预览（紧凑版，叠在徽章列表上方） -->
+          <div v-if="nextSpecies" class="achievement-trail__next" :title="`${nextSpecies.name} · 再专注 ${Math.max(0, nextSpecies.unlockMinutes - store.focusGardenTotals.totalMinutes)} 分钟解锁`">
+            <span class="achievement-trail__next-icon"><LockKeyhole :size="13" /></span>
+            <FocusSpeciesPreview :species-id="nextSpecies.id" :alt="`${nextSpecies.name}预览`" class="achievement-trail__next-preview" />
+            <div class="achievement-trail__next-meta">
+              <small>下一个花种</small>
+              <strong>{{ nextSpecies.name }}</strong>
+              <i><b :style="{ width: `${nextSpeciesProgress}%` }"></b></i>
+            </div>
+          </div>
+          <div v-else class="achievement-trail__next achievement-trail__next--done">
+            <span class="achievement-trail__next-icon"><Check :size="13" /></span>
+            <div class="achievement-trail__next-meta">
+              <small>花种收集</small>
+              <strong>当前花种已全部解锁</strong>
+            </div>
+          </div>
           <div v-if="recentAchievements.length" class="achievement-recent__list">
             <article v-for="item in recentAchievements" :key="item.id"><span><Trophy :size="20" /></span><div><strong>{{ item.name }}</strong><small>{{ item.description }}</small></div><time>{{ formatShortDate(item.unlockedAt) }}</time></article>
           </div>
@@ -987,7 +1018,21 @@ onBeforeUnmount(cancelGrowthReplay)
 }
 .achievement-year__landscape button:hover .achievement-year__drill { color: var(--accent-strong); background: var(--accent-soft); }
 .achievement-year__landscape button.active .achievement-year__drill { color: #fff; background: #6f9a5a; }
-.achievement-summary { padding: 17px; }.achievement-summary > header,.achievement-unlock > header { display: flex; justify-content: space-between; color: var(--accent-strong); font-size: 11px; font-weight: 700; }.achievement-summary dl { display: grid; gap: 0; margin: 12px 0 0; }.achievement-summary dl div { display: flex; justify-content: space-between; gap: 10px; padding: 12px 0; border-top: 1px solid var(--divider-soft); }.achievement-summary dt { color: var(--text-muted); font-size: 11px; }.achievement-summary dd { margin: 0; color: var(--text); font-size: 15px; font-weight: 750; }
+.achievement-summary { padding: 17px; }.achievement-summary > header,.achievement-unlock > header { display: flex; justify-content: space-between; align-items: center; color: var(--accent-strong); font-size: 11px; font-weight: 700; }
+/* 环形图：SVG 双圆，外圈轨道 + 内圈进度（用 stroke-dasharray 实现） */
+.achievement-summary__ring { position: relative; display: grid; place-items: center; margin: 12px 0 4px; }
+.achievement-summary__ring svg { width: 124px; height: 124px; transform: rotate(-90deg); }
+.achievement-summary__ring-track { fill: none; stroke: color-mix(in srgb, var(--divider-soft) 60%, transparent); stroke-width: 6; }
+.achievement-summary__ring-fill { fill: none; stroke: #6f9a5a; stroke-width: 6; stroke-linecap: round; stroke-dasharray: calc(2 * 3.14159 * 27); stroke-dashoffset: calc(2 * 3.14159 * 27 * (1 - var(--p, 0) / 100)); transition: stroke-dashoffset .6s cubic-bezier(.2, .7, .2, 1); }
+.achievement-summary__ring > div { position: absolute; inset: 0; display: grid; align-content: center; justify-items: center; text-align: center; padding: 4px; gap: 1px; }
+.achievement-summary__ring > div small { color: var(--text-muted); font-size: 9px; letter-spacing: .03em; }
+.achievement-summary__ring > div strong { display: block; color: var(--text); font-size: 14px; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; }
+.achievement-summary__ring > div em { color: var(--accent-strong); font-size: 9px; font-style: normal; line-height: 1.25; }
+.achievement-summary dl { display: grid; gap: 0; margin: 8px 0 0; }
+.achievement-summary dl div { display: grid; grid-template-columns: 16px 1fr auto; align-items: center; gap: 9px; padding: 9px 0; border-top: 1px solid var(--divider-soft); }
+.achievement-summary__icon { display: grid; place-items: center; color: #6f9a5a; }
+.achievement-summary dt { color: var(--text-muted); font-size: 11px; }
+.achievement-summary dd { margin: 0; color: var(--text); font-size: 13px; font-weight: 750; }
 .achievement-month { padding: 18px; }.achievement-month__nav { display: flex; gap: 5px; }.achievement-month__nav button { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid var(--divider-soft); border-radius: 8px; color: var(--text-muted); cursor: pointer; }.achievement-month__nav button:hover { color: var(--accent-strong); background: var(--accent-soft); }
 /* 月格统计条：横向紧凑数据条（替代原来的 4 个等宽卡），垂直高度从 ~80px 压到 ~36px */
 .achievement-month__stats {
@@ -1046,7 +1091,17 @@ onBeforeUnmount(cancelGrowthReplay)
   box-shadow: 0 0 0 2px color-mix(in srgb, #6f9a5a 65%, transparent), 0 6px 14px rgba(36, 85, 73, .1);
 }
 .achievement-month__grid button.active .achievement-month__day { color: #4f7842; font-weight: 700; }
-.achievement-unlock { display: grid; justify-items: center; padding: 17px; text-align: center; }.achievement-unlock > header { width: 100%; }.achievement-unlock .focus-plant { width: 100px; margin: -6px 0 -4px; }.achievement-unlock :deep(.focus-species-preview) { width: 132px; height: 132px; margin: 8px 0; border: 1px solid var(--divider-soft); border-radius: 18px; box-shadow: 0 8px 20px rgba(42,71,62,.08); }.achievement-unlock h3 { margin: 0; color: var(--text); font-size: 17px; }.achievement-unlock p { margin: 4px 0 10px; color: var(--text-muted); font-size: 11px; line-height: 1.5; }.achievement-progress { width: 100%; height: 7px; overflow: hidden; border-radius: 999px; background: var(--surface-muted); }.achievement-progress i { display: block; height: 100%; border-radius: inherit; background: var(--accent); }.achievement-unlock__complete { display: grid; justify-items: center; gap: 5px; margin: 24px 0 10px; color: var(--accent); }.achievement-unlock__complete strong { color: var(--text); font-size: 13px; }
+/* 近期足迹：原 下一个解锁 紧凑化为顶部一行，下面是徽章列表 */
+.achievement-trail { padding: 18px; }
+.achievement-trail__next { display: grid; grid-template-columns: 22px 56px 1fr; align-items: center; gap: 12px; margin-top: 12px; padding: 10px 12px; border: 1px dashed color-mix(in srgb, #b9c89e 65%, transparent); border-radius: 12px; background: color-mix(in srgb, #eff5e4 35%, var(--surface)); }
+.achievement-trail__next--done { grid-template-columns: 22px 1fr; }
+.achievement-trail__next-icon { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent-soft); color: var(--accent-strong); }
+.achievement-trail__next-preview { width: 56px; height: 56px; }
+.achievement-trail__next-meta { min-width: 0; }
+.achievement-trail__next-meta small { color: var(--accent-strong); font-size: 9.5px; font-weight: 700; letter-spacing: .04em; }
+.achievement-trail__next-meta strong { display: block; overflow: hidden; color: var(--text); font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.achievement-trail__next-meta i { display: block; height: 4px; margin-top: 6px; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--divider-soft) 60%, transparent); }
+.achievement-trail__next-meta i b { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width .4s ease; }
 .achievement-recent { padding: 18px; }.achievement-recent .achievement-section-heading > button { align-self: center; display: inline-flex; align-items: center; gap: 3px; color: var(--accent-strong); font-size: 11px; cursor: pointer; }.achievement-recent__list { display: grid; gap: 7px; margin-top: 13px; }.achievement-recent__list article { display: grid; grid-template-columns: 36px 1fr auto; align-items: center; gap: 9px; padding: 9px; border-radius: 11px; background: var(--surface-muted); }.achievement-recent__list article > span { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 50%; background: var(--accent-soft); color: var(--accent-strong); }.achievement-recent__list article div { display: grid; gap: 2px; }.achievement-recent__list strong { color: var(--text); font-size: 12px; }.achievement-recent__list small,.achievement-recent__list time { color: var(--text-muted); font-size: 9px; }.achievement-empty { display: grid; justify-items: center; gap: 6px; margin-top: 18px; padding: 22px; border-radius: 12px; background: var(--surface-muted); color: var(--accent); text-align: center; }.achievement-empty p { max-width: 280px; margin: 0; color: var(--text-muted); font-size: 11px; line-height: 1.55; }
 .achievement-species { display: grid; gap: 16px; }
 .species-playground {
