@@ -842,9 +842,9 @@ onBeforeUnmount(cancelGrowthReplay)
   grid-template-rows: auto 1fr auto;
   align-items: center;
   justify-items: center;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
-  min-height: 168px;
+  min-height: 180px;
   padding: 8px 4px 10px;
   border: 0;
   border-radius: 14px;
@@ -907,10 +907,11 @@ onBeforeUnmount(cancelGrowthReplay)
 /* 月格子：每个 cell 都是温室。日期数字在左上角，温室居中。 */
 .achievement-month__grid button {
   position: relative;
-  display: grid;
-  min-height: 92px;
-  place-items: center;
-  padding: 14px 4px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 144px;
+  padding: 18px 4px 6px;
   overflow: hidden;
   border: 1px solid var(--divider-soft);
   border-radius: 12px;
@@ -921,9 +922,9 @@ onBeforeUnmount(cancelGrowthReplay)
 }
 .achievement-month__grid button:hover { transform: translateY(-1px); }
 .achievement-month__grid button.future { opacity: .5; }
-.achievement-month__day { position: absolute; top: 4px; left: 7px; font-size: 10px; color: var(--text-muted); font-weight: 600; }
-.achievement-month__terrarium { width: 100%; height: 100%; }
-.achievement-month__blank { min-height: 92px; }
+.achievement-month__day { position: absolute; top: 5px; left: 8px; font-size: 10px; color: var(--text-muted); font-weight: 600; }
+.achievement-month__terrarium { display: block; }
+.achievement-month__blank { min-height: 144px; }
 /* 当日高亮：底色变浅绿，边框变绿，罩子也会变绿（在 terrarium--highlight 里） */
 .achievement-month__grid button.active {
   background: color-mix(in srgb, #c5dda6 35%, var(--surface));
