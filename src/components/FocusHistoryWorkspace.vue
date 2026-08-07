@@ -333,6 +333,7 @@
       <section v-else-if="activeTab === 'focus'" class="review-card review-records">
         <div class="review-filter-panel">
           <div class="review-filters">
+            <label><Search :size="16" /><span class="sr-only">搜索专注记录</span><input v-model.trim="focusSearch" type="search" placeholder="搜索任务、方式或备注" /></label>
             <ReviewRangeControl
               compact
               :range="range"
@@ -342,7 +343,6 @@
               @update:custom-start="customStart = $event"
               @update:custom-end="customEnd = $event"
             />
-            <label><Search :size="16" /><span class="sr-only">搜索专注记录</span><input v-model.trim="focusSearch" type="search" placeholder="搜索任务、方式或备注" /></label>
             <ReviewSelect v-model="focusResult" :options="FOCUS_RESULT_OPTIONS" aria-label="筛选专注结果" />
             <ReviewSelect v-model="focusPhase" :options="FOCUS_PHASE_OPTIONS" aria-label="筛选专注类型" />
             <ReviewSelect v-model="focusPause" :options="FOCUS_PAUSE_OPTIONS" aria-label="筛选暂停情况" />
@@ -423,6 +423,7 @@
       <section v-else class="review-card review-records">
         <div class="review-filter-panel">
           <div class="review-filters">
+            <label><Search :size="16" /><span class="sr-only">搜索节律记录</span><input v-model.trim="rhythmSearch" type="search" placeholder="搜索提醒名称" /></label>
             <ReviewRangeControl
               compact
               :range="range"
@@ -432,7 +433,6 @@
               @update:custom-start="customStart = $event"
               @update:custom-end="customEnd = $event"
             />
-            <label><Search :size="16" /><span class="sr-only">搜索节律记录</span><input v-model.trim="rhythmSearch" type="search" placeholder="搜索提醒名称" /></label>
             <ReviewSelect v-model="rhythmAction" :options="RHYTHM_ACTION_OPTIONS" aria-label="筛选节律处理结果" />
             <ReviewSelect v-model="rhythmTrigger" :options="RHYTHM_TRIGGER_OPTIONS" aria-label="筛选节律触发方式" />
             <ReviewSelect v-model="rhythmSort" :options="RHYTHM_SORT_OPTIONS" aria-label="节律记录排序" />
