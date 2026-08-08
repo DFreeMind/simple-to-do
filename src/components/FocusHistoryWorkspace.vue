@@ -149,28 +149,7 @@
               <span><i class="is-weekend"></i>周末</span>
               <span v-if="trendAverage"><i class="is-average"></i>日均</span>
             </div>
-            <div ref="trendChartRef" class="review-chart" :style="{ gridTemplateColumns: `repeat(${trendDays.length}, minmax(0, 1fr))` }">
-              <div v-for="(day, idx) in trendDays" :key="day.key" tabindex="0" :class="{ 'is-today': day.isToday, 'is-weekend': day.isWeekend, 'is-empty': !day.seconds }" :aria-label="trendDayAria(day)" @mouseenter="hoverTrendDay(idx, $event)" @mousemove="moveTrendTooltip($event)" @mouseleave="hoverTrendDay(-1)" @focus="hoverTrendDay(idx)" @blur="hoverTrendDay(-1)">
-                <span>{{ trendDays.length <= 14 && day.seconds ? formatCompactDuration(day.seconds) : '' }}</span>
-                <i>
-                  <b v-if="day.seconds" :style="{ height: `${Math.max(8, day.seconds / trendMax * 100)}%` }"></b>
-                  <b v-else class="review-chart__placeholder"></b>
-                </i>
-                <small>{{ day.showLabel ? day.shortLabel : '' }}</small>
-              </div>
-              <div v-if="trendAverage" class="review-chart-average" :class="{ 'is-high': trendAverage / trendMax > 0.5 }" :style="{ '--line': `${Math.min(94, trendAverage / trendMax * 100)}%` }" aria-hidden="true">
-                <b>日均 {{ formatCompactDuration(trendAverage) }}</b>
-              </div>
-              <div v-if="hoveredTrendDay" ref="trendTooltipEl" class="review-chart-tooltip" :style="trendTooltipStyle" role="tooltip">
-                <strong>{{ hoveredTrendDay.label }}{{ hoveredTrendDay.isToday ? '（今日）' : '' }}</strong>
-                <p v-if="hoveredTrendDay.seconds"><b>{{ formatDuration(hoveredTrendDay.seconds) }}</b> · {{ hoveredTrendDay.records.length }} 段专注</p>
-                <p v-else class="is-empty">无投入</p>
-                <ul v-if="hoveredTrendDay.records.length">
-                  <li v-for="(record, idx) in hoveredTrendDay.records.slice(0, 3)" :key="idx">{{ focusTitle(record) }}</li>
-                  <li v-if="hoveredTrendDay.records.length > 3" class="is-more">还有 {{ hoveredTrendDay.records.length - 3 }} 段…</li>
-                </ul>
-              </div>
-            </div>
+            <div ref="trendChartEl" class="review-trend-chart" role="img" :aria-label="`每日专注时长柱状图（最近 ${trendDays.length} 天）`"></div>
             <table class="sr-only" aria-label="每日专注时长明细">
               <caption>每日专注时长（最近 {{ trendDays.length }} 天）</caption>
               <thead><tr><th scope="col">日期</th><th scope="col">投入</th></tr></thead>
@@ -194,28 +173,19 @@
               <BellRing :size="19" />
             </header>
             <template v-if="rhythmEntries.length">
-              <div class="review-rhythm-actions">
-                <div v-for="item in rhythmActionSummary" :key="item.action">
-                  <span><i :class="`is-${item.action}`"></i>{{ item.label }}</span>
-                  <strong>{{ item.count }}</strong>
-                  <b><i :class="`is-${item.action}`" :style="{ width: `${item.percent}%` }"></i></b>
+              <div class="review-rhythm-charts">
+                <div class="review-rhythm-chart-block">
+                  <h4>处理结果</h4>
+                  <div ref="rhythmActionChartEl" class="review-rhythm-chart" role="img" :aria-label="`节律处理结果分布`"></div>
                 </div>
-              </div>
-              <div class="review-rhythm-buckets">
-                <div class="review-rhythm-bucket">
+                <div class="review-rhythm-chart-block">
                   <header>
                     <h4>响应速度</h4>
                     <button ref="bucketTriggerRef" type="button" class="review-rhythm-bucket__adjust" :aria-expanded="customBucketsOpen" :aria-haspopup="true" @click="toggleBucketPopover">
                       <SlidersHorizontal :size="12" />自定义分桶
                     </button>
                   </header>
-                  <ul>
-                    <li v-for="b in rhythmResponseBuckets" :key="b.id" :class="{ 'is-active': b.count > 0 }">
-                      <span>{{ b.label }}</span>
-                      <strong>{{ b.count }}</strong>
-                      <i :style="{ width: `${b.percent}%` }" :title="`${b.percent}%`"></i>
-                    </li>
-                  </ul>
+                  <div ref="rhythmResponseChartEl" class="review-rhythm-chart" role="img" :aria-label="`节律响应速度分布`"></div>
                   <table class="sr-only" aria-label="节律响应速度明细">
                     <caption>{{ selectedRangeLabel }} 节律响应速度分布</caption>
                     <thead><tr><th scope="col">分段</th><th scope="col">次数</th><th scope="col">占比</th></tr></thead>
@@ -228,15 +198,9 @@
                     </tbody>
                   </table>
                 </div>
-                <div class="review-rhythm-bucket">
+                <div class="review-rhythm-chart-block">
                   <h4>提醒时段</h4>
-                  <ul>
-                    <li v-for="b in rhythmHourBuckets" :key="b.id" :class="{ 'is-active': b.count > 0 }">
-                      <span>{{ b.label }}</span>
-                      <strong>{{ b.count }}</strong>
-                      <i :style="{ width: `${b.percent}%` }" :title="`${b.percent}%`"></i>
-                    </li>
-                  </ul>
+                  <div ref="rhythmHourChartEl" class="review-rhythm-chart" role="img" :aria-label="`节律提醒时段分布`"></div>
                   <table class="sr-only" aria-label="节律提醒时段明细">
                     <caption>{{ selectedRangeLabel }} 节律提醒时段分布</caption>
                     <thead><tr><th scope="col">时段</th><th scope="col">次数</th><th scope="col">占比</th></tr></thead>
@@ -249,37 +213,26 @@
                     </tbody>
                   </table>
                 </div>
-              </div>
-              <div class="review-rhythm-weekday">
-                <h4>工作日 vs 周末</h4>
-                <div class="review-rhythm-weekday__bar" :title="`工作日 ${rhythmWeekdaySummary.weekday.count} 次（${rhythmWeekdaySummary.weekday.percent}%），周末 ${rhythmWeekdaySummary.weekend.count} 次（${rhythmWeekdaySummary.weekend.percent}%）`">
-                  <i class="is-weekday" :style="{ width: `${rhythmWeekdaySummary.weekday.percent}%` }">
-                    <span v-if="rhythmWeekdaySummary.weekday.count">{{ rhythmWeekdaySummary.weekday.count }}</span>
-                  </i>
-                  <i class="is-weekend" :style="{ width: `${rhythmWeekdaySummary.weekend.percent}%` }">
-                    <span v-if="rhythmWeekdaySummary.weekend.count">{{ rhythmWeekdaySummary.weekend.count }}</span>
-                  </i>
+                <div class="review-rhythm-chart-block">
+                  <h4>工作日 vs 周末</h4>
+                  <div ref="rhythmWeekdayChartEl" class="review-rhythm-chart" role="img" :aria-label="`节律工作日与周末对比`"></div>
+                  <table class="sr-only" aria-label="节律工作日与周末对比">
+                    <caption>{{ selectedRangeLabel }} 工作日 vs 周末</caption>
+                    <thead><tr><th scope="col">分组</th><th scope="col">次数</th><th scope="col">完成率</th></tr></thead>
+                    <tbody>
+                      <tr>
+                        <th scope="row">工作日</th>
+                        <td>{{ rhythmWeekdaySummary.weekday.count }}</td>
+                        <td>{{ rhythmWeekdaySummary.weekday.completionRate }}%</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">周末</th>
+                        <td>{{ rhythmWeekdaySummary.weekend.count }}</td>
+                        <td>{{ rhythmWeekdaySummary.weekend.completionRate }}%</td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
-                <p>
-                  <span><i class="is-weekday"></i>工作日 {{ rhythmWeekdaySummary.weekday.count }} 次 · 完成 {{ rhythmWeekdaySummary.weekday.completionRate }}%</span>
-                  <span><i class="is-weekend"></i>周末 {{ rhythmWeekdaySummary.weekend.count }} 次 · 完成 {{ rhythmWeekdaySummary.weekend.completionRate }}%</span>
-                </p>
-                <table class="sr-only" aria-label="节律工作日与周末对比">
-                  <caption>{{ selectedRangeLabel }} 工作日 vs 周末</caption>
-                  <thead><tr><th scope="col">分组</th><th scope="col">次数</th><th scope="col">完成率</th></tr></thead>
-                  <tbody>
-                    <tr>
-                      <th scope="row">工作日</th>
-                      <td>{{ rhythmWeekdaySummary.weekday.count }}</td>
-                      <td>{{ rhythmWeekdaySummary.weekday.completionRate }}%</td>
-                    </tr>
-                    <tr>
-                      <th scope="row">周末</th>
-                      <td>{{ rhythmWeekdaySummary.weekend.count }}</td>
-                      <td>{{ rhythmWeekdaySummary.weekend.completionRate }}%</td>
-                    </tr>
-                  </tbody>
-                </table>
               </div>
             </template>
           </article>
@@ -778,6 +731,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import { Activity, ArrowRight, BarChart3, BellRing, Calendar, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock3, Coffee, Download, ExternalLink, Eye, FileText, History, Keyboard, Lightbulb, Pencil, Play, RotateCcw, Search, SlidersHorizontal, Sparkles, Timer, Trash2, TrendingDown, TrendingUp, X } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import { saveTextFile } from '@/services/platform'
+import { initChart, readChartColors, chartTooltipStyle, echarts } from '@/utils/chartTheme'
 import FocusRewardBadge from './FocusRewardBadge.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
 import ReviewRangeControl from './ReviewRangeControl.vue'
@@ -1088,59 +1042,100 @@ const trendAverage = computed(() => {
   if (!activeDays.length) return 0
   return Math.round(activeDays.reduce((t, i) => t + i.seconds, 0) / activeDays.length)
 })
-// 趋势图 hover：信息卡定位在 hover 柱子的正上方（柱顶之上），不遮挡柱体
-// 用 index 而非对象引用定位，避免 trendDays 重算后引用失效
-const trendChartRef = ref(null)
-const trendTooltipEl = ref(null)
-const hoveredTrendIndex = ref(-1)
-const trendTooltipPos = ref({ x: 0, y: 0 })
-const trendTipSize = ref({ w: 0, h: 0 })
-const hoveredTrendDay = computed(() => hoveredTrendIndex.value >= 0 ? (trendDays.value[hoveredTrendIndex.value] || null) : null)
-function trendDayAria(day) {
-  const base = `${day.label}${day.isToday ? '（今日）' : ''}：${day.seconds ? formatDuration(day.seconds) : '无投入'}`
-  return day.records.length ? `${base}，${day.records.length} 段专注` : base
+// 趋势图：ECharts 柱状图实例管理（hover tooltip / 日均虚线由 ECharts 渲染，替代手写）
+const trendChartEl = ref(null)
+let trendChartInstance = null
+function buildTrendChartOption() {
+  const colors = readChartColors()
+  const days = trendDays.value
+  const avg = trendAverage.value
+  const data = days.map(day => (day.seconds ? { value: day.seconds, day } : null))
+  return {
+    animationDuration: 280,
+    grid: { left: 46, right: 10, top: 24, bottom: 24 },
+    tooltip: {
+      trigger: 'axis',
+      ...chartTooltipStyle(colors),
+      formatter: (params) => {
+        const day = params?.[0]?.data?.day
+        if (!day) return ''
+        let html = `<b>${escapeHtml(day.label)}${day.isToday ? '（今日）' : ''}</b>`
+        if (day.seconds) {
+          html += `<br/><b>${escapeHtml(formatDuration(day.seconds))}</b> · ${day.records.length} 段专注`
+          if (day.records.length) {
+            html += '<br/>' + day.records.slice(0, 3).map(r => escapeHtml(focusTitle(r))).join('<br/>')
+            if (day.records.length > 3) html += `<br/>还有 ${day.records.length - 3} 段…`
+          }
+        } else {
+          html += '<br/>无投入'
+        }
+        return html
+      }
+    },
+    xAxis: {
+      type: 'category',
+      data: days.map(d => d.shortLabel),
+      axisTick: { show: false },
+      axisLine: { lineStyle: { color: colors.border } },
+      axisLabel: {
+        interval: 0,
+        color: colors.textMuted,
+        fontSize: 9,
+        formatter: (value, index) => (days[index]?.showLabel ? value : '')
+      }
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: { color: colors.textMuted, fontSize: 9, formatter: value => formatCompactDuration(value) },
+      splitLine: { lineStyle: { color: colors.border } }
+    },
+    series: [{
+      type: 'bar',
+      data,
+      barMaxWidth: 16,
+      itemStyle: {
+        borderRadius: [3, 3, 0, 0],
+        color: (params) => (params.data?.day?.isWeekend ? '#6a9bc3' : colors.accent)
+      },
+      markLine: avg ? {
+        symbol: 'none',
+        lineStyle: { type: 'dashed', color: colors.accentStrong, width: 1 },
+        label: {
+          formatter: `日均 ${formatCompactDuration(avg)}`,
+          color: colors.accentStrong,
+          fontSize: 9,
+          position: 'insideEndTop',
+          backgroundColor: colors.surface,
+          padding: [1, 4],
+          borderRadius: 4
+        },
+        data: [{ yAxis: avg }]
+      } : undefined
+    }]
+  }
 }
-function hoverTrendDay(index, event) {
-  hoveredTrendIndex.value = index
-  if (event) moveTrendTooltip(event)
+function renderTrendChart() {
+  const el = trendChartEl.value
+  if (!el || typeof window === 'undefined') return
+  // tab 切走再切回时 DOM 重建，旧的已卸载实例需要重建
+  if (trendChartInstance && !trendChartInstance.getDom().isConnected) {
+    trendChartInstance.dispose()
+    trendChartInstance = null
+  }
+  if (!trendChartInstance) trendChartInstance = initChart(el)
+  trendChartInstance.setOption(buildTrendChartOption(), true)
 }
-function moveTrendTooltip(event) {
-  const el = trendChartRef.value
-  if (!el) return
-  const rect = el.getBoundingClientRect()
-  trendTooltipPos.value = { x: event.clientX - rect.left, y: event.clientY - rect.top }
+watch([trendDays, () => store.settings.theme, activeTab], () => renderTrendChart(), { flush: 'post' })
+function resizeCharts() {
+  trendChartInstance?.resize()
+  rhythmChartInstances.forEach(({ chart }) => chart.resize())
 }
-// 渲染后读取 tooltip 实际尺寸，用于柱顶上方定位
-watch(hoveredTrendDay, async (day) => {
-  if (!day) return
-  await nextTick()
-  const el = trendTooltipEl.value
-  if (el) trendTipSize.value = { w: el.offsetWidth, h: el.offsetHeight }
-})
-const trendTooltipStyle = computed(() => {
-  if (hoveredTrendIndex.value < 0) return { display: 'none' }
-  const el = trendChartRef.value
-  const width = el?.clientWidth || 500
-  const day = hoveredTrendDay.value
-  if (!day) return { display: 'none' }
-  const idx = hoveredTrendIndex.value
-  const colWidth = width / trendDays.value.length
-  const tipW = trendTipSize.value.w || 150
-  const tipH = trendTipSize.value.h || 120
-  // 水平：优先放柱子右侧；右缘放不下时翻转到左侧，避免遮挡 hover 柱
-  const rightX = (idx + 1) * colWidth
-  const flip = rightX + 12 + tipW > width - 4
-  const left = flip
-    ? Math.max(4, idx * colWidth - tipW - 12)
-    : Math.min(rightX + 12, width - tipW - 4)
-  // 垂直：对齐 hover 柱的柱顶上方；柱顶上方空间不足时顶部贴图表上缘
-  const barRatio = day.seconds ? Math.max(8, day.seconds / trendMax.value * 100) / 100 : 0
-  const barTop = 0.18 * 180 + 0.68 * 180 * (1 - barRatio)
-  const top = Math.max(4, barTop - tipH - 8)
-  return { left: `${left}px`, top: `${top}px` }
-})
-// 范围或数据变化后清掉残留的 hover 状态
-watch(trendDays, () => { hoveredTrendIndex.value = -1 })
+function disposeCharts() {
+  trendChartInstance?.dispose()
+  trendChartInstance = null
+  rhythmChartInstances.forEach(({ chart }) => chart.dispose())
+  rhythmChartInstances.length = 0
+}
 const trendTitle = computed(() => {
   const id = selectedRange.value.id
   if (id === 'custom') return `${selectedRangeLabel.value}的投入变化`
@@ -1194,6 +1189,94 @@ const bucketPrefs = loadBucketPrefs()
 const bucketFast = ref(bucketPrefs.fast)
 const bucketMedium = ref(bucketPrefs.medium)
 const bucketSlow = ref(bucketPrefs.slow)
+
+// 节律执行：4 个横向条形小图（处理结果 / 响应速度 / 提醒时段 / 工作日对比）
+const rhythmActionChartEl = ref(null)
+const rhythmResponseChartEl = ref(null)
+const rhythmHourChartEl = ref(null)
+const rhythmWeekdayChartEl = ref(null)
+const rhythmChartInstances = []
+// 横向条形图的统一 option：y 轴类别倒序（首项在顶部），label 显示次数与占比（0 值不显示）
+function buildRhythmBarOption(items, { barColor = '#2f8f86', labelFormatter = p => `${p.value} 次 · ${p.data.percent}%`, tooltipFormatter = p => `<b>${escapeHtml(p.name)}</b><br/>${p.value} 次 · ${p.data.percent}%` } = {}) {
+  const colors = readChartColors()
+  return {
+    animationDuration: 220,
+    grid: { left: 96, right: 96, top: 4, bottom: 4 },
+    tooltip: {
+      trigger: 'item',
+      ...chartTooltipStyle(colors),
+      formatter: tooltipFormatter
+    },
+    xAxis: { type: 'value', show: false },
+    yAxis: {
+      type: 'category',
+      inverse: true,
+      data: items.map(item => item.label),
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: colors.text, fontSize: 11 }
+    },
+    series: [{
+      type: 'bar',
+      data: items.map(item => ({ value: item.count, percent: item.percent, itemStyle: { color: item.color || barColor, borderRadius: [0, 4, 4, 0] } })),
+      barWidth: 10,
+      label: { show: true, position: 'right', formatter: p => (p.value > 0 ? labelFormatter(p) : ''), color: colors.textMuted, fontSize: 10 }
+    }]
+  }
+}
+function renderRhythmCharts() {
+  // 清理已从 DOM 移除的旧实例（v-if 或 tab 切换重建后 el 引用变化）
+  for (let i = rhythmChartInstances.length - 1; i >= 0; i -= 1) {
+    if (!rhythmChartInstances[i].el.isConnected) {
+      rhythmChartInstances[i].chart.dispose()
+      rhythmChartInstances.splice(i, 1)
+    }
+  }
+  const bindings = [
+    { el: rhythmActionChartEl.value, key: 'action' },
+    { el: rhythmResponseChartEl.value, key: 'response' },
+    { el: rhythmHourChartEl.value, key: 'hour' },
+    { el: rhythmWeekdayChartEl.value, key: 'weekday' }
+  ]
+  bindings.forEach(({ el, key }) => {
+    if (!el) return
+    let instance = rhythmChartInstances.find(item => item.el === el)
+    if (!instance) {
+      instance = { el, chart: initChart(el) }
+      rhythmChartInstances.push(instance)
+    }
+    instance.chart.setOption(buildRhythmOptionFor(key), true)
+  })
+}
+function rhythmActionColor(action) {
+  if (action === 'completed') return readChartColors().accent
+  if (action === 'snoozed') return '#d69c42'
+  return '#89918f'
+}
+function buildRhythmOptionFor(key) {
+  const colors = readChartColors()
+  if (key === 'action') {
+    return buildRhythmBarOption(rhythmActionSummary.value.map(item => ({ ...item, label: item.label, color: rhythmActionColor(item.action) })))
+  }
+  if (key === 'response') {
+    return buildRhythmBarOption(rhythmResponseBuckets.value.map(b => ({ ...b, color: colors.accent })))
+  }
+  if (key === 'hour') {
+    return buildRhythmBarOption(rhythmHourBuckets.value.map(b => ({ ...b, color: '#6a9bc3' })))
+  }
+  // weekday：两行，label 与其他图统一（次数 · 占比），完成率放到 tooltip
+  const w = rhythmWeekdaySummary.value
+  return buildRhythmBarOption([
+    { label: '工作日', count: w.weekday.count, percent: w.weekday.percent, color: colors.accent },
+    { label: '周末', count: w.weekend.count, percent: w.weekend.percent, color: '#6a9bc3' }
+  ], {
+    tooltipFormatter: p => {
+      const rate = p.dataIndex === 0 ? w.weekday.completionRate : w.weekend.completionRate
+      return `<b>${escapeHtml(p.name)}</b><br/>${p.value} 次 · ${p.data.percent}%<br/>完成率 ${rate}%`
+    }
+  })
+}
+watch([rhythmEntries, bucketFast, bucketMedium, bucketSlow, () => store.settings.theme, activeTab], () => renderRhythmCharts(), { flush: 'post' })
 const customBucketsOpen = ref(false)
 const bucketTriggerRef = ref(null)
 const bucketPopoverRef = ref(null)
@@ -2005,94 +2088,76 @@ async function exportFocusReport() {
 
 // HTML 报告：自包含单文件（内联样式 + canvas 手绘图表 base64 内嵌），零依赖，
 // 浏览器 / 系统打印即可另存为 PDF。图表颜色与页面主色保持一致。
-const REPORT_CHART_COLORS = {
+// 导出报告图表：用 ECharts 临时实例渲染输出高清 PNG（替代手绘 canvas）
+const EXPORT_CHART_COLORS = {
   weekday: '#8a75e3',
   weekend: '#6a9bc3',
   average: '#5d89b0',
   muted: '#9aa5a3',
   grid: '#e8eceb',
-  slot: '#f0f2f2',
   text: '#4a5553'
 }
-function reportCanvas(width, height) {
-  const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
-  return canvas
+function renderChartToDataUrl(option, width = 760, height = 240) {
+  const holder = document.createElement('div')
+  holder.style.cssText = `position:fixed;left:-99999px;top:0;width:${width}px;height:${height}px`
+  document.body.appendChild(holder)
+  const chart = echarts.init(holder, null, { width, height, renderer: 'canvas' })
+  chart.setOption(option)
+  const url = chart.getDataURL({ pixelRatio: 2, backgroundColor: '#ffffff' })
+  chart.dispose()
+  holder.remove()
+  return url
 }
-function drawTrendChart() {
+function buildExportTrendOption() {
   const days = trendDays.value
-  if (!days.length) return null
-  const canvas = reportCanvas(760, 280)
-  const ctx = canvas.getContext('2d')
-  const max = trendMax.value || 1
-  const average = trendAverage.value
-  const pad = { top: 20, right: 16, bottom: 26, left: 56 }
-  const innerW = canvas.width - pad.left - pad.right
-  const innerH = canvas.height - pad.top - pad.bottom
-  ctx.font = '11px sans-serif'
-  ctx.textAlign = 'right'
-  // y 轴网格与刻度
-  for (let i = 0; i <= 4; i += 1) {
-    const y = pad.top + innerH - (innerH * i / 4)
-    ctx.strokeStyle = REPORT_CHART_COLORS.grid
-    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + innerW, y); ctx.stroke()
-    ctx.fillStyle = REPORT_CHART_COLORS.muted
-    ctx.fillText(formatCompactDuration(max * i / 4), pad.left - 8, y + 4)
+  const avg = trendAverage.value
+  return {
+    grid: { left: 56, right: 16, top: 28, bottom: 28 },
+    xAxis: {
+      type: 'category',
+      data: days.map(d => d.shortLabel),
+      axisTick: { show: false },
+      axisLine: { lineStyle: { color: EXPORT_CHART_COLORS.grid } },
+      axisLabel: { interval: 0, color: EXPORT_CHART_COLORS.muted, fontSize: 11, formatter: (value, index) => (days[index]?.showLabel ? value : '') }
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: { color: EXPORT_CHART_COLORS.muted, fontSize: 11, formatter: value => formatCompactDuration(value) },
+      splitLine: { lineStyle: { color: EXPORT_CHART_COLORS.grid } }
+    },
+    series: [{
+      type: 'bar',
+      data: days.map(d => d.seconds || null),
+      barMaxWidth: 18,
+      itemStyle: { borderRadius: [3, 3, 0, 0], color: (params) => (days[params.dataIndex]?.isWeekend ? EXPORT_CHART_COLORS.weekend : EXPORT_CHART_COLORS.weekday) },
+      markLine: avg ? {
+        symbol: 'none',
+        lineStyle: { type: 'dashed', color: EXPORT_CHART_COLORS.average, width: 1 },
+        label: { formatter: `日均 ${formatCompactDuration(avg)}`, color: EXPORT_CHART_COLORS.average, fontSize: 11, position: 'insideEndTop' },
+        data: [{ yAxis: avg }]
+      } : undefined
+    }]
   }
-  // 柱体
-  const slot = innerW / days.length
-  const barWidth = Math.max(2, Math.min(14, slot * 0.62))
-  days.forEach((day, idx) => {
-    if (!day.seconds) return
-    const x = pad.left + slot * idx + (slot - barWidth) / 2
-    const barH = Math.max(2, day.seconds / max * innerH)
-    ctx.fillStyle = day.isWeekend ? REPORT_CHART_COLORS.weekend : REPORT_CHART_COLORS.weekday
-    ctx.fillRect(x, pad.top + innerH - barH, barWidth, barH)
-  })
-  // 日均虚线
-  if (average) {
-    const y = pad.top + innerH - (average / max * innerH)
-    ctx.setLineDash([5, 4])
-    ctx.strokeStyle = REPORT_CHART_COLORS.average
-    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + innerW, y); ctx.stroke()
-    ctx.setLineDash([])
-    ctx.fillStyle = REPORT_CHART_COLORS.average
-    ctx.textAlign = 'left'
-    ctx.fillText(`日均 ${formatCompactDuration(average)}`, pad.left + 8, y - 5)
-  }
-  // x 轴标签（稀疏）
-  ctx.fillStyle = REPORT_CHART_COLORS.muted
-  ctx.textAlign = 'center'
-  days.forEach((day, idx) => {
-    if (!day.showLabel) return
-    ctx.fillText(day.shortLabel, pad.left + slot * idx + slot / 2, canvas.height - 8)
-  })
-  return canvas.toDataURL('image/png')
 }
-function drawBarList(items) {
-  if (!items.length) return null
-  const canvas = reportCanvas(760, Math.max(120, 34 + items.length * 34))
-  const ctx = canvas.getContext('2d')
-  const pad = { top: 14, right: 56, bottom: 14, left: 150 }
-  const innerW = canvas.width - pad.left - pad.right
-  const rowH = (canvas.height - pad.top - pad.bottom) / items.length
-  ctx.font = '12px sans-serif'
-  items.forEach((item, idx) => {
-    const y = pad.top + rowH * idx + rowH / 2
-    ctx.textAlign = 'right'
-    ctx.fillStyle = REPORT_CHART_COLORS.text
-    ctx.fillText(item.label, pad.left - 10, y + 4)
-    ctx.fillStyle = REPORT_CHART_COLORS.slot
-    ctx.fillRect(pad.left, y - 7, innerW, 14)
-    const barWidth = Math.max(2, innerW * item.percent / 100)
-    ctx.fillStyle = item.color
-    ctx.fillRect(pad.left, y - 7, barWidth, 14)
-    ctx.textAlign = 'left'
-    ctx.fillStyle = REPORT_CHART_COLORS.text
-    ctx.fillText(`${item.count} 次 · ${item.percent}%`, pad.left + barWidth + 8, y + 4)
-  })
-  return canvas.toDataURL('image/png')
+function buildExportBarOption(items) {
+  return {
+    grid: { left: 160, right: 70, top: 8, bottom: 8 },
+    xAxis: { type: 'value', show: false },
+    yAxis: {
+      type: 'category',
+      inverse: true,
+      data: items.map(item => item.label),
+      axisLabel: { color: EXPORT_CHART_COLORS.text, fontSize: 12 },
+      axisLine: { show: false },
+      axisTick: { show: false }
+    },
+    series: [{
+      type: 'bar',
+      data: items.map(item => ({ value: item.count, percent: item.percent, itemStyle: { color: item.color, borderRadius: [0, 4, 4, 0] } })),
+      barWidth: 12,
+      label: { show: true, position: 'right', formatter: p => (p.value > 0 ? `${p.value} 次 · ${p.data.percent}%` : ''), color: EXPORT_CHART_COLORS.text, fontSize: 11 }
+    }]
+  }
 }
 function escapeHtml(value) {
   return String(value == null ? '' : value)
@@ -2140,19 +2205,19 @@ function buildHtmlReport() {
     parts.push('</ul></section>')
   }
   // 专注趋势图
-  const trendImg = drawTrendChart()
+  const trendImg = trendDays.value.length ? renderChartToDataUrl(buildExportTrendOption(), 760, 280) : null
   if (trendImg) {
     parts.push('<section><h2>专注趋势</h2><img src="' + trendImg + '" alt="每日专注时长趋势图" /></section>')
   }
   // 节律执行图
   if (rhythmEntries.value.length) {
     parts.push('<section><h2>节律执行</h2>')
-    const actionImg = drawBarList(rhythmActionSummary.value.map(item => ({ label: item.label, count: item.count, percent: item.percent, color: item.action === 'completed' ? '#8a75e3' : item.action === 'snoozed' ? '#d69c42' : '#89918f' })))
-    if (actionImg) parts.push('<img src="' + actionImg + '" alt="节律处理结果分布" style="margin-bottom:10px" />')
-    const responseImg = drawBarList(rhythmResponseBuckets.value.map(b => ({ label: b.label, count: b.count, percent: b.percent, color: '#8a75e3' })))
-    if (responseImg) parts.push('<img src="' + responseImg + '" alt="响应速度分布" style="margin-bottom:10px" />')
-    const hourImg = drawBarList(rhythmHourBuckets.value.map(b => ({ label: b.label, count: b.count, percent: b.percent, color: '#6a9bc3' })))
-    if (hourImg) parts.push('<img src="' + hourImg + '" alt="提醒时段分布" />')
+    const actionImg = renderChartToDataUrl(buildExportBarOption(rhythmActionSummary.value.map(item => ({ label: item.label, count: item.count, percent: item.percent, color: item.action === 'completed' ? '#8a75e3' : item.action === 'snoozed' ? '#d69c42' : '#89918f' }))), 760, 130)
+    parts.push('<img src="' + actionImg + '" alt="节律处理结果分布" style="margin-bottom:10px" />')
+    const responseImg = renderChartToDataUrl(buildExportBarOption(rhythmResponseBuckets.value.map(b => ({ label: b.label, count: b.count, percent: b.percent, color: '#8a75e3' }))), 760, 160)
+    parts.push('<img src="' + responseImg + '" alt="响应速度分布" style="margin-bottom:10px" />')
+    const hourImg = renderChartToDataUrl(buildExportBarOption(rhythmHourBuckets.value.map(b => ({ label: b.label, count: b.count, percent: b.percent, color: '#6a9bc3' }))), 760, 160)
+    parts.push('<img src="' + hourImg + '" alt="提醒时段分布" />')
     parts.push('</section>')
   }
   // 最近记录
@@ -2427,8 +2492,17 @@ function handleKeydown(event) {
   }
 }
 
-onMounted(() => window.addEventListener('keydown', handleKeydown))
-onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
+  window.addEventListener('resize', resizeCharts)
+  renderTrendChart()
+  renderRhythmCharts()
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleKeydown)
+  window.removeEventListener('resize', resizeCharts)
+  disposeCharts()
+})
 </script>
 
 <style scoped>
@@ -2486,28 +2560,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-card > header h2 { margin: 0; color: var(--text); font-size: 16px; letter-spacing: -.02em; }
 .review-card > header > strong { color: var(--text); font-size: 14px; font-variant-numeric: tabular-nums; }
 .review-card > header > small { color: var(--text-muted); font-size: 11px; }
-.review-chart { position: relative; display: grid; height: 180px; align-items: end; gap: 5px; margin-top: 14px; padding-top: 10px; border-bottom: 1px solid var(--divider-soft); }
-.review-chart > div:not(.review-chart-tooltip):not(.review-chart-average) { display: grid; min-width: 0; height: 100%; grid-template-rows: 18px 1fr 20px; align-items: end; gap: 4px; cursor: default; }
-.review-chart > div:not(.review-chart-tooltip):not(.review-chart-average):hover b:not(.review-chart__placeholder) { filter: brightness(1.1); }
-.review-chart > div:not(.review-chart-tooltip):not(.review-chart-average):focus-visible { outline: 3px solid var(--accent-20-border-fallback); outline-offset: 2px; border-radius: 6px; }
-.review-chart span, .review-chart small { color: var(--text-muted); font-size: 9px; text-align: center; white-space: nowrap; }
-.review-chart span { overflow: hidden; text-overflow: ellipsis; }
-/* x 轴标签允许溢出列宽：稀疏刻度间距足够，避免 "7/1" 被截成 "7…" */
-.review-chart small { overflow: visible; }
-.review-chart > div > i { display: flex; height: 100%; align-items: end; overflow: hidden; border-radius: 5px 5px 2px 2px; background: color-mix(in srgb, var(--accent-soft) 58%, var(--surface-muted)); }
-.review-chart > div:not(.review-chart-tooltip):not(.review-chart-average) > i > b { display: block; width: 100%; min-height: 2px; border-radius: inherit; background: linear-gradient(180deg, var(--accent), var(--accent-strong)); transition: height .25s ease; }
+/* 趋势图与节律图：ECharts 容器 */
+.review-trend-chart { height: 200px; margin-top: 14px; }
 .review-rhythm-card > header svg { color: #5d89b0; }
-.review-rhythm-actions { display: grid; gap: 18px; margin-top: 23px; }
-.review-rhythm-actions > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; }
-.review-rhythm-actions span { display: flex; align-items: center; gap: 7px; color: var(--text); font-size: 12px; letter-spacing: 0; }
-.review-rhythm-actions span > i { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
-.review-rhythm-actions span > i.is-snoozed { background: #d69c42; }
-.review-rhythm-actions span > i.is-skipped { background: #89918f; }
-.review-rhythm-actions strong { color: var(--text); font-size: 12px; }
-.review-rhythm-actions b { grid-column: 1 / -1; height: 6px; overflow: hidden; border-radius: 999px; background: var(--surface-muted); }
-.review-rhythm-actions b i { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
-.review-rhythm-actions b i.is-snoozed { background: #d69c42; }
-.review-rhythm-actions b i.is-skipped { background: #89918f; }
+.review-rhythm-charts { display: grid; gap: 16px; margin-top: 16px; }
+.review-rhythm-chart-block { display: grid; gap: 6px; min-width: 0; }
+.review-rhythm-chart-block h4 { margin: 0; color: var(--text-muted); font-size: 10.5px; font-weight: 700; letter-spacing: .04em; }
+.review-rhythm-chart-block > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.review-rhythm-chart { height: 76px; }
 .review-recent { margin-top: 12px; }
 .review-recent__header { align-items: center !important; }
 .review-recent__header > div:first-child { gap: 3px; }
@@ -2832,37 +2892,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-chart-note { margin: 0 0 10px; padding: 6px 10px; border-radius: 8px; background: color-mix(in srgb, var(--accent-soft) 50%, transparent); color: var(--accent-strong); font-size: 11px; }
 .review-chart-note__btn { display: inline-flex; align-items: center; min-height: 24px; margin: 0 2px; padding: 0 8px; border: 0; border-radius: 6px; background: var(--surface); color: var(--accent-strong); font: inherit; font-size: 10.5px; font-weight: 650; cursor: pointer; }
 .review-chart-note__btn:hover { background: var(--accent-soft); }
-.review-chart > div.is-today > i > b { background: linear-gradient(180deg, var(--accent), var(--accent-strong)); box-shadow: 0 0 0 2px var(--accent-soft); }
-.review-chart > div.is-today small { color: var(--accent-strong); font-weight: 700; }
-.review-chart > div.is-weekend > i { background: color-mix(in srgb, #6a9bc3 22%, var(--surface-muted)); }
-.review-chart > div.is-weekend > i > b { background: linear-gradient(180deg, #6a9bc3, #4f7fa6); }
-.review-chart > div.is-empty > i { background: transparent; }
 .review-chart-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 6px; font-size: 10px; color: var(--text-muted); }
 .review-chart-legend i { display: inline-block; width: 10px; height: 10px; margin-right: 4px; border-radius: 2px; vertical-align: middle; }
 .review-chart-legend i.is-weekday { background: var(--accent); }
 .review-chart-legend i.is-weekend { background: #6a9bc3; }
 .review-chart-legend i.is-average { width: 12px; height: 0; border-top: 1px dashed var(--accent); border-radius: 0; background: transparent; }
 .review-chart-empty { margin: 12px 0 4px; padding: 18px 12px; border-radius: 10px; background: var(--surface-muted); color: var(--text-muted); font-size: 12px; text-align: center; }
-.review-chart__placeholder { display: block; width: 1px; height: 1px; background: var(--divider-soft); }
-/* 日均参考线：画在图表主体内按投入比例定位，标签贴线显示，不再挤在底部轴区 */
-.review-chart-average { position: absolute; left: 0; right: 0; top: calc(100% - var(--line, 50%)); height: 0; border-top: 1px dashed var(--accent); z-index: 3; pointer-events: none; }
-.review-chart-average b { position: absolute; right: 4px; top: -21px; padding: 1px 6px; border-radius: 4px; background: var(--surface); color: var(--accent-strong); font-size: 9px; font-weight: 600; white-space: nowrap; }
-.review-chart-average.is-high b { right: auto; left: 4px; }
-
-/* 趋势图 hover 信息卡 */
-.review-chart-tooltip { position: absolute; z-index: 6; width: max-content; max-width: 220px; padding: 9px 11px; border: 1px solid var(--divider-soft); border-radius: 10px; background: var(--surface); box-shadow: 0 10px 26px var(--text-7-fallback); pointer-events: none; font-size: 11px; color: var(--text); }
-.review-chart-tooltip strong { display: block; margin-bottom: 3px; color: var(--text); font-size: 11.5px; font-weight: 700; }
-.review-chart-tooltip p { margin: 0; color: var(--text-muted); }
-.review-chart-tooltip p b { color: var(--accent-strong); font-weight: 700; font-variant-numeric: tabular-nums; }
-.review-chart-tooltip p.is-empty { color: var(--text-muted); }
-.review-chart-tooltip ul { display: grid; gap: 2px; margin: 6px 0 0; padding: 6px 0 0; border-top: 1px solid var(--divider-soft); list-style: none; }
-.review-chart-tooltip li { max-width: 200px; overflow: hidden; color: var(--text); font-size: 10.5px; text-overflow: ellipsis; white-space: nowrap; }
-.review-chart-tooltip li.is-more { color: var(--text-muted); }
-
-/* 新增：节律执行卡 - 响应速度 / 时段分布 */
-.review-rhythm-buckets { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 18px; }
-.review-rhythm-bucket h4 { margin: 0; color: var(--text-muted); font-size: 10.5px; font-weight: 700; letter-spacing: .04em; }
-.review-rhythm-bucket > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .review-rhythm-bucket__adjust { display: inline-flex; align-items: center; gap: 3px; min-height: 24px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: var(--text-muted); font: inherit; font-size: 10px; font-weight: 600; cursor: pointer; }
 .review-rhythm-bucket__adjust:hover { background: var(--surface-muted); color: var(--accent-strong); }
 
@@ -2881,23 +2916,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-bucket-popover__foot .review-bucket-popover__done:hover { background: var(--accent-strong); color: #fff; }
 .review-range-pop-enter-active, .review-range-pop-leave-active { transition: opacity .16s ease, transform .16s ease; }
 .review-range-pop-enter-from, .review-range-pop-leave-to { opacity: 0; transform: translateY(-4px); }
-.review-rhythm-weekday { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--divider-soft); }
-.review-rhythm-weekday h4 { margin: 0 0 8px; color: var(--text-muted); font-size: 10.5px; font-weight: 700; letter-spacing: .04em; }
-.review-rhythm-weekday__bar { display: flex; height: 18px; overflow: hidden; border-radius: 9px; background: var(--surface-muted); }
-.review-rhythm-weekday__bar i { display: flex; align-items: center; justify-content: center; min-width: 0; font-size: 10px; font-weight: 600; color: #fff; transition: width .25s ease; }
-.review-rhythm-weekday__bar i.is-weekday { background: var(--accent); }
-.review-rhythm-weekday__bar i.is-weekend { background: #6a9bc3; }
-.review-rhythm-weekday p { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 8px 0 0; color: var(--text-muted); font-size: 10.5px; }
-.review-rhythm-weekday p i { display: inline-block; width: 8px; height: 8px; margin-right: 4px; border-radius: 50%; vertical-align: middle; }
-.review-rhythm-weekday p i.is-weekday { background: var(--accent); }
-.review-rhythm-weekday p i.is-weekend { background: #6a9bc3; }
-.review-rhythm-bucket ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.review-rhythm-bucket li { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; opacity: .55; }
-.review-rhythm-bucket li.is-active { opacity: 1; }
-.review-rhythm-bucket li span { color: var(--text); font-size: 11px; }
-.review-rhythm-bucket li strong { color: var(--text); font-size: 11px; font-variant-numeric: tabular-nums; }
-.review-rhythm-bucket li i { grid-column: 1 / -1; display: block; height: 4px; border-radius: 999px; background: var(--surface-muted); }
-.review-rhythm-bucket li i::after { content: ''; display: block; height: 100%; border-radius: inherit; background: #6a9bc3; }
 
 /* 新增：详情面板 - 上一条/下一条 + 关闭动画 */
 .review-detail-header__actions { display: flex; align-items: center; gap: 6px; }
@@ -2914,9 +2932,5 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-cta:hover { background: color-mix(in srgb, var(--accent-soft) 50%, var(--accent)); }
 .review-cta > span { line-height: 1; }
 
-@media (max-width: 900px) {
-  .review-rhythm-buckets { grid-template-columns: 1fr; gap: 12px; }
-}
-
-@media (prefers-reduced-motion: reduce) { .review-chart > div:not(.review-chart-tooltip):not(.review-chart-average) > i > b, .review-detail-fade-enter-active, .review-detail-fade-leave-active { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .review-detail-fade-enter-active, .review-detail-fade-leave-active { transition: none; } }
 </style>
