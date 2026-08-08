@@ -3739,6 +3739,8 @@ struct StorageHealth {
     quarantined_file_bytes: u64,
     profile_bytes: u64,
     backup_bytes: u64,
+    migration_backup_bytes: u64,
+    migration_backups: Vec<StorageItem>,
     other_bytes: u64,
 }
 
@@ -3870,6 +3872,49 @@ fn compact_empty_dirs(dir: &Path) {
     }
 }
 
+fn migration_backup_name_is_safe(name: &str) -> bool {
+    (name.starts_with("migration-") && name.ends_with(".json"))
+        || (name.starts_with("simpletodo-schema-") && name.ends_with(".db"))
+        || (name.starts_with("simpletodo-v") && name.ends_with(".db"))
+}
+
+fn migration_backup_items(app: &tauri::AppHandle) -> Result<Vec<StorageItem>, String> {
+    let root = backup_dir(app)?;
+    let mut items = Vec::new();
+    for entry in fs::read_dir(&root).map_err(|err| format!("读取迁移备份失败: {err}"))? {
+        let path = entry
+            .map_err(|err| format!("读取迁移备份失败: {err}"))?
+            .path();
+        if !path.is_file() {
+            continue;
+        }
+        let name = path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or("");
+        if !migration_backup_name_is_safe(name) {
+            continue;
+        }
+        items.push(storage_item(&root, &path, name.to_string())?);
+    }
+    items.sort_by(|left, right| right.modified_at.cmp(&left.modified_at));
+    Ok(items)
+}
+
+fn data_backup_size(app: &tauri::AppHandle) -> Result<u64, String> {
+    let mut total = 0;
+    for entry in fs::read_dir(backup_dir(app)?).map_err(|err| format!("读取恢复点失败: {err}"))?
+    {
+        let path = entry
+            .map_err(|err| format!("读取恢复点失败: {err}"))?
+            .path();
+        if let Some(record) = read_data_backup_record(&path)? {
+            total += record.size_bytes;
+        }
+    }
+    Ok(total)
+}
+
 #[tauri::command]
 fn scan_storage_health(app: tauri::AppHandle) -> Result<StorageHealth, String> {
     let referenced = referenced_attachment_paths(&app)?;
@@ -3945,10 +3990,16 @@ fn scan_storage_health(app: tauri::AppHandle) -> Result<StorageHealth, String> {
     .map(|metadata| metadata.len())
     .sum();
     let profile_bytes = directory_size(&data_dir.join("profile"))?;
-    let backup_bytes = directory_size(&backup_dir(&app)?)?;
+    let backup_bytes = data_backup_size(&app)?;
+    let migration_backups = migration_backup_items(&app)?;
+    let migration_backup_bytes = migration_backups.iter().map(|item| item.size_bytes).sum();
     let total_bytes = directory_size(&data_dir)?;
-    let known_bytes =
-        database_bytes + attachment_bytes + quarantined_bytes + profile_bytes + backup_bytes;
+    let known_bytes = database_bytes
+        + attachment_bytes
+        + quarantined_bytes
+        + profile_bytes
+        + backup_bytes
+        + migration_backup_bytes;
     Ok(StorageHealth {
         supported: true,
         total_bytes,
@@ -3968,7 +4019,39 @@ fn scan_storage_health(app: tauri::AppHandle) -> Result<StorageHealth, String> {
         quarantined_file_bytes,
         profile_bytes,
         backup_bytes,
+        migration_backup_bytes,
+        migration_backups,
         other_bytes: total_bytes.saturating_sub(known_bytes),
+    })
+}
+
+#[tauri::command]
+fn delete_migration_backups(
+    app: tauri::AppHandle,
+    backup_ids: Vec<String>,
+) -> Result<StorageOperation, String> {
+    let root = backup_dir(&app)?;
+    let mut affected_count = 0;
+    let mut affected_bytes = 0;
+    for id in backup_ids {
+        if !migration_backup_name_is_safe(&id)
+            || Path::new(&id).file_name().and_then(|name| name.to_str()) != Some(id.as_str())
+        {
+            return Err("迁移备份标识无效".to_string());
+        }
+        let path = root.join(&id);
+        if !path.is_file() {
+            continue;
+        }
+        affected_bytes += fs::metadata(&path)
+            .map_err(|err| format!("读取迁移备份失败: {err}"))?
+            .len();
+        fs::remove_file(path).map_err(|err| format!("删除迁移备份失败: {err}"))?;
+        affected_count += 1;
+    }
+    Ok(StorageOperation {
+        affected_count,
+        affected_bytes,
     })
 }
 
@@ -4443,6 +4526,18 @@ mod tests {
         );
         fs::remove_dir_all(&root).unwrap();
     }
+
+    #[test]
+    fn migration_backup_names_are_limited_to_known_backup_formats() {
+        assert!(migration_backup_name_is_safe("migration-20260806-123115.545.json"));
+        assert!(migration_backup_name_is_safe(
+            "simpletodo-schema-v1-to-v2-20260722-121419.db"
+        ));
+        assert!(migration_backup_name_is_safe("simpletodo-v0.2.5-20260716-103854.db"));
+        assert!(!migration_backup_name_is_safe("snapshot-20260804-manual"));
+        assert!(!migration_backup_name_is_safe("../simpletodo.db"));
+        assert!(!migration_backup_name_is_safe("migration-backup.exe"));
+    }
 }
 
 fn main() {
@@ -4519,6 +4614,7 @@ fn main() {
             resolve_html_images,
             cleanup_orphan_attachments,
             scan_storage_health,
+            delete_migration_backups,
             quarantine_orphan_attachments,
             read_quarantined_attachment,
             restore_quarantined_attachments,

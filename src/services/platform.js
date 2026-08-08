@@ -139,6 +139,15 @@ export async function deleteDataBackup(backupId) {
   }
 }
 
+export async function deleteMigrationBackups(backupIds) {
+  if (!isTauri()) throw new Error('当前环境不支持管理迁移备份')
+  try {
+    return await invoke('delete_migration_backups', { backupIds })
+  } catch (error) {
+    throw new Error(formatPlatformError(error, '删除迁移备份失败'))
+  }
+}
+
 export async function restoreDataBackup(backupId) {
   if (!isTauri()) throw new Error('当前环境不支持恢复本机数据')
   try {
@@ -261,6 +270,8 @@ function buildWebStorageMock() {
     referencedFileBytes: 1_443_120,
     profileBytes: 412_870,
     backupBytes: 2_148_006,
+    migrationBackupBytes: 0,
+    migrationBackups: [],
     otherBytes: 102_502,
     missingReferences: []
   }

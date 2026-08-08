@@ -28,7 +28,7 @@
           </div>
         </section>
         <p v-if="activeSection === 'profile' && errorMessage" class="profile-editor__error">{{ errorMessage }}</p>
-        <SpaceManagement v-else-if="activeSection === 'space'" />
+        <SpaceManagement v-else-if="activeSection === 'space'" @open-security="activeSection = 'security'" />
         <section v-else-if="activeSection === 'connection'" class="profile-section profile-section--first profile-section--capabilities">
           <div class="profile-section__head"><h3>连接与协作</h3><p>准备中</p></div>
           <div class="profile-capability-list">
