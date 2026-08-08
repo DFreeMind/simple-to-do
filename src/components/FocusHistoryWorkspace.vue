@@ -52,14 +52,24 @@
             <small>基于当前{{ selectedRangeLabel }}的数据自动生成</small>
           </header>
           <div class="review-insights__list">
-            <div v-for="(item, idx) in insights" :key="idx" :class="['review-insight', `is-${item.type}`]">
-              <span class="review-insight__icon"><component :is="item.icon" :size="16" /></span>
-              <div class="review-insight__body">
-                <strong>{{ item.text }}</strong>
-                <small v-if="item.detail">{{ item.detail }}</small>
-                <div v-if="item.bar" class="review-insight__bar" :title="`当前 vs 上 ${previousRangeStart?.days || ''} 天`">
-                  <i class="is-prev" :style="{ width: `${item.bar.prev}%` }"></i>
-                  <i class="is-current" :style="{ width: `${item.bar.current}%` }"></i>
+            <div v-for="(item, idx) in insights" :key="idx" :class="['review-insight', `is-${item.type}`, { 'is-clickable': !!item.item }]">
+              <button v-if="item.item" type="button" class="review-insight__click" :aria-label="`查看详情：${item.text}`" @click="openDetail(item.kind, item.item)">
+                <span class="review-insight__icon"><component :is="item.icon" :size="16" /></span>
+                <div class="review-insight__body">
+                  <strong>{{ item.text }}</strong>
+                  <small v-if="item.detail">{{ item.detail }}</small>
+                  <small v-if="item.when" class="review-insight__when">{{ item.when }} · 点击查看详情</small>
+                </div>
+              </button>
+              <div v-else class="review-insight__click">
+                <span class="review-insight__icon"><component :is="item.icon" :size="16" /></span>
+                <div class="review-insight__body">
+                  <strong>{{ item.text }}</strong>
+                  <small v-if="item.detail">{{ item.detail }}</small>
+                  <div v-if="item.bar" class="review-insight__bar" :title="`当前 vs 上 ${previousRangeStart?.days || ''} 天`">
+                    <i class="is-prev" :style="{ width: `${item.bar.prev}%` }"></i>
+                    <i class="is-current" :style="{ width: `${item.bar.current}%` }"></i>
+                  </div>
                 </div>
               </div>
             </div>
@@ -74,7 +84,8 @@
                 <ChevronDown :size="12" />
               </button>
               <div v-if="exportMenuOpen.overview" class="review-export-menu__panel" role="menu">
-                <button type="button" role="menuitem" @click="exportFocusReport(); closeAllExportMenus()">Markdown 报告（人类可读）</button>
+                <button type="button" role="menuitem" @click="exportFocusHtmlReport(); closeAllExportMenus()">HTML 报告（含图表，可打印为 PDF）</button>
+                <button type="button" role="menuitem" @click="exportFocusReport(); closeAllExportMenus()">Markdown 报告</button>
                 <button type="button" role="menuitem" @click="exportFocusJson(); closeAllExportMenus()">JSON（开发者用）</button>
               </div>
             </div>
@@ -86,7 +97,7 @@
               <small>{{ focusEntries.length }} 段 · {{ focusActiveDays }} 天有投入</small>
               <span v-if="previousRangeStart && focusSecondsDelta" :class="['review-metric__delta', focusSecondsDelta > 0 ? 'is-up' : 'is-down']" :title="`与上一周期对比（${previousRangeStart.days} 天）`">
                 {{ focusSecondsDelta > 0 ? '↑' : focusSecondsDelta < 0 ? '↓' : '持平' }} {{ Math.abs(focusSecondsDelta) }}%
-                <small>· vs 上 {{ previousRangeStart.days }} 天</small>
+                <small>· 对比上 {{ previousRangeStart.days }} 天</small>
               </span>
             </article>
             <article class="review-metric">
@@ -95,7 +106,7 @@
               <small>{{ completedFocusEntries.length }} 段自然完成 / {{ focusEntries.length }} 段</small>
               <span v-if="previousRangeStart && completionRateDelta" :class="['review-metric__delta', completionRateDelta > 0 ? 'is-up' : 'is-down']" :title="`与上一周期对比`">
                 {{ completionRateDelta > 0 ? '↑' : completionRateDelta < 0 ? '↓' : '持平' }} {{ Math.abs(completionRateDelta) }}pp
-                <small>· vs 上 {{ previousRangeStart.days }} 天</small>
+                <small>· 对比上 {{ previousRangeStart.days }} 天</small>
               </span>
             </article>
             <article class="review-metric">
@@ -129,7 +140,7 @@
               </div>
             </header>
             <p v-if="trendTruncated" class="review-chart-note">
-              记录超过 {{ TREND_HARD_CAP }} 天，仅显示最近 {{ trendDaysCount }} 天。
+              记录超过 {{ TREND_HARD_CAP }} 天，仅显示最近 {{ trendDaysCount }} 天（下方日均按此窗口计算）。
               <button type="button" class="review-chart-note__btn" @click="range = '90d'">查看近 90 天</button>
               <button type="button" class="review-chart-note__btn" @click="range = 'custom'">自定义</button>
             </p>
@@ -145,7 +156,7 @@
                   <b v-if="day.seconds" :style="{ height: `${Math.max(8, day.seconds / trendMax * 100)}%` }"></b>
                   <b v-else class="review-chart__placeholder"></b>
                 </i>
-                <small>{{ day.shortLabel }}</small>
+                <small>{{ day.showLabel ? day.shortLabel : '' }}</small>
               </div>
             </div>
             <table class="sr-only" aria-label="每日专注时长明细">
@@ -182,25 +193,17 @@
                 <div v-for="item in rhythmActionSummary" :key="item.action">
                   <span><i :class="`is-${item.action}`"></i>{{ item.label }}</span>
                   <strong>{{ item.count }}</strong>
-                  <b><i :style="{ width: `${item.percent}%` }"></i></b>
+                  <b><i :class="`is-${item.action}`" :style="{ width: `${item.percent}%` }"></i></b>
                 </div>
               </div>
               <div class="review-rhythm-buckets">
                 <div class="review-rhythm-bucket">
                   <header>
                     <h4>响应速度</h4>
-                    <button type="button" class="review-rhythm-bucket__adjust" :aria-expanded="customBucketsOpen" @click="customBucketsOpen = !customBucketsOpen">
+                    <button ref="bucketTriggerRef" type="button" class="review-rhythm-bucket__adjust" :aria-expanded="customBucketsOpen" :aria-haspopup="true" @click="toggleBucketPopover">
                       <SlidersHorizontal :size="12" />自定义分桶
                     </button>
                   </header>
-                  <Transition name="review-range-fade">
-                    <div v-if="customBucketsOpen" class="review-rhythm-bucket__custom">
-                      <label><span>快</span><input v-model.number="bucketFast" type="number" min="0" max="999" /> 秒内</label>
-                      <label><span>中</span><input v-model.number="bucketMedium" type="number" min="1" max="999" /> 秒内</label>
-                      <label><span>慢</span><input v-model.number="bucketSlow" type="number" min="2" max="9999" /> 秒内</label>
-                      <button type="button" @click="resetBuckets">恢复</button>
-                    </div>
-                  </Transition>
                   <ul>
                     <li v-for="b in rhythmResponseBuckets" :key="b.id" :class="{ 'is-active': b.count > 0 }">
                       <span>{{ b.label }}</span>
@@ -280,41 +283,57 @@
         <section class="review-card review-recent">
           <header class="review-recent__header">
             <div><span>最近发生</span><h2>专注与节律时间线</h2><p>{{ selectedRangeLabel }}的数据，与上方统计使用相同时间范围</p></div>
-            <div class="review-recent-switch" role="group" aria-label="筛选最近记录类型">
-              <button v-for="option in recentKindOptions" :key="option.id" type="button" :class="{ active: recentKind === option.id }" :title="`${option.label}（${recentKindCounts[option.id] || 0} 条）`" @click="setRecentKind(option.id)">
-                {{ option.label }}
-                <span v-if="recentKindCounts[option.id]" class="review-recent-switch__count">{{ recentKindCounts[option.id] }}</span>
-              </button>
+            <div class="review-recent__tools">
+              <label class="review-recent-search" :class="{ 'has-value': recentSearch }">
+                <Search :size="13" />
+                <input v-model="recentSearch" type="search" placeholder="搜索记录" aria-label="搜索最近记录" @keydown.esc="recentSearch = ''" />
+                <button v-if="recentSearch" type="button" aria-label="清空搜索" @click="recentSearch = ''"><X :size="12" /></button>
+              </label>
+              <div class="review-recent-switch" role="group" aria-label="筛选最近记录类型">
+                <button v-for="option in recentKindOptions" :key="option.id" type="button" :class="{ active: recentKind === option.id }" :title="`${option.label}（${recentKindCounts[option.id] || 0} 条）`" @click="setRecentKind(option.id)">
+                  {{ option.label }}
+                  <span v-if="recentKindCounts[option.id]" class="review-recent-switch__count">{{ recentKindCounts[option.id] }}</span>
+                </button>
+              </div>
             </div>
           </header>
           <div v-if="recentVisibleRecords.length" class="review-recent-list">
-            <article v-for="record in recentVisibleRecords" :key="`${record.kind}-${record.item.id}`" class="review-recent-row" :class="{ 'is-selected': isRecentSelected(record) }">
-              <label class="review-record-check" @click.stop>
-                <input type="checkbox" :checked="isRecentSelected(record)" :aria-label="`选择${recordTitle(record)}`" @change="toggleRecentSelect(record)" />
-              </label>
-              <button class="review-record-open" type="button" @click="openDetail(record.kind, record.item)">
-                <span class="review-record-icon" :class="`is-${record.kind}`"><Timer v-if="record.kind === 'focus'" :size="17" /><BellRing v-else :size="17" /></span>
-                <span class="review-record-main"><strong>{{ recordTitle(record) }}</strong><small>
-                  <span v-if="record.kind === 'focus'" class="review-record-chip">{{ profileName(record.item.profileId, record.item) }}</span>
-                  <span v-else class="review-record-chip">{{ triggerTypeLabel(record.item.triggerType) }}</span>
-                  <span v-if="record.kind === 'focus' && record.item.timeline?.some(e => e.type === 'paused')" class="review-record-chip review-record-chip--quiet">含暂停</span>
-                </small></span>
+            <section v-for="group in recentGroups.slice(0, recentShownGroups)" :key="group.key" class="review-recent-group" :aria-label="group.label">
+              <header class="review-recent-group__head">
+                <strong>{{ group.label }}</strong>
+                <small>{{ group.records.length }} 条</small>
+              </header>
+              <article v-for="record in groupVisibleRecords(group)" :key="`${record.kind}-${record.item.id}`" class="review-recent-row" :class="{ 'is-selected': isRecentSelected(record) }">
+                <label class="review-record-check" @click.stop>
+                  <input type="checkbox" :checked="isRecentSelected(record)" :aria-label="`选择${recordTitle(record)}`" @change="toggleRecentSelect(record)" />
+                </label>
+                <button class="review-record-open" type="button" @click="openDetail(record.kind, record.item)">
+                  <span class="review-record-icon" :class="`is-${record.kind}`"><Timer v-if="record.kind === 'focus'" :size="17" /><BellRing v-else :size="17" /></span>
+                  <span class="review-record-main"><strong>{{ recordTitle(record) }}</strong><small>
+                    <span v-if="record.kind === 'focus'" class="review-record-chip">{{ profileName(record.item.profileId, record.item) }}</span>
+                    <span v-else class="review-record-chip">{{ triggerTypeLabel(record.item.triggerType) }}</span>
+                    <span v-if="record.kind === 'focus' && record.item.timeline?.some(e => e.type === 'paused')" class="review-record-chip review-record-chip--quiet">含暂停</span>
+                  </small></span>
+                </button>
+                <span class="review-record-time">
+                  <strong>{{ formatClock(record.at) }}</strong>
+                  <small>{{ record.kind === 'focus' ? formatTimeRange(record.item.startedAt, record.item.finishedAt) : `${formatClock(record.item.triggeredAt)} → ${formatClock(record.item.resolvedAt)}` }}</small>
+                </span>
+                <span class="review-record-meta"><strong>{{ record.kind === 'focus' ? formatCompactDuration(record.item.elapsedSeconds) : rhythmActionLabel(record.item.action) }}</strong><small>{{ record.kind === 'focus' ? resultLabel(record.item.result) : `${formatResponseTime(record.item.responseSeconds)}响应` }}</small></span>
+                <span class="review-record-actions">
+                  <button type="button" :aria-label="`查看${record.kind === 'focus' ? '专注' : '节律'}详情`" :data-label="`查看${record.kind === 'focus' ? '专注' : '节律'}详情`" title="查看详情" @click="openDetail(record.kind, record.item)"><Eye :size="16" /></button>
+                  <button class="is-danger" type="button" :aria-label="`删除${record.kind === 'focus' ? '专注' : '节律'}记录`" :data-label="`删除${record.kind === 'focus' ? '专注' : '节律'}记录`" title="删除记录" @click="deleteRecord(record)"><Trash2 :size="16" /></button>
+                </span>
+              </article>
+              <button v-if="recentDayRemainingCount(group)" type="button" class="review-recent-group__more" @click="toggleDayExpand(group.key)">
+                {{ isDayExpanded(group.key) ? '收起当天记录' : `还有 ${recentDayRemainingCount(group)} 条当天记录` }}
               </button>
-              <span class="review-record-time">
-                <strong>{{ formatShortDate(record.at) }}</strong>
-                <small>{{ record.kind === 'focus' ? formatTimeRange(record.item.startedAt, record.item.finishedAt) : `${formatClock(record.item.triggeredAt)} → ${formatClock(record.item.resolvedAt)}` }}</small>
-              </span>
-              <span class="review-record-meta"><strong>{{ record.kind === 'focus' ? formatCompactDuration(record.item.elapsedSeconds) : rhythmActionLabel(record.item.action) }}</strong><small>{{ record.kind === 'focus' ? resultLabel(record.item.result) : `${formatResponseTime(record.item.responseSeconds)}响应` }}</small></span>
-              <span class="review-record-actions">
-                <button type="button" :aria-label="`查看${record.kind === 'focus' ? '专注' : '节律'}详情`" :data-label="`查看${record.kind === 'focus' ? '专注' : '节律'}详情`" title="查看详情" @click="openDetail(record.kind, record.item)"><Eye :size="16" /></button>
-                <button class="is-danger" type="button" :aria-label="`删除${record.kind === 'focus' ? '专注' : '节律'}记录`" :data-label="`删除${record.kind === 'focus' ? '专注' : '节律'}记录`" title="删除记录" @click="deleteRecord(record)"><Trash2 :size="16" /></button>
-              </span>
-            </article>
+            </section>
           </div>
-          <p v-else class="review-card__empty">当前范围没有{{ recentKind === 'focus' ? '专注' : recentKind === 'rhythm' ? '节律' : '' }}记录。试试切换"全部/仅专注/仅节律"。</p>
+          <p v-else class="review-card__empty">{{ recentSearch ? `没有匹配「${recentSearch.trim()}」的记录` : `当前范围没有${recentKind === 'focus' ? '专注' : recentKind === 'rhythm' ? '节律' : ''}记录。试试切换"全部/仅专注/仅节律"。` }}</p>
           <footer class="review-recent__footer">
-            <div v-if="recentShownCount < recentRecords.length" class="review-recent__more">
-              <button type="button" class="review-cta" @click="loadMoreRecent"><ChevronDown :size="14" /><span>显示更多（还有 {{ recentRecords.length - recentShownCount }} 条）</span></button>
+            <div v-if="recentShownGroups < recentGroups.length" class="review-recent__more">
+              <button type="button" class="review-cta" @click="loadMoreRecent"><ChevronDown :size="14" /><span>显示更多（还有 {{ recentRemainingCount }} 条）</span></button>
             </div>
             <span v-else>共 {{ recentRecords.length }} 条</span>
             <div v-if="recentSelectionCount" class="review-recent__batch">
@@ -328,6 +347,22 @@
             </div>
           </footer>
         </section>
+
+        <Teleport to=".app">
+          <Transition name="review-range-pop">
+            <div v-if="customBucketsOpen" ref="bucketPopoverRef" class="review-bucket-popover" :style="bucketPopoverStyle" role="dialog" aria-label="自定义响应速度分桶" tabindex="-1" @click.stop>
+              <h4><SlidersHorizontal :size="13" />自定义分桶阈值</h4>
+              <p class="review-bucket-popover__hint">按响应秒数划分快 / 中 / 慢，修改后实时更新上方分布。</p>
+              <label class="review-bucket-popover__field"><span>快</span><input v-model.number="bucketFast" type="number" min="0" max="999" /> 秒内</label>
+              <label class="review-bucket-popover__field"><span>中</span><input v-model.number="bucketMedium" type="number" min="1" max="999" /> 秒内</label>
+              <label class="review-bucket-popover__field"><span>慢</span><input v-model.number="bucketSlow" type="number" min="2" max="9999" /> 秒内</label>
+              <div class="review-bucket-popover__foot">
+                <button type="button" @click="resetBuckets"><RotateCcw :size="12" />恢复默认</button>
+                <button type="button" class="review-bucket-popover__done" @click="customBucketsOpen = false">完成</button>
+              </div>
+            </div>
+          </Transition>
+        </Teleport>
       </template>
 
       <section v-else-if="activeTab === 'focus'" class="review-card review-records">
@@ -1020,6 +1055,8 @@ const trendDays = computed(() => {
     start = new Date(today)
     start.setDate(start.getDate() - days + 1)
   }
+  // 长范围时稀疏化 x 轴刻度：约 20 个标签左右，避免日期糊成一团
+  const labelEvery = days <= 14 ? 1 : Math.max(1, Math.round(days / 20))
   return Array.from({ length: days }, (_, index) => {
     const date = new Date(start)
     date.setDate(start.getDate() + index)
@@ -1033,7 +1070,8 @@ const trendDays = computed(() => {
       isToday: key === dateKey(today),
       isWeekend: dayOfWeek === 0 || dayOfWeek === 6,
       label: new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', weekday: 'short' }).format(date),
-      shortLabel: days <= 7 ? `周${'日一二三四五六'[dayOfWeek]}` : `${date.getMonth() + 1}/${date.getDate()}`
+      shortLabel: days <= 7 ? `周${'日一二三四五六'[dayOfWeek]}` : `${date.getMonth() + 1}/${date.getDate()}`,
+      showLabel: days <= 7 || index % labelEvery === 0 || index === days - 1
     }
   })
 })
@@ -1097,6 +1135,46 @@ const bucketFast = ref(bucketPrefs.fast)
 const bucketMedium = ref(bucketPrefs.medium)
 const bucketSlow = ref(bucketPrefs.slow)
 const customBucketsOpen = ref(false)
+const bucketTriggerRef = ref(null)
+const bucketPopoverRef = ref(null)
+const bucketTriggerRect = ref({ left: 0, top: 0, width: 0, bottom: 0 })
+// 分桶弹窗定位：跟随触发按钮（position: fixed 与页面滚动无关，需随滚动更新）
+const bucketPopoverStyle = computed(() => {
+  if (!bucketTriggerRect.value.width) return { visibility: 'hidden' }
+  const margin = 12
+  const popoverWidth = 304
+  const desiredLeft = bucketTriggerRect.value.left + bucketTriggerRect.value.width - popoverWidth
+  const maxLeft = (typeof window !== 'undefined' ? window.innerWidth : 1024) - popoverWidth - margin
+  const minLeft = margin
+  const left = Math.max(minLeft, Math.min(desiredLeft, maxLeft))
+  return { left: `${left}px`, top: `${bucketTriggerRect.value.bottom + 8}px`, width: `${popoverWidth}px` }
+})
+function toggleBucketPopover() {
+  if (customBucketsOpen.value) customBucketsOpen.value = false
+  else { updateBucketTriggerRect(); customBucketsOpen.value = true }
+}
+function updateBucketTriggerRect() {
+  const el = bucketTriggerRef.value
+  if (!el || typeof window === 'undefined') return
+  const rect = el.getBoundingClientRect()
+  bucketTriggerRect.value = { left: rect.left, top: rect.top, width: rect.width, bottom: rect.bottom }
+}
+function onDocClickBucket(event) {
+  if (!customBucketsOpen.value) return
+  if (bucketTriggerRef.value?.contains(event.target)) return
+  if (bucketPopoverRef.value?.contains(event.target)) return
+  customBucketsOpen.value = false
+}
+watch(customBucketsOpen, (open) => {
+  if (typeof window === 'undefined') return
+  if (open) {
+    window.addEventListener('scroll', updateBucketTriggerRect, true)
+    window.addEventListener('resize', updateBucketTriggerRect)
+  } else {
+    window.removeEventListener('scroll', updateBucketTriggerRect, true)
+    window.removeEventListener('resize', updateBucketTriggerRect)
+  }
+})
 function resetBuckets() {
   bucketFast.value = DEFAULT_BUCKET_FAST
   bucketMedium.value = DEFAULT_BUCKET_MEDIUM
@@ -1310,7 +1388,7 @@ const insights = computed(() => {
     }
   }
 
-  // 亮点 2：单次最长专注
+  // 亮点 2：单次最长专注（可点击查看详情，带日期上下文）
   if (focusEntries.value.length) {
     const longest = focusEntries.value.reduce((max, item) => item.elapsedSeconds > max.elapsedSeconds ? item : max, focusEntries.value[0])
     if (longest.elapsedSeconds >= longestThreshold) {
@@ -1318,7 +1396,10 @@ const insights = computed(() => {
         type: 'positive',
         icon: Sparkles,
         text: `最长一次专注 ${formatCompactDuration(longest.elapsedSeconds)}`,
-        detail: focusTitle(longest)
+        detail: focusTitle(longest),
+        when: formatShortDate(longest.finishedAt),
+        kind: 'focus',
+        item: longest
       })
     }
   }
@@ -1357,19 +1438,70 @@ const insights = computed(() => {
 
   return result.slice(0, 3)
 })
+// 概览"最近发生"：类型过滤 + 关键词搜索（任务 / 提醒 / 备注 / 方式）
+const recentSearch = ref('')
 const recentRecords = computed(() => [
   ...focusHistory.value.map(item => ({ kind: 'focus', item, at: item.finishedAt })),
   ...rhythmHistory.value.map(item => ({ kind: 'rhythm', item, at: item.resolvedAt }))
-].filter(record => recentKind.value === 'all' || record.kind === recentKind.value).sort((a, b) => new Date(b.at) - new Date(a.at)))
-// 概览默认显示前 8 条，提供"显示更多"展开剩余
-const RECENT_PAGE_SIZE = 8
-const recentShownCount = ref(RECENT_PAGE_SIZE)
-const recentVisibleRecords = computed(() => recentRecords.value.slice(0, recentShownCount.value))
+].filter(record => recentKind.value === 'all' || record.kind === recentKind.value)
+  .filter(record => {
+    const query = recentSearch.value.trim().toLocaleLowerCase('zh-CN')
+    if (!query) return true
+    const title = recordTitle(record).toLocaleLowerCase('zh-CN')
+    const note = (record.item.note || '').toLocaleLowerCase('zh-CN')
+    const detail = record.kind === 'focus' ? profileName(record.item.profileId, record.item) : triggerTypeLabel(record.item.triggerType)
+    return title.includes(query) || note.includes(query) || detail.includes(query)
+  })
+  .sort((a, b) => new Date(b.at) - new Date(a.at)))
+// 按天分组：解决长范围下记录堆叠无法定位的问题；组内同样按时间倒序
+const recentGroups = computed(() => {
+  const groups = []
+  const byKey = new Map()
+  recentRecords.value.forEach(record => {
+    const key = dateKey(record.at)
+    let group = byKey.get(key)
+    if (!group) {
+      group = { key, label: recentDayLabel(record.at), records: [] }
+      byKey.set(key, group)
+      groups.push(group)
+    }
+    group.records.push(record)
+  })
+  return groups
+})
+function recentDayLabel(at) {
+  const date = new Date(at)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const diff = Math.round((today - dayStart) / 86400000)
+  if (diff === 0) return '今天'
+  if (diff === 1) return '昨天'
+  return formatShortDate(at)
+}
+// 展开控制：默认展开前 2 天；单天记录超过上限时默认折叠该天的其余条目
+const INITIAL_RECENT_GROUPS = 2
+const DAY_PAGE_SIZE = 6
+const recentShownGroups = ref(INITIAL_RECENT_GROUPS)
+const expandedDayKeys = ref(new Set())
+function isDayExpanded(key) { return expandedDayKeys.value.has(key) }
+function toggleDayExpand(key) {
+  const next = new Set(expandedDayKeys.value)
+  if (next.has(key)) next.delete(key)
+  else next.add(key)
+  expandedDayKeys.value = next
+}
+function groupVisibleRecords(group) {
+  return isDayExpanded(group.key) ? group.records : group.records.slice(0, DAY_PAGE_SIZE)
+}
+function recentDayRemainingCount(group) { return Math.max(0, group.records.length - DAY_PAGE_SIZE) }
+const recentVisibleRecords = computed(() => recentGroups.value.slice(0, recentShownGroups.value).flatMap(group => groupVisibleRecords(group)))
+const recentRemainingCount = computed(() => recentGroups.value.slice(recentShownGroups.value).reduce((total, group) => total + group.records.length, 0))
 const recentSelectionCount = computed(() => {
   let n = 0
   selectedFocusIds.value.forEach(() => { n += 1 })
   selectedRhythmIds.value.forEach(() => { n += 1 })
-  // 概览只显示当前可见的前 N 条，选中只在 visible 子集里计
+  // 概览只显示当前可见的条目，选中只在 visible 子集里计
   return recentVisibleRecords.value.reduce((total, record) => {
     const set = record.kind === 'focus' ? selectedFocusIds.value : selectedRhythmIds.value
     return total + (set.has(record.item.id) ? 1 : 0)
@@ -1395,12 +1527,13 @@ function clearRecentSelection() {
   selectedRhythmIds.value = nextRhythm
 }
 function loadMoreRecent() {
-  recentShownCount.value = Math.min(recentRecords.value.length, recentShownCount.value + RECENT_PAGE_SIZE)
+  recentShownGroups.value = Math.min(recentGroups.value.length, recentShownGroups.value + 2)
 }
 function setRecentKind(id) {
   recentKind.value = id
-  // 切换类型时重置"显示更多"展开位置
-  recentShownCount.value = RECENT_PAGE_SIZE
+  // 切换类型时重置"显示更多"展开位置（保留搜索词，便于在子类型里继续搜）
+  recentShownGroups.value = INITIAL_RECENT_GROUPS
+  expandedDayKeys.value = new Set()
 }
 const filteredFocusRecords = computed(() => focusHistory.value.filter(item => {
   if (focusResult.value === 'completed' && item.result !== 'completed') return false
@@ -1646,8 +1779,14 @@ function closeAllExportMenus() { exportMenuOpen.value = { overview: false, focus
 function onDocClickExport(event) {
   if (!event.target.closest('.review-export-menu')) closeAllExportMenus()
 }
-onMounted(() => document.addEventListener('click', onDocClickExport))
-onBeforeUnmount(() => document.removeEventListener('click', onDocClickExport))
+onMounted(() => {
+  document.addEventListener('click', onDocClickExport)
+  document.addEventListener('click', onDocClickBucket)
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('click', onDocClickExport)
+  document.removeEventListener('click', onDocClickBucket)
+})
 async function exportFocusJson() {
   const records = filteredFocusRecords.value
   if (!records.length) { store.showNotice('当前筛选条件下没有可导出的专注记录', 'info'); return }
@@ -1734,7 +1873,7 @@ async function exportRhythmJson() {
   }
 }
 
-// Markdown 周报：当前范围的数据摘要 + 洞察 + 最近记录，方便汇报 / 记录到笔记工具
+// Markdown 周报：当前范围的数据摘要 + 洞察 + 节律分布 + 最近记录，方便汇报 / 记录到笔记工具
 async function exportFocusReport() {
   const lines = []
   lines.push(`# 专注回顾报告（${selectedRangeLabel}）`)
@@ -1754,7 +1893,28 @@ async function exportFocusReport() {
   if (insights.value.length) {
     lines.push('## 本期亮点')
     lines.push('')
-    insights.value.forEach(item => lines.push(`- **${item.text}**${item.detail ? `：${item.detail}` : ''}`))
+    insights.value.forEach(item => lines.push(`- **${item.text}**${item.detail ? `：${item.detail}` : ''}${item.when ? `（${item.when}）` : ''}`))
+    lines.push('')
+  }
+  if (rhythmEntries.value.length) {
+    lines.push('## 节律执行')
+    lines.push('')
+    lines.push('| 结果 | 次数 | 占比 |')
+    lines.push('| --- | --- | --- |')
+    rhythmActionSummary.value.forEach(item => lines.push(`| ${item.label} | ${item.count} | ${item.percent}% |`))
+    lines.push('')
+    lines.push('| 响应速度 | 次数 | 占比 |')
+    lines.push('| --- | --- | --- |')
+    rhythmResponseBuckets.value.forEach(b => lines.push(`| ${b.label} | ${b.count} | ${b.percent}% |`))
+    lines.push('')
+    lines.push('| 提醒时段 | 次数 | 占比 |')
+    lines.push('| --- | --- | --- |')
+    rhythmHourBuckets.value.forEach(b => lines.push(`| ${b.label} | ${b.count} | ${b.percent}% |`))
+    lines.push('')
+    lines.push(`| 分组 | 次数 | 完成率 |`)
+    lines.push('| --- | --- | --- |')
+    lines.push(`| 工作日 | ${rhythmWeekdaySummary.value.weekday.count} | ${rhythmWeekdaySummary.value.weekday.completionRate}% |`)
+    lines.push(`| 周末 | ${rhythmWeekdaySummary.value.weekend.count} | ${rhythmWeekdaySummary.value.weekend.completionRate}% |`)
     lines.push('')
   }
   if (recentRecords.value.length) {
@@ -1762,7 +1922,7 @@ async function exportFocusReport() {
     lines.push('')
     lines.push('| 时间 | 类型 | 内容 | 结果 |')
     lines.push('| --- | --- | --- | --- |')
-    recentRecords.value.slice(0, 12).forEach(record => {
+    recentRecords.value.slice(0, 20).forEach(record => {
       const type = record.kind === 'focus' ? '专注' : '节律'
       const content = recordTitle(record)
       const result = record.kind === 'focus'
@@ -1783,10 +1943,189 @@ async function exportFocusReport() {
   }
 }
 
+// HTML 报告：自包含单文件（内联样式 + canvas 手绘图表 base64 内嵌），零依赖，
+// 浏览器 / 系统打印即可另存为 PDF。图表颜色与页面主色保持一致。
+const REPORT_CHART_COLORS = {
+  weekday: '#8a75e3',
+  weekend: '#6a9bc3',
+  average: '#5d89b0',
+  muted: '#9aa5a3',
+  grid: '#e8eceb',
+  slot: '#f0f2f2',
+  text: '#4a5553'
+}
+function reportCanvas(width, height) {
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  return canvas
+}
+function drawTrendChart() {
+  const days = trendDays.value
+  if (!days.length) return null
+  const canvas = reportCanvas(760, 280)
+  const ctx = canvas.getContext('2d')
+  const max = trendMax.value || 1
+  const average = trendAverage.value
+  const pad = { top: 20, right: 16, bottom: 26, left: 56 }
+  const innerW = canvas.width - pad.left - pad.right
+  const innerH = canvas.height - pad.top - pad.bottom
+  ctx.font = '11px sans-serif'
+  ctx.textAlign = 'right'
+  // y 轴网格与刻度
+  for (let i = 0; i <= 4; i += 1) {
+    const y = pad.top + innerH - (innerH * i / 4)
+    ctx.strokeStyle = REPORT_CHART_COLORS.grid
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + innerW, y); ctx.stroke()
+    ctx.fillStyle = REPORT_CHART_COLORS.muted
+    ctx.fillText(formatCompactDuration(max * i / 4), pad.left - 8, y + 4)
+  }
+  // 柱体
+  const slot = innerW / days.length
+  const barWidth = Math.max(2, Math.min(14, slot * 0.62))
+  days.forEach((day, idx) => {
+    if (!day.seconds) return
+    const x = pad.left + slot * idx + (slot - barWidth) / 2
+    const barH = Math.max(2, day.seconds / max * innerH)
+    ctx.fillStyle = day.isWeekend ? REPORT_CHART_COLORS.weekend : REPORT_CHART_COLORS.weekday
+    ctx.fillRect(x, pad.top + innerH - barH, barWidth, barH)
+  })
+  // 日均虚线
+  if (average) {
+    const y = pad.top + innerH - (average / max * innerH)
+    ctx.setLineDash([5, 4])
+    ctx.strokeStyle = REPORT_CHART_COLORS.average
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + innerW, y); ctx.stroke()
+    ctx.setLineDash([])
+    ctx.fillStyle = REPORT_CHART_COLORS.average
+    ctx.textAlign = 'left'
+    ctx.fillText(`日均 ${formatCompactDuration(average)}`, pad.left + 8, y - 5)
+  }
+  // x 轴标签（稀疏）
+  ctx.fillStyle = REPORT_CHART_COLORS.muted
+  ctx.textAlign = 'center'
+  days.forEach((day, idx) => {
+    if (!day.showLabel) return
+    ctx.fillText(day.shortLabel, pad.left + slot * idx + slot / 2, canvas.height - 8)
+  })
+  return canvas.toDataURL('image/png')
+}
+function drawBarList(items) {
+  if (!items.length) return null
+  const canvas = reportCanvas(760, Math.max(120, 34 + items.length * 34))
+  const ctx = canvas.getContext('2d')
+  const pad = { top: 14, right: 56, bottom: 14, left: 150 }
+  const innerW = canvas.width - pad.left - pad.right
+  const rowH = (canvas.height - pad.top - pad.bottom) / items.length
+  ctx.font = '12px sans-serif'
+  items.forEach((item, idx) => {
+    const y = pad.top + rowH * idx + rowH / 2
+    ctx.textAlign = 'right'
+    ctx.fillStyle = REPORT_CHART_COLORS.text
+    ctx.fillText(item.label, pad.left - 10, y + 4)
+    ctx.fillStyle = REPORT_CHART_COLORS.slot
+    ctx.fillRect(pad.left, y - 7, innerW, 14)
+    const barWidth = Math.max(2, innerW * item.percent / 100)
+    ctx.fillStyle = item.color
+    ctx.fillRect(pad.left, y - 7, barWidth, 14)
+    ctx.textAlign = 'left'
+    ctx.fillStyle = REPORT_CHART_COLORS.text
+    ctx.fillText(`${item.count} 次 · ${item.percent}%`, pad.left + barWidth + 8, y + 4)
+  })
+  return canvas.toDataURL('image/png')
+}
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+}
+function buildHtmlReport() {
+  const parts = []
+  const css = [
+    'body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;max-width:840px;margin:28px auto;padding:0 18px;color:#2b3331;line-height:1.55}',
+    'h1{font-size:26px;margin:0 0 6px;letter-spacing:-.02em}',
+    '.meta{color:#7a8582;font-size:12px;margin:0 0 4px}',
+    'section{margin:24px 0}',
+    'h2{font-size:15px;margin:0 0 10px;padding-left:9px;border-left:3px solid #8a75e3}',
+    'img{width:100%;border:1px solid #e4e8e7;border-radius:10px}',
+    'table{width:100%;border-collapse:collapse;font-size:12px}',
+    'th,td{padding:7px 10px;border-bottom:1px solid #eef0f0;text-align:left;vertical-align:top}',
+    'th{background:#f7f8f8;color:#7a8582;font-weight:600}',
+    '.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}',
+    '@media(max-width:720px){.metrics{grid-template-columns:repeat(2,1fr)}}',
+    '.metric{border:1px solid #e4e8e7;border-radius:10px;padding:12px 14px}',
+    '.metric span{font-size:11px;color:#7a8582;display:block}',
+    '.metric b{display:block;font-size:20px;margin-top:4px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}',
+    'ul.highlights{list-style:none;padding:0;margin:0}',
+    'ul.highlights li{padding:9px 12px;background:#f7f5ff;border-radius:8px;margin:6px 0;font-size:13px}',
+    'footer{margin-top:30px;color:#9aa5a3;font-size:11px;border-top:1px solid #eef0f0;padding-top:10px}'
+  ].join('')
+  parts.push(`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>专注回顾报告（${escapeHtml(selectedRangeLabel.value)}）</title><style>${css}</style></head><body>`)
+  parts.push(`<h1>专注回顾报告</h1>`)
+  parts.push(`<p class="meta">范围：${escapeHtml(selectedRangeLabel.value)} · ${focusEntries.length} 段专注 · ${rhythmEntries.length} 次节律 · 生成时间：${escapeHtml(formatFullDateTime(new Date()))}</p>`)
+  // 概览指标
+  parts.push('<section><h2>数据摘要</h2><div class="metrics">')
+  const metrics = [
+    { label: '有效专注', value: formatDuration(totalFocusSeconds.value), sub: `${focusEntries.value.length} 段 · ${focusActiveDays.value} 天有投入` },
+    { label: '专注完成率', value: `${focusCompletionRate.value}%`, sub: `${completedFocusEntries.value.length} 段自然完成` },
+    { label: '暂停', value: `${totalPauseCount.value} 次`, sub: `累计 ${formatDuration(totalPausedSeconds.value)}` },
+    { label: '节律响应', value: `${rhythmEntries.value.length} 次`, sub: `${rhythmCompletionRate.value}% 完成或自然离席` }
+  ]
+  metrics.forEach(metric => parts.push(`<div class="metric"><span>${escapeHtml(metric.label)}</span><b>${escapeHtml(metric.value)}</b><span>${escapeHtml(metric.sub)}</span></div>`))
+  parts.push('</div></section>')
+  // 本期亮点
+  if (insights.value.length) {
+    parts.push('<section><h2>本期亮点</h2><ul class="highlights">')
+    insights.value.forEach(item => parts.push(`<li><b>${escapeHtml(item.text)}</b>${item.detail ? `：${escapeHtml(item.detail)}` : ''}${item.when ? `（${escapeHtml(item.when)}）` : ''}</li>`))
+    parts.push('</ul></section>')
+  }
+  // 专注趋势图
+  const trendImg = drawTrendChart()
+  if (trendImg) {
+    parts.push('<section><h2>专注趋势</h2><img src="' + trendImg + '" alt="每日专注时长趋势图" /></section>')
+  }
+  // 节律执行图
+  if (rhythmEntries.value.length) {
+    parts.push('<section><h2>节律执行</h2>')
+    const actionImg = drawBarList(rhythmActionSummary.value.map(item => ({ label: item.label, count: item.count, percent: item.percent, color: item.action === 'completed' ? '#8a75e3' : item.action === 'snoozed' ? '#d69c42' : '#89918f' })))
+    if (actionImg) parts.push('<img src="' + actionImg + '" alt="节律处理结果分布" style="margin-bottom:10px" />')
+    const responseImg = drawBarList(rhythmResponseBuckets.value.map(b => ({ label: b.label, count: b.count, percent: b.percent, color: '#8a75e3' })))
+    if (responseImg) parts.push('<img src="' + responseImg + '" alt="响应速度分布" style="margin-bottom:10px" />')
+    const hourImg = drawBarList(rhythmHourBuckets.value.map(b => ({ label: b.label, count: b.count, percent: b.percent, color: '#6a9bc3' })))
+    if (hourImg) parts.push('<img src="' + hourImg + '" alt="提醒时段分布" />')
+    parts.push('</section>')
+  }
+  // 最近记录
+  if (recentRecords.value.length) {
+    parts.push('<section><h2>最近记录</h2><table><thead><tr><th>时间</th><th>类型</th><th>内容</th><th>结果</th></tr></thead><tbody>')
+    recentRecords.value.slice(0, 20).forEach(record => {
+      const type = record.kind === 'focus' ? '专注' : '节律'
+      const content = recordTitle(record)
+      const result = record.kind === 'focus'
+        ? `${formatCompactDuration(record.item.elapsedSeconds)} · ${resultLabel(record.item.result)}`
+        : `${rhythmActionLabel(record.item.action)} · ${formatResponseTime(record.item.responseSeconds)}`
+      parts.push(`<tr><td>${escapeHtml(formatShortDate(record.at))}</td><td>${escapeHtml(type)}</td><td>${escapeHtml(content)}</td><td>${escapeHtml(result)}</td></tr>`)
+    })
+    parts.push('</tbody></table></section>')
+  }
+  parts.push('<footer>由易简清单自动生成 · 此文件可直接打印为 PDF</footer></body></html>')
+  return parts.join('')
+}
+async function exportFocusHtmlReport() {
+  const html = buildHtmlReport()
+  try {
+    await saveTextFile(`专注回顾报告-${dateKey(new Date())}.html`, html, 'html')
+    store.showNotice('报告已导出为 HTML（含图表，可用浏览器打印为 PDF）', 'success')
+  } catch (error) {
+    if (error !== '已取消保存') store.showNotice(`导出失败：${error}`, 'error')
+  }
+}
+
 watch([range], () => {
   focusPage.value = 1
   rhythmPage.value = 1
-  recentShownCount.value = RECENT_PAGE_SIZE
+  recentShownGroups.value = INITIAL_RECENT_GROUPS
+  expandedDayKeys.value = new Set()
   // 范围切换时滚顶，避免停留在上个范围的中段
   if (typeof window !== 'undefined' && workspaceRef.value) {
     nextTick(() => workspaceRef.value?.scrollTo({ top: 0, behavior: 'smooth' }))
@@ -2008,6 +2347,7 @@ function handleKeydown(event) {
   const tag = (event.target?.tagName || '').toLowerCase()
   const isInput = tag === 'input' || tag === 'textarea' || tag === 'select'
   if (event.key === 'Escape') {
+    if (customBucketsOpen.value) { customBucketsOpen.value = false; return }
     if (shortcutsPanelOpen.value) { shortcutsPanelOpen.value = false; return }
     if (detail.value) { closeDetail(); return }
     if (confirmDialog.visible) { confirmDialog.visible = false; return }
@@ -2056,10 +2396,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 }
 .review-shell { width: min(100%, 1120px); margin: 0 auto; }
 .review-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding: 4px 2px 18px; }
+.review-header > div:first-child { min-width: 0; }
 .review-header .eyebrow { margin: 0 0 5px; color: var(--accent-strong); font-size: 11px; font-weight: 750; letter-spacing: .08em; }
 .review-header h1 { margin: 0; color: var(--text); font-size: clamp(26px, 3vw, 34px); letter-spacing: -.045em; line-height: 1.18; }
 .review-header > div > p:last-child { margin: 8px 0 0; color: var(--text-muted); font-size: 13px; }
-.review-range-block { display: flex; justify-content: flex-end; }
+.review-range-block { display: flex; justify-content: flex-end; flex-shrink: 0; }
 .review-tabs { display: flex; gap: 5px; margin-bottom: 13px; padding: 5px; border: 1px solid var(--divider-soft); border-radius: 14px; background-color: var(--surface); }
 .review-tabs button { display: inline-flex; min-height: 42px; align-items: center; gap: 7px; padding: 0 13px; border-radius: 10px; color: var(--text-muted); font-size: 12px; font-weight: 680; }
 .review-tabs button:hover { color: var(--text); background: var(--surface-muted); }
@@ -2077,7 +2418,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-metric--primary > strong { font-size: clamp(25px, 2.5vw, 32px); }
 .review-metric--rhythm { background: linear-gradient(145deg, var(--surface), color-mix(in srgb, var(--accent-soft) 30%, var(--surface))); }
 .review-metric--rhythm .review-metric__delta.is-up { background: var(--accent-soft); color: var(--accent-strong); }
-.review-overview-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(300px, .75fr); gap: 12px; margin-top: 12px; }
+.review-overview-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(330px, 1fr); gap: 12px; margin-top: 12px; }
 .review-card { min-width: 0; padding: 18px; }
 .review-card > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .review-card > header > div { display: grid; gap: 4px; }
@@ -2099,7 +2440,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-rhythm-actions span > i.is-skipped { background: #89918f; }
 .review-rhythm-actions strong { color: var(--text); font-size: 12px; }
 .review-rhythm-actions b { grid-column: 1 / -1; height: 6px; overflow: hidden; border-radius: 999px; background: var(--surface-muted); }
-.review-rhythm-actions b i { display: block; height: 100%; border-radius: inherit; background: #6a9bc3; }
+.review-rhythm-actions b i { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+.review-rhythm-actions b i.is-snoozed { background: #d69c42; }
+.review-rhythm-actions b i.is-skipped { background: #89918f; }
 .review-recent { margin-top: 12px; }
 .review-recent__header { align-items: center !important; }
 .review-recent__header > div:first-child { gap: 3px; }
@@ -2110,7 +2453,20 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-recent-switch button.active { background: var(--surface); color: var(--accent-strong); box-shadow: 0 2px 6px var(--text-7-fallback); }
 .review-recent-switch__count { display: inline-flex; align-items: center; justify-content: center; min-width: 16px; height: 16px; margin-left: 4px; padding: 0 4px; border-radius: 999px; background: var(--surface); color: var(--text-muted); font-size: 9px; font-variant-numeric: tabular-nums; }
 .review-recent-switch button.active .review-recent-switch__count { background: var(--accent-soft); color: var(--accent-strong); }
+.review-recent__tools { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.review-recent-search { display: inline-flex; align-items: center; gap: 5px; min-height: 32px; padding: 0 9px; border: 1px solid var(--divider-soft); border-radius: 9px; background: var(--surface-muted); color: var(--text-muted); transition: border-color var(--transition-fast), box-shadow var(--transition-fast); }
+.review-recent-search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.review-recent-search input { width: 120px; min-width: 0; border: 0; background: transparent; color: var(--text); font: inherit; font-size: 11px; outline: none; }
+.review-recent-search input::placeholder { color: var(--text-muted); }
+.review-recent-search button { display: grid; width: 18px; height: 18px; place-items: center; padding: 0; border: 0; border-radius: 5px; background: transparent; color: var(--text-muted); cursor: pointer; }
+.review-recent-search button:hover { background: var(--surface); color: var(--text); }
 .review-recent-list { overflow: hidden; margin-top: 14px; border: 1px solid var(--divider-soft); border-radius: 13px; }
+.review-recent-group + .review-recent-group { margin-top: 10px; border-top: 1px solid var(--divider-soft); }
+.review-recent-group__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px 6px; border-bottom: 1px solid var(--divider-soft); background: var(--surface-muted); }
+.review-recent-group__head strong { color: var(--text); font-size: 11.5px; font-weight: 700; letter-spacing: .02em; }
+.review-recent-group__head small { color: var(--text-muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.review-recent-group__more { display: flex; width: 100%; min-height: 34px; align-items: center; justify-content: center; gap: 4px; border: 0; border-top: 1px solid var(--divider-soft); background: var(--surface); color: var(--accent-strong); font: inherit; font-size: 11px; font-weight: 650; cursor: pointer; transition: background var(--transition-fast); }
+.review-recent-group__more:hover { background: var(--accent-soft); }
 .review-recent-row { display: grid; min-height: 66px; grid-template-columns: 24px minmax(250px, 1fr) 148px 105px 80px; align-items: center; padding: 0 10px; border-bottom: 1px solid var(--divider-soft); transition: background var(--transition-fast), box-shadow var(--transition-fast); position: relative; }
 .review-recent-row:last-child { border-bottom: 0; }
 .review-recent-row:hover { background: var(--surface-muted); }
@@ -2354,6 +2710,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-insight__bar i { display: block; height: 100%; border-radius: 3px; transition: width .25s ease; }
 .review-insight__bar i.is-prev { background: var(--divider-soft); }
 .review-insight__bar i.is-current { background: var(--accent); }
+.review-insight.is-clickable { transition: box-shadow var(--transition-fast), transform var(--transition-fast); }
+.review-insight.is-clickable:hover { box-shadow: 0 4px 14px var(--text-7-fallback); transform: translateY(-1px); }
+.review-insight__click { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.review-insight__click:focus-visible { outline: 3px solid var(--accent-20-border-fallback); outline-offset: 2px; border-radius: 8px; }
+.review-insight__when { color: var(--accent-strong); font-size: 10px !important; font-weight: 650; }
 
 /* 范围控件已抽到 ReviewRangeControl 组件，原有的双层按钮与自定义面板样式不再使用 */
 
@@ -2428,12 +2789,22 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-rhythm-bucket > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .review-rhythm-bucket__adjust { display: inline-flex; align-items: center; gap: 3px; min-height: 24px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: var(--text-muted); font: inherit; font-size: 10px; font-weight: 600; cursor: pointer; }
 .review-rhythm-bucket__adjust:hover { background: var(--surface-muted); color: var(--accent-strong); }
-.review-rhythm-bucket__custom { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 8px; padding: 8px 10px; border: 1px solid var(--divider-soft); border-radius: 9px; background: var(--surface-muted); font-size: 10.5px; }
-.review-rhythm-bucket__custom label { display: inline-flex; align-items: center; gap: 4px; color: var(--text-muted); }
-.review-rhythm-bucket__custom input { width: 56px; min-height: 24px; padding: 0 6px; border: 1px solid var(--divider-soft); border-radius: 6px; background: var(--surface); color: var(--text); font: inherit; font-size: 11px; text-align: right; }
-.review-rhythm-bucket__custom input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-.review-rhythm-bucket__custom button { display: inline-flex; align-items: center; min-height: 24px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: var(--text-muted); font: inherit; font-size: 10.5px; font-weight: 600; cursor: pointer; }
-.review-rhythm-bucket__custom button:hover { color: var(--accent-strong); background: var(--accent-soft); }
+
+/* 自定义分桶弹窗：fixed 浮层，不撑开节律卡片高度 */
+.review-bucket-popover { position: fixed; z-index: 1100; display: grid; gap: 10px; padding: 14px 16px; border: 1px solid var(--divider-soft); border-radius: 14px; background: var(--surface, #fff); box-shadow: 0 24px 56px rgba(8, 24, 20, .22), 0 4px 12px rgba(8, 24, 20, .12); }
+.review-bucket-popover h4 { display: inline-flex; align-items: center; gap: 6px; margin: 0; color: var(--text); font-size: 12.5px; letter-spacing: -.01em; }
+.review-bucket-popover__hint { margin: 0; color: var(--text-muted); font-size: 10.5px; line-height: 1.5; }
+.review-bucket-popover__field { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; align-items: center; gap: 8px; color: var(--text); font-size: 11.5px; }
+.review-bucket-popover__field span { color: var(--text-muted); font-size: 11px; font-weight: 650; }
+.review-bucket-popover__field input { width: 100%; min-width: 0; padding: 5px 8px; border: 1px solid var(--divider-soft); border-radius: 8px; background: var(--surface-muted); color: var(--text); font: inherit; font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+.review-bucket-popover__field input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.review-bucket-popover__foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 10px; border-top: 1px solid var(--divider-soft); }
+.review-bucket-popover__foot button { display: inline-flex; align-items: center; gap: 5px; min-height: 28px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--text-muted); font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }
+.review-bucket-popover__foot button:hover { color: var(--accent-strong); background: var(--accent-soft); }
+.review-bucket-popover__foot .review-bucket-popover__done { background: var(--accent); color: #fff; }
+.review-bucket-popover__foot .review-bucket-popover__done:hover { background: var(--accent-strong); color: #fff; }
+.review-range-pop-enter-active, .review-range-pop-leave-active { transition: opacity .16s ease, transform .16s ease; }
+.review-range-pop-enter-from, .review-range-pop-leave-to { opacity: 0; transform: translateY(-4px); }
 .review-rhythm-weekday { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--divider-soft); }
 .review-rhythm-weekday h4 { margin: 0 0 8px; color: var(--text-muted); font-size: 10.5px; font-weight: 700; letter-spacing: .04em; }
 .review-rhythm-weekday__bar { display: flex; height: 18px; overflow: hidden; border-radius: 9px; background: var(--surface-muted); }
