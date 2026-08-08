@@ -546,9 +546,11 @@
           <template v-if="detail.kind === 'focus'">
             <div class="review-focus-summary">
             <section class="review-detail-hero is-focus">
-              <i class="review-detail-hero__orbit" aria-hidden="true"></i>
-              <i class="review-detail-hero__sprout" aria-hidden="true"><b></b></i>
               <div class="review-detail-hero__value"><span>本次有效时长</span><strong>{{ formatDuration(detail.item.elapsedSeconds) }}</strong><small>{{ resultLabel(detail.item.result) }} · {{ profileName(detail.item.profileId, detail.item) }}</small></div>
+              <div class="review-detail-hero__illustration" aria-hidden="true">
+                <i class="review-detail-hero__orbit"></i>
+                <i class="review-detail-hero__sprout"><b></b></i>
+              </div>
               <div class="review-detail-hero__window">
                 <div><span>开始</span><strong>{{ formatClock(detail.item.startedAt) }}</strong><small>{{ formatShortDate(detail.item.startedAt) }}</small></div>
                 <ArrowRight :size="19" />
@@ -580,7 +582,7 @@
               <div class="review-focus-plan__track">
                 <article><span>{{ detailFocusPlan.initialName }}</span><strong>{{ detailFocusPlan.initialLabel }}</strong></article>
                 <ChevronRight class="review-focus-plan__connector" :size="22" aria-hidden="true" />
-                <article class="is-adjusted"><span>{{ detailFocusPlan.targetName }}</span><strong>{{ detailFocusPlan.targetLabel }}</strong><small v-if="detailFocusPlan.adjustments">共 {{ detailFocusPlan.adjustments }} 次变更</small></article>
+                <article class="is-adjusted"><span>{{ detailFocusPlan.targetName }}</span><strong>{{ detailFocusPlan.targetLabel }}</strong></article>
                 <ChevronRight class="review-focus-plan__connector" :size="22" aria-hidden="true" />
                 <article class="is-complete"><span>实际完成</span><strong>{{ formatDuration(detail.item.elapsedSeconds) }}</strong><CircleCheckBig :size="20" /></article>
               </div>
@@ -3075,14 +3077,18 @@ onBeforeUnmount(() => {
 .review-detail-progress { min-width: 38px; color: var(--text-muted); font-size: 10px; font-variant-numeric: tabular-nums; text-align: center; }
 .review-detail-hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px 18px; margin: 10px 20px 8px; padding: 12px 16px; border: 1px solid var(--divider-soft); border-radius: 16px; }
 .review-focus-summary { --accent: #7557e8; --accent-strong: #6246d8; --accent-soft: #f0ecff; margin: 14px 20px 12px; overflow: visible; border: 1px solid #d9d0fb; border-radius: 19px; background: var(--surface); box-shadow: 0 8px 24px var(--text-4-fallback); }
-.review-detail-hero.is-focus { position: relative; grid-template-columns: minmax(0, 1fr) auto; min-height: 128px; margin: 0; overflow: hidden; padding: 20px 24px 19px; border: 0; border-bottom: 1px solid color-mix(in srgb, var(--accent) 15%, var(--divider-soft)); border-radius: 18px 18px 0 0; background: radial-gradient(circle at 30% 18%, rgba(255, 255, 255, .92), transparent 32%), linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 78%, #f7f4ff) 0%, #fbfaff 54%, color-mix(in srgb, var(--accent-soft) 38%, #fff) 100%); }
+.review-detail-hero.is-focus { position: relative; grid-template-columns: minmax(145px, 1fr) 96px auto; min-height: 128px; margin: 0; overflow: hidden; gap: 9px; padding: 18px 20px; border: 0; border-bottom: 1px solid color-mix(in srgb, var(--accent) 15%, var(--divider-soft)); border-radius: 18px 18px 0 0; background: radial-gradient(circle at 30% 18%, rgba(255, 255, 255, .92), transparent 32%), linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 78%, #f7f4ff) 0%, #fbfaff 54%, color-mix(in srgb, var(--accent-soft) 38%, #fff) 100%); }
 .review-detail-hero.is-rhythm { background: linear-gradient(145deg, #f2f7fb, var(--surface)); }
-.review-detail-hero.is-focus > :not(i) { position: relative; z-index: 1; }
-.review-detail-hero__orbit { position: absolute; z-index: 0; top: 20px; left: 40%; width: 76px; height: 76px; border: 8px solid #e0d9fc; border-left-color: #a991ef; border-radius: 50%; transform: rotate(-38deg); box-shadow: 0 0 0 1px rgba(121, 94, 230, .15), 0 12px 26px rgba(121, 94, 230, .14); }
-.review-detail-hero__sprout { position: absolute; z-index: 0; bottom: 17px; left: 51%; width: 48px; height: 12px; border-radius: 50% 50% 36% 36%; background: radial-gradient(ellipse at center, #d9cffd 0%, #eee9ff 66%, transparent 68%); }
+.review-detail-hero.is-focus > * { position: relative; z-index: 1; }
+.review-detail-hero__illustration { align-self: stretch; min-width: 0; }
+.review-detail-hero__illustration::before, .review-detail-hero__illustration::after { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: rgba(255, 255, 255, .96); box-shadow: 0 0 10px rgba(117, 87, 232, .25); content: ''; }
+.review-detail-hero__illustration::before { top: 9px; right: 2px; }
+.review-detail-hero__illustration::after { right: 38px; bottom: 15px; }
+.review-detail-hero__orbit { position: absolute; top: 1px; left: -2px; width: 78px; height: 78px; border: 8px solid rgba(255, 255, 255, .78); border-right-color: #ddd4fc; border-bottom-color: #c9bbfa; border-radius: 50%; transform: rotate(27deg); box-shadow: 0 0 0 1px rgba(121, 94, 230, .06), 0 12px 26px rgba(121, 94, 230, .08); }
+.review-detail-hero__sprout { position: absolute; right: -1px; bottom: 3px; width: 58px; height: 14px; border-radius: 50% 50% 36% 36%; background: radial-gradient(ellipse at center, #cfc2fa 0%, #e6dfff 58%, transparent 70%); filter: drop-shadow(0 7px 7px rgba(105, 76, 205, .12)); }
 .review-detail-hero__sprout::before { position: absolute; bottom: 7px; left: 23px; width: 2px; height: 29px; border-radius: 999px; background: #9c86ed; content: ''; transform: rotate(-8deg); transform-origin: bottom; }
-.review-detail-hero__sprout::after { position: absolute; top: -21px; left: 22px; width: 25px; height: 13px; border-radius: 100% 0 100% 0; background: #af9af4; content: ''; transform: rotate(-23deg); }
-.review-detail-hero__sprout b { position: absolute; top: -14px; left: 2px; width: 26px; height: 13px; border-radius: 0 100% 0 100%; background: #c1b1fa; transform: rotate(22deg); }
+.review-detail-hero__sprout::after { position: absolute; top: -22px; left: 25px; width: 25px; height: 13px; border-radius: 100% 0 100% 0; background: #a98ff1; content: ''; transform: rotate(-24deg); }
+.review-detail-hero__sprout b { position: absolute; top: -15px; left: 4px; width: 26px; height: 13px; border-radius: 0 100% 0 100%; background: #bca9f7; transform: rotate(23deg); }
 .review-detail-hero__value { display: grid; min-width: 0; gap: 2px; }
 .review-detail-hero__value > span { color: var(--accent-strong); font-size: 11px; font-weight: 720; }
 .review-detail-hero__value > strong { color: var(--accent-strong); font-size: clamp(27px, 2vw, 36px); font-weight: 780; letter-spacing: -.065em; line-height: 1.05; white-space: nowrap; }
@@ -3127,13 +3133,13 @@ onBeforeUnmount(() => {
 .review-focus-process__tooltip li { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 6px; color: var(--text); font-size: 10px; line-height: 1.4; }
 .review-focus-process__tooltip time { color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .review-focus-plan { gap: 11px; padding-top: 2px; padding-bottom: 14px; }
-.review-focus-plan__track { display: grid; grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr) 24px minmax(0, 1fr); align-items: center; gap: 7px; }
-.review-focus-plan__track > article { display: grid; min-width: 0; gap: 3px; padding: 10px 11px; border-radius: 12px; background: color-mix(in srgb, var(--accent-soft) 48%, var(--surface)); }
+.review-focus-plan__track { display: grid; grid-template-columns: minmax(0, .95fr) 28px minmax(0, 1fr) 28px minmax(0, 1.08fr); align-items: center; gap: 5px; }
+.review-focus-plan__track > article { display: grid; min-width: 0; min-height: 58px; align-content: center; gap: 3px; padding: 10px 11px; border-radius: 12px; background: #f5f2ff; }
 .review-focus-plan__track > article span { color: var(--text-muted); font-size: 10px; }
 .review-focus-plan__track > article strong { color: var(--text); font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .review-focus-plan__track > article small { color: var(--accent-strong); font-size: 10px; }
-.review-focus-plan__connector { width: 24px; height: 24px; color: #687277; stroke-width: 2.25; }
-.review-focus-plan__track > article.is-adjusted { background: color-mix(in srgb, var(--accent-soft) 78%, var(--surface)); }
+.review-focus-plan__connector { width: 28px; height: 28px; color: #687277; stroke-width: 2.25; }
+.review-focus-plan__track > article.is-adjusted { background: #f5f2ff; }
 .review-focus-plan__track > article.is-complete { position: relative; border: 1px solid color-mix(in srgb, var(--accent) 48%, var(--divider-soft)); background: var(--surface); }
 .review-focus-plan__track > article.is-complete svg { position: absolute; top: 50%; right: 8px; color: var(--accent); transform: translateY(-50%); }
 .review-focus-plan > p { display: flex; align-items: flex-start; gap: 6px; margin: 0; color: var(--text); font-size: 10.5px; font-weight: 620; line-height: 1.45; }
@@ -3231,6 +3237,7 @@ onBeforeUnmount(() => {
   .review-filters label { flex-basis: 100%; }
 }
 @media (max-width: 680px) { .review-workspace { padding: 14px; }.review-header { display: grid; gap: 14px; }.review-range, .review-tabs { overflow-x: auto; }.review-tabs button { white-space: nowrap; }.review-metrics { grid-template-columns: 1fr 1fr; }.review-metric { min-height: 88px; padding: 12px; }.review-recent__header { display: grid !important; }.review-recent-switch { width: 100%; }.review-recent-switch button { flex: 1; }.review-recent__footer { display: grid; }.review-recent__footer > div { display: grid; grid-template-columns: 1fr 1fr; }.review-filters label { flex-basis: 100%; }.review-filter-summary { gap: 4px 10px; }.review-pagination { flex-wrap: wrap; justify-content: space-between; }.review-detail-hero { grid-template-columns: 1fr; }.review-detail-hero__window { justify-content: space-between; }.review-detail-hero__stats { grid-template-columns: 1fr; }.review-detail-hero__stats > div + div { border-left: 0; border-top: 1px solid var(--divider-soft); }.review-focus-process__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.review-focus-plan__track { grid-template-columns: minmax(0, 1fr) 17px minmax(0, 1fr) 17px minmax(0, 1fr); }.review-focus-plan__track > article { padding: 8px 6px; }.review-focus-plan__track > article strong { font-size: 11px; }.review-rhythm-pattern__stats { grid-template-columns: 1fr; }.review-rhythm-pattern__stats span + span { border-top: 1px solid rgba(79, 127, 166, .13); border-left: 0; }.review-detail-footer__actions { flex-wrap: wrap; } }
+@media (max-width: 680px) { .review-detail-hero.is-focus { grid-template-columns: minmax(0, 1fr) auto; }.review-detail-hero__illustration { display: none; }.review-focus-plan__connector { width: 17px; height: 17px; } }
 /* 新增：本期亮点洞察 */
 .review-insights { display: grid; gap: clamp(8px, 1.2vw, 12px); margin-bottom: clamp(10px, 1.4vw, 16px); padding: clamp(12px, 1.6vw, 16px); border: 1px solid var(--accent-34-fallback); border-radius: 16px; background: linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 70%, var(--surface)) 0%, var(--surface) 100%); }
 .review-insights > header { display: flex; align-items: center; gap: 7px; color: var(--accent-strong); }
