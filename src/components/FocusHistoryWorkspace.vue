@@ -133,62 +133,62 @@
         <section class="review-overview-grid">
           <article class="review-card">
             <header>
-              <div><span>专注趋势</span><h2>{{ trendTitle }}</h2></div>
+              <div><span>投入节奏</span><h2>{{ trendTitle }}</h2></div>
               <div class="review-chart-meta">
                 <strong>{{ formatCompactDuration(totalFocusSeconds) }}</strong>
-                <small v-if="trendAverage" :title="`只统计有投入的天数（共 ${trendDays.filter(d => d.seconds > 0).length} 天）`">日均 {{ formatCompactDuration(trendAverage) }}</small>
+                <small v-if="focusActiveDays">{{ focusActiveDays }} 天有投入 · {{ trendPeakLabel }}</small>
               </div>
             </header>
-            <p v-if="trendTruncated" class="review-chart-note">
-              记录超过 {{ TREND_HARD_CAP }} 天，仅显示最近 {{ trendDaysCount }} 天（下方日均按此窗口计算）。
-              <button type="button" class="review-chart-note__btn" @click="range = '90d'">查看近 90 天</button>
-              <button type="button" class="review-chart-note__btn" @click="range = 'custom'">自定义</button>
-            </p>
-            <div class="review-chart-legend" aria-hidden="true">
+            <p class="review-chart-description">{{ trendDescription }}</p>
+            <div v-if="trendGranularity === 'day'" class="review-chart-legend" aria-hidden="true">
               <span><i class="is-weekday"></i>工作日</span>
               <span><i class="is-weekend"></i>周末</span>
-              <span v-if="trendAverage"><i class="is-average"></i>日均</span>
             </div>
-            <div ref="trendChartEl" class="review-trend-chart" role="img" :aria-label="`每日专注时长柱状图（最近 ${trendDays.length} 天）`"></div>
-            <table class="sr-only" aria-label="每日专注时长明细">
-              <caption>每日专注时长（最近 {{ trendDays.length }} 天）</caption>
+            <div ref="trendChartEl" class="review-trend-chart" role="img" :aria-label="`${trendPeriodLabel}专注投入柱状图，共 ${trendDays.length} 个时间段`"></div>
+            <table class="sr-only" :aria-label="`${trendPeriodLabel}专注时长明细`">
+              <caption>{{ trendPeriodLabel }}专注时长</caption>
               <thead><tr><th scope="col">日期</th><th scope="col">投入</th></tr></thead>
               <tbody>
                 <tr v-for="day in trendDays" :key="day.key">
-                  <th scope="row">{{ day.label }}{{ day.isToday ? '（今日）' : '' }}</th>
+                  <th scope="row">{{ day.label }}{{ day.isCurrent ? '（当前）' : '' }}</th>
                   <td>{{ day.seconds ? formatDuration(day.seconds) : '无投入' }}</td>
                 </tr>
               </tbody>
             </table>
-            <p v-if="!trendAverage" class="review-chart-empty">这段时间没有专注记录。试试切换到「全部」或更短的范围。</p>
+            <p v-if="!totalFocusSeconds" class="review-chart-empty">这段时间没有专注记录。试试切换到「全部」或更宽的范围。</p>
           </article>
 
           <article class="review-card review-rhythm-card" :class="{ 'is-collapsed': !rhythmEntries.length }">
             <header>
               <div>
-                <span>节律执行</span>
-                <h2 v-if="rhythmEntries.length">提醒之后发生了什么</h2>
+                <span>提醒使用情况</span>
+                <h2 v-if="rhythmEntries.length">这些提醒适合你吗？</h2>
                 <p v-else class="review-rhythm-card__empty-line">{{ selectedRangeLabel }} 还没有节律处理记录</p>
               </div>
               <BellRing :size="19" />
             </header>
             <template v-if="rhythmEntries.length">
-              <div class="review-rhythm-charts">
-                <div class="review-rhythm-chart-block">
-                  <h4>处理结果</h4>
-                  <div ref="rhythmActionChartEl" class="review-rhythm-chart" role="img" :aria-label="`节律处理结果分布`"></div>
-                  <table class="sr-only" aria-label="节律处理结果明细">
-                    <caption>{{ selectedRangeLabel }} 节律处理结果分布</caption>
-                    <thead><tr><th scope="col">结果</th><th scope="col">次数</th><th scope="col">占比</th></tr></thead>
-                    <tbody>
-                      <tr v-for="item in rhythmActionSummary" :key="item.action">
-                        <th scope="row">{{ item.label }}</th>
-                        <td>{{ item.count }}</td>
-                        <td>{{ item.percent }}%</td>
-                      </tr>
-                    </tbody>
-                  </table>
+              <section class="review-rhythm-status" :aria-label="`${selectedRangeLabel}提醒处理概览`">
+                <div class="review-rhythm-status__summary"><strong>{{ rhythmEntries.length }} 次</strong><span>本期到点提醒</span></div>
+                <div class="review-rhythm-status__bar" aria-hidden="true">
+                  <i v-for="item in rhythmActionSummary.filter(item => item.count)" :key="item.action" :class="`is-${item.action}`" :style="{ width: `${item.percent}%` }"></i>
                 </div>
+                <div class="review-rhythm-status__legend">
+                  <span v-for="item in rhythmActionSummary.filter(item => item.count)" :key="item.action"><i :class="`is-${item.action}`"></i>{{ item.shortLabel }} {{ item.count }} 次</span>
+                </div>
+                <p>{{ rhythmSummaryMessage }}</p>
+              </section>
+              <section class="review-rhythm-reminders" aria-label="按提醒查看使用情况">
+                <header><h3>按提醒看一看</h3><small>点击可调整规则</small></header>
+                <button v-for="item in rhythmReminderSummary.slice(0, 3)" :key="item.id" type="button" @click="openRhythmRuleFromRow(item.latest)">
+                  <span><strong>{{ item.title }}</strong><small>本期 {{ item.count }} 次 · 完成 {{ item.completed }} 次 · 跳过 {{ item.skipped }} 次</small></span>
+                  <ChevronRight :size="15" />
+                </button>
+              </section>
+              <button v-if="rhythmEntries.length >= RHYTHM_DETAIL_MINIMUM" type="button" class="review-rhythm-detail-toggle" :aria-expanded="rhythmDetailsOpen" @click="rhythmDetailsOpen = !rhythmDetailsOpen">
+                <span>{{ rhythmDetailsOpen ? '收起细节统计' : '查看细节统计' }}</span><ChevronDown :size="14" :class="{ 'is-open': rhythmDetailsOpen }" />
+              </button>
+              <div v-if="rhythmDetailsOpen && rhythmEntries.length >= RHYTHM_DETAIL_MINIMUM" class="review-rhythm-charts">
                 <div class="review-rhythm-chart-block">
                   <header>
                     <h4>响应速度</h4>
@@ -1003,64 +1003,92 @@ const tabs = computed(() => [
   { id: 'focus', label: '专注记录', icon: Timer, count: focusHistory.value.length },
   { id: 'rhythm', label: '节律记录', icon: BellRing, count: rhythmEntries.value.length }
 ])
-// 趋势图：天数根据 range 决定。'all' 与自定义超长范围封顶 60 天，避免画布塞爆；超过封顶会显示提示
-const TREND_HARD_CAP = 60
-const trendDaysCount = computed(() => {
-  if (selectedRange.value.id === 'custom') {
-    if (!customStart.value || !customEnd.value) return 0
-    const diff = Math.round((new Date(`${customEnd.value}T00:00:00`) - new Date(`${customStart.value}T00:00:00`)) / 86400000) + 1
-    return Math.max(1, Math.min(TREND_HARD_CAP, diff))
-  }
-  if (selectedRange.value.days) return Math.min(TREND_HARD_CAP, selectedRange.value.days)
-  return TREND_HARD_CAP
+// 投入节奏：短范围按日、较长范围按周、完整历史按月聚合。
+// 这样稀疏记录不会被大量空白日期放大，也不需要截断历史数据。
+function dayStart(value) {
+  const date = new Date(value)
+  date.setHours(0, 0, 0, 0)
+  return date
+}
+function weekStart(value) {
+  const date = dayStart(value)
+  date.setDate(date.getDate() - ((date.getDay() + 6) % 7))
+  return date
+}
+function monthStart(value) {
+  const date = dayStart(value)
+  return new Date(date.getFullYear(), date.getMonth(), 1)
+}
+function addTrendPeriod(date, granularity) {
+  const next = new Date(date)
+  if (granularity === 'day') next.setDate(next.getDate() + 1)
+  else if (granularity === 'week') next.setDate(next.getDate() + 7)
+  else next.setMonth(next.getMonth() + 1)
+  return next
+}
+function trendPeriodStart(value, granularity) {
+  if (granularity === 'day') return dayStart(value)
+  if (granularity === 'week') return weekStart(value)
+  return monthStart(value)
+}
+const trendRangeStart = computed(() => {
+  if (rangeStart.value) return dayStart(rangeStart.value)
+  const earliest = focusEntries.value.reduce((result, item) => !result || new Date(item.finishedAt) < result ? new Date(item.finishedAt) : result, null)
+  return earliest ? dayStart(earliest) : dayStart(new Date())
 })
+const trendRangeEnd = computed(() => dayStart(rangeEnd.value || new Date()))
+const trendRangeDays = computed(() => Math.max(1, Math.round((trendRangeEnd.value - trendRangeStart.value) / 86400000) + 1))
+const trendGranularity = computed(() => trendRangeDays.value <= 14 ? 'day' : trendRangeDays.value <= 120 ? 'week' : 'month')
 const trendDays = computed(() => {
-  const days = trendDaysCount.value
-  if (!days) return []
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  let start
-  if (selectedRange.value.id === 'custom' && customStart.value) {
-    start = new Date(`${customStart.value}T00:00:00`)
-  } else {
-    start = new Date(today)
-    start.setDate(start.getDate() - days + 1)
-  }
-  // 长范围时稀疏化 x 轴刻度：约 10 个标签，避免日期糊成一团
-  const labelEvery = days <= 7 ? 1 : Math.max(1, Math.round(days / 10))
-  return Array.from({ length: days }, (_, index) => {
-    const date = new Date(start)
-    date.setDate(start.getDate() + index)
-    const key = dateKey(date)
-    const records = focusEntries.value.filter(item => dateKey(item.finishedAt) === key)
-    const seconds = records.reduce((total, item) => total + item.elapsedSeconds, 0)
-    const dayOfWeek = date.getDay()
-    return {
-      key,
-      seconds,
-      records,
-      date,
-      isToday: key === dateKey(today),
-      isWeekend: dayOfWeek === 0 || dayOfWeek === 6,
-      label: new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', weekday: 'short' }).format(date),
-      shortLabel: days <= 7 ? `周${'日一二三四五六'[dayOfWeek]}` : `${date.getMonth() + 1}/${date.getDate()}`,
-      showLabel: days <= 7 || index % labelEvery === 0 || index === days - 1
-    }
+  const granularity = trendGranularity.value
+  const recordsByPeriod = new Map()
+  focusEntries.value.forEach(item => {
+    const start = trendPeriodStart(item.finishedAt, granularity)
+    const key = dateKey(start)
+    if (!recordsByPeriod.has(key)) recordsByPeriod.set(key, [])
+    recordsByPeriod.get(key).push(item)
   })
+  const currentPeriod = trendPeriodStart(trendRangeEnd.value, granularity)
+  const result = []
+  let cursor = trendPeriodStart(trendRangeStart.value, granularity)
+  while (cursor <= trendRangeEnd.value) {
+    const key = dateKey(cursor)
+    const records = recordsByPeriod.get(key) || []
+    const end = granularity === 'week' ? new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 6) : cursor
+    const dayOfWeek = cursor.getDay()
+    const label = granularity === 'day'
+      ? new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', weekday: 'short' }).format(cursor)
+      : granularity === 'week'
+        ? `${cursor.getMonth() + 1}/${cursor.getDate()}–${end.getMonth() + 1}/${end.getDate()}`
+        : `${cursor.getFullYear()}年${cursor.getMonth() + 1}月`
+    result.push({
+      key,
+      seconds: records.reduce((total, item) => total + item.elapsedSeconds, 0),
+      records,
+      date: cursor,
+      label,
+      shortLabel: granularity === 'day' ? `周${'日一二三四五六'[dayOfWeek]}` : granularity === 'week' ? `${cursor.getMonth() + 1}/${cursor.getDate()}` : `${cursor.getFullYear()}/${cursor.getMonth() + 1}`,
+      isCurrent: key === dateKey(currentPeriod),
+      isWeekend: granularity === 'day' && (dayOfWeek === 0 || dayOfWeek === 6)
+    })
+    cursor = addTrendPeriod(cursor, granularity)
+  }
+  return result
 })
-const trendMax = computed(() => Math.max(...trendDays.value.map(item => item.seconds), 1))
-const trendAverage = computed(() => {
-  const activeDays = trendDays.value.filter(item => item.seconds > 0)
-  if (!activeDays.length) return 0
-  return Math.round(activeDays.reduce((t, i) => t + i.seconds, 0) / activeDays.length)
-})
-// 趋势图：ECharts 柱状图实例管理（hover tooltip / 日均虚线由 ECharts 渲染，替代手写）
+const trendPeak = computed(() => trendDays.value.reduce((peak, item) => item.seconds > (peak?.seconds || 0) ? item : peak, null))
+const trendPeakLabel = computed(() => trendPeak.value?.seconds ? `峰值 ${trendPeak.value.label} · ${formatCompactDuration(trendPeak.value.seconds)}` : '还没有投入')
+const trendPeriodLabel = computed(() => ({ day: '每日', week: '每周', month: '每月' }[trendGranularity.value]))
+const trendDescription = computed(() => ({
+  day: '按天查看投入，周末以蓝色区分；悬停柱子可查看当天的专注记录。',
+  week: '按周汇总投入，让间隔与集中出现得更清楚；悬停柱子可查看这一周的专注记录。',
+  month: '按月回看长期投入，不把早期记录截断成一段空白。'
+}[trendGranularity.value]))
+// 趋势图：ECharts 柱状图实例管理；按范围自动切换日 / 周 / 月粒度。
 const trendChartEl = ref(null)
 let trendChartInstance = null
 function buildTrendChartOption() {
   const colors = readChartColors()
   const days = trendDays.value
-  const avg = trendAverage.value
   const data = days.map(day => (day.seconds ? { value: day.seconds, day } : null))
   return {
     animationDuration: 280,
@@ -1071,7 +1099,7 @@ function buildTrendChartOption() {
       formatter: (params) => {
         const day = params?.[0]?.data?.day
         if (!day) return ''
-        let html = `<b>${escapeHtml(day.label)}${day.isToday ? '（今日）' : ''}</b>`
+        let html = `<b>${escapeHtml(day.label)}${day.isCurrent ? '（当前）' : ''}</b>`
         if (day.seconds) {
           html += `<br/><b>${escapeHtml(formatDuration(day.seconds))}</b> · ${day.records.length} 段专注`
           if (day.records.length) {
@@ -1093,7 +1121,11 @@ function buildTrendChartOption() {
         interval: 0,
         color: colors.textMuted,
         fontSize: 9,
-        formatter: (value, index) => (days[index]?.showLabel ? value : '')
+        formatter: (value, index) => {
+          const total = days.length
+          const every = total <= 8 ? 1 : Math.ceil(total / 8)
+          return index % every === 0 || index === total - 1 ? value : ''
+        }
       }
     },
     yAxis: {
@@ -1108,21 +1140,7 @@ function buildTrendChartOption() {
       itemStyle: {
         borderRadius: [3, 3, 0, 0],
         color: (params) => (params.data?.day?.isWeekend ? '#6a9bc3' : colors.accent)
-      },
-      markLine: avg ? {
-        symbol: 'none',
-        lineStyle: { type: 'dashed', color: colors.accentStrong, width: 1 },
-        label: {
-          formatter: `日均 ${formatCompactDuration(avg)}`,
-          color: colors.accentStrong,
-          fontSize: 9,
-          position: 'insideEndTop',
-          backgroundColor: colors.surface,
-          padding: [1, 4],
-          borderRadius: 4
-        },
-        data: [{ yAxis: avg }]
-      } : undefined
+      }
     }]
   }
 }
@@ -1149,34 +1167,44 @@ function disposeCharts() {
   rhythmChartInstances.length = 0
 }
 const trendTitle = computed(() => {
-  const id = selectedRange.value.id
-  if (id === 'custom') return `${selectedRangeLabel.value}的投入变化`
-  if (id === 'all') return `最近 ${trendDaysCount.value} 天的投入节奏（更早数据未在图中显示）`
-  if (id === '7d' || id === 'thisWeek') return '这一周的投入节奏'
-  if (id === 'today') return '今天的投入分布'
-  if (id === 'yesterday') return '昨日的投入分布'
-  if (id === 'thisMonth') return '本月的投入节奏'
-  return `${selectedRange.value.label}的投入变化`
-})
-// "全部"模式或自定义超长范围被截断时，给用户一个明确提示而不是默默显示最近 60 天
-const trendTruncated = computed(() => {
-  if (selectedRange.value.id === 'custom') {
-    return customStart.value && customEnd.value
-      ? (Math.round((new Date(`${customEnd.value}T00:00:00`) - new Date(`${customStart.value}T00:00:00`)) / 86400000) + 1) > TREND_HARD_CAP
-      : false
-  }
-  return selectedRange.value.days === null && (store.focusHistory.length || 0) > TREND_HARD_CAP * 2
+  if (trendGranularity.value === 'day') return selectedRange.value.id === 'today' ? '今天的投入分布' : '每天的投入节奏'
+  if (trendGranularity.value === 'week') return '每周的投入节奏'
+  return '每月的长期投入'
 })
 const rhythmActionSummary = computed(() => {
   const definitions = [
-    { action: 'completed', label: '完成 / 自然离席', matches: item => ['completed', 'natural-break'].includes(item.action) },
-    { action: 'snoozed', label: '延后', matches: item => item.action === 'snoozed' },
-    { action: 'skipped', label: '跳过 / 关闭', matches: item => ['skipped-today', 'dismissed'].includes(item.action) }
+    { action: 'completed', label: '完成 / 自然离席', shortLabel: '完成', matches: item => ['completed', 'natural-break'].includes(item.action) },
+    { action: 'snoozed', label: '延后', shortLabel: '延后', matches: item => item.action === 'snoozed' },
+    { action: 'skipped', label: '跳过 / 关闭', shortLabel: '跳过', matches: item => ['skipped-today', 'dismissed'].includes(item.action) }
   ]
   return definitions.map(item => {
     const count = rhythmEntries.value.filter(item.matches).length
     return { ...item, count, percent: rhythmEntries.value.length ? Math.round(count / rhythmEntries.value.length * 100) : 0 }
   })
+})
+const RHYTHM_DETAIL_MINIMUM = 10
+const rhythmDetailsOpen = ref(false)
+const rhythmReminderSummary = computed(() => {
+  const groups = new Map()
+  rhythmEntries.value.forEach(item => {
+    const id = item.reminderId || item.reminderTitle || item.id
+    if (!groups.has(id)) groups.set(id, { id, title: item.reminderTitle || '未命名提醒', count: 0, completed: 0, snoozed: 0, skipped: 0, latest: item })
+    const group = groups.get(id)
+    group.count += 1
+    if (['completed', 'natural-break'].includes(item.action)) group.completed += 1
+    else if (item.action === 'snoozed') group.snoozed += 1
+    else group.skipped += 1
+    if (new Date(item.resolvedAt) > new Date(group.latest.resolvedAt)) group.latest = item
+  })
+  return [...groups.values()].sort((a, b) => b.count - a.count || b.skipped - a.skipped)
+})
+const rhythmSummaryMessage = computed(() => {
+  const top = rhythmReminderSummary.value[0]
+  if (!top) return ''
+  if (top.skipped > top.completed && top.skipped >= 2) return `「${top.title}」本期有 ${top.skipped} 次被跳过，可能没有出现在合适的时段。`
+  if (top.snoozed > top.completed && top.snoozed >= 2) return `「${top.title}」经常需要稍后处理，可以试试调整提醒时段或间隔。`
+  if (completedRhythmEntries.value.length) return '至少有一部分提醒被自然地处理了；需要时可以继续微调具体规则。'
+  return '先从最常出现的提醒开始看看，保留真正适合你的节奏。'
 })
 
 // 响应时间分桶：用户可在「自定义分桶」里改阈值，默认 1 / 5 / 15 分钟
@@ -1202,8 +1230,7 @@ const bucketFast = ref(bucketPrefs.fast)
 const bucketMedium = ref(bucketPrefs.medium)
 const bucketSlow = ref(bucketPrefs.slow)
 
-// 节律执行：4 个横向条形小图（处理结果 / 响应速度 / 提醒时段 / 工作日对比）
-const rhythmActionChartEl = ref(null)
+// 细节统计只在样本足够时按需展开，避免少量记录被拆成无意义的小图。
 const rhythmResponseChartEl = ref(null)
 const rhythmHourChartEl = ref(null)
 const rhythmWeekdayChartEl = ref(null)
@@ -1245,7 +1272,6 @@ function renderRhythmCharts() {
     }
   }
   const bindings = [
-    { el: rhythmActionChartEl.value, key: 'action' },
     { el: rhythmResponseChartEl.value, key: 'response' },
     { el: rhythmHourChartEl.value, key: 'hour' },
     { el: rhythmWeekdayChartEl.value, key: 'weekday' }
@@ -1267,9 +1293,6 @@ function rhythmActionColor(action) {
 }
 function buildRhythmOptionFor(key) {
   const colors = readChartColors()
-  if (key === 'action') {
-    return buildRhythmBarOption(rhythmActionSummary.value.map(item => ({ ...item, label: item.label, color: rhythmActionColor(item.action) })))
-  }
   if (key === 'response') {
     return buildRhythmBarOption(rhythmResponseBuckets.value.map(b => ({ ...b, color: colors.accent })))
   }
@@ -2122,7 +2145,6 @@ function renderChartToDataUrl(option, width = 760, height = 240) {
 }
 function buildExportTrendOption() {
   const days = trendDays.value
-  const avg = trendAverage.value
   return {
     grid: { left: 56, right: 16, top: 28, bottom: 28 },
     xAxis: {
@@ -2130,7 +2152,7 @@ function buildExportTrendOption() {
       data: days.map(d => d.shortLabel),
       axisTick: { show: false },
       axisLine: { lineStyle: { color: EXPORT_CHART_COLORS.grid } },
-      axisLabel: { interval: 0, color: EXPORT_CHART_COLORS.muted, fontSize: 11, formatter: (value, index) => (days[index]?.showLabel ? value : '') }
+      axisLabel: { interval: 0, color: EXPORT_CHART_COLORS.muted, fontSize: 11, formatter: (value, index) => (index % Math.max(1, Math.ceil(days.length / 8)) === 0 || index === days.length - 1 ? value : '') }
     },
     yAxis: {
       type: 'value',
@@ -2141,13 +2163,7 @@ function buildExportTrendOption() {
       type: 'bar',
       data: days.map(d => d.seconds || null),
       barMaxWidth: 18,
-      itemStyle: { borderRadius: [3, 3, 0, 0], color: (params) => (days[params.dataIndex]?.isWeekend ? EXPORT_CHART_COLORS.weekend : EXPORT_CHART_COLORS.weekday) },
-      markLine: avg ? {
-        symbol: 'none',
-        lineStyle: { type: 'dashed', color: EXPORT_CHART_COLORS.average, width: 1 },
-        label: { formatter: `日均 ${formatCompactDuration(avg)}`, color: EXPORT_CHART_COLORS.average, fontSize: 11, position: 'insideEndTop' },
-        data: [{ yAxis: avg }]
-      } : undefined
+      itemStyle: { borderRadius: [3, 3, 0, 0], color: (params) => (days[params.dataIndex]?.isWeekend ? EXPORT_CHART_COLORS.weekend : EXPORT_CHART_COLORS.weekday) }
     }]
   }
 }
@@ -2632,13 +2648,41 @@ onBeforeUnmount(() => {
 .review-card > header > strong { color: var(--text); font-size: 14px; font-variant-numeric: tabular-nums; }
 .review-card > header > small { color: var(--text-muted); font-size: 11px; }
 /* 趋势图与节律图：ECharts 容器 */
-.review-trend-chart { height: 218px; margin-top: 16px; }
+.review-chart-description { margin: 8px 0 0; color: var(--text-muted); font-size: 11px; line-height: 1.55; }
+.review-trend-chart { height: 218px; margin-top: 14px; }
 .review-rhythm-card > header svg { color: #5d89b0; }
 .review-rhythm-charts { display: grid; gap: 14px; margin-top: 16px; }
 .review-rhythm-chart-block { display: grid; gap: 6px; min-width: 0; padding: 10px 11px; border: 1px solid color-mix(in srgb, var(--divider-soft) 84%, transparent); border-radius: 12px; background: color-mix(in srgb, var(--surface-muted) 55%, transparent); }
 .review-rhythm-chart-block h4 { margin: 0; color: var(--text-muted); font-size: 10.5px; font-weight: 700; letter-spacing: .04em; }
 .review-rhythm-chart-block > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .review-rhythm-chart { height: 72px; }
+.review-rhythm-status { display: grid; gap: 9px; margin-top: 16px; padding: 14px; border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--divider-soft)); border-radius: 14px; background: linear-gradient(145deg, color-mix(in srgb, var(--accent-soft) 52%, var(--surface)), var(--surface)); }
+.review-rhythm-status__summary { display: flex; align-items: baseline; gap: 7px; }
+.review-rhythm-status__summary strong { color: var(--text); font-size: 22px; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.review-rhythm-status__summary span { color: var(--text-muted); font-size: 11px; }
+.review-rhythm-status__bar { display: flex; height: 8px; overflow: hidden; border-radius: 999px; background: var(--surface-muted); }
+.review-rhythm-status__bar i { display: block; min-width: 0; height: 100%; }
+.review-rhythm-status__bar i.is-completed, .review-rhythm-status__legend i.is-completed { background: var(--accent); }
+.review-rhythm-status__bar i.is-snoozed, .review-rhythm-status__legend i.is-snoozed { background: #d69c42; }
+.review-rhythm-status__bar i.is-skipped, .review-rhythm-status__legend i.is-skipped { background: #89918f; }
+.review-rhythm-status__legend { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.review-rhythm-status__legend span { display: inline-flex; align-items: center; gap: 5px; color: var(--text-muted); font-size: 10px; }
+.review-rhythm-status__legend i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; }
+.review-rhythm-status > p { margin: 0; color: var(--text); font-size: 11.5px; line-height: 1.55; }
+.review-rhythm-reminders { display: grid; gap: 5px; margin-top: 14px; }
+.review-rhythm-reminders > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.review-rhythm-reminders h3 { margin: 0; color: var(--text); font-size: 12px; letter-spacing: -.01em; }
+.review-rhythm-reminders header small { color: var(--text-muted); font-size: 10px; }
+.review-rhythm-reminders > button { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 48px; padding: 8px 9px 8px 11px; border: 1px solid transparent; border-radius: 10px; background: var(--surface-muted); color: var(--text-muted); font: inherit; text-align: left; cursor: pointer; transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast); }
+.review-rhythm-reminders > button:hover { border-color: color-mix(in srgb, var(--accent) 26%, var(--divider-soft)); background: var(--surface); color: var(--accent-strong); }
+.review-rhythm-reminders > button > span { display: grid; min-width: 0; gap: 2px; }
+.review-rhythm-reminders strong { overflow: hidden; color: var(--text); font-size: 11.5px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.review-rhythm-reminders small { color: var(--text-muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.review-rhythm-reminders svg { flex: 0 0 auto; }
+.review-rhythm-detail-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 4px; width: 100%; min-height: 32px; margin-top: 12px; border: 0; border-radius: 9px; background: transparent; color: var(--accent-strong); font: inherit; font-size: 10.5px; font-weight: 700; cursor: pointer; }
+.review-rhythm-detail-toggle:hover { background: var(--accent-soft); }
+.review-rhythm-detail-toggle svg { transition: transform var(--transition-fast); }
+.review-rhythm-detail-toggle svg.is-open { transform: rotate(180deg); }
 .review-recent { margin-top: 12px; }
 .review-recent__header { align-items: center !important; }
 .review-recent__header > div:first-child { gap: 3px; }
