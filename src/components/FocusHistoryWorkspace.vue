@@ -526,7 +526,7 @@
       <Transition name="review-detail-fade">
       <div v-if="detail" class="review-detail-backdrop" @click.self="closeDetail">
         <aside ref="detailRef" class="review-detail" role="dialog" aria-modal="true" :aria-labelledby="detail.kind === 'focus' ? 'focus-detail-title' : 'rhythm-detail-title'">
-          <header class="review-detail-header">
+          <header class="review-detail-header" :class="{ 'is-focus': detail.kind === 'focus' }">
             <div class="review-detail-heading">
               <span class="review-detail-heading__icon" :class="`is-${detail.kind}`"><Timer v-if="detail.kind === 'focus'" :size="19" /><BellRing v-else :size="19" /></span>
               <div>
@@ -3063,23 +3063,24 @@ onBeforeUnmount(() => {
 .review-detail > header { position: sticky; z-index: 2; top: 0; display: flex; min-height: 68px; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 20px; border-bottom: 1px solid var(--divider-soft); background: var(--surface); }
 .review-detail-heading { display: flex; min-width: 0; align-items: center; gap: 11px; }
 .review-detail-heading__icon { display: grid; width: 32px; height: 32px; flex: 0 0 auto; place-items: center; border-radius: 10px; }
-.review-detail-heading__icon.is-focus { background: var(--accent-soft); color: var(--accent-strong); }
+.review-detail-heading__icon.is-focus { background: #f0ecff; color: #6649df; }
 .review-detail-heading__icon.is-rhythm { background: #eaf2f8; color: #4f7fa6; }
 .review-detail-heading > div { display: grid; min-width: 0; gap: 2px; }
 .review-detail-heading > div > span { color: var(--accent-strong); font-size: 10px; font-weight: 730; }
 .review-detail > header h2 { margin: 0; color: var(--text); font-size: 17px; letter-spacing: -.03em; }
 .review-detail-heading p { margin: 0; color: var(--text-muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.review-detail-header.is-focus .review-detail-heading > div > span { color: #6649df; }
 .review-detail > header button { display: grid; width: 40px; height: 40px; flex: 0 0 auto; place-items: center; border-radius: 11px; color: var(--text-muted); }
 .review-detail > header button:hover { background: var(--surface-muted); color: var(--text); }
 .review-detail-progress { min-width: 38px; color: var(--text-muted); font-size: 10px; font-variant-numeric: tabular-nums; text-align: center; }
 .review-detail-hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px 18px; margin: 10px 20px 8px; padding: 12px 16px; border: 1px solid var(--divider-soft); border-radius: 16px; }
-.review-focus-summary { margin: 14px 20px 12px; overflow: visible; border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--divider-soft)); border-radius: 19px; background: var(--surface); box-shadow: 0 8px 24px var(--text-4-fallback); }
+.review-focus-summary { --accent: #7557e8; --accent-strong: #6246d8; --accent-soft: #f0ecff; margin: 14px 20px 12px; overflow: visible; border: 1px solid #d9d0fb; border-radius: 19px; background: var(--surface); box-shadow: 0 8px 24px var(--text-4-fallback); }
 .review-detail-hero.is-focus { grid-template-columns: minmax(0, 1.08fr) minmax(198px, .92fr); min-height: 128px; margin: 0; overflow: hidden; padding: 20px 24px 19px; border: 0; border-bottom: 1px solid color-mix(in srgb, var(--accent) 15%, var(--divider-soft)); border-radius: 18px 18px 0 0; background: radial-gradient(circle at 30% 18%, rgba(255, 255, 255, .92), transparent 32%), linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 78%, #f7f4ff) 0%, #fbfaff 54%, color-mix(in srgb, var(--accent-soft) 38%, #fff) 100%); }
 .review-detail-hero.is-rhythm { background: linear-gradient(145deg, #f2f7fb, var(--surface)); }
 .review-detail-hero.is-focus > :not(i) { position: relative; z-index: 1; }
-.review-detail-hero__orbit { position: absolute; top: 22px; left: 41%; width: 82px; height: 82px; border: 8px solid rgba(255, 255, 255, .74); border-left-color: color-mix(in srgb, var(--accent) 30%, #fff); border-radius: 50%; transform: rotate(-38deg); box-shadow: 0 0 0 1px rgba(121, 94, 230, .08), 0 12px 26px rgba(121, 94, 230, .08); }
-.review-detail-hero__sprout { position: absolute; right: 37%; bottom: 18px; width: 32px; height: 16px; border-radius: 100% 0 100% 0; background: color-mix(in srgb, var(--accent) 45%, #fff); transform: rotate(-34deg); opacity: .65; }
-.review-detail-hero__sprout::after { position: absolute; right: -18px; top: -14px; width: 28px; height: 14px; border-radius: 0 100% 0 100%; background: color-mix(in srgb, var(--accent) 38%, #fff); content: ''; transform: rotate(62deg); }
+.review-detail-hero__orbit { position: absolute; z-index: 0; top: 22px; left: 41%; width: 82px; height: 82px; border: 8px solid #e0d9fc; border-left-color: #a991ef; border-radius: 50%; transform: rotate(-38deg); box-shadow: 0 0 0 1px rgba(121, 94, 230, .15), 0 12px 26px rgba(121, 94, 230, .14); }
+.review-detail-hero__sprout { position: absolute; z-index: 0; right: 37%; bottom: 18px; width: 32px; height: 16px; border-radius: 100% 0 100% 0; background: #aa94f4; transform: rotate(-34deg); opacity: .95; }
+.review-detail-hero__sprout::after { position: absolute; right: -18px; top: -14px; width: 28px; height: 14px; border-radius: 0 100% 0 100%; background: #c0aff9; content: ''; transform: rotate(62deg); }
 .review-detail-hero__value { display: grid; min-width: 0; gap: 2px; }
 .review-detail-hero__value > span { color: var(--accent-strong); font-size: 11px; font-weight: 720; }
 .review-detail-hero__value > strong { overflow: hidden; color: var(--accent-strong); font-size: clamp(31px, 3.15vw, 45px); font-weight: 780; letter-spacing: -.065em; line-height: 1.05; text-overflow: ellipsis; white-space: nowrap; }
