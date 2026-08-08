@@ -547,7 +547,7 @@
             <div class="review-focus-summary">
             <section class="review-detail-hero is-focus">
               <i class="review-detail-hero__orbit" aria-hidden="true"></i>
-              <i class="review-detail-hero__sprout" aria-hidden="true"></i>
+              <i class="review-detail-hero__sprout" aria-hidden="true"><b></b></i>
               <div class="review-detail-hero__value"><span>本次有效时长</span><strong>{{ formatDuration(detail.item.elapsedSeconds) }}</strong><small>{{ resultLabel(detail.item.result) }} · {{ profileName(detail.item.profileId, detail.item) }}</small></div>
               <div class="review-detail-hero__window">
                 <div><span>开始</span><strong>{{ formatClock(detail.item.startedAt) }}</strong><small>{{ formatShortDate(detail.item.startedAt) }}</small></div>
@@ -579,9 +579,9 @@
               <header><Orbit :size="17" /><h3>计划与实际</h3><small v-if="detailFocusPlan.adjustments">中途调时 {{ detailFocusPlan.adjustments }} 次</small></header>
               <div class="review-focus-plan__track">
                 <article><span>{{ detailFocusPlan.initialName }}</span><strong>{{ detailFocusPlan.initialLabel }}</strong></article>
-                <i aria-hidden="true"></i>
+                <ChevronRight class="review-focus-plan__connector" :size="22" aria-hidden="true" />
                 <article class="is-adjusted"><span>{{ detailFocusPlan.targetName }}</span><strong>{{ detailFocusPlan.targetLabel }}</strong><small v-if="detailFocusPlan.adjustments">共 {{ detailFocusPlan.adjustments }} 次变更</small></article>
-                <i aria-hidden="true"></i>
+                <ChevronRight class="review-focus-plan__connector" :size="22" aria-hidden="true" />
                 <article class="is-complete"><span>实际完成</span><strong>{{ formatDuration(detail.item.elapsedSeconds) }}</strong><CircleCheckBig :size="20" /></article>
               </div>
               <p><Sparkles :size="14" />{{ focusOutcomeSummary(detail.item) }}</p>
@@ -3078,9 +3078,11 @@ onBeforeUnmount(() => {
 .review-detail-hero.is-focus { position: relative; grid-template-columns: minmax(0, 1fr) auto; min-height: 128px; margin: 0; overflow: hidden; padding: 20px 24px 19px; border: 0; border-bottom: 1px solid color-mix(in srgb, var(--accent) 15%, var(--divider-soft)); border-radius: 18px 18px 0 0; background: radial-gradient(circle at 30% 18%, rgba(255, 255, 255, .92), transparent 32%), linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 78%, #f7f4ff) 0%, #fbfaff 54%, color-mix(in srgb, var(--accent-soft) 38%, #fff) 100%); }
 .review-detail-hero.is-rhythm { background: linear-gradient(145deg, #f2f7fb, var(--surface)); }
 .review-detail-hero.is-focus > :not(i) { position: relative; z-index: 1; }
-.review-detail-hero__orbit { position: absolute; z-index: 0; top: 22px; left: 41%; width: 82px; height: 82px; border: 8px solid #e0d9fc; border-left-color: #a991ef; border-radius: 50%; transform: rotate(-38deg); box-shadow: 0 0 0 1px rgba(121, 94, 230, .15), 0 12px 26px rgba(121, 94, 230, .14); }
-.review-detail-hero__sprout { position: absolute; z-index: 0; right: 37%; bottom: 18px; width: 32px; height: 16px; border-radius: 100% 0 100% 0; background: #aa94f4; transform: rotate(-34deg); opacity: .95; }
-.review-detail-hero__sprout::after { position: absolute; right: -18px; top: -14px; width: 28px; height: 14px; border-radius: 0 100% 0 100%; background: #c0aff9; content: ''; transform: rotate(62deg); }
+.review-detail-hero__orbit { position: absolute; z-index: 0; top: 20px; left: 40%; width: 76px; height: 76px; border: 8px solid #e0d9fc; border-left-color: #a991ef; border-radius: 50%; transform: rotate(-38deg); box-shadow: 0 0 0 1px rgba(121, 94, 230, .15), 0 12px 26px rgba(121, 94, 230, .14); }
+.review-detail-hero__sprout { position: absolute; z-index: 0; bottom: 17px; left: 51%; width: 48px; height: 12px; border-radius: 50% 50% 36% 36%; background: radial-gradient(ellipse at center, #d9cffd 0%, #eee9ff 66%, transparent 68%); }
+.review-detail-hero__sprout::before { position: absolute; bottom: 7px; left: 23px; width: 2px; height: 29px; border-radius: 999px; background: #9c86ed; content: ''; transform: rotate(-8deg); transform-origin: bottom; }
+.review-detail-hero__sprout::after { position: absolute; top: -21px; left: 22px; width: 25px; height: 13px; border-radius: 100% 0 100% 0; background: #af9af4; content: ''; transform: rotate(-23deg); }
+.review-detail-hero__sprout b { position: absolute; top: -14px; left: 2px; width: 26px; height: 13px; border-radius: 0 100% 0 100%; background: #c1b1fa; transform: rotate(22deg); }
 .review-detail-hero__value { display: grid; min-width: 0; gap: 2px; }
 .review-detail-hero__value > span { color: var(--accent-strong); font-size: 11px; font-weight: 720; }
 .review-detail-hero__value > strong { color: var(--accent-strong); font-size: clamp(27px, 2vw, 36px); font-weight: 780; letter-spacing: -.065em; line-height: 1.05; white-space: nowrap; }
@@ -3125,13 +3127,12 @@ onBeforeUnmount(() => {
 .review-focus-process__tooltip li { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 6px; color: var(--text); font-size: 10px; line-height: 1.4; }
 .review-focus-process__tooltip time { color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .review-focus-plan { gap: 11px; padding-top: 2px; padding-bottom: 14px; }
-.review-focus-plan__track { display: grid; grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr) 24px minmax(0, 1fr); align-items: center; gap: 4px; }
+.review-focus-plan__track { display: grid; grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr) 24px minmax(0, 1fr); align-items: center; gap: 7px; }
 .review-focus-plan__track > article { display: grid; min-width: 0; gap: 3px; padding: 10px 11px; border-radius: 12px; background: color-mix(in srgb, var(--accent-soft) 48%, var(--surface)); }
 .review-focus-plan__track > article span { color: var(--text-muted); font-size: 10px; }
 .review-focus-plan__track > article strong { color: var(--text); font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .review-focus-plan__track > article small { color: var(--accent-strong); font-size: 10px; }
-.review-focus-plan__track > i { position: relative; width: 24px; height: 24px; background: transparent; }
-.review-focus-plan__track > i::after { position: absolute; top: 50%; left: 6px; width: 10px; height: 10px; border-top: 2px solid #667078; border-right: 2px solid #667078; content: ''; transform: translateY(-50%) rotate(45deg); }
+.review-focus-plan__connector { width: 24px; height: 24px; color: #687277; stroke-width: 2.25; }
 .review-focus-plan__track > article.is-adjusted { background: color-mix(in srgb, var(--accent-soft) 78%, var(--surface)); }
 .review-focus-plan__track > article.is-complete { position: relative; border: 1px solid color-mix(in srgb, var(--accent) 48%, var(--divider-soft)); background: var(--surface); }
 .review-focus-plan__track > article.is-complete svg { position: absolute; top: 50%; right: 8px; color: var(--accent); transform: translateY(-50%); }
