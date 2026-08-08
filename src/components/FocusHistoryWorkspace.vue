@@ -571,7 +571,14 @@
             <section class="review-detail-record-compact">
               <div class="review-detail-record-compact__main">
                 <span>关联任务</span>
-                <button v-if="detail.item.taskId" type="button" class="review-detail-task-link" @click="openLinkedTask(detail.item)">{{ detail.item.taskTitle || '打开任务' }}<ExternalLink :size="12" /></button><strong v-else>未关联任务</strong>
+                <span v-if="focusTaskTrail(detail.item).length" class="review-detail-task-trail">
+                  <template v-for="(task, index) in focusTaskTrail(detail.item)" :key="`${task.id || 'none'}-${task.at || index}`">
+                    <ChevronRight v-if="index" :size="12" />
+                    <button v-if="focusTaskAvailable(task.id)" type="button" class="review-detail-task-link" :title="`打开任务：${task.title}`" @click="openFocusTask(task)">{{ task.title }}<ExternalLink :size="11" /></button>
+                    <strong v-else>{{ task.title }}</strong>
+                  </template>
+                </span>
+                <strong v-else>未关联任务</strong>
               </div>
               <div class="review-detail-record-compact__facts" aria-label="记录信息">
                 <span><small>方式</small>{{ profileName(detail.item.profileId, detail.item) }}</span>
@@ -2432,6 +2439,24 @@ function rhythmOutcomeDescription(item) {
   return `${formatResponseTime(item.responseSeconds)}后处理`
 }
 function focusTaskChangeCount(item) { return (item.timeline || []).filter(event => event.type === 'task-changed').length }
+function focusTaskEventTitle(event) {
+  if (!event?.taskId) return '解除关联'
+  return event.taskTitle || store.activeTasks.find(task => task.id === event.taskId)?.title || '已关联任务'
+}
+function focusTaskAvailable(taskId) { return Boolean(taskId && store.activeTasks.some(task => task.id === taskId)) }
+function focusTaskTrail(item) {
+  const trail = []
+  const pushTask = (id, title, at) => {
+    const normalizedTitle = title || (id ? store.activeTasks.find(task => task.id === id)?.title || '已关联任务' : '解除关联')
+    const previous = trail[trail.length - 1]
+    if (previous?.id === (id || null) && previous.title === normalizedTitle) return
+    trail.push({ id: id || null, title: normalizedTitle, at })
+  }
+  ;(item.timeline || []).filter(event => ['started', 'task-changed'].includes(event.type)).forEach(event => pushTask(event.taskId, focusTaskEventTitle(event), event.at))
+  if (!trail.length && (item.taskId || item.taskTitle)) pushTask(item.taskId, item.taskTitle, item.finishedAt)
+  else if (item.taskId && trail[trail.length - 1]?.id !== item.taskId) pushTask(item.taskId, item.taskTitle, item.finishedAt)
+  return trail
+}
 function focusOutcomeSummary(item) {
   const story = focusDurationStory(item)
   if (story && item.result === 'completed') {
@@ -2468,7 +2493,7 @@ function focusEventLabel(event) { return ({ started: '开始计时', paused: '�
 function focusEventDescription(event) {
   if (event.type === 'resumed' && event.pausedSeconds) return `本次暂停 ${formatDuration(event.pausedSeconds)}`
   if (event.type === 'duration-adjusted') return `${event.deltaSeconds >= 0 ? '增加' : '减少'} ${formatDuration(Math.abs(event.deltaSeconds))}，目标调整为 ${formatDuration(event.durationSeconds)}`
-  if (event.type === 'task-changed') return event.taskId ? '已切换关联任务' : '已解除任务关联'
+  if (event.type === 'task-changed') return event.taskId ? `关联至「${focusTaskEventTitle(event)}」` : '已解除任务关联'
   if (event.type === 'finished') return `${resultLabel(event.result)}${event.pausedSeconds ? ` · 结束前暂停 ${formatDuration(event.pausedSeconds)}` : ''}`
   return ''
 }
@@ -2583,7 +2608,11 @@ function openLinkedTask(item) {
   store.selectTask(item.taskId)
   if (task) store.showNotice(`已打开任务「${task.title}」`, 'info')
 }
-function resetFocusFilters() { focusSearch.value = ''; focusResult.value = 'all'; focusPhase.value = 'all'; focusPause.value = 'all'; focusSort.value = 'newest' }
+function openFocusTask(task) {
+  if (!task?.id) return
+  openLinkedTask({ taskId: task.id, taskTitle: task.title })
+}
+function resetFocusFilters() { focusSearch.value = ''; focusResult.value = 'all'; focusPhase.value = 'focus'; focusPause.value = 'all'; focusSort.value = 'newest' }
 function resetRhythmFilters() { rhythmSearch.value = ''; rhythmAction.value = 'all'; rhythmTrigger.value = 'all'; rhythmSort.value = 'newest' }
 
 function openConfirm({ title, message, details, type, confirmText, onConfirm }) {
@@ -3086,6 +3115,10 @@ onBeforeUnmount(() => {
 .review-detail-record-compact__main { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 12px; }
 .review-detail-record-compact__main > span { color: var(--text-muted); font-size: 10.5px; }
 .review-detail-record-compact__main > strong { color: var(--text); font-size: 11.5px; font-weight: 600; }
+.review-detail-task-trail { display: inline-flex; min-width: 0; align-items: center; justify-content: flex-end; gap: 3px; color: var(--text-muted); }
+.review-detail-task-trail > svg { flex: 0 0 auto; color: var(--text-muted); }
+.review-detail-task-trail .review-detail-task-link { max-width: 148px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.review-detail-task-trail > strong { overflow: hidden; max-width: 110px; color: var(--text-muted); font-size: 10.5px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .review-detail-record-compact__facts { display: flex; flex-wrap: wrap; gap: 5px; }
 .review-detail-record-compact__facts span { display: inline-flex; align-items: center; gap: 4px; padding: 4px 7px; border-radius: 7px; background: var(--surface-muted); color: var(--text); font-size: 10.5px; font-weight: 600; }
 .review-detail-record-compact__facts small { color: var(--text-muted); font-size: 9px; font-weight: 550; }

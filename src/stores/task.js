@@ -2082,7 +2082,10 @@ export const useTaskStore = defineStore('task', () => {
         durationSeconds: event.type === 'duration-adjusted'
           ? Math.max(60, Math.min(8 * 60 * 60, Math.round(Number(event.durationSeconds) || 60)))
           : null,
-        taskId: event.type === 'task-changed' ? (event.taskId ? String(event.taskId) : null) : null,
+        taskId: ['started', 'task-changed'].includes(event.type) ? (event.taskId ? String(event.taskId) : null) : null,
+        taskTitle: ['started', 'task-changed'].includes(event.type)
+          ? String(event.taskTitle || '').trim().slice(0, 240)
+          : '',
         result: event.type === 'finished' && ['completed', 'abandoned', 'interrupted'].includes(event.result) ? event.result : null
       }))
       .sort((a, b) => new Date(a.at) - new Date(b.at))
@@ -2222,7 +2225,7 @@ export const useTaskStore = defineStore('task', () => {
       durationSeconds: durationOverride === undefined || profile.durationSeconds === null
         ? profile.durationSeconds
         : normalizeDuration(durationOverride, profile.durationSeconds),
-      timeline: [{ type: 'started', at: startedAt }]
+      timeline: [{ type: 'started', at: startedAt, taskId: validTaskId, taskTitle: validTaskId ? activeTasks.value.find(task => task.id === validTaskId)?.title || '' : '' }]
     }
     focusClockNow.value = Date.now()
     syncFocusTimer()
@@ -2265,7 +2268,7 @@ export const useTaskStore = defineStore('task', () => {
     const nextTaskId = activeTasks.value.some(task => task.id === taskId) ? taskId : null
     if (session.taskId === nextTaskId) return true
     session.taskId = nextTaskId
-    appendFocusTimelineEvent(session, { type: 'task-changed', at: nowIso(), taskId: nextTaskId })
+    appendFocusTimelineEvent(session, { type: 'task-changed', at: nowIso(), taskId: nextTaskId, taskTitle: nextTaskId ? activeTasks.value.find(task => task.id === nextTaskId)?.title || '' : '' })
     syncNativeFocusCompletion()
     syncNativeFocusController()
     return true
