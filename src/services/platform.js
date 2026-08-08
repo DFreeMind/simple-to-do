@@ -165,7 +165,7 @@ export async function readImage(filePath) {
 // 导出文件：Tauri 下弹原生"另存为"对话框并写入用户选择的位置；
 // 浏览器环境回退为 blob 下载。
 export async function saveTextFile(defaultName, content, fileKind = 'text') {
-  const mime = fileKind === 'csv' ? 'text/csv;charset=utf-8' : fileKind === 'markdown' ? 'text/markdown;charset=utf-8' : 'text/plain;charset=utf-8'
+  const mime = fileKind === 'csv' ? 'text/csv;charset=utf-8' : fileKind === 'markdown' ? 'text/markdown;charset=utf-8' : fileKind === 'html' ? 'text/html;charset=utf-8' : 'text/plain;charset=utf-8'
   if (!isTauri()) {
     const blob = new Blob([content], { type: mime })
     const url = URL.createObjectURL(blob)

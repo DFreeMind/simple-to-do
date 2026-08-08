@@ -3389,6 +3389,7 @@ fn save_text_file(default_name: String, content: String, file_kind: String) -> R
     dialog = match file_kind.as_str() {
         "csv" => dialog.add_filter("CSV", &["csv"]),
         "markdown" => dialog.add_filter("Markdown", &["md", "markdown"]),
+        "html" => dialog.add_filter("HTML", &["html"]),
         _ => dialog.add_filter("文本", &["txt"]),
     };
     let path = dialog.save_file().ok_or_else(|| "已取消保存".to_string())?;
