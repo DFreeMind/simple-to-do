@@ -557,24 +557,33 @@
                 <div><span>过程变化</span><strong>{{ focusChangeLabel(detail.item) }}</strong></div>
               </div>
             </section>
-            <section v-if="detailFocusStory" class="review-focus-story" aria-label="计划与实际">
-              <span>计划与实际</span>
-              <strong>{{ formatDuration(detailFocusStory.initialSeconds) }}<ArrowRight :size="14" />{{ formatDuration(detailFocusStory.finalSeconds) }}<ArrowRight :size="14" />{{ formatDuration(detail.item.elapsedSeconds) }}</strong>
-              <small>原计划 → 调整后目标 → 实际完成 · 中途调整 {{ detailFocusStory.adjustments }} 次</small>
+            <section class="review-focus-recap" aria-label="计划与实际及本次小结">
+              <div v-if="detailFocusStory" class="review-focus-recap__flow">
+                <span>计划与实际</span>
+                <strong>{{ formatDuration(detailFocusStory.initialSeconds) }}<ArrowRight :size="13" />{{ formatDuration(detailFocusStory.finalSeconds) }}<ArrowRight :size="13" />{{ formatDuration(detail.item.elapsedSeconds) }}</strong>
+                <small>原计划 → 调整后目标 → 实际完成 · 调整 {{ detailFocusStory.adjustments }} 次</small>
+              </div>
+              <div class="review-focus-recap__summary">
+                <Sparkles :size="15" />
+                <strong>{{ focusOutcomeSummary(detail.item) }}</strong>
+              </div>
             </section>
-            <section class="review-detail-insight is-focus" aria-label="本次专注小结">
-              <Sparkles :size="16" />
-              <div><span>本次小结</span><strong>{{ focusOutcomeSummary(detail.item) }}</strong></div>
-            </section>
-            <section class="review-detail-section">
-              <header><Activity :size="16" /><h3>记录信息</h3></header>
-              <dl class="review-detail-fields">
-                <div><dt>专注方式</dt><dd>{{ profileName(detail.item.profileId, detail.item) }}</dd></div>
-                <div><dt>阶段</dt><dd>{{ detail.item.phase === 'focus' ? '专注' : phaseLabel(detail.item.phase) }}</dd></div>
-                <div><dt>结束结果</dt><dd>{{ resultLabel(detail.item.result) }}</dd></div>
-                <div><dt>关联任务</dt><dd><button v-if="detail.item.taskId" type="button" class="review-detail-task-link" @click="openLinkedTask(detail.item)">{{ detail.item.taskTitle || '打开任务' }}<ExternalLink :size="12" /></button><span v-else>未关联任务</span></dd></div>
-              </dl>
-              <p v-if="focusTaskChangeCount(detail.item)" class="review-detail-context-note"><Activity :size="13" />过程中调整过 {{ focusTaskChangeCount(detail.item) }} 次任务关联，以上显示最终关联任务。</p>
+            <section class="review-detail-record-compact">
+              <div class="review-detail-record-compact__main">
+                <span>关联任务</span>
+                <button v-if="detail.item.taskId" type="button" class="review-detail-task-link" @click="openLinkedTask(detail.item)">{{ detail.item.taskTitle || '打开任务' }}<ExternalLink :size="12" /></button><strong v-else>未关联任务</strong>
+              </div>
+              <button type="button" class="review-detail-info-toggle" :aria-expanded="focusInfoExpanded" @click="focusInfoExpanded = !focusInfoExpanded"><Activity :size="13" />{{ focusInfoExpanded ? '收起记录信息' : '更多记录信息' }}<ChevronDown :size="13" :class="{ 'is-open': focusInfoExpanded }" /></button>
+              <Transition name="review-detail-expand">
+                <div v-if="focusInfoExpanded" class="review-detail-record-compact__more">
+                  <dl class="review-detail-fields">
+                    <div><dt>专注方式</dt><dd>{{ profileName(detail.item.profileId, detail.item) }}</dd></div>
+                    <div><dt>阶段</dt><dd>{{ detail.item.phase === 'focus' ? '专注' : phaseLabel(detail.item.phase) }}</dd></div>
+                    <div><dt>结束结果</dt><dd>{{ resultLabel(detail.item.result) }}</dd></div>
+                  </dl>
+                  <p v-if="focusTaskChangeCount(detail.item)" class="review-detail-context-note"><Activity :size="13" />过程中调整过 {{ focusTaskChangeCount(detail.item) }} 次任务关联，以上显示最终关联任务。</p>
+                </div>
+              </Transition>
             </section>
             <section class="review-detail-section">
               <header><Clock3 :size="16" /><h3>过程回放</h3><span class="review-detail-section__count">{{ focusTimelineSummary(detail.item).length }} 个重点</span></header>
@@ -899,6 +908,7 @@ const detailIndex = ref(-1) // 详情面板当前记录在筛选后列表中的�
 const detailReturnTarget = ref(null)
 const noteDraft = ref('')
 const editingNote = ref(false)
+const focusInfoExpanded = ref(false)
 // 批量操作：基于筛选结果的多选状态（Set 便于增删与判断）
 const selectedFocusIds = ref(new Set())
 const selectedRhythmIds = ref(new Set())
@@ -2490,6 +2500,7 @@ function openDetail(kind, item) {
   detailReturnTarget.value = document.activeElement instanceof HTMLElement ? document.activeElement : null
   detail.value = { kind, item }
   editingNote.value = false
+  focusInfoExpanded.value = false
   noteDraft.value = ''
   syncDetailIndex()
   nextTick(() => focusFirstInDetail())
@@ -2497,6 +2508,7 @@ function openDetail(kind, item) {
 function closeDetail() {
   const returnTarget = detailReturnTarget.value
   detail.value = null
+  focusInfoExpanded.value = false
   detailIndex.value = -1
   detailReturnTarget.value = null
   nextTick(() => returnTarget?.isConnected && returnTarget.focus?.())
@@ -2506,6 +2518,7 @@ function goPrevDetail() {
   detailIndex.value -= 1
   const prev = detailList.value[detailIndex.value]
   detail.value = { kind: activeTab.value, item: prev }
+  focusInfoExpanded.value = false
   nextTick(() => focusFirstInDetail())
 }
 function goNextDetail() {
@@ -2513,6 +2526,7 @@ function goNextDetail() {
   detailIndex.value += 1
   const next = detailList.value[detailIndex.value]
   detail.value = { kind: activeTab.value, item: next }
+  focusInfoExpanded.value = false
   nextTick(() => focusFirstInDetail())
 }
 function focusFirstInDetail() {
@@ -3003,17 +3017,15 @@ onBeforeUnmount(() => {
 .review-detail-hero__stats > div + div { border-left: 1px solid var(--divider-soft); }
 .review-detail-hero__stats span { color: var(--text-muted); font-size: 9.5px; }
 .review-detail-hero__stats strong { color: var(--text); font-size: 12px; font-variant-numeric: tabular-nums; }
-.review-focus-story { display: grid; gap: 4px; margin: 0 20px 10px; padding: 11px 14px; border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--divider-soft)); border-radius: 12px; background: color-mix(in srgb, var(--accent-soft) 45%, var(--surface)); }
-.review-focus-story > span { color: var(--accent-strong); font-size: 10px; font-weight: 720; }
-.review-focus-story > strong { display: flex; align-items: center; gap: 7px; color: var(--text); font-size: 14px; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
-.review-focus-story > strong svg { color: var(--accent); }
-.review-focus-story > small { color: var(--text-muted); font-size: 10.5px; }
-.review-detail-insight { display: flex; align-items: flex-start; gap: 9px; margin: 0 20px 10px; padding: 11px 13px; border-radius: 12px; background: var(--surface-muted); }
-.review-detail-insight.is-focus { border: 1px solid color-mix(in srgb, var(--accent) 15%, var(--divider-soft)); background: linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 52%, var(--surface)), var(--surface)); }
-.review-detail-insight > svg { flex: 0 0 auto; margin-top: 2px; color: var(--accent-strong); }
-.review-detail-insight > div { display: grid; gap: 2px; }
-.review-detail-insight span { color: var(--accent-strong); font-size: 10px; font-weight: 700; }
-.review-detail-insight strong { color: var(--text); font-size: 11.5px; font-weight: 620; line-height: 1.55; }
+.review-focus-recap { display: grid; gap: 7px; margin: 0 20px 9px; padding: 9px 12px; border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--divider-soft)); border-radius: 12px; background: linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 48%, var(--surface)), var(--surface)); }
+.review-focus-recap__flow { display: grid; gap: 2px; }
+.review-focus-recap__flow > span { color: var(--accent-strong); font-size: 9.5px; font-weight: 720; }
+.review-focus-recap__flow > strong { display: flex; align-items: center; gap: 6px; color: var(--text); font-size: 13px; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.review-focus-recap__flow > strong svg { color: var(--accent); }
+.review-focus-recap__flow > small { color: var(--text-muted); font-size: 9.5px; }
+.review-focus-recap__summary { display: flex; align-items: flex-start; gap: 7px; padding-top: 7px; border-top: 1px solid color-mix(in srgb, var(--accent) 12%, var(--divider-soft)); }
+.review-focus-recap__summary svg { flex: 0 0 auto; margin-top: 1px; color: var(--accent-strong); }
+.review-focus-recap__summary strong { color: var(--text); font-size: 10.5px; font-weight: 620; line-height: 1.45; }
 .review-rhythm-pattern { display: grid; gap: 9px; margin: 0 20px 10px; padding: 13px 14px; border: 1px solid #dbe7f0; border-radius: 13px; background: linear-gradient(135deg, #f2f7fb, var(--surface)); }
 .review-rhythm-pattern > header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .review-rhythm-pattern > header span { color: #426d8e; font-size: 11px; font-weight: 730; }
@@ -3080,6 +3092,19 @@ onBeforeUnmount(() => {
 .review-detail-task-link { display: inline-flex; align-items: center; gap: 4px; color: var(--accent-strong); font: inherit; font-size: 11px; font-weight: 650; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--accent) 35%, transparent); text-underline-offset: 2px; transition: text-decoration-color var(--transition-fast); }
 .review-detail-task-link:hover { text-decoration-color: var(--accent-strong); }
 .review-detail-task-link svg { flex-shrink: 0; }
+.review-detail-record-compact { display: grid; gap: 7px; padding: 11px 20px; border-top: 1px solid var(--border); }
+.review-detail-record-compact__main { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 12px; }
+.review-detail-record-compact__main > span { color: var(--text-muted); font-size: 10.5px; }
+.review-detail-record-compact__main > strong { color: var(--text); font-size: 11.5px; font-weight: 600; }
+.review-detail-info-toggle { display: inline-flex; width: fit-content; min-height: 26px; align-items: center; gap: 4px; padding: 0 8px; border: 0; border-radius: 7px; background: var(--surface-muted); color: var(--text-muted); font: inherit; font-size: 10px; font-weight: 650; cursor: pointer; }
+.review-detail-info-toggle:hover { background: var(--accent-soft); color: var(--accent-strong); }
+.review-detail-info-toggle svg:last-child { transition: transform var(--transition-fast); }
+.review-detail-info-toggle svg.is-open { transform: rotate(180deg); }
+.review-detail-record-compact__more { padding-top: 2px; }
+.review-detail-record-compact__more .review-detail-fields { padding-top: 1px; }
+.review-detail-record-compact__more .review-detail-fields > div { padding: 7px 0; }
+.review-detail-expand-enter-active, .review-detail-expand-leave-active { transition: opacity .16s ease, transform .16s ease; }
+.review-detail-expand-enter-from, .review-detail-expand-leave-to { opacity: 0; transform: translateY(-4px); }
 .review-detail-context-note { display: flex; align-items: flex-start; gap: 5px; margin: 10px 0 0; padding: 8px 10px; border-radius: 8px; background: var(--surface-muted); color: var(--text-muted); font-size: 10.5px; line-height: 1.45; }
 .review-detail-context-note svg { flex: 0 0 auto; margin-top: 1px; color: var(--accent-strong); }
 .review-detail > footer { position: sticky; z-index: 2; bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; padding: 14px 20px; border-top: 1px solid var(--divider-soft); background-color: var(--surface, #fff); box-shadow: 0 -8px 20px var(--text-4-fallback); }
