@@ -544,6 +544,7 @@
           </header>
 
           <template v-if="detail.kind === 'focus'">
+            <div class="review-focus-summary">
             <section class="review-detail-hero is-focus">
               <i class="review-detail-hero__orbit" aria-hidden="true"></i>
               <i class="review-detail-hero__sprout" aria-hidden="true"></i>
@@ -585,6 +586,7 @@
               </div>
               <p><Sparkles :size="14" />{{ focusOutcomeSummary(detail.item) }}</p>
             </section>
+            </div>
             <section class="review-detail-record-compact">
               <div class="review-detail-record-compact__main">
                 <span>关联任务</span>
@@ -3071,7 +3073,8 @@ onBeforeUnmount(() => {
 .review-detail > header button:hover { background: var(--surface-muted); color: var(--text); }
 .review-detail-progress { min-width: 38px; color: var(--text-muted); font-size: 10px; font-variant-numeric: tabular-nums; text-align: center; }
 .review-detail-hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px 18px; margin: 10px 20px 8px; padding: 12px 16px; border: 1px solid var(--divider-soft); border-radius: 16px; }
-.review-detail-hero.is-focus { position: relative; min-height: 142px; overflow: hidden; padding: 23px 25px; border-color: color-mix(in srgb, var(--accent) 24%, var(--divider-soft)); background: radial-gradient(circle at 30% 18%, rgba(255, 255, 255, .92), transparent 32%), linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 78%, #f7f4ff) 0%, #fbfaff 54%, color-mix(in srgb, var(--accent-soft) 38%, #fff) 100%); }
+.review-focus-summary { margin: 10px 20px 12px; border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--divider-soft)); border-radius: 18px; background: var(--surface); box-shadow: 0 10px 24px var(--text-4-fallback); }
+.review-detail-hero.is-focus { position: relative; min-height: 142px; margin: 0; overflow: hidden; padding: 23px 25px; border: 0; border-bottom: 1px solid color-mix(in srgb, var(--accent) 15%, var(--divider-soft)); border-radius: 17px 17px 0 0; background: radial-gradient(circle at 30% 18%, rgba(255, 255, 255, .92), transparent 32%), linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 78%, #f7f4ff) 0%, #fbfaff 54%, color-mix(in srgb, var(--accent-soft) 38%, #fff) 100%); }
 .review-detail-hero.is-rhythm { background: linear-gradient(145deg, #f2f7fb, var(--surface)); }
 .review-detail-hero.is-focus > :not(i) { position: relative; z-index: 1; }
 .review-detail-hero__orbit { position: absolute; top: 23px; left: 42%; width: 84px; height: 84px; border: 9px solid rgba(255, 255, 255, .74); border-left-color: color-mix(in srgb, var(--accent) 30%, #fff); border-radius: 50%; transform: rotate(-38deg); box-shadow: 0 0 0 1px rgba(121, 94, 230, .08), 0 12px 26px rgba(121, 94, 230, .08); }
@@ -3094,7 +3097,7 @@ onBeforeUnmount(() => {
 .review-detail-hero__stats > div + div { border-left: 1px solid var(--divider-soft); }
 .review-detail-hero__stats span { color: var(--text-muted); font-size: 9.5px; }
 .review-detail-hero__stats strong { color: var(--text); font-size: 12px; font-variant-numeric: tabular-nums; }
-.review-focus-process, .review-focus-plan { display: grid; gap: 10px; margin: 0 20px 10px; padding: 13px 14px; border: 1px solid var(--divider-soft); border-radius: 14px; background: var(--surface); }
+.review-focus-process, .review-focus-plan { display: grid; gap: 10px; margin: 0; padding: 15px 16px; background: transparent; }
 .review-focus-process > header, .review-focus-plan > header { display: flex; align-items: center; gap: 6px; color: var(--accent-strong); }
 .review-focus-process h3, .review-focus-plan h3 { margin: 0; color: var(--text); font-size: 12px; font-weight: 730; }
 .review-focus-process > header small, .review-focus-plan > header small { margin-left: auto; color: var(--text-muted); font-size: 9.5px; font-weight: 550; }
@@ -3109,15 +3112,18 @@ onBeforeUnmount(() => {
 .review-focus-process__item strong { overflow: hidden; color: var(--text); font-size: 12px; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
 .review-focus-process__item.is-interactive { cursor: help; transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast); }
 .review-focus-process__item.is-interactive:hover, .review-focus-process__item.is-interactive:focus-visible { z-index: 3; border-color: color-mix(in srgb, var(--accent) 34%, var(--divider-soft)); box-shadow: 0 8px 18px var(--text-7-fallback); outline: none; transform: translateY(-1px); }
-.review-focus-process__tooltip { position: absolute; z-index: 5; bottom: calc(100% + 8px); left: 0; display: grid; width: min(270px, 76vw); gap: 7px; padding: 10px 11px; border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--divider-soft)); border-radius: 10px; background: var(--surface); box-shadow: 0 14px 32px rgba(18, 23, 38, .18); opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity .16s ease, transform .16s ease; }
+.review-focus-process__tooltip { position: absolute; z-index: 5; bottom: calc(100% + 4px); left: 0; display: grid; width: min(270px, 76vw); gap: 7px; padding: 10px 11px; border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--divider-soft)); border-radius: 10px; background: var(--surface); box-shadow: 0 14px 32px rgba(18, 23, 38, .18); cursor: default; opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity .16s ease, transform .16s ease; }
+.review-focus-process__tooltip::after { position: absolute; right: 0; bottom: -6px; left: 0; height: 6px; content: ''; }
 .review-focus-process__item:nth-child(n + 3) .review-focus-process__tooltip { right: 0; left: auto; }
-.review-focus-process__item.is-interactive:hover .review-focus-process__tooltip, .review-focus-process__item.is-interactive:focus-visible .review-focus-process__tooltip { opacity: 1; transform: translateY(0); }
+.review-focus-process__item.is-interactive:hover .review-focus-process__tooltip, .review-focus-process__item.is-interactive:focus-visible .review-focus-process__tooltip { opacity: 1; pointer-events: auto; transform: translateY(0); }
 .review-focus-process__tooltip > strong { color: var(--accent-strong); font-size: 10px; }
 .review-focus-process__tooltip p { margin: 0; color: var(--text-muted); font-size: 10px; line-height: 1.45; }
-.review-focus-process__tooltip ul { display: grid; gap: 5px; max-height: 150px; margin: 0; padding: 0; overflow: auto; list-style: none; }
+.review-focus-process__tooltip ul { display: grid; gap: 5px; max-height: 150px; margin: 0; padding: 0 4px 0 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; list-style: none; }
+.review-focus-process__tooltip ul::-webkit-scrollbar { width: 5px; }
+.review-focus-process__tooltip ul::-webkit-scrollbar-thumb { border-radius: 999px; background: color-mix(in srgb, var(--accent) 35%, var(--divider-soft)); }
 .review-focus-process__tooltip li { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 6px; color: var(--text); font-size: 10px; line-height: 1.4; }
 .review-focus-process__tooltip time { color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.review-focus-plan { gap: 11px; border-color: color-mix(in srgb, var(--accent) 22%, var(--divider-soft)); background: linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 48%, var(--surface)), var(--surface)); }
+.review-focus-plan { gap: 11px; padding-top: 4px; }
 .review-focus-plan__track { display: grid; grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr) 24px minmax(0, 1fr); align-items: center; gap: 4px; }
 .review-focus-plan__track > article { display: grid; min-width: 0; gap: 3px; padding: 9px 10px; border-radius: 10px; background: rgba(255, 255, 255, .66); }
 .review-focus-plan__track > article span { color: var(--text-muted); font-size: 9px; }
