@@ -150,15 +150,18 @@
               <span v-if="trendAverage"><i class="is-average"></i>日均</span>
             </div>
             <div ref="trendChartRef" class="review-chart" :style="{ gridTemplateColumns: `repeat(${trendDays.length}, minmax(0, 1fr))` }">
-              <div v-for="day in trendDays" :key="day.key" tabindex="0" :class="{ 'is-today': day.isToday, 'is-weekend': day.isWeekend, 'is-empty': !day.seconds }" :aria-label="trendDayAria(day)" @mouseenter="hoverTrendDay(day, $event)" @mousemove="moveTrendTooltip($event)" @mouseleave="hoverTrendDay(null)" @focus="hoverTrendDay(day)" @blur="hoverTrendDay(null)">
-                <span v-if="trendDays.length <= 14 && day.seconds">{{ formatCompactDuration(day.seconds) }}</span>
+              <div v-for="(day, idx) in trendDays" :key="day.key" tabindex="0" :class="{ 'is-today': day.isToday, 'is-weekend': day.isWeekend, 'is-empty': !day.seconds }" :aria-label="trendDayAria(day)" @mouseenter="hoverTrendDay(idx, $event)" @mousemove="moveTrendTooltip($event)" @mouseleave="hoverTrendDay(-1)" @focus="hoverTrendDay(idx)" @blur="hoverTrendDay(-1)">
+                <span>{{ trendDays.length <= 14 && day.seconds ? formatCompactDuration(day.seconds) : '' }}</span>
                 <i>
                   <b v-if="day.seconds" :style="{ height: `${Math.max(8, day.seconds / trendMax * 100)}%` }"></b>
                   <b v-else class="review-chart__placeholder"></b>
                 </i>
                 <small>{{ day.showLabel ? day.shortLabel : '' }}</small>
               </div>
-              <div v-if="hoveredTrendDay" class="review-chart-tooltip" :style="trendTooltipStyle" role="tooltip">
+              <div v-if="trendAverage" class="review-chart-average" :class="{ 'is-high': trendAverage / trendMax > 0.5 }" :style="{ '--line': `${Math.min(94, trendAverage / trendMax * 100)}%` }" aria-hidden="true">
+                <b>日均 {{ formatCompactDuration(trendAverage) }}</b>
+              </div>
+              <div v-if="hoveredTrendDay" ref="trendTooltipEl" class="review-chart-tooltip" :style="trendTooltipStyle" role="tooltip">
                 <strong>{{ hoveredTrendDay.label }}{{ hoveredTrendDay.isToday ? '（今日）' : '' }}</strong>
                 <p v-if="hoveredTrendDay.seconds"><b>{{ formatDuration(hoveredTrendDay.seconds) }}</b> · {{ hoveredTrendDay.records.length }} 段专注</p>
                 <p v-else class="is-empty">无投入</p>
@@ -178,13 +181,7 @@
                 </tr>
               </tbody>
             </table>
-            <div v-if="trendAverage" class="review-chart-axis" aria-hidden="true">
-              <span>0</span>
-              <i :style="{ '--line': `${Math.min(100, trendAverage / trendMax * 100)}%` }">
-                <b>日均 {{ formatCompactDuration(trendAverage) }}</b>
-              </i>
-            </div>
-            <p v-else class="review-chart-empty">这段时间没有专注记录。试试切换到「全部」或更短的范围。</p>
+            <p v-if="!trendAverage" class="review-chart-empty">这段时间没有专注记录。试试切换到「全部」或更短的范围。</p>
           </article>
 
           <article class="review-card review-rhythm-card" :class="{ 'is-collapsed': !rhythmEntries.length }">
@@ -1091,16 +1088,20 @@ const trendAverage = computed(() => {
   if (!activeDays.length) return 0
   return Math.round(activeDays.reduce((t, i) => t + i.seconds, 0) / activeDays.length)
 })
-// 趋势图 hover：柱体上浮出信息卡（日期 / 时长 / 段数 / 当天任务），随鼠标移动定位
+// 趋势图 hover：信息卡定位在 hover 柱子的正上方（柱顶之上），不遮挡柱体
+// 用 index 而非对象引用定位，避免 trendDays 重算后引用失效
 const trendChartRef = ref(null)
-const hoveredTrendDay = ref(null)
+const trendTooltipEl = ref(null)
+const hoveredTrendIndex = ref(-1)
 const trendTooltipPos = ref({ x: 0, y: 0 })
+const trendTipSize = ref({ w: 0, h: 0 })
+const hoveredTrendDay = computed(() => hoveredTrendIndex.value >= 0 ? (trendDays.value[hoveredTrendIndex.value] || null) : null)
 function trendDayAria(day) {
   const base = `${day.label}${day.isToday ? '（今日）' : ''}：${day.seconds ? formatDuration(day.seconds) : '无投入'}`
   return day.records.length ? `${base}，${day.records.length} 段专注` : base
 }
-function hoverTrendDay(day, event) {
-  hoveredTrendDay.value = day
+function hoverTrendDay(index, event) {
+  hoveredTrendIndex.value = index
   if (event) moveTrendTooltip(event)
 }
 function moveTrendTooltip(event) {
@@ -1109,19 +1110,37 @@ function moveTrendTooltip(event) {
   const rect = el.getBoundingClientRect()
   trendTooltipPos.value = { x: event.clientX - rect.left, y: event.clientY - rect.top }
 }
+// 渲染后读取 tooltip 实际尺寸，用于柱顶上方定位
+watch(hoveredTrendDay, async (day) => {
+  if (!day) return
+  await nextTick()
+  const el = trendTooltipEl.value
+  if (el) trendTipSize.value = { w: el.offsetWidth, h: el.offsetHeight }
+})
 const trendTooltipStyle = computed(() => {
-  if (!hoveredTrendDay.value) return { display: 'none' }
-  const { x, y } = trendTooltipPos.value
-  // 默认显示在鼠标右上方；靠近右边缘时翻转到左侧，避免溢出
-  const flip = x > 150
-  return {
-    left: `${flip ? x - 10 : x + 10}px`,
-    top: `${y - 10}px`,
-    transform: flip ? 'translateX(-100%) translateY(-100%)' : 'translateY(-100%)'
-  }
+  if (hoveredTrendIndex.value < 0) return { display: 'none' }
+  const el = trendChartRef.value
+  const width = el?.clientWidth || 500
+  const day = hoveredTrendDay.value
+  if (!day) return { display: 'none' }
+  const idx = hoveredTrendIndex.value
+  const colWidth = width / trendDays.value.length
+  const tipW = trendTipSize.value.w || 150
+  const tipH = trendTipSize.value.h || 120
+  // 水平：优先放柱子右侧；右缘放不下时翻转到左侧，避免遮挡 hover 柱
+  const rightX = (idx + 1) * colWidth
+  const flip = rightX + 12 + tipW > width - 4
+  const left = flip
+    ? Math.max(4, idx * colWidth - tipW - 12)
+    : Math.min(rightX + 12, width - tipW - 4)
+  // 垂直：对齐 hover 柱的柱顶上方；柱顶上方空间不足时顶部贴图表上缘
+  const barRatio = day.seconds ? Math.max(8, day.seconds / trendMax.value * 100) / 100 : 0
+  const barTop = 0.18 * 180 + 0.68 * 180 * (1 - barRatio)
+  const top = Math.max(4, barTop - tipH - 8)
+  return { left: `${left}px`, top: `${top}px` }
 })
 // 范围或数据变化后清掉残留的 hover 状态
-watch(trendDays, () => { hoveredTrendDay.value = null })
+watch(trendDays, () => { hoveredTrendIndex.value = -1 })
 const trendTitle = computed(() => {
   const id = selectedRange.value.id
   if (id === 'custom') return `${selectedRangeLabel.value}的投入变化`
@@ -2468,12 +2487,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-card > header > strong { color: var(--text); font-size: 14px; font-variant-numeric: tabular-nums; }
 .review-card > header > small { color: var(--text-muted); font-size: 11px; }
 .review-chart { position: relative; display: grid; height: 180px; align-items: end; gap: 5px; margin-top: 14px; padding-top: 10px; border-bottom: 1px solid var(--divider-soft); }
-.review-chart > div { display: grid; min-width: 0; height: 100%; grid-template-rows: 18px 1fr 20px; align-items: end; gap: 4px; cursor: default; }
-.review-chart > div:hover b:not(.review-chart__placeholder) { filter: brightness(1.1); }
-.review-chart > div:focus-visible { outline: 3px solid var(--accent-20-border-fallback); outline-offset: 2px; border-radius: 6px; }
-.review-chart span, .review-chart small { overflow: hidden; color: var(--text-muted); font-size: 9px; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.review-chart > div:not(.review-chart-tooltip):not(.review-chart-average) { display: grid; min-width: 0; height: 100%; grid-template-rows: 18px 1fr 20px; align-items: end; gap: 4px; cursor: default; }
+.review-chart > div:not(.review-chart-tooltip):not(.review-chart-average):hover b:not(.review-chart__placeholder) { filter: brightness(1.1); }
+.review-chart > div:not(.review-chart-tooltip):not(.review-chart-average):focus-visible { outline: 3px solid var(--accent-20-border-fallback); outline-offset: 2px; border-radius: 6px; }
+.review-chart span, .review-chart small { color: var(--text-muted); font-size: 9px; text-align: center; white-space: nowrap; }
+.review-chart span { overflow: hidden; text-overflow: ellipsis; }
+/* x 轴标签允许溢出列宽：稀疏刻度间距足够，避免 "7/1" 被截成 "7…" */
+.review-chart small { overflow: visible; }
 .review-chart > div > i { display: flex; height: 100%; align-items: end; overflow: hidden; border-radius: 5px 5px 2px 2px; background: color-mix(in srgb, var(--accent-soft) 58%, var(--surface-muted)); }
-.review-chart b { display: block; width: 100%; min-height: 2px; border-radius: inherit; background: linear-gradient(180deg, var(--accent), var(--accent-strong)); transition: height .25s ease; }
+.review-chart > div:not(.review-chart-tooltip):not(.review-chart-average) > i > b { display: block; width: 100%; min-height: 2px; border-radius: inherit; background: linear-gradient(180deg, var(--accent), var(--accent-strong)); transition: height .25s ease; }
 .review-rhythm-card > header svg { color: #5d89b0; }
 .review-rhythm-actions { display: grid; gap: 18px; margin-top: 23px; }
 .review-rhythm-actions > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; }
@@ -2822,9 +2844,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 .review-chart-legend i.is-average { width: 12px; height: 0; border-top: 1px dashed var(--accent); border-radius: 0; background: transparent; }
 .review-chart-empty { margin: 12px 0 4px; padding: 18px 12px; border-radius: 10px; background: var(--surface-muted); color: var(--text-muted); font-size: 12px; text-align: center; }
 .review-chart__placeholder { display: block; width: 1px; height: 1px; background: var(--divider-soft); }
-.review-chart-axis { position: relative; display: flex; align-items: center; justify-content: space-between; margin-top: 4px; height: 18px; color: var(--text-muted); font-size: 9px; }
-.review-chart-axis > i { position: absolute; left: 0; right: 0; top: 50%; height: 0; border-top: 1px dashed var(--accent); pointer-events: none; }
-.review-chart-axis > i > b { position: absolute; left: var(--line, 50%); top: -18px; padding: 1px 6px; border-radius: 4px; background: var(--surface); color: var(--accent-strong); font-size: 9px; font-weight: 600; white-space: nowrap; transform: translateX(-100%); }
+/* 日均参考线：画在图表主体内按投入比例定位，标签贴线显示，不再挤在底部轴区 */
+.review-chart-average { position: absolute; left: 0; right: 0; top: calc(100% - var(--line, 50%)); height: 0; border-top: 1px dashed var(--accent); z-index: 3; pointer-events: none; }
+.review-chart-average b { position: absolute; right: 4px; top: -21px; padding: 1px 6px; border-radius: 4px; background: var(--surface); color: var(--accent-strong); font-size: 9px; font-weight: 600; white-space: nowrap; }
+.review-chart-average.is-high b { right: auto; left: 4px; }
 
 /* 趋势图 hover 信息卡 */
 .review-chart-tooltip { position: absolute; z-index: 6; width: max-content; max-width: 220px; padding: 9px 11px; border: 1px solid var(--divider-soft); border-radius: 10px; background: var(--surface); box-shadow: 0 10px 26px var(--text-7-fallback); pointer-events: none; font-size: 11px; color: var(--text); }
@@ -2895,5 +2918,5 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
   .review-rhythm-buckets { grid-template-columns: 1fr; gap: 12px; }
 }
 
-@media (prefers-reduced-motion: reduce) { .review-chart b, .review-detail-fade-enter-active, .review-detail-fade-leave-active { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .review-chart > div:not(.review-chart-tooltip):not(.review-chart-average) > i > b, .review-detail-fade-enter-active, .review-detail-fade-leave-active { transition: none; } }
 </style>
