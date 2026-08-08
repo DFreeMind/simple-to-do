@@ -92,9 +92,9 @@
           </div></header>
           <div class="review-metrics">
             <article class="review-metric review-metric--primary">
-              <span class="review-metric__label" :title="`专注段（不含休息）`"><Timer :size="13" />有效专注</span>
-              <strong :aria-label="`${selectedRangeLabel}累计有效专注 ${formatDuration(totalFocusSeconds)}`">{{ formatDuration(totalFocusSeconds) }}</strong>
-              <small>{{ focusEntries.length }} 段 · {{ focusActiveDays }} 天有投入</small>
+              <span class="review-metric__label" :title="`已记录的专注阶段（不含休息；中断或放弃的实际投入也会保留）`"><Timer :size="13" />专注投入</span>
+              <strong :aria-label="`${selectedRangeLabel}累计专注投入 ${formatDuration(totalFocusSeconds)}`">{{ formatDuration(totalFocusSeconds) }}</strong>
+              <small>{{ completedFocusEntries.length }} 段自然完成 · {{ focusActiveDays }} 天有投入</small>
               <span v-if="previousRangeStart && focusSecondsDelta" :class="['review-metric__delta', focusSecondsDelta > 0 ? 'is-up' : 'is-down']" :title="`与上一周期对比（${previousRangeStart.days} 天）`">
                 {{ focusSecondsDelta > 0 ? '↑' : focusSecondsDelta < 0 ? '↓' : '持平' }} {{ Math.abs(focusSecondsDelta) }}%
                 <small>· 对比上 {{ previousRangeStart.days }} 天</small>
@@ -177,6 +177,17 @@
                 <div class="review-rhythm-chart-block">
                   <h4>处理结果</h4>
                   <div ref="rhythmActionChartEl" class="review-rhythm-chart" role="img" :aria-label="`节律处理结果分布`"></div>
+                  <table class="sr-only" aria-label="节律处理结果明细">
+                    <caption>{{ selectedRangeLabel }} 节律处理结果分布</caption>
+                    <thead><tr><th scope="col">结果</th><th scope="col">次数</th><th scope="col">占比</th></tr></thead>
+                    <tbody>
+                      <tr v-for="item in rhythmActionSummary" :key="item.action">
+                        <th scope="row">{{ item.label }}</th>
+                        <td>{{ item.count }}</td>
+                        <td>{{ item.percent }}%</td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
                 <div class="review-rhythm-chart-block">
                   <header>
@@ -797,7 +808,7 @@ const DEFAULT_REVIEW_PREFS = {
   activeTab: 'overview',
   recentKind: 'all',
   focusResult: 'all',
-  focusPhase: 'all',
+  focusPhase: 'focus',
   focusPause: 'all',
   focusSort: 'newest',
   rhythmAction: 'all',
@@ -850,6 +861,7 @@ const customStart = ref(reviewPrefs.customStart || (() => { const d = new Date()
 const customEnd = ref(reviewPrefs.customEnd || isoToday())
 const detail = ref(null)
 const detailIndex = ref(-1) // 详情面板当前记录在筛选后列表中的位置，用于上下条导航
+const detailReturnTarget = ref(null)
 const noteDraft = ref('')
 const editingNote = ref(false)
 // 批量操作：基于筛选结果的多选状态（Set 便于增删与判断）
@@ -2330,13 +2342,20 @@ async function selectTab(tabId) {
 function openDetail(kind, item) {
   // 从概览页点开时，自动切到对应的管理 tab，让 prev/next 导航能在完整筛选列表里走
   if (activeTab.value === 'overview') activeTab.value = kind
+  detailReturnTarget.value = document.activeElement instanceof HTMLElement ? document.activeElement : null
   detail.value = { kind, item }
   editingNote.value = false
   noteDraft.value = ''
   syncDetailIndex()
   nextTick(() => focusFirstInDetail())
 }
-function closeDetail() { detail.value = null; detailIndex.value = -1 }
+function closeDetail() {
+  const returnTarget = detailReturnTarget.value
+  detail.value = null
+  detailIndex.value = -1
+  detailReturnTarget.value = null
+  nextTick(() => returnTarget?.isConnected && returnTarget.focus?.())
+}
 function goPrevDetail() {
   if (!hasPrevDetail.value) return
   detailIndex.value -= 1
@@ -2357,6 +2376,26 @@ function focusFirstInDetail() {
   if (!root) return
   const target = root.querySelector('button, [href], [tabindex]:not([tabindex="-1"])')
   if (target && typeof target.focus === 'function') target.focus()
+}
+function trapDetailFocus(event) {
+  const root = detailRef.value
+  if (!root || event.key !== 'Tab') return false
+  const nodes = [...root.querySelectorAll('button:not(:disabled), [href], textarea:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])')]
+    .filter(node => node instanceof HTMLElement && node.offsetParent !== null)
+  if (!nodes.length) return false
+  const first = nodes[0]
+  const last = nodes[nodes.length - 1]
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault()
+    last.focus()
+    return true
+  }
+  if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault()
+    first.focus()
+    return true
+  }
+  return false
 }
 function startEditNote() {
   noteDraft.value = detail.value?.item?.note || ''
@@ -2477,6 +2516,7 @@ function handleKeydown(event) {
     if (detail.value) { closeDetail(); return }
     if (confirmDialog.visible) { confirmDialog.visible = false; return }
   }
+  if (detail.value && trapDetailFocus(event)) return
   if (isInput) return
   if (event.altKey && !event.ctrlKey && !event.metaKey) {
     if (event.key === '1') { event.preventDefault(); selectTab('overview'); return }
@@ -2511,7 +2551,10 @@ onBeforeUnmount(() => {
   justify-items: stretch;
   overflow: auto;
   padding: clamp(18px, 2.6vw, 34px);
-  background: radial-gradient(circle at 80% 0, var(--accent-soft), transparent 32%), var(--surface-muted);
+  background:
+    radial-gradient(circle at 84% 2%, color-mix(in srgb, var(--accent-soft) 82%, transparent), transparent 30%),
+    radial-gradient(circle at 2% 24%, color-mix(in srgb, #dbeaf4 54%, transparent), transparent 24%),
+    var(--surface-muted);
   scrollbar-width: thin;
   scrollbar-color: var(--text-muted-26-fallback, rgba(104, 118, 116, 0.26)) transparent;
   scrollbar-gutter: stable;
@@ -2529,22 +2572,49 @@ onBeforeUnmount(() => {
   background-clip: padding-box;
 }
 .review-shell { width: min(100%, 1120px); margin: 0 auto; }
-.review-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding: 4px 2px 18px; }
+.review-header {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  overflow: hidden;
+  margin-bottom: 14px;
+  padding: clamp(20px, 2.4vw, 28px);
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--divider-soft));
+  border-radius: 22px;
+  background: linear-gradient(128deg, color-mix(in srgb, var(--accent-tint) 92%, var(--surface)) 0%, var(--surface) 68%);
+  box-shadow: 0 16px 38px var(--text-4-fallback);
+}
+.review-header::after {
+  position: absolute;
+  top: -72px;
+  right: -52px;
+  width: 210px;
+  height: 210px;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  border-radius: 50%;
+  box-shadow: 0 0 0 22px color-mix(in srgb, var(--accent) 5%, transparent), 0 0 0 54px color-mix(in srgb, var(--accent) 3%, transparent);
+  content: '';
+  pointer-events: none;
+}
 .review-header > div:first-child { min-width: 0; }
-.review-header .eyebrow { margin: 0 0 5px; color: var(--accent-strong); font-size: 11px; font-weight: 750; letter-spacing: .08em; }
-.review-header h1 { margin: 0; color: var(--text); font-size: clamp(26px, 3vw, 34px); letter-spacing: -.045em; line-height: 1.18; }
-.review-header > div > p:last-child { margin: 8px 0 0; color: var(--text-muted); font-size: 13px; }
-.review-range-block { display: flex; justify-content: flex-end; flex-shrink: 0; }
-.review-tabs { display: flex; gap: 5px; margin-bottom: 13px; padding: 5px; border: 1px solid var(--divider-soft); border-radius: 14px; background-color: var(--surface); }
+.review-header .eyebrow { margin: 0 0 7px; color: var(--accent-strong); font-size: 10px; font-weight: 800; letter-spacing: .11em; }
+.review-header h1 { position: relative; z-index: 1; margin: 0; color: var(--text); font-size: clamp(27px, 3vw, 36px); letter-spacing: -.055em; line-height: 1.13; }
+.review-header > div > p:last-child { position: relative; z-index: 1; max-width: 640px; margin: 10px 0 0; color: var(--text-muted); font-size: 12.5px; line-height: 1.65; }
+.review-range-block { position: relative; z-index: 1; display: flex; justify-content: flex-end; flex-shrink: 0; padding-top: 2px; }
+.review-tabs { display: flex; gap: 5px; margin-bottom: 14px; padding: 5px; border: 1px solid var(--divider-soft); border-radius: 15px; background: color-mix(in srgb, var(--surface) 88%, transparent); box-shadow: 0 6px 16px var(--text-4-fallback); }
 .review-tabs button { display: inline-flex; min-height: 42px; align-items: center; gap: 7px; padding: 0 13px; border-radius: 10px; color: var(--text-muted); font-size: 12px; font-weight: 680; }
 .review-tabs button:hover { color: var(--text); background: var(--surface-muted); }
-.review-tabs button.active { color: var(--accent-strong); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent-20-border-fallback); }
+.review-tabs button.active { color: var(--accent-strong); background: linear-gradient(135deg, var(--accent-soft), color-mix(in srgb, var(--accent-soft) 48%, var(--surface))); box-shadow: inset 0 0 0 1px var(--accent-20-border-fallback), 0 3px 9px var(--text-4-fallback); }
 .review-tabs button span { min-width: 18px; padding: 2px 5px; border-radius: 999px; background: var(--surface); color: var(--text-muted); font-size: 9px; text-align: center; }
 .review-tabs button:focus-visible, .review-record-list button:focus-visible, .review-detail button:focus-visible { outline: 3px solid var(--accent-20-border-fallback); outline-offset: 2px; }
 .review-summary > header p { margin: 0; color: var(--text-muted); font-size: 10px; }
 .review-metrics { display: grid; grid-template-columns: 1.25fr repeat(3, minmax(150px, .75fr)); gap: 1px; margin-top: 14px; overflow: hidden; border: 1px solid var(--divider-soft); border-radius: 13px; background: var(--divider-soft); }
-.review-metric, .review-card { border: 1px solid var(--divider-soft); border-radius: 18px; background: var(--surface); box-shadow: 0 10px 26px var(--text-4-fallback); }
-.review-metric { display: grid; min-height: 116px; align-content: center; gap: 4px; padding: 14px 16px; border: 0; border-radius: 0; box-shadow: none; }
+.review-metric, .review-card { border: 1px solid var(--divider-soft); border-radius: 18px; background: color-mix(in srgb, var(--surface) 96%, transparent); box-shadow: 0 10px 26px var(--text-4-fallback); }
+.review-metric { position: relative; display: grid; min-height: 122px; align-content: center; gap: 5px; padding: 16px 18px; border: 0; border-radius: 0; box-shadow: none; }
+.review-metric::before { position: absolute; top: 17px; left: 0; width: 3px; height: 26px; border-radius: 0 999px 999px 0; background: var(--accent); content: ''; opacity: .72; }
+.review-metric:not(.review-metric--primary)::before { background: #6a9bc3; opacity: .42; }
 .review-metric > span, .review-metric small { color: var(--text-muted); font-size: 11px; }
 .review-metric > strong { color: var(--text); font-size: 25px; letter-spacing: -.045em; font-variant-numeric: tabular-nums; }
 .review-metric small { line-height: 1.45; }
@@ -2553,7 +2623,8 @@ onBeforeUnmount(() => {
 .review-metric--rhythm { background: linear-gradient(145deg, var(--surface), color-mix(in srgb, var(--accent-soft) 30%, var(--surface))); }
 .review-metric--rhythm .review-metric__delta.is-up { background: var(--accent-soft); color: var(--accent-strong); }
 .review-overview-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(330px, 1fr); gap: 12px; margin-top: 12px; }
-.review-card { min-width: 0; padding: 18px; }
+.review-card { min-width: 0; padding: 20px; transition: border-color var(--transition-fast), box-shadow var(--transition-fast); }
+.review-card:hover { border-color: color-mix(in srgb, var(--accent) 22%, var(--divider-soft)); box-shadow: 0 14px 32px var(--text-7-fallback); }
 .review-card > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .review-card > header > div { display: grid; gap: 4px; }
 .review-card > header span { color: var(--accent-strong); font-size: 10px; font-weight: 730; letter-spacing: .06em; }
@@ -2561,13 +2632,13 @@ onBeforeUnmount(() => {
 .review-card > header > strong { color: var(--text); font-size: 14px; font-variant-numeric: tabular-nums; }
 .review-card > header > small { color: var(--text-muted); font-size: 11px; }
 /* 趋势图与节律图：ECharts 容器 */
-.review-trend-chart { height: 200px; margin-top: 14px; }
+.review-trend-chart { height: 218px; margin-top: 16px; }
 .review-rhythm-card > header svg { color: #5d89b0; }
-.review-rhythm-charts { display: grid; gap: 16px; margin-top: 16px; }
-.review-rhythm-chart-block { display: grid; gap: 6px; min-width: 0; }
+.review-rhythm-charts { display: grid; gap: 14px; margin-top: 16px; }
+.review-rhythm-chart-block { display: grid; gap: 6px; min-width: 0; padding: 10px 11px; border: 1px solid color-mix(in srgb, var(--divider-soft) 84%, transparent); border-radius: 12px; background: color-mix(in srgb, var(--surface-muted) 55%, transparent); }
 .review-rhythm-chart-block h4 { margin: 0; color: var(--text-muted); font-size: 10.5px; font-weight: 700; letter-spacing: .04em; }
 .review-rhythm-chart-block > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.review-rhythm-chart { height: 76px; }
+.review-rhythm-chart { height: 72px; }
 .review-recent { margin-top: 12px; }
 .review-recent__header { align-items: center !important; }
 .review-recent__header > div:first-child { gap: 3px; }
