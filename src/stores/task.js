@@ -2081,7 +2081,9 @@ export const useTaskStore = defineStore('task', () => {
           : null,
         durationSeconds: event.type === 'duration-adjusted'
           ? Math.max(60, Math.min(8 * 60 * 60, Math.round(Number(event.durationSeconds) || 60)))
-          : null,
+          : event.type === 'started' && Number.isFinite(Number(event.durationSeconds))
+            ? Math.max(60, Math.min(8 * 60 * 60, Math.round(Number(event.durationSeconds))))
+            : null,
         taskId: ['started', 'task-changed'].includes(event.type) ? (event.taskId ? String(event.taskId) : null) : null,
         taskTitle: ['started', 'task-changed'].includes(event.type)
           ? String(event.taskTitle || '').trim().slice(0, 240)
@@ -2213,6 +2215,9 @@ export const useTaskStore = defineStore('task', () => {
     if (!profile) return false
     const validTaskId = activeTasks.value.some(task => task.id === taskId) ? taskId : null
     const startedAt = nowIso()
+    const durationSeconds = durationOverride === undefined || profile.durationSeconds === null
+      ? profile.durationSeconds
+      : normalizeDuration(durationOverride, profile.durationSeconds)
     clock.value.activeSession = {
       id: genId(),
       profileId: profile.id,
@@ -2222,10 +2227,8 @@ export const useTaskStore = defineStore('task', () => {
       startedAt,
       elapsedSeconds: 0,
       phase: 'focus',
-      durationSeconds: durationOverride === undefined || profile.durationSeconds === null
-        ? profile.durationSeconds
-        : normalizeDuration(durationOverride, profile.durationSeconds),
-      timeline: [{ type: 'started', at: startedAt, taskId: validTaskId, taskTitle: validTaskId ? activeTasks.value.find(task => task.id === validTaskId)?.title || '' : '' }]
+      durationSeconds,
+      timeline: [{ type: 'started', at: startedAt, durationSeconds, taskId: validTaskId, taskTitle: validTaskId ? activeTasks.value.find(task => task.id === validTaskId)?.title || '' : '' }]
     }
     focusClockNow.value = Date.now()
     syncFocusTimer()
@@ -2329,7 +2332,7 @@ export const useTaskStore = defineStore('task', () => {
       elapsedSeconds: 0,
       phase: pending.phase,
       durationSeconds: pending.durationSeconds,
-      timeline: [{ type: 'started', at: startedAt }]
+      timeline: [{ type: 'started', at: startedAt, durationSeconds: pending.durationSeconds }]
     }
     clock.value.pendingBreak = null
     focusClockNow.value = Date.now()
