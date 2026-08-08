@@ -536,6 +536,7 @@
               </div>
             </div>
             <div class="review-detail-header__actions">
+              <span v-if="detailProgressLabel" class="review-detail-progress">{{ detailProgressLabel }}</span>
               <button v-if="hasPrevDetail || hasNextDetail" type="button" class="review-detail-nav" :disabled="!hasPrevDetail" aria-label="上一条" title="上一条（↑）" @click="goPrevDetail"><ChevronUp :size="16" /></button>
               <button v-if="hasPrevDetail || hasNextDetail" type="button" class="review-detail-nav" :disabled="!hasNextDetail" aria-label="下一条" title="下一条（↓）" @click="goNextDetail"><ChevronDown :size="16" /></button>
               <button type="button" aria-label="关闭详情" title="关闭（Esc）" @click="closeDetail"><X :size="19" /></button>
@@ -556,10 +557,14 @@
                 <div><span>过程变化</span><strong>{{ focusChangeLabel(detail.item) }}</strong></div>
               </div>
             </section>
-            <section v-if="focusDurationStory(detail.item)" class="review-focus-story" aria-label="计划与实际">
+            <section v-if="detailFocusStory" class="review-focus-story" aria-label="计划与实际">
               <span>计划与实际</span>
-              <strong>{{ formatDuration(focusDurationStory(detail.item).initialSeconds) }}<ArrowRight :size="14" />{{ formatDuration(focusDurationStory(detail.item).finalSeconds) }}<ArrowRight :size="14" />{{ formatDuration(detail.item.elapsedSeconds) }}</strong>
-              <small>原计划 → 调整后目标 → 实际完成 · 中途调整 {{ focusDurationStory(detail.item).adjustments }} 次</small>
+              <strong>{{ formatDuration(detailFocusStory.initialSeconds) }}<ArrowRight :size="14" />{{ formatDuration(detailFocusStory.finalSeconds) }}<ArrowRight :size="14" />{{ formatDuration(detail.item.elapsedSeconds) }}</strong>
+              <small>原计划 → 调整后目标 → 实际完成 · 中途调整 {{ detailFocusStory.adjustments }} 次</small>
+            </section>
+            <section class="review-detail-insight is-focus" aria-label="本次专注小结">
+              <Sparkles :size="16" />
+              <div><span>本次小结</span><strong>{{ focusOutcomeSummary(detail.item) }}</strong></div>
             </section>
             <section class="review-detail-section">
               <header><Activity :size="16" /><h3>记录信息</h3></header>
@@ -569,6 +574,7 @@
                 <div><dt>结束结果</dt><dd>{{ resultLabel(detail.item.result) }}</dd></div>
                 <div><dt>关联任务</dt><dd><button v-if="detail.item.taskId" type="button" class="review-detail-task-link" @click="openLinkedTask(detail.item)">{{ detail.item.taskTitle || '打开任务' }}<ExternalLink :size="12" /></button><span v-else>未关联任务</span></dd></div>
               </dl>
+              <p v-if="focusTaskChangeCount(detail.item)" class="review-detail-context-note"><Activity :size="13" />过程中调整过 {{ focusTaskChangeCount(detail.item) }} 次任务关联，以上显示最终关联任务。</p>
             </section>
             <section class="review-detail-section">
               <header><Clock3 :size="16" /><h3>过程回放</h3><span class="review-detail-section__count">{{ focusTimelineSummary(detail.item).length }} 个重点</span></header>
@@ -640,6 +646,15 @@
                 <div><span>中途延后</span><strong>{{ detail.item.snoozeMinutes ? `${detail.item.snoozeMinutes} 分钟` : '未延后' }}</strong></div>
               </div>
             </section>
+            <section v-if="detailRhythmPattern.count > 1" class="review-rhythm-pattern" aria-label="同一提醒的近期处理情况">
+              <header><span>这条提醒的近期表现</span><small>最近 {{ detailRhythmPattern.count }} 次</small></header>
+              <div class="review-rhythm-pattern__stats">
+                <span><strong>{{ detailRhythmPattern.completed }}</strong>完成或离席</span>
+                <span><strong>{{ detailRhythmPattern.snoozed }}</strong>延后</span>
+                <span><strong>{{ detailRhythmPattern.skipped }}</strong>跳过或稍后</span>
+              </div>
+              <p>{{ rhythmPatternDescription(detail.item) }}</p>
+            </section>
             <section class="review-detail-section">
               <header>
                 <BellRing :size="16" />
@@ -700,7 +715,11 @@
 
           <footer>
             <button type="button" class="review-detail-delete" @click="deleteDetail"><Trash2 :size="15" />删除这条记录</button>
-            <button type="button" class="review-detail-close" @click="closeDetail">关闭详情</button>
+            <div class="review-detail-footer__actions">
+              <button v-if="detail.kind === 'focus' && detail.item.taskId" type="button" class="review-detail-context-action" @click="openLinkedTask(detail.item)"><ExternalLink :size="14" />打开关联任务</button>
+              <button v-else-if="detail.kind === 'rhythm'" type="button" class="review-detail-context-action" @click="openRhythmRule"><BellRing :size="14" />调整提醒</button>
+              <button type="button" class="review-detail-close" @click="closeDetail">关闭详情</button>
+            </div>
           </footer>
         </aside>
       </div>
@@ -1544,6 +1563,9 @@ const detailList = computed(() => {
 })
 const hasPrevDetail = computed(() => detailList.value.length > 0 && detailIndex.value > 0)
 const hasNextDetail = computed(() => detailList.value.length > 0 && detailIndex.value < detailList.value.length - 1)
+const detailProgressLabel = computed(() => detailIndex.value >= 0 && detailList.value.length > 1 ? `${detailIndex.value + 1} / ${detailList.value.length}` : '')
+const detailFocusStory = computed(() => detail.value?.kind === 'focus' ? focusDurationStory(detail.value.item) : null)
+const detailRhythmPattern = computed(() => detail.value?.kind === 'rhythm' ? rhythmPattern(detail.value.item) : { count: 0, completed: 0, snoozed: 0, skipped: 0 })
 
 // 洞察卡片：自动从数据中生成 1-3 条高亮信息
 const insights = computed(() => {
@@ -2405,6 +2427,39 @@ function rhythmOutcomeDescription(item) {
   if (item.action === 'skipped-today') return '今天不再为这条提醒打扰你'
   return `${formatResponseTime(item.responseSeconds)}后处理`
 }
+function focusTaskChangeCount(item) { return (item.timeline || []).filter(event => event.type === 'task-changed').length }
+function focusOutcomeSummary(item) {
+  const story = focusDurationStory(item)
+  if (story && item.result === 'completed') {
+    const delta = Number(item.elapsedSeconds) - story.initialSeconds
+    if (delta > 0) return `比原计划多投入 ${formatDuration(delta)}，这一段已顺利完成。`
+    if (delta < 0) return `在原计划前结束，实际投入 ${formatDuration(item.elapsedSeconds)}。`
+  }
+  if (item.result !== 'completed') return `本次以“${resultLabel(item.result)}”结束，实际留下 ${formatDuration(item.elapsedSeconds)} 的投入记录。`
+  if (focusPauseCount(item)) return `完成这段专注，中途有 ${focusInterruptionLabel(item)}。`
+  return `完成这段专注，过程保持连贯。`
+}
+function rhythmPattern(item) {
+  const key = item.reminderId || item.reminderTitle
+  const records = rhythmHistory.value
+    .filter(entry => (entry.reminderId || entry.reminderTitle) === key)
+    .sort((a, b) => new Date(b.resolvedAt) - new Date(a.resolvedAt))
+    .slice(0, 7)
+  return records.reduce((summary, entry) => {
+    summary.count += 1
+    if (['completed', 'natural-break'].includes(entry.action)) summary.completed += 1
+    else if (entry.action === 'snoozed') summary.snoozed += 1
+    else summary.skipped += 1
+    return summary
+  }, { count: 0, completed: 0, snoozed: 0, skipped: 0 })
+}
+function rhythmPatternDescription(item) {
+  const pattern = rhythmPattern(item)
+  if (pattern.completed === pattern.count) return '最近几次都顺利处理，可以继续保持当前节奏。'
+  if (pattern.snoozed > pattern.completed) return '近期延后较多；如果经常不方便处理，可以考虑调整提醒时机。'
+  if (pattern.skipped > pattern.completed) return '近期跳过或稍后处理较多；可以检查这条提醒是否仍适合当前安排。'
+  return '近期处理方式较为均衡，可按需要继续观察。'
+}
 function focusEventLabel(event) { return ({ started: '开始计时', paused: '暂停', resumed: '继续计时', 'duration-adjusted': '调整时长', 'task-changed': '更换关联任务', finished: '结束并记录' }[event.type] || '状态变化') }
 function focusEventDescription(event) {
   if (event.type === 'resumed' && event.pausedSeconds) return `本次暂停 ${formatDuration(event.pausedSeconds)}`
@@ -2927,6 +2982,7 @@ onBeforeUnmount(() => {
 .review-detail-heading p { margin: 0; color: var(--text-muted); font-size: 10px; font-variant-numeric: tabular-nums; }
 .review-detail > header button { display: grid; width: 38px; height: 38px; flex: 0 0 auto; place-items: center; border-radius: 10px; color: var(--text-muted); }
 .review-detail > header button:hover { background: var(--surface-muted); color: var(--text); }
+.review-detail-progress { min-width: 38px; color: var(--text-muted); font-size: 10px; font-variant-numeric: tabular-nums; text-align: center; }
 .review-detail-hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px 18px; margin: 10px 20px 8px; padding: 12px 16px; border: 1px solid var(--divider-soft); border-radius: 16px; }
 .review-detail-hero.is-focus { background: linear-gradient(145deg, var(--accent-tint), var(--surface)); }
 .review-detail-hero.is-rhythm { background: linear-gradient(145deg, #f2f7fb, var(--surface)); }
@@ -2952,6 +3008,21 @@ onBeforeUnmount(() => {
 .review-focus-story > strong { display: flex; align-items: center; gap: 7px; color: var(--text); font-size: 14px; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
 .review-focus-story > strong svg { color: var(--accent); }
 .review-focus-story > small { color: var(--text-muted); font-size: 10.5px; }
+.review-detail-insight { display: flex; align-items: flex-start; gap: 9px; margin: 0 20px 10px; padding: 11px 13px; border-radius: 12px; background: var(--surface-muted); }
+.review-detail-insight.is-focus { border: 1px solid color-mix(in srgb, var(--accent) 15%, var(--divider-soft)); background: linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 52%, var(--surface)), var(--surface)); }
+.review-detail-insight > svg { flex: 0 0 auto; margin-top: 2px; color: var(--accent-strong); }
+.review-detail-insight > div { display: grid; gap: 2px; }
+.review-detail-insight span { color: var(--accent-strong); font-size: 10px; font-weight: 700; }
+.review-detail-insight strong { color: var(--text); font-size: 11.5px; font-weight: 620; line-height: 1.55; }
+.review-rhythm-pattern { display: grid; gap: 9px; margin: 0 20px 10px; padding: 13px 14px; border: 1px solid #dbe7f0; border-radius: 13px; background: linear-gradient(135deg, #f2f7fb, var(--surface)); }
+.review-rhythm-pattern > header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.review-rhythm-pattern > header span { color: #426d8e; font-size: 11px; font-weight: 730; }
+.review-rhythm-pattern > header small { color: var(--text-muted); font-size: 10px; }
+.review-rhythm-pattern__stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: hidden; border: 1px solid rgba(79, 127, 166, .14); border-radius: 9px; background: rgba(255, 255, 255, .68); }
+.review-rhythm-pattern__stats span { display: grid; gap: 2px; padding: 8px 9px; color: var(--text-muted); font-size: 9.5px; line-height: 1.35; }
+.review-rhythm-pattern__stats span + span { border-left: 1px solid rgba(79, 127, 166, .13); }
+.review-rhythm-pattern__stats strong { color: #3f6d91; font-size: 14px; font-variant-numeric: tabular-nums; }
+.review-rhythm-pattern > p { margin: 0; color: #536e81; font-size: 10.5px; line-height: 1.5; }
 .review-detail-section { padding: 18px 20px 16px; border-top: 1px solid var(--border); }
 .review-detail-section > header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; color: var(--accent-strong); }
 .review-detail-section > header svg { color: var(--accent-strong); }
@@ -3009,8 +3080,13 @@ onBeforeUnmount(() => {
 .review-detail-task-link { display: inline-flex; align-items: center; gap: 4px; color: var(--accent-strong); font: inherit; font-size: 11px; font-weight: 650; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--accent) 35%, transparent); text-underline-offset: 2px; transition: text-decoration-color var(--transition-fast); }
 .review-detail-task-link:hover { text-decoration-color: var(--accent-strong); }
 .review-detail-task-link svg { flex-shrink: 0; }
+.review-detail-context-note { display: flex; align-items: flex-start; gap: 5px; margin: 10px 0 0; padding: 8px 10px; border-radius: 8px; background: var(--surface-muted); color: var(--text-muted); font-size: 10.5px; line-height: 1.45; }
+.review-detail-context-note svg { flex: 0 0 auto; margin-top: 1px; color: var(--accent-strong); }
 .review-detail > footer { position: sticky; z-index: 2; bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; padding: 14px 20px; border-top: 1px solid var(--divider-soft); background-color: var(--surface, #fff); box-shadow: 0 -8px 20px var(--text-4-fallback); }
 .review-detail > footer button { display: inline-flex; min-height: 42px; align-items: center; justify-content: center; gap: 6px; padding: 0 13px; border-radius: 10px; font-size: 12px; font-weight: 680; }
+.review-detail-footer__actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.review-detail-context-action { min-height: 36px !important; border: 1px solid var(--divider-soft); background: var(--surface); color: var(--accent-strong); }
+.review-detail-context-action:hover { border-color: var(--accent); background: var(--accent-soft); }
 .review-detail-delete { min-height: 34px !important; padding: 0 9px !important; border: 0; background: transparent; color: #b05757; }
 .review-detail-delete:hover { background: #f7e3e0; border-color: rgba(176, 87, 87, .3); color: #a04949; }
 .review-detail-close { min-width: 86px; background: var(--accent); color: #fff; }
@@ -3019,7 +3095,7 @@ onBeforeUnmount(() => {
 @media (max-width: 900px) {
   .review-filters label { flex-basis: 100%; }
 }
-@media (max-width: 680px) { .review-workspace { padding: 14px; }.review-header { display: grid; gap: 14px; }.review-range, .review-tabs { overflow-x: auto; }.review-tabs button { white-space: nowrap; }.review-metrics { grid-template-columns: 1fr 1fr; }.review-metric { min-height: 88px; padding: 12px; }.review-recent__header { display: grid !important; }.review-recent-switch { width: 100%; }.review-recent-switch button { flex: 1; }.review-recent__footer { display: grid; }.review-recent__footer > div { display: grid; grid-template-columns: 1fr 1fr; }.review-filters label { flex-basis: 100%; }.review-filter-summary { gap: 4px 10px; }.review-pagination { flex-wrap: wrap; justify-content: space-between; }.review-detail-hero { grid-template-columns: 1fr; }.review-detail-hero__window { justify-content: space-between; }.review-detail-hero__stats { grid-template-columns: 1fr; }.review-detail-hero__stats > div + div { border-left: 0; border-top: 1px solid var(--divider-soft); } }
+@media (max-width: 680px) { .review-workspace { padding: 14px; }.review-header { display: grid; gap: 14px; }.review-range, .review-tabs { overflow-x: auto; }.review-tabs button { white-space: nowrap; }.review-metrics { grid-template-columns: 1fr 1fr; }.review-metric { min-height: 88px; padding: 12px; }.review-recent__header { display: grid !important; }.review-recent-switch { width: 100%; }.review-recent-switch button { flex: 1; }.review-recent__footer { display: grid; }.review-recent__footer > div { display: grid; grid-template-columns: 1fr 1fr; }.review-filters label { flex-basis: 100%; }.review-filter-summary { gap: 4px 10px; }.review-pagination { flex-wrap: wrap; justify-content: space-between; }.review-detail-hero { grid-template-columns: 1fr; }.review-detail-hero__window { justify-content: space-between; }.review-detail-hero__stats { grid-template-columns: 1fr; }.review-detail-hero__stats > div + div { border-left: 0; border-top: 1px solid var(--divider-soft); }.review-rhythm-pattern__stats { grid-template-columns: 1fr; }.review-rhythm-pattern__stats span + span { border-top: 1px solid rgba(79, 127, 166, .13); border-left: 0; }.review-detail-footer__actions { flex-wrap: wrap; } }
 /* 新增：本期亮点洞察 */
 .review-insights { display: grid; gap: clamp(8px, 1.2vw, 12px); margin-bottom: clamp(10px, 1.4vw, 16px); padding: clamp(12px, 1.6vw, 16px); border: 1px solid var(--accent-34-fallback); border-radius: 16px; background: linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 70%, var(--surface)) 0%, var(--surface) 100%); }
 .review-insights > header { display: flex; align-items: center; gap: 7px; color: var(--accent-strong); }
