@@ -347,11 +347,15 @@
               @update:custom-start="customStart = $event"
               @update:custom-end="customEnd = $event"
             />
-            <ReviewSelect v-model="focusResult" :options="FOCUS_RESULT_OPTIONS" aria-label="筛选专注结果" />
-            <ReviewSelect v-model="focusPhase" :options="FOCUS_PHASE_OPTIONS" aria-label="筛选专注类型" />
-            <ReviewSelect v-model="focusPause" :options="FOCUS_PAUSE_OPTIONS" aria-label="筛选暂停情况" />
-            <ReviewSelect v-model="focusSort" :options="FOCUS_SORT_OPTIONS" aria-label="专注记录排序" />
-            <button v-if="focusFilterCount" class="review-filter-reset" type="button" @click="resetFocusFilters"><RotateCcw :size="14" />重置筛选</button>
+            <button type="button" class="review-filter-toggle" :class="{ active: focusFiltersOpen }" :aria-expanded="focusFiltersOpen" @click="focusFiltersOpen = !focusFiltersOpen"><SlidersHorizontal :size="14" />筛选<span v-if="focusFilterCount">{{ focusFilterCount }}</span></button>
+            <button type="button" class="review-manage-toggle" :class="{ active: focusManageMode }" :aria-pressed="focusManageMode" @click="toggleFocusManageMode">{{ focusManageMode ? '完成整理' : '整理记录' }}</button>
+            <template v-if="focusFiltersOpen">
+              <ReviewSelect v-model="focusResult" :options="FOCUS_RESULT_OPTIONS" aria-label="筛选专注结果" />
+              <ReviewSelect v-model="focusPhase" :options="FOCUS_PHASE_OPTIONS" aria-label="筛选专注类型" />
+              <ReviewSelect v-model="focusPause" :options="FOCUS_PAUSE_OPTIONS" aria-label="筛选暂停情况" />
+              <ReviewSelect v-model="focusSort" :options="FOCUS_SORT_OPTIONS" aria-label="专注记录排序" />
+              <button v-if="focusFilterCount" class="review-filter-reset" type="button" @click="resetFocusFilters"><RotateCcw :size="14" />重置筛选</button>
+            </template>
           </div>
         </div>
         <div v-if="!focusHistory.length" class="review-empty review-empty--inline">
@@ -369,9 +373,9 @@
         <div class="review-filter-summary" aria-label="当前筛选的专注统计">
           <div v-if="focusFilterCount"><span>已启用</span><strong>{{ focusFilterCount }} 项条件</strong></div>
           <div><span>匹配记录</span><strong>{{ formatCount(filteredFocusRecords.length) }} 条</strong></div>
-          <div><span>有效时长</span><strong>{{ formatDuration(filteredFocusSeconds) }}</strong></div>
+          <div><span>专注投入</span><strong>{{ formatDuration(filteredFocusSeconds) }}</strong></div>
           <div><span>完成率</span><strong>{{ filteredFocusCompletionRate }}%</strong></div>
-          <div><span>暂停情况</span><strong>{{ filteredFocusPauseCount }} 次 · {{ formatDuration(filteredFocusPausedSeconds) }}</strong></div>
+          <div class="review-filter-summary__secondary"><span>暂停</span><strong>{{ filteredFocusPauseCount }} 次 · {{ formatDuration(filteredFocusPausedSeconds) }}</strong></div>
           <div class="review-filter-summary__export">
             <div class="review-export-menu">
               <button type="button" class="review-export-btn" :class="{ active: exportMenuOpen.focus }" :aria-expanded="exportMenuOpen.focus" aria-haspopup="menu" @click.stop="toggleExportMenu('focus')">
@@ -393,22 +397,22 @@
             <button type="button" class="is-danger" @click="batchDeleteFocus"><Trash2 :size="14" />批量删除</button>
           </div>
         </div>
-        <div v-if="pagedFocusRecords.length" class="review-record-table">
+        <div v-if="pagedFocusRecords.length" class="review-record-table" :class="{ 'is-managing': focusManageMode }">
           <div class="review-record-table__head" aria-hidden="true">
-            <label class="review-record-check"><input type="checkbox" :checked="allFocusSelected" :indeterminate.prop="someFocusSelected" aria-label="全选当前筛选的专注记录" @change="toggleSelectAllFocus" /></label>
-            <span>记录</span><span>起止时间</span><span>结果</span><span>操作</span>
+            <label v-if="focusManageMode" class="review-record-check"><input type="checkbox" :checked="allFocusSelected" :indeterminate.prop="someFocusSelected" aria-label="全选当前筛选的专注记录" @change="toggleSelectAllFocus" /></label>
+            <span>记录</span><span>时间</span><span>时长与状态</span><span></span>
           </div>
           <article v-for="item in pagedFocusRecords" :key="item.id" class="review-record-row" :class="{ 'is-selected': selectedFocusIds.has(item.id) }">
-            <label class="review-record-check"><input type="checkbox" :checked="selectedFocusIds.has(item.id)" :aria-label="`选择${focusTitle(item)}`" @change="toggleFocusSelect(item.id)" /></label>
+            <label v-if="focusManageMode" class="review-record-check"><input type="checkbox" :checked="selectedFocusIds.has(item.id)" :aria-label="`选择${focusTitle(item)}`" @change="toggleFocusSelect(item.id)" /></label>
             <button class="review-record-open" type="button" @click="openDetail('focus', item)">
               <span class="review-record-icon is-focus"><FocusRewardBadge v-if="item.reward" :reward="item.reward" size="sm" /><Coffee v-else-if="item.phase !== 'focus'" :size="17" /><Timer v-else :size="17" /></span>
-              <span class="review-record-main"><strong>{{ focusTitle(item) }}</strong><small>{{ profileName(item.profileId, item) }} · {{ focusPauseCount(item) ? `暂停 ${focusPauseCount(item)} 次` : '未暂停' }}</small></span>
+              <span class="review-record-main"><strong>{{ focusTitle(item) }}</strong><small>{{ item.phase === 'focus' ? `${profileName(item.profileId, item)} · ${focusPauseCount(item) ? `暂停 ${focusPauseCount(item)} 次` : '未暂停'}` : `${phaseLabel(item.phase)} · 不计入专注投入` }}</small></span>
             </button>
             <span class="review-record-time"><strong>{{ formatShortDate(item.finishedAt) }}</strong><small>{{ formatTimeRange(item.startedAt, item.finishedAt) }}</small></span>
-            <span class="review-record-meta"><strong>{{ formatCompactDuration(item.elapsedSeconds) }}</strong><small>{{ resultLabel(item.result) }}</small></span>
+            <span class="review-record-meta"><strong>{{ item.phase === 'focus' ? formatCompactDuration(item.elapsedSeconds) : formatCompactDuration(item.elapsedSeconds) }}</strong><small :class="['review-record-status', `is-${item.result}`]">{{ resultLabel(item.result) }}</small></span>
             <span class="review-record-actions">
-              <button type="button" aria-label="查看专注详情" data-label="查看专注详情" title="查看详情" @click="openDetail('focus', item)"><Eye :size="16" /></button>
-              <button class="is-danger" type="button" aria-label="删除专注记录" data-label="删除专注记录" title="删除记录" @click="deleteFocusRecord(item)"><Trash2 :size="16" /></button>
+              <button v-if="focusManageMode" class="is-danger" type="button" aria-label="删除专注记录" data-label="删除专注记录" title="删除记录" @click="deleteFocusRecord(item)"><Trash2 :size="16" /></button>
+              <button v-else type="button" aria-label="查看专注详情" data-label="查看专注详情" title="查看详情" @click="openDetail('focus', item)"><ChevronRight :size="17" /></button>
             </span>
           </article>
         </div>
@@ -437,10 +441,14 @@
               @update:custom-start="customStart = $event"
               @update:custom-end="customEnd = $event"
             />
-            <ReviewSelect v-model="rhythmAction" :options="RHYTHM_ACTION_OPTIONS" aria-label="筛选节律处理结果" />
-            <ReviewSelect v-model="rhythmTrigger" :options="RHYTHM_TRIGGER_OPTIONS" aria-label="筛选节律触发方式" />
-            <ReviewSelect v-model="rhythmSort" :options="RHYTHM_SORT_OPTIONS" aria-label="节律记录排序" />
-            <button v-if="rhythmFilterCount" class="review-filter-reset" type="button" @click="resetRhythmFilters"><RotateCcw :size="14" />重置</button>
+            <button type="button" class="review-filter-toggle" :class="{ active: rhythmFiltersOpen }" :aria-expanded="rhythmFiltersOpen" @click="rhythmFiltersOpen = !rhythmFiltersOpen"><SlidersHorizontal :size="14" />筛选<span v-if="rhythmFilterCount">{{ rhythmFilterCount }}</span></button>
+            <button type="button" class="review-manage-toggle" :class="{ active: rhythmManageMode }" :aria-pressed="rhythmManageMode" @click="toggleRhythmManageMode">{{ rhythmManageMode ? '完成整理' : '整理记录' }}</button>
+            <template v-if="rhythmFiltersOpen">
+              <ReviewSelect v-model="rhythmAction" :options="RHYTHM_ACTION_OPTIONS" aria-label="筛选节律处理结果" />
+              <ReviewSelect v-model="rhythmTrigger" :options="RHYTHM_TRIGGER_OPTIONS" aria-label="筛选节律触发方式" />
+              <ReviewSelect v-model="rhythmSort" :options="RHYTHM_SORT_OPTIONS" aria-label="节律记录排序" />
+              <button v-if="rhythmFilterCount" class="review-filter-reset" type="button" @click="resetRhythmFilters"><RotateCcw :size="14" />重置筛选</button>
+            </template>
           </div>
         </div>
         <div v-if="!rhythmHistory.length" class="review-empty review-empty--inline">
@@ -482,13 +490,13 @@
             <button type="button" class="is-danger" @click="batchDeleteRhythm"><Trash2 :size="14" />批量删除</button>
           </div>
         </div>
-        <div v-if="pagedRhythmRecords.length" class="review-record-table">
+        <div v-if="pagedRhythmRecords.length" class="review-record-table" :class="{ 'is-managing': rhythmManageMode }">
           <div class="review-record-table__head" aria-hidden="true">
-            <label class="review-record-check"><input type="checkbox" :checked="allRhythmSelected" :indeterminate.prop="someRhythmSelected" aria-label="全选当前筛选的节律记录" @change="toggleSelectAllRhythm" /></label>
-            <span>提醒</span><span>提醒与处理</span><span>结果</span><span>操作</span>
+            <label v-if="rhythmManageMode" class="review-record-check"><input type="checkbox" :checked="allRhythmSelected" :indeterminate.prop="someRhythmSelected" aria-label="全选当前筛选的节律记录" @change="toggleSelectAllRhythm" /></label>
+            <span>提醒</span><span>到点与处理</span><span>处理结果</span><span></span>
           </div>
           <article v-for="item in pagedRhythmRecords" :key="item.id" class="review-record-row" :class="{ 'is-selected': selectedRhythmIds.has(item.id) }">
-            <label class="review-record-check"><input type="checkbox" :checked="selectedRhythmIds.has(item.id)" :aria-label="`选择${item.reminderTitle}`" @change="toggleRhythmSelect(item.id)" /></label>
+            <label v-if="rhythmManageMode" class="review-record-check"><input type="checkbox" :checked="selectedRhythmIds.has(item.id)" :aria-label="`选择${item.reminderTitle}`" @change="toggleRhythmSelect(item.id)" /></label>
             <button class="review-record-open" type="button" @click="openDetail('rhythm', item)">
               <span class="review-record-icon is-rhythm"><BellRing :size="17" /></span>
               <span class="review-record-main"><strong>{{ item.reminderTitle }}</strong><small>{{ triggerTypeLabel(item.triggerType) }} · {{ item.triggerLabel || '未记录规则' }}</small></span>
@@ -496,9 +504,8 @@
             <span class="review-record-time"><strong>{{ formatShortDate(item.triggeredAt) }}</strong><small>{{ formatClock(item.triggeredAt) }} → {{ formatClock(item.resolvedAt) }}</small></span>
             <span class="review-record-meta"><strong :class="`rhythm-action rhythm-action--${item.action}`">{{ rhythmActionLabel(item.action) }}</strong><small>{{ formatResponseTime(item.responseSeconds) }}响应</small></span>
             <span class="review-record-actions">
-              <button type="button" aria-label="查看节律详情" data-label="查看节律详情" title="查看详情" @click="openDetail('rhythm', item)"><Eye :size="16" /></button>
-              <button type="button" aria-label="查看提醒规则" data-label="查看提醒规则" title="查看提醒规则" @click="openRhythmRuleFromRow(item)"><ExternalLink :size="16" /></button>
-              <button class="is-danger" type="button" aria-label="删除节律记录" data-label="删除节律记录" title="删除记录" @click="deleteRhythmRecord(item)"><Trash2 :size="16" /></button>
+              <template v-if="rhythmManageMode"><button type="button" aria-label="查看提醒规则" data-label="查看提醒规则" title="查看提醒规则" @click="openRhythmRuleFromRow(item)"><ExternalLink :size="16" /></button><button class="is-danger" type="button" aria-label="删除节律记录" data-label="删除节律记录" title="删除记录" @click="deleteRhythmRecord(item)"><Trash2 :size="16" /></button></template>
+              <button v-else type="button" aria-label="查看节律详情" data-label="查看节律详情" title="查看详情" @click="openDetail('rhythm', item)"><ChevronRight :size="17" /></button>
             </span>
           </article>
         </div>
@@ -544,10 +551,15 @@
                 <div><span>结束</span><strong>{{ formatClock(detail.item.finishedAt) }}</strong><small>{{ formatShortDate(detail.item.finishedAt) }}</small></div>
               </div>
               <div class="review-detail-hero__stats">
-                <div><span>暂停次数</span><strong>{{ focusPauseCount(detail.item) }} 次</strong></div>
-                <div><span>暂停总时长</span><strong>{{ formatDuration(focusPausedSeconds(detail.item)) }}</strong></div>
                 <div><span>实际时间跨度</span><strong>{{ formatDuration(focusWallSeconds(detail.item)) }}</strong></div>
+                <div><span>中途暂停</span><strong>{{ focusInterruptionLabel(detail.item) }}</strong></div>
+                <div><span>过程变化</span><strong>{{ focusChangeLabel(detail.item) }}</strong></div>
               </div>
+            </section>
+            <section v-if="focusDurationStory(detail.item)" class="review-focus-story" aria-label="计划与实际">
+              <span>计划与实际</span>
+              <strong>{{ formatDuration(focusDurationStory(detail.item).initialSeconds) }}<ArrowRight :size="14" />{{ formatDuration(focusDurationStory(detail.item).finalSeconds) }}<ArrowRight :size="14" />{{ formatDuration(detail.item.elapsedSeconds) }}</strong>
+              <small>原计划 → 调整后目标 → 实际完成 · 中途调整 {{ focusDurationStory(detail.item).adjustments }} 次</small>
             </section>
             <section class="review-detail-section">
               <header><Activity :size="16" /><h3>记录信息</h3></header>
@@ -559,11 +571,11 @@
               </dl>
             </section>
             <section class="review-detail-section">
-              <header><Clock3 :size="16" /><h3>过程时间线</h3><span class="review-detail-section__count">{{ detail.item.timeline?.length || 0 }} 个节点</span></header>
+              <header><Clock3 :size="16" /><h3>过程回放</h3><span class="review-detail-section__count">{{ focusTimelineSummary(detail.item).length }} 个重点</span></header>
               <ol v-if="detail.item.timeline?.length" class="review-timeline">
-                <li v-for="(event, index) in detail.item.timeline" :key="`${event.type}-${event.at}-${index}`">
+                <li v-for="(event, index) in focusTimelineSummary(detail.item)" :key="`${event.type}-${event.at}-${index}`" :class="{ 'is-summary': event.isSummary }">
                   <i :class="`is-${event.type}`"></i>
-                  <div><strong>{{ focusEventLabel(event) }}</strong><span>{{ formatFullDateTime(event.at) }}</span><small v-if="focusEventDescription(event)">{{ focusEventDescription(event) }}</small></div>
+                  <div><strong>{{ event.isSummary ? `调整时长 ${event.count} 次` : focusEventLabel(event) }}</strong><span :title="formatFullDateTime(event.at)">{{ formatClock(event.at) }}</span><small>{{ event.isSummary ? `目标从 ${formatDuration(event.initialSeconds)} 调整至 ${formatDuration(event.finalSeconds)}` : focusEventDescription(event) }}</small></div>
                 </li>
               </ol>
               <div v-else class="review-detail-legacy">
@@ -616,7 +628,7 @@
 
           <template v-else>
             <section class="review-detail-hero is-rhythm">
-              <div class="review-detail-hero__value"><span>本次处理结果</span><strong>{{ rhythmActionLabel(detail.item.action) }}</strong><small>{{ formatResponseTime(detail.item.responseSeconds) }}后响应</small></div>
+              <div class="review-detail-hero__value"><span>这次提醒如何处理</span><strong>{{ rhythmActionLabel(detail.item.action) }}</strong><small>{{ rhythmOutcomeDescription(detail.item) }}</small></div>
               <div class="review-detail-hero__window">
                 <div><span>提醒</span><strong>{{ formatClock(detail.item.triggeredAt) }}</strong><small>{{ formatShortDate(detail.item.triggeredAt) }}</small></div>
                 <ArrowRight :size="19" />
@@ -624,15 +636,15 @@
               </div>
               <div class="review-detail-hero__stats">
                 <div><span>响应耗时</span><strong>{{ formatResponseTime(detail.item.responseSeconds) }}</strong></div>
-                <div><span>触发方式</span><strong>{{ triggerTypeLabel(detail.item.triggerType) }}</strong></div>
-                <div><span>延后时长</span><strong>{{ detail.item.snoozeMinutes ? `${detail.item.snoozeMinutes} 分钟` : '未延后' }}</strong></div>
+                <div><span>提醒规则</span><strong>{{ detail.item.triggerLabel || triggerTypeLabel(detail.item.triggerType) }}</strong></div>
+                <div><span>中途延后</span><strong>{{ detail.item.snoozeMinutes ? `${detail.item.snoozeMinutes} 分钟` : '未延后' }}</strong></div>
               </div>
             </section>
             <section class="review-detail-section">
               <header>
                 <BellRing :size="16" />
                 <h3>提醒信息</h3>
-                <button type="button" class="review-detail-edit" @click="openRhythmRule"><ExternalLink :size="13" />查看规则</button>
+                <button type="button" class="review-detail-edit" @click="openRhythmRule"><ExternalLink :size="13" />调整提醒规则</button>
               </header>
               <dl class="review-detail-fields">
                 <div><dt>触发方式</dt><dd>{{ triggerTypeLabel(detail.item.triggerType) }}</dd></div>
@@ -641,13 +653,13 @@
               </dl>
             </section>
             <section class="review-detail-section">
-              <header><Activity :size="16" /><h3>响应过程</h3><span class="review-detail-section__count">{{ rhythmTimeline(detail.item).length }} 个节点</span></header>
+              <header><Activity :size="16" /><h3>提醒与处理</h3><span class="review-detail-section__count">{{ rhythmTimeline(detail.item).length }} 个节点</span></header>
               <ol class="review-timeline">
                 <li v-for="(event, index) in rhythmTimeline(detail.item)" :key="`${event.type}-${event.at}-${index}`">
                   <i :class="`is-${event.type}`"></i>
                   <div>
                     <strong>{{ rhythmEventLabel(event) }}</strong>
-                    <span>{{ formatFullDateTime(event.at) }}</span>
+                    <span :title="formatFullDateTime(event.at)">{{ formatClock(event.at) }}</span>
                     <small v-if="rhythmEventDescription(event)">{{ rhythmEventDescription(event) }}</small>
                   </div>
                 </li>
@@ -688,7 +700,7 @@
 
           <footer>
             <button type="button" class="review-detail-delete" @click="deleteDetail"><Trash2 :size="15" />删除这条记录</button>
-            <button type="button" class="review-detail-close" @click="closeDetail">完成</button>
+            <button type="button" class="review-detail-close" @click="closeDetail">关闭详情</button>
           </footer>
         </aside>
       </div>
@@ -802,7 +814,7 @@ const RHYTHM_SORT_OPTIONS = [
 ]
 
 // 筛选状态：尝试从 localStorage 恢复上次选择。仅持久化稳定的偏好类状态（不含临时分页）
-const REVIEW_PREFS_KEY = 'simple-todo.review-prefs.v1'
+const REVIEW_PREFS_KEY = 'simple-todo.review-prefs.v2'
 const DEFAULT_REVIEW_PREFS = {
   range: '7d',
   activeTab: 'overview',
@@ -855,6 +867,10 @@ const focusPage = ref(1)
 const rhythmPage = ref(1)
 const focusPageSize = ref(reviewPrefs.focusPageSize)
 const rhythmPageSize = ref(reviewPrefs.rhythmPageSize)
+const focusFiltersOpen = ref(false)
+const rhythmFiltersOpen = ref(false)
+const focusManageMode = ref(false)
+const rhythmManageMode = ref(false)
 // 自定义日期范围（YYYY-MM-DD），默认近 7 天到今日
 function isoToday() { return dateKey(new Date()) }
 const customStart = ref(reviewPrefs.customStart || (() => { const d = new Date(); d.setDate(d.getDate() - 6); return dateKey(d) })())
@@ -1738,14 +1754,15 @@ const filteredRhythmRecords = computed(() => rhythmHistory.value.filter(item => 
   if (rhythmSort.value === 'slowest') return b.responseSeconds - a.responseSeconds
   return new Date(b.resolvedAt) - new Date(a.resolvedAt)
 }))
-const filteredFocusSeconds = computed(() => filteredFocusRecords.value.reduce((total, item) => total + item.elapsedSeconds, 0))
-const filteredFocusCompletionRate = computed(() => filteredFocusRecords.value.length ? Math.round(filteredFocusRecords.value.filter(item => item.result === 'completed').length / filteredFocusRecords.value.length * 100) : 0)
-const filteredFocusPauseCount = computed(() => filteredFocusRecords.value.reduce((total, item) => total + focusPauseCount(item), 0))
-const filteredFocusPausedSeconds = computed(() => filteredFocusRecords.value.reduce((total, item) => total + focusPausedSeconds(item), 0))
+const filteredFocusOnlyRecords = computed(() => filteredFocusRecords.value.filter(item => item.phase === 'focus'))
+const filteredFocusSeconds = computed(() => filteredFocusOnlyRecords.value.reduce((total, item) => total + item.elapsedSeconds, 0))
+const filteredFocusCompletionRate = computed(() => filteredFocusOnlyRecords.value.length ? Math.round(filteredFocusOnlyRecords.value.filter(item => item.result === 'completed').length / filteredFocusOnlyRecords.value.length * 100) : 0)
+const filteredFocusPauseCount = computed(() => filteredFocusOnlyRecords.value.reduce((total, item) => total + focusPauseCount(item), 0))
+const filteredFocusPausedSeconds = computed(() => filteredFocusOnlyRecords.value.reduce((total, item) => total + focusPausedSeconds(item), 0))
 const filteredRhythmCompletionRate = computed(() => filteredRhythmRecords.value.length ? Math.round(filteredRhythmRecords.value.filter(item => ['completed', 'natural-break'].includes(item.action)).length / filteredRhythmRecords.value.length * 100) : 0)
 const filteredRhythmResponseAverage = computed(() => filteredRhythmRecords.value.length ? filteredRhythmRecords.value.reduce((total, item) => total + item.responseSeconds, 0) / filteredRhythmRecords.value.length : 0)
 const filteredRhythmSnoozeCount = computed(() => filteredRhythmRecords.value.filter(item => item.action === 'snoozed').length)
-const focusFilterCount = computed(() => [focusSearch.value, focusResult.value !== 'all', focusPhase.value !== 'all', focusPause.value !== 'all', focusSort.value !== 'newest'].filter(Boolean).length)
+const focusFilterCount = computed(() => [focusSearch.value, focusResult.value !== 'all', focusPhase.value !== 'focus', focusPause.value !== 'all', focusSort.value !== 'newest'].filter(Boolean).length)
 const rhythmFilterCount = computed(() => [rhythmSearch.value, rhythmAction.value !== 'all', rhythmTrigger.value !== 'all', rhythmSort.value !== 'newest'].filter(Boolean).length)
 const focusPageCount = computed(() => Math.max(1, Math.ceil(filteredFocusRecords.value.length / focusPageSize.value)))
 const rhythmPageCount = computed(() => Math.max(1, Math.ceil(filteredRhythmRecords.value.length / rhythmPageSize.value)))
@@ -1784,6 +1801,14 @@ function toggleSelectAllRhythm() {
 }
 function clearFocusSelection() { selectedFocusIds.value = new Set() }
 function clearRhythmSelection() { selectedRhythmIds.value = new Set() }
+function toggleFocusManageMode() {
+  focusManageMode.value = !focusManageMode.value
+  if (!focusManageMode.value) clearFocusSelection()
+}
+function toggleRhythmManageMode() {
+  rhythmManageMode.value = !rhythmManageMode.value
+  if (!rhythmManageMode.value) clearRhythmSelection()
+}
 // 筛选条件变化时清空选中（避免选中已不在筛选结果里的项）
 watch([focusSearch, focusResult, focusPhase, focusPause, focusSort, range], clearFocusSelection)
 watch([rhythmSearch, rhythmAction, rhythmTrigger, rhythmSort, range], clearRhythmSelection)
@@ -2331,6 +2356,55 @@ function rhythmEventDescription(event) {
 function focusPauseCount(item) { return (item.timeline || []).filter(event => event.type === 'paused').length }
 function focusPausedSeconds(item) { return (item.timeline || []).reduce((total, event) => total + (['resumed', 'finished'].includes(event.type) ? Number(event.pausedSeconds) || 0 : 0), 0) }
 function focusWallSeconds(item) { return Math.max(0, Math.round((new Date(item.finishedAt).getTime() - new Date(item.startedAt).getTime()) / 1000)) }
+function focusInterruptionLabel(item) {
+  const count = focusPauseCount(item)
+  const seconds = focusPausedSeconds(item)
+  if (!count) return '未暂停'
+  if (seconds < 30) return `短暂操作 ${count} 次`
+  return `${count} 次 · ${formatDuration(seconds)}`
+}
+function focusChangeLabel(item) {
+  const timeline = item.timeline || []
+  const adjustments = timeline.filter(event => event.type === 'duration-adjusted').length
+  const taskChanges = timeline.filter(event => event.type === 'task-changed').length
+  if (!adjustments && !taskChanges) return '无'
+  return [adjustments ? `调时 ${adjustments} 次` : '', taskChanges ? `换任务 ${taskChanges} 次` : ''].filter(Boolean).join(' · ')
+}
+function focusDurationStory(item) {
+  const adjustments = (item.timeline || []).filter(event => event.type === 'duration-adjusted' && Number.isFinite(Number(event.durationSeconds)) && Number.isFinite(Number(event.deltaSeconds)))
+  if (!adjustments.length) return null
+  const first = adjustments[0]
+  const initialSeconds = Math.max(0, Number(first.durationSeconds) - Number(first.deltaSeconds))
+  const finalSeconds = Math.max(0, Number(adjustments[adjustments.length - 1].durationSeconds))
+  if (!initialSeconds || !finalSeconds) return null
+  return { initialSeconds, finalSeconds, adjustments: adjustments.length }
+}
+function focusTimelineSummary(item) {
+  const timeline = item.timeline || []
+  const adjustments = timeline.filter(event => event.type === 'duration-adjusted')
+  if (adjustments.length < 2) return timeline
+  const firstAdjust = adjustments[0]
+  const lastAdjust = adjustments[adjustments.length - 1]
+  const story = focusDurationStory(item)
+  let summaryAdded = false
+  return timeline.reduce((result, event) => {
+    if (event.type === 'duration-adjusted') {
+      if (!summaryAdded) {
+        result.push({ type: 'duration-adjusted', at: firstAdjust.at, isSummary: true, count: adjustments.length, initialSeconds: story?.initialSeconds || 0, finalSeconds: story?.finalSeconds || Number(lastAdjust.durationSeconds) || 0 })
+        summaryAdded = true
+      }
+      return result
+    }
+    result.push(event)
+    return result
+  }, [])
+}
+function rhythmOutcomeDescription(item) {
+  if (item.action === 'natural-break') return '检测到自然离席，已自动记录本次休息'
+  if (item.action === 'snoozed') return `已延后 ${item.snoozeMinutes || 0} 分钟，等待下一次提醒`
+  if (item.action === 'skipped-today') return '今天不再为这条提醒打扰你'
+  return `${formatResponseTime(item.responseSeconds)}后处理`
+}
 function focusEventLabel(event) { return ({ started: '开始计时', paused: '暂停', resumed: '继续计时', 'duration-adjusted': '调整时长', 'task-changed': '更换关联任务', finished: '结束并记录' }[event.type] || '状态变化') }
 function focusEventDescription(event) {
   if (event.type === 'resumed' && event.pausedSeconds) return `本次暂停 ${formatDuration(event.pausedSeconds)}`
@@ -2744,6 +2818,10 @@ onBeforeUnmount(() => {
 .review-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; padding: 0; }
 .review-filters label { display: flex; flex: 1 1 190px; min-width: 150px; height: 34px; align-items: center; gap: 7px; padding: 0 10px; border: 1px solid var(--divider-soft); border-radius: 9px; background: var(--surface); color: var(--text-muted); }
 .review-filters input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; font-size: 12px; }
+.review-filter-toggle, .review-manage-toggle { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; gap: 5px; padding: 0 10px; border: 1px solid var(--divider-soft); border-radius: 9px; background: var(--surface); color: var(--text-muted); font: inherit; font-size: 11.5px; font-weight: 650; cursor: pointer; transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast); }
+.review-filter-toggle span { display: grid; min-width: 16px; height: 16px; place-items: center; padding: 0 3px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-strong); font-size: 9px; }
+.review-filter-toggle:hover, .review-filter-toggle.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); }
+.review-manage-toggle:hover, .review-manage-toggle.active { border-color: var(--divider); background: var(--surface); color: var(--text); }
 .review-filters label:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .review-filter-reset { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; gap: 5px; padding: 0 14px; border: 0; border-radius: 8px; background: transparent; color: var(--accent-strong); font-size: 11px; font-weight: 680; white-space: nowrap; }
 .review-filter-reset:hover { background: var(--accent-soft); }
@@ -2757,7 +2835,8 @@ onBeforeUnmount(() => {
 .review-record-list button { display: grid; width: 100%; min-height: 58px; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 11px; padding: 8px 10px; border: 1px solid transparent; border-radius: 11px; color: var(--text-muted); text-align: left; transition: border-color var(--transition-fast), background var(--transition-fast); }
 .review-record-list button:hover { border-color: var(--divider-soft); background: var(--surface-muted); }
 .review-record-table { overflow: hidden; border: 1px solid var(--divider-soft); border-radius: 13px; }
-.review-record-table__head, .review-record-row { display: grid; grid-template-columns: 28px minmax(200px, 1fr) 118px 96px 112px; align-items: center; }
+.review-record-table__head, .review-record-row { display: grid; grid-template-columns: minmax(200px, 1fr) 118px 96px 42px; align-items: center; }
+.review-record-table.is-managing .review-record-table__head, .review-record-table.is-managing .review-record-row { grid-template-columns: 28px minmax(200px, 1fr) 118px 96px 74px; }
 .review-record-table__head { min-height: 34px; padding: 0 8px; border-bottom: 1px solid var(--divider-soft); background: var(--surface-muted); color: var(--text-muted); font-size: 10px; font-weight: 680; }
 .review-record-table__head span:nth-child(n + 3) { text-align: right; }
 .review-record-check { display: grid; place-items: center; }
@@ -2787,6 +2866,8 @@ onBeforeUnmount(() => {
 .review-record-time small { color: var(--text-muted); font-size: 10px; }
 .review-record-meta strong { color: var(--text); font-size: 12px; }
 .review-record-meta small { color: var(--text-muted); font-size: 10px; }
+.review-record-status { display: inline-flex; width: fit-content; padding: 2px 6px; border-radius: 999px; background: var(--surface-muted); color: var(--text-muted); font-weight: 650; }
+.review-record-status.is-completed { background: var(--accent-soft); color: var(--accent-strong); }
 .rhythm-action--completed { color: var(--accent-strong); }
 .rhythm-action--natural-break { color: var(--accent-strong); }
 .rhythm-action--snoozed { color: #c98a35; }
@@ -2866,6 +2947,11 @@ onBeforeUnmount(() => {
 .review-detail-hero__stats > div + div { border-left: 1px solid var(--divider-soft); }
 .review-detail-hero__stats span { color: var(--text-muted); font-size: 9.5px; }
 .review-detail-hero__stats strong { color: var(--text); font-size: 12px; font-variant-numeric: tabular-nums; }
+.review-focus-story { display: grid; gap: 4px; margin: 0 20px 10px; padding: 11px 14px; border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--divider-soft)); border-radius: 12px; background: color-mix(in srgb, var(--accent-soft) 45%, var(--surface)); }
+.review-focus-story > span { color: var(--accent-strong); font-size: 10px; font-weight: 720; }
+.review-focus-story > strong { display: flex; align-items: center; gap: 7px; color: var(--text); font-size: 14px; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.review-focus-story > strong svg { color: var(--accent); }
+.review-focus-story > small { color: var(--text-muted); font-size: 10.5px; }
 .review-detail-section { padding: 18px 20px 16px; border-top: 1px solid var(--border); }
 .review-detail-section > header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; color: var(--accent-strong); }
 .review-detail-section > header svg { color: var(--accent-strong); }
@@ -2887,6 +2973,7 @@ onBeforeUnmount(() => {
 .review-timeline strong { color: var(--text); font-size: 12px; font-weight: 680; }
 .review-timeline span { color: var(--text-muted); font-size: 10px; font-variant-numeric: tabular-nums; justify-self: end; white-space: nowrap; }
 .review-timeline small { grid-column: 1 / -1; color: var(--text-muted); font-size: 10px; line-height: 1.45; }
+.review-timeline li.is-summary { min-height: 48px; padding: 8px 10px 8px 0; border-radius: 10px; background: color-mix(in srgb, var(--accent-soft) 46%, transparent); }
 .review-detail-legacy { display: flex; align-items: flex-start; gap: 12px; padding: 13px; border: 1px solid #e7d9bd; border-radius: 12px; background: #fff9ee; color: #8a6a31; }
 .review-detail-legacy > svg { flex: 0 0 auto; margin-top: 2px; }
 .review-detail-legacy > div { display: grid; gap: 10px; min-width: 0; }
@@ -2924,7 +3011,7 @@ onBeforeUnmount(() => {
 .review-detail-task-link svg { flex-shrink: 0; }
 .review-detail > footer { position: sticky; z-index: 2; bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; padding: 14px 20px; border-top: 1px solid var(--divider-soft); background-color: var(--surface, #fff); box-shadow: 0 -8px 20px var(--text-4-fallback); }
 .review-detail > footer button { display: inline-flex; min-height: 42px; align-items: center; justify-content: center; gap: 6px; padding: 0 13px; border-radius: 10px; font-size: 12px; font-weight: 680; }
-.review-detail-delete { background: #fbf0ef; color: #b05757; border: 1px solid rgba(176, 87, 87, .16); }
+.review-detail-delete { min-height: 34px !important; padding: 0 9px !important; border: 0; background: transparent; color: #b05757; }
 .review-detail-delete:hover { background: #f7e3e0; border-color: rgba(176, 87, 87, .3); color: #a04949; }
 .review-detail-close { min-width: 86px; background: var(--accent); color: #fff; }
 .review-detail-close:hover { background: var(--accent-strong); }
