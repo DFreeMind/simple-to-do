@@ -475,7 +475,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 2px;
+  gap: 1px;
   padding: 2px;
   border: 1px solid var(--divider-soft);
   border-radius: 10px;
@@ -494,14 +494,14 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  min-height: 26px;
-  padding: 0 10px;
+  min-height: 24px;
+  padding: 0 8px;
   border: 0;
   border-radius: 7px;
   background: transparent;
   color: var(--text-muted);
   font: inherit;
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 650;
   cursor: pointer;
   white-space: nowrap;
