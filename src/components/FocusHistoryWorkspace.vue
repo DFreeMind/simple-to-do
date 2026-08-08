@@ -546,7 +546,15 @@
           <template v-if="detail.kind === 'focus'">
             <div class="review-focus-summary">
             <section class="review-detail-hero is-focus">
-              <div class="review-detail-hero__value"><span>本次有效时长</span><strong>{{ formatDuration(detail.item.elapsedSeconds) }}</strong><small>{{ resultLabel(detail.item.result) }} · {{ profileName(detail.item.profileId, detail.item) }}</small></div>
+              <div class="review-detail-hero__value">
+                <span>本次有效时长</span>
+                <strong class="review-detail-duration" :aria-label="formatDuration(detail.item.elapsedSeconds)">
+                  <template v-for="part in durationMetricParts(detail.item.elapsedSeconds)" :key="part.unit">
+                    <b>{{ part.value }}</b><em>{{ part.unit }}</em>
+                  </template>
+                </strong>
+                <small>{{ resultLabel(detail.item.result) }} · {{ profileName(detail.item.profileId, detail.item) }}</small>
+              </div>
               <div class="review-detail-hero__illustration" aria-hidden="true">
                 <i class="review-detail-hero__orbit"></i>
                 <i class="review-detail-hero__sprout"><b></b></i>
@@ -2388,6 +2396,17 @@ function profileName(profileId, item) {
   if (item?.profileName) return item.profileName
   return store.focusProfiles.find(item => item.id === profileId)?.name || '专注'
 }
+function durationMetricParts(seconds) {
+  const value = Math.max(0, Math.round(Number(seconds) || 0))
+  if (value > 0 && value < 60) return [{ value, unit: '秒' }]
+  const minutes = Math.round(value / 60)
+  if (minutes < 60) return [{ value: minutes, unit: '分钟' }]
+  const hours = Math.floor(minutes / 60)
+  const restMinutes = minutes % 60
+  return restMinutes
+    ? [{ value: hours, unit: '小时' }, { value: restMinutes, unit: '分钟' }]
+    : [{ value: hours, unit: '小时' }]
+}
 function phaseLabel(phase) { return phase === 'long-break' ? '长休息' : phase === 'short-break' ? '短休息' : '未关联任务的专注' }
 function resultLabel(result) { return result === 'completed' ? '已完成' : result === 'abandoned' ? '已放弃' : '被中断' }
 function rhythmActionLabel(action) { return ({ completed: '已完成', snoozed: '已延后', 'skipped-today': '今天跳过', dismissed: '稍后处理', 'natural-break': '自然离席' }[action] || '已处理') }
@@ -3092,6 +3111,10 @@ onBeforeUnmount(() => {
 .review-detail-hero__value { display: grid; min-width: 0; gap: 2px; }
 .review-detail-hero__value > span { color: var(--accent-strong); font-size: 11px; font-weight: 720; }
 .review-detail-hero__value > strong { color: var(--accent-strong); font-size: clamp(27px, 2vw, 36px); font-weight: 780; letter-spacing: -.065em; line-height: 1.05; white-space: nowrap; }
+.review-detail-hero__value > strong.review-detail-duration { display: flex; align-items: baseline; gap: 2px; letter-spacing: 0; }
+.review-detail-duration b { color: var(--accent-strong); font-size: clamp(34px, 2.8vw, 46px); font-weight: 790; letter-spacing: -.055em; line-height: 1; }
+.review-detail-duration em { color: var(--text); font-size: 15px; font-style: normal; font-weight: 750; letter-spacing: -.02em; }
+.review-detail-duration em:not(:last-child) { margin-right: 4px; }
 .review-detail-hero__value > small { color: var(--accent-strong); font-size: 11px; font-weight: 700; }
 .review-detail-hero__window { display: flex; align-items: center; justify-content: space-between; gap: 11px; color: var(--text-muted); }
 .review-detail-hero__window > div { display: grid; min-width: 56px; gap: 3px; }
