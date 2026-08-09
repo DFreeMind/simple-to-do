@@ -38,11 +38,11 @@ jobs:
           - id: macos-x64
             name: 构建 macOS Intel
             runner: macos-15-intel
-            bundles: dmg
+            bundles: dmg,app
           - id: macos-aarch64
             name: 构建 macOS Apple Silicon
             runner: macos-latest
-            bundles: dmg
+            bundles: dmg,app
     steps:
       - uses: actions/checkout@v4
         if: ${{ matrix.id != 'windows-x64' || inputs.include_windows }}
