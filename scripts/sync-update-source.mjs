@@ -101,7 +101,12 @@ async function main() {
   // 3. 上传到服务器（按版本目录 + 固定 latest.json）
   if (!keyFile && env.DEPLOY_SSH_KEY) {
     temporaryKeyFile = path.join(workdir, 'deploy_key')
-    fs.writeFileSync(temporaryKeyFile, env.DEPLOY_SSH_KEY, { mode: 0o600 })
+    // GitHub Secret 可能以 CRLF 保存，也可能由管理界面粘贴成字面量 \\n；
+    // OpenSSH/OpenSSL 在两种情况下都会报 "error in libcrypto"。
+    const normalizedKey = env.DEPLOY_SSH_KEY
+      .replace(/\r/g, '')
+      .replace(/\\n/g, '\n')
+    fs.writeFileSync(temporaryKeyFile, normalizedKey.endsWith('\n') ? normalizedKey : `${normalizedKey}\n`, { mode: 0o600 })
     keyFile = temporaryKeyFile
   }
   if (keyFile && process.platform !== 'win32') fs.chmodSync(keyFile, 0o600)
