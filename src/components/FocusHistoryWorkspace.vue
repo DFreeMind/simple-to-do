@@ -1261,6 +1261,42 @@ const trendDescription = computed(() => {
   const scope = { day: '按天查看', week: '按周汇总', month: '按月回看' }[trendGranularity.value]
   return `${scope}${noun}；点击柱子即可回看该时段的原始记录。${trendGranularity.value === 'day' ? '周末以蓝色区分。' : ''}`
 })
+function shortenTrendTooltipText(value, limit = 18) {
+  const text = String(value || '').trim()
+  return text.length > limit ? `${text.slice(0, limit - 1)}…` : text
+}
+function summarizeTrendTooltip(day) {
+  const outcomes = { completed: 0, interrupted: 0, abandoned: 0 }
+  const taskBuckets = new Map()
+  let linkedCount = 0
+  day.records.forEach(record => {
+    outcomes[record.result] = (outcomes[record.result] || 0) + 1
+    const title = String(record.taskTitle || '').trim()
+    if (!title) return
+    linkedCount += 1
+    const bucket = taskBuckets.get(title) || { title, seconds: 0, count: 0 }
+    bucket.seconds += Math.max(0, Number(record.elapsedSeconds) || 0)
+    bucket.count += 1
+    taskBuckets.set(title, bucket)
+  })
+  const primaryTask = [...taskBuckets.values()].sort((a, b) => b.seconds - a.seconds || b.count - a.count)[0]
+  const outcomeText = [
+    outcomes.completed ? `完成 ${outcomes.completed} 段` : '',
+    outcomes.interrupted ? `中断 ${outcomes.interrupted} 段` : '',
+    outcomes.abandoned ? `放弃 ${outcomes.abandoned} 段` : ''
+  ].filter(Boolean).join(' · ') || '暂无结果信息'
+  const unlinkedCount = day.records.length - linkedCount
+  const taskText = primaryTask
+    ? `主要：${shortenTrendTooltipText(primaryTask.title)} ${formatCompactDuration(primaryTask.seconds)} · ${linkedCount} 段已关联${unlinkedCount ? ` · ${unlinkedCount} 段未关联` : ''}`
+    : `全部为未关联专注 · ${unlinkedCount} 段`
+  return { outcomeText, taskText }
+}
+function buildTrendTooltip(day) {
+  if (!day.seconds) return `<b>${escapeHtml(day.label)}${day.isCurrent ? '（当前）' : ''}</b><br/>无投入`
+  const summary = summarizeTrendTooltip(day)
+  const secondaryValue = trendMetric.value === 'sessions' ? formatDuration(day.seconds) : `${day.sessionCount} 段专注`
+  return `<div style="display:grid;gap:5px;max-width:256px;line-height:1.35"><b>${escapeHtml(day.label)}${day.isCurrent ? '（当前）' : ''}</b><strong style="font-size:13px">${escapeHtml(formatTrendValue(trendValue(day)))}</strong><span style="color:#687674">${escapeHtml(secondaryValue)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(summary.outcomeText)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#687674">${escapeHtml(summary.taskText)}</span><small style="color:#687674">点击查看完整记录</small></div>`
+}
 // 趋势图：ECharts 柱状图实例管理；按范围自动切换日 / 周 / 月粒度。
 const trendChartEl = ref(null)
 let trendChartInstance = null
@@ -1276,18 +1312,7 @@ function buildTrendChartOption() {
       ...chartTooltipStyle(colors),
       formatter: (params) => {
         const day = params?.[0]?.data?.day
-        if (!day) return ''
-        let html = `<b>${escapeHtml(day.label)}${day.isCurrent ? '（当前）' : ''}</b>`
-        if (day.seconds) {
-          html += `<br/><b>${escapeHtml(formatTrendValue(trendValue(day)))}</b> · ${escapeHtml(trendMetric.value === 'sessions' ? formatDuration(day.seconds) : `${day.sessionCount} 段专注`)}`
-          if (day.records.length) {
-            html += '<br/>' + day.records.slice(0, 3).map(r => escapeHtml(focusTitle(r))).join('<br/>')
-            if (day.records.length > 3) html += `<br/>还有 ${day.records.length - 3} 段…`
-          }
-        } else {
-          html += '<br/>无投入'
-        }
-        return html
+        return day ? buildTrendTooltip(day) : ''
       }
     },
     xAxis: {
