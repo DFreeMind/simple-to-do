@@ -241,25 +241,28 @@
           </article>
         </section>
 
-        <section v-if="focusEntries.length" class="review-card review-focus-map" aria-label="本期专注地图">
+        <section v-if="focusEntries.length" class="review-card review-focus-map" aria-label="投入去向">
           <header>
-            <div><span>专注地图</span><h2>精力去向</h2><p>{{ focusMapNarrative }}</p></div>
+            <div><span>投入去向</span><h2>专注时间花在了哪里</h2><p>按专注时长汇总；已关联事项可直接查看记录。</p></div>
             <span class="review-focus-map__total"><Timer :size="15" />{{ formatCompactDuration(totalFocusSeconds) }}</span>
           </header>
-          <div class="review-focus-map__signals">
-            <button v-if="focusMapPrimaryTask" type="button" class="review-focus-map__signal" @click="openFocusSlice(focusMapPrimaryTask.query)"><span>主要投入</span><strong>{{ focusMapPrimaryTask.label }}</strong><small>{{ focusMapPrimaryTask.count }} 段 · {{ formatCompactDuration(focusMapPrimaryTask.seconds) }}</small></button>
-            <div v-else class="review-focus-map__signal"><span>主要投入</span><strong>未关联任务</strong><small>本期仍完整计入投入</small></div>
-            <button v-if="focusProfileSummary[0]" type="button" class="review-focus-map__signal" @click="openFocusSlice(focusProfileSummary[0].query)"><span>常用方式</span><strong>{{ focusProfileSummary[0].label }}</strong><small>{{ focusProfileSummary[0].count }} 段 · {{ formatCompactDuration(focusProfileSummary[0].seconds) }}</small></button>
-            <div class="review-focus-map__signal"><span>高峰时段</span><strong>{{ focusTimePeak.label }}</strong><small>{{ focusTimePeak.count }} 段从这里开始</small></div>
+          <div class="review-focus-map__summary">
+            <div><span>主要去向</span><strong>{{ focusDistribution[0]?.label || '—' }}</strong><small>{{ focusDistribution[0]?.percent || 0 }}% · {{ focusDistribution[0] ? formatCompactDuration(focusDistribution[0].seconds) : '0 分钟' }}</small></div>
+            <div><span>已关联</span><strong>{{ focusLinkedPercent }}%</strong><small>{{ focusLinkedCount }} 段有明确事项</small></div>
+            <div><span>未关联</span><strong>{{ focusUnlinkedPercent }}%</strong><small>{{ focusUnlinkedCount }} 段待归类</small></div>
           </div>
-          <section class="review-focus-map__breakdown">
-            <header><div><span>任务投入构成</span><small>按有效时长排序；点击查看对应记录</small></div><small>占本期投入</small></header>
-            <button v-for="item in focusTaskSummary.filter(item => item.query).slice(0, 4)" :key="item.key" type="button" class="review-focus-map__row" :aria-label="`查看${item.label}的专注记录`" @click="openFocusSlice(item.query)">
-              <span><strong>{{ item.label }}</strong><small>{{ item.count }} 段 · {{ formatCompactDuration(item.seconds) }}</small></span>
-              <i><b :style="{ width: `${item.percent}%` }"></b></i>
-              <em>{{ item.percent }}%</em>
-            </button>
-            <p v-if="!focusMapPrimaryTask" class="review-focus-map__empty">本期专注尚未关联任务，时长仍会被完整保留。</p>
+          <section class="review-focus-map__distribution" :aria-label="`${selectedRangeLabel}投入去向分布`">
+            <div class="review-focus-map__track" role="img" :aria-label="focusDistributionAriaLabel">
+              <template v-for="(item, index) in focusDistribution" :key="item.key">
+                <button v-if="item.query" type="button" :class="`is-${index}`" :style="{ width: `${Math.max(item.percent, 4)}%` }" :title="`${item.label}：${item.percent}%`" :aria-label="`查看${item.label}的专注记录，占${item.percent}%`" @click="openFocusSlice(item.query)"></button>
+                <span v-else :class="`is-${index}`" :style="{ width: `${Math.max(item.percent, 4)}%` }" :title="`${item.label}：${item.percent}%`"></span>
+              </template>
+            </div>
+            <div class="review-focus-map__legend">
+              <component :is="item.query ? 'button' : 'div'" v-for="(item, index) in focusDistribution" :key="item.key" :class="['review-focus-map__legend-item', `is-${index}`]" :type="item.query ? 'button' : undefined" @click="item.query && openFocusSlice(item.query)">
+                <i></i><span><strong>{{ item.label }}</strong><small>{{ formatCompactDuration(item.seconds) }} · {{ item.percent }}%</small></span>
+              </component>
+            </div>
           </section>
         </section>
 
@@ -1089,34 +1092,21 @@ const focusTaskSummary = computed(() => summarizeFocusDimension(focusEntries.val
   const title = String(item.taskTitle || '').trim()
   return { key: title || '__unlinked__', label: title || '未关联任务', query: title }
 }))
-const focusMapPrimaryTask = computed(() => focusTaskSummary.value.find(item => item.query) || null)
-const focusProfileSummary = computed(() => summarizeFocusDimension(focusEntries.value, item => {
-  const label = profileName(item.profileId, item)
-  return { key: item.profileId || label, label, query: label }
-}))
-const focusTimeSummary = computed(() => {
-  const periods = [
-    { id: 'morning', label: '上午', from: 6, to: 12 },
-    { id: 'afternoon', label: '下午', from: 12, to: 18 },
-    { id: 'evening', label: '晚上', from: 18, to: 24 },
-    { id: 'late', label: '深夜', from: 0, to: 6 }
-  ].map(period => ({ ...period, count: 0, seconds: 0 }))
-  focusEntries.value.forEach(item => {
-    const hour = new Date(item.startedAt || item.finishedAt).getHours()
-    const period = periods.find(candidate => candidate.from <= hour && hour < candidate.to) || periods[0]
-    period.count += 1
-    period.seconds += Math.max(0, Number(item.elapsedSeconds) || 0)
-  })
-  return periods
+const focusDistribution = computed(() => {
+  const items = focusTaskSummary.value
+  if (items.length <= 4) return items
+  const visible = items.slice(0, 3)
+  const others = items.slice(3)
+  const seconds = others.reduce((total, item) => total + item.seconds, 0)
+  const count = others.reduce((total, item) => total + item.count, 0)
+  return [...visible, { key: '__other__', label: '其他事项', query: '', seconds, count, percent: Math.max(0, 100 - visible.reduce((total, item) => total + item.percent, 0)) }]
 })
-const focusTimePeak = computed(() => focusTimeSummary.value.reduce((peak, item) => item.count > peak.count ? item : peak, focusTimeSummary.value[0] || { count: 0, label: '—', seconds: 0 }))
-const focusMapNarrative = computed(() => {
-  const task = focusMapPrimaryTask.value
-  const profile = focusProfileSummary.value[0]
-  const time = focusTimePeak.value
-  if (!task || !profile || !time?.count) return '更多记录会让这里更清晰。'
-  return `主要：${task.label} · 方式：${profile.label} · 高峰：${time.label}`
-})
+const focusLinkedEntries = computed(() => focusEntries.value.filter(item => String(item.taskTitle || '').trim()))
+const focusLinkedCount = computed(() => focusLinkedEntries.value.length)
+const focusUnlinkedCount = computed(() => focusEntries.value.length - focusLinkedCount.value)
+const focusLinkedPercent = computed(() => totalFocusSeconds.value ? Math.round(focusLinkedEntries.value.reduce((total, item) => total + item.elapsedSeconds, 0) / totalFocusSeconds.value * 100) : 0)
+const focusUnlinkedPercent = computed(() => Math.max(0, 100 - focusLinkedPercent.value))
+const focusDistributionAriaLabel = computed(() => focusDistribution.value.map(item => `${item.label}${item.percent}%`).join('，'))
 const completedRhythmEntries = computed(() => rhythmEntries.value.filter(item => ['completed', 'natural-break'].includes(item.action)))
 const rhythmCompletionRate = computed(() => rhythmEntries.value.length ? Math.round(completedRhythmEntries.value.length / rhythmEntries.value.length * 100) : 0)
 const tabs = computed(() => [
@@ -2997,9 +2987,9 @@ onBeforeUnmount(() => {
 .review-card > header > small { color: var(--text-muted); font-size: 11px; }
 .review-focus-map { margin-top: 12px; border-color: color-mix(in srgb, var(--accent) 18%, var(--divider-soft)); background: linear-gradient(118deg, color-mix(in srgb, var(--accent-soft) 36%, var(--surface)), var(--surface) 46%, color-mix(in srgb, #e8f1df 28%, var(--surface))); }
 .review-focus-map__total { display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto; padding: 7px 9px; border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--divider-soft)); border-radius: 9px; background: var(--surface); color: var(--accent-strong) !important; font-size: 11px !important; font-weight: 750 !important; letter-spacing: 0 !important; font-variant-numeric: tabular-nums; }
-.review-focus-map__signals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }.review-focus-map__signal { display: grid; min-width: 0; gap: 3px; padding: 10px 11px; border: 1px solid color-mix(in srgb, var(--accent) 12%, var(--divider-soft)); border-radius: 11px; background: color-mix(in srgb, var(--surface) 86%, transparent); color: inherit; font: inherit; text-align: left; }.review-focus-map__signal:is(button) { cursor: pointer; }.review-focus-map__signal:is(button):hover { border-color: color-mix(in srgb, var(--accent) 34%, var(--divider-soft)); background: var(--surface); }.review-focus-map__signal span { color: var(--text-muted); font-size: 9px; font-weight: 680; }.review-focus-map__signal strong { overflow: hidden; color: var(--text); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }.review-focus-map__signal small { overflow: hidden; color: var(--accent-strong); font-size: 9.5px; text-overflow: ellipsis; white-space: nowrap; }
-.review-focus-map__breakdown { display: grid; gap: 0; margin-top: 12px; padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--accent) 16%, var(--divider-soft)); }.review-focus-map__breakdown > header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 7px; }.review-focus-map__breakdown > header > div { display: grid; gap: 2px; }.review-focus-map__breakdown > header span { color: var(--text); font-size: 11px; font-weight: 750; }.review-focus-map__breakdown > header small { color: var(--text-muted); font-size: 9px; }
-.review-focus-map__row { display: grid; grid-template-columns: minmax(0, 1fr) 48px 31px; align-items: center; gap: 8px; width: 100%; min-height: 42px; padding: 5px 0; border: 0; border-top: 1px solid color-mix(in srgb, var(--divider-soft) 76%, transparent); color: inherit; font: inherit; text-align: left; cursor: pointer; }.review-focus-map__row:first-of-type { border-top: 0; }.review-focus-map__row:hover strong { color: var(--accent-strong); }.review-focus-map__row > span { display: grid; min-width: 0; gap: 2px; }.review-focus-map__row strong { overflow: hidden; color: var(--text); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; transition: color var(--transition-fast); }.review-focus-map__row small { overflow: hidden; color: var(--text-muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }.review-focus-map__row i { height: 5px; overflow: hidden; border-radius: 99px; background: color-mix(in srgb, var(--accent) 10%, var(--surface-muted)); }.review-focus-map__row i b { display: block; height: 100%; border-radius: inherit; background: var(--accent); }.review-focus-map__section--profiles .review-focus-map__row i b { background: #6a9bc3; }.review-focus-map__row em { color: var(--text-muted); font-size: 9px; font-style: normal; font-variant-numeric: tabular-nums; text-align: right; }.review-focus-map__empty { margin: 12px 0 0; color: var(--text-muted); font-size: 10px; line-height: 1.55; }
+.review-focus-map__summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }.review-focus-map__summary > div { display: grid; min-width: 0; gap: 3px; padding: 10px 11px; border: 1px solid color-mix(in srgb, var(--accent) 12%, var(--divider-soft)); border-radius: 11px; background: color-mix(in srgb, var(--surface) 86%, transparent); }.review-focus-map__summary span { color: var(--text-muted); font-size: 9px; font-weight: 680; }.review-focus-map__summary strong { overflow: hidden; color: var(--text); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }.review-focus-map__summary small { overflow: hidden; color: var(--accent-strong); font-size: 9.5px; text-overflow: ellipsis; white-space: nowrap; }
+.review-focus-map__distribution { display: grid; gap: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--accent) 16%, var(--divider-soft)); }.review-focus-map__track { display: flex; gap: 3px; height: 16px; overflow: hidden; border-radius: 999px; background: var(--surface-muted); }.review-focus-map__track button, .review-focus-map__track span { min-width: 0; border: 0; border-radius: 3px; background: var(--accent); cursor: pointer; }.review-focus-map__track span { cursor: default; }.review-focus-map__track .is-1 { background: #6a9bc3; }.review-focus-map__track .is-2 { background: #9a82c9; }.review-focus-map__track .is-3 { background: #c69d57; }.review-focus-map__track button:hover { filter: brightness(.92); }.review-focus-map__track button:focus-visible { outline: 3px solid var(--accent-strong); outline-offset: -2px; }
+.review-focus-map__legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 14px; }.review-focus-map__legend-item { display: flex; min-width: 0; align-items: center; gap: 7px; padding: 4px 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; }.review-focus-map__legend-item:is(button) { cursor: pointer; }.review-focus-map__legend-item:is(button):hover strong { color: var(--accent-strong); }.review-focus-map__legend-item i { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 3px; background: var(--accent); }.review-focus-map__legend-item.is-1 i { background: #6a9bc3; }.review-focus-map__legend-item.is-2 i { background: #9a82c9; }.review-focus-map__legend-item.is-3 i { background: #c69d57; }.review-focus-map__legend-item > span { display: grid; min-width: 0; gap: 1px; }.review-focus-map__legend-item strong { overflow: hidden; color: var(--text); font-size: 10.5px; text-overflow: ellipsis; white-space: nowrap; }.review-focus-map__legend-item small { color: var(--text-muted); font-size: 9px; }
 /* 趋势图与节律图：ECharts 容器 */
 .review-chart-description { margin: 8px 0 0; color: var(--text-muted); font-size: 11px; line-height: 1.55; }
 .review-trend-chart { height: 218px; margin-top: 14px; }
@@ -3370,8 +3360,8 @@ onBeforeUnmount(() => {
 .review-detail-close { min-width: 86px; background: var(--accent); color: #fff; }
 .review-detail-close:hover { background: var(--accent-strong); }
 @media (max-width: 900px) { .review-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }.review-overview-grid { grid-template-columns: 1fr; }.review-record-table, .review-recent-list { overflow-x: auto; }.review-record-table__head, .review-record-row, .review-recent-row { min-width: 720px; } }
-@media (max-width: 900px) { .review-focus-map__signals { grid-template-columns: 1fr 1fr; }.review-summary > header { display: grid; }.review-summary-actions { justify-content: flex-start; flex-wrap: wrap; } }
-@media (max-width: 620px) { .review-focus-map__signals { grid-template-columns: 1fr; }.review-focus-map__total { display: none; } }
+@media (max-width: 900px) { .review-focus-map__summary { grid-template-columns: 1fr 1fr; }.review-summary > header { display: grid; }.review-summary-actions { justify-content: flex-start; flex-wrap: wrap; } }
+@media (max-width: 620px) { .review-focus-map__summary, .review-focus-map__legend { grid-template-columns: 1fr; }.review-focus-map__total { display: none; } }
 @media (max-width: 900px) {
   .review-filters label { flex-basis: 100%; }
 }
