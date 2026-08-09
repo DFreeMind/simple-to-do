@@ -177,7 +177,8 @@
               :key="cell.date"
               type="button"
               :class="{ grown: cell.entry, future: cell.date > todayKey, active: cell.date === todayKey }"
-              :title="cell.entry ? `${cell.date} · ${stageName(cell.entry.stage)} · ${cell.entry.growthMinutes}/${cell.entry.goalMinutes} 分钟` : `${cell.date} · 没有专注成长`"
+              :aria-label="dayCellLabel(cell)"
+              @click="openDayDetail(cell)"
             >
               <span class="achievement-month__day">{{ cell.day }}</span>
               <FocusTerrarium
@@ -190,6 +191,45 @@
             </button>
           </div>
         </section>
+
+        <div v-if="selectedDayCell" class="achievement-day-dialog" role="presentation" @click.self="closeDayDetail">
+          <section class="achievement-day-dialog__panel" role="dialog" aria-modal="true" aria-labelledby="achievement-day-dialog-title" tabindex="-1" @keydown.esc="closeDayDetail">
+            <header>
+              <div>
+                <span>{{ formatLongDate(selectedDayCell.date) }}</span>
+                <h2 id="achievement-day-dialog-title">{{ selectedDayCell.entry ? `${stageName(selectedDayCell.entry.stage)}的花` : selectedDayCell.date > todayKey ? '这一天还没有到来' : '这一天没有留下成长' }}</h2>
+              </div>
+              <button ref="dayDialogCloseButton" type="button" aria-label="关闭当日成长详情" @click="closeDayDetail"><X :size="18" /></button>
+            </header>
+
+            <template v-if="selectedDayCell.entry">
+              <div class="achievement-day-dialog__hero">
+                <FocusPlant :species-id="selectedDayCell.entry.speciesId" :stage="selectedDayCell.entry.stage" />
+                <div>
+                  <small>{{ daySpeciesName(selectedDayCell.entry.speciesId) }}</small>
+                  <strong>{{ stageName(selectedDayCell.entry.stage) }}</strong>
+                  <p>{{ selectedDayCell.entry.growthMinutes }} / {{ selectedDayCell.entry.goalMinutes }} 分钟有效专注</p>
+                </div>
+              </div>
+              <dl class="achievement-day-dialog__stats">
+                <div><dt>当天目标</dt><dd>{{ selectedDayCell.entry.goalMinutes }} 分钟</dd></div>
+                <div><dt>完成进度</dt><dd>{{ selectedDayProgress }}%</dd></div>
+                <div><dt>完成专注</dt><dd>{{ selectedDayFocusCount }} 段</dd></div>
+              </dl>
+              <section class="achievement-day-dialog__tasks">
+                <header><span>关联任务</span><small>{{ selectedDayTasks.length ? '本日完成的专注记录' : '当天没有关联任务' }}</small></header>
+                <ul v-if="selectedDayTasks.length">
+                  <li v-for="task in selectedDayTasks" :key="task.title"><span>{{ task.title }}</span><small>{{ task.minutes }} 分钟 · {{ task.sessions }} 段</small></li>
+                </ul>
+                <p v-else>这一天的有效专注没有关联任务，投入仍已如实保留在花田里。</p>
+              </section>
+            </template>
+            <div v-else class="achievement-day-dialog__empty">
+              <Sprout :size="30" />
+              <p>{{ selectedDayCell.date > todayKey ? '等这一天真正到来后，再把专注交给一株新的花。' : '没有专注的日子保持空白，不会被记作中断或失败。' }}</p>
+            </div>
+          </section>
+        </div>
 
         <section class="achievement-trail card-surface">
           <header class="achievement-section-heading">
@@ -465,7 +505,7 @@
 <script setup>
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, ref } from 'vue'
 import { motion as Motion } from 'motion-v'
-import { Archive, ArrowRight, BookOpen, CalendarDays, Check, ChevronLeft, ChevronRight, Flame, Flower2, Leaf, LockKeyhole, Pause, Play, Sparkles, Sprout, Timer, TimerReset, Trees, Trophy } from 'lucide-vue-next'
+import { Archive, ArrowRight, BookOpen, CalendarDays, Check, ChevronLeft, ChevronRight, Flame, Flower2, Leaf, LockKeyhole, Pause, Play, Sparkles, Sprout, Timer, TimerReset, Trees, Trophy, X } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import {
   FOCUS_GARDEN_COLLECTIONS,
@@ -518,6 +558,8 @@ const reactionBurst = ref(0)
 const artworkStageFailed = ref(false)
 const replayScrubbing = ref(false)
 const replayPlaying = ref(false)
+const selectedDayCell = ref(null)
+const dayDialogCloseButton = ref(null)
 let replayAnimationFrame = 0
 const todayKey = localGardenDateKey()
 const gardenStages = FOCUS_GARDEN_STAGES
@@ -604,6 +646,31 @@ const selectedMonthSummary = computed(() => {
     blooms: entries.filter(entry => gardenStageFor(entry.growthMinutes, entry.goalMinutes).id === 'bloom').length,
     species: new Set(entries.filter(entry => entry.growthMinutes > 0).map(entry => entry.speciesId)).size
   }
+})
+const selectedDayProgress = computed(() => {
+  const entry = selectedDayCell.value?.entry
+  if (!entry) return 0
+  return Math.min(100, Math.round((Number(entry.growthMinutes) || 0) / Math.max(1, Number(entry.goalMinutes) || 1) * 100))
+})
+const selectedDayFocusRecords = computed(() => {
+  const date = selectedDayCell.value?.date
+  if (!date) return []
+  return store.focusHistory.filter(item => (
+    item.phase === 'focus' && item.result === 'completed' && localGardenDateKey(item.finishedAt) === date
+  ))
+})
+const selectedDayFocusCount = computed(() => selectedDayFocusRecords.value.length)
+const selectedDayTasks = computed(() => {
+  const tasks = new Map()
+  selectedDayFocusRecords.value.forEach(item => {
+    const title = String(item.taskTitle || '').trim()
+    if (!title) return
+    const current = tasks.get(title) || { title, minutes: 0, sessions: 0 }
+    current.minutes += Math.max(0, Math.floor((Number(item.elapsedSeconds) || 0) / 60))
+    current.sessions += 1
+    tasks.set(title, current)
+  })
+  return [...tasks.values()].sort((a, b) => b.minutes - a.minutes || b.sessions - a.sessions)
 })
 const monthLeadingBlanks = computed(() => {
   const weekday = new Date(selectedYear.value, selectedMonth.value, 1).getDay()
@@ -704,6 +771,7 @@ const legacyRewards = computed(() => {
 })
 
 function stageName(id) { return FOCUS_GARDEN_STAGES.find(item => item.id === id)?.name || '种子' }
+function daySpeciesName(id) { return store.focusGardenSpecies.find(item => item.id === id)?.name || '小雏菊' }
 function durationHuman(minutes) {
   const value = Math.max(0, Math.round(Number(minutes) || 0))
   if (value < 60) return `${value} 分钟`
@@ -724,6 +792,21 @@ function shiftMonth(delta) {
   const date = new Date(selectedYear.value, selectedMonth.value + delta, 1)
   selectedYear.value = date.getFullYear()
   selectedMonth.value = date.getMonth()
+}
+function dayCellLabel(cell) {
+  if (cell.entry) return `${cell.date}，${daySpeciesName(cell.entry.speciesId)}，${stageName(cell.entry.stage)}，${cell.entry.growthMinutes}/${cell.entry.goalMinutes} 分钟。查看详情`
+  return cell.date > todayKey ? `${cell.date}，未来日期` : `${cell.date}，没有专注成长。查看说明`
+}
+function formatLongDate(value) {
+  const [year, month, day] = String(value).split('-').map(Number)
+  return `${year} 年 ${month} 月 ${day} 日`
+}
+function openDayDetail(cell) {
+  selectedDayCell.value = cell
+  nextTick(() => dayDialogCloseButton.value?.focus())
+}
+function closeDayDetail() {
+  selectedDayCell.value = null
 }
 // 年格 drill down：点月份后切换 + 滚到月格
 function goToMonth(monthIndex) {
@@ -1092,7 +1175,7 @@ onBeforeUnmount(cancelGrowthReplay)
   border-radius: 12px;
   background: var(--surface);
   color: var(--text-muted);
-  cursor: default;
+  cursor: pointer;
   transition: transform .15s ease, box-shadow .15s ease;
   /* 抑制点击/键盘聚焦时的浏览器默认黑框 */
   outline: none;
@@ -1112,6 +1195,19 @@ onBeforeUnmount(cancelGrowthReplay)
   box-shadow: 0 0 0 2px color-mix(in srgb, #6f9a5a 65%, transparent), 0 6px 14px rgba(36, 85, 73, .1);
 }
 .achievement-month__grid button.active .achievement-month__day { color: #4f7842; font-weight: 700; }
+.achievement-day-dialog { position: fixed; z-index: 40; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(25, 39, 32, .34); backdrop-filter: blur(5px); }
+.achievement-day-dialog__panel { width: min(440px, 100%); max-height: min(650px, calc(100vh - 48px)); overflow: auto; padding: 19px; border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--divider-soft)); border-radius: 18px; background: var(--surface); box-shadow: 0 24px 70px rgba(20, 42, 33, .25); }
+.achievement-day-dialog__panel > header,.achievement-day-dialog__tasks > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.achievement-day-dialog__panel > header > div > span,.achievement-day-dialog__tasks > header > span { color: var(--accent-strong); font-size: 10px; font-weight: 800; letter-spacing: .05em; }
+.achievement-day-dialog__panel h2 { margin: 4px 0 0; color: var(--text); font-size: 20px; letter-spacing: -.03em; }
+.achievement-day-dialog__panel > header > button { display: grid; flex: 0 0 auto; width: 30px; height: 30px; place-items: center; border: 1px solid var(--divider-soft); border-radius: 9px; color: var(--text-muted); cursor: pointer; }
+.achievement-day-dialog__panel > header > button:hover { color: var(--accent-strong); background: var(--accent-soft); }
+.achievement-day-dialog__hero { display: grid; grid-template-columns: 128px 1fr; align-items: center; gap: 14px; min-height: 128px; margin-top: 16px; padding: 8px 14px 8px 5px; border: 1px solid color-mix(in srgb, #9bbf85 22%, var(--divider-soft)); border-radius: 14px; background: color-mix(in srgb, #eff5e4 42%, var(--surface)); }
+.achievement-day-dialog__hero :deep(.focus-plant) { width: 128px; height: 112px; }
+.achievement-day-dialog__hero > div { display: grid; gap: 3px; min-width: 0; }.achievement-day-dialog__hero small { color: var(--accent-strong); font-size: 10px; font-weight: 750; }.achievement-day-dialog__hero strong { color: var(--text); font-size: 17px; }.achievement-day-dialog__hero p { margin: 0; color: var(--text-muted); font-size: 11px; line-height: 1.5; }
+.achievement-day-dialog__stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 13px 0; }.achievement-day-dialog__stats div { display: grid; gap: 4px; padding: 10px 8px; border: 1px solid var(--divider-soft); border-radius: 10px; background: var(--surface-muted); }.achievement-day-dialog__stats dt { color: var(--text-muted); font-size: 9px; }.achievement-day-dialog__stats dd { margin: 0; overflow: hidden; color: var(--text); font-size: 12px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.achievement-day-dialog__tasks { padding-top: 13px; border-top: 1px solid var(--divider-soft); }.achievement-day-dialog__tasks > header { align-items: baseline; }.achievement-day-dialog__tasks > header small { color: var(--text-muted); font-size: 9px; }.achievement-day-dialog__tasks ul { display: grid; gap: 7px; margin: 10px 0 0; padding: 0; list-style: none; }.achievement-day-dialog__tasks li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 9px 10px; border-radius: 9px; background: var(--surface-muted); }.achievement-day-dialog__tasks li span { overflow: hidden; color: var(--text); font-size: 11px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }.achievement-day-dialog__tasks li small,.achievement-day-dialog__tasks > p { flex: 0 0 auto; margin: 0; color: var(--text-muted); font-size: 9px; }.achievement-day-dialog__tasks > p { margin-top: 10px; line-height: 1.6; }
+.achievement-day-dialog__empty { display: grid; justify-items: center; gap: 10px; padding: 38px 24px 20px; color: var(--accent-strong); text-align: center; }.achievement-day-dialog__empty p { max-width: 260px; margin: 0; color: var(--text-muted); font-size: 12px; line-height: 1.65; }
 /* 近期足迹：原 下一个解锁 紧凑化为顶部一行，下面是徽章列表 */
 .achievement-trail { padding: 18px; }
 .achievement-trail__next { display: grid; grid-template-columns: 22px 56px 1fr; align-items: center; gap: 12px; margin-top: 12px; padding: 10px 12px; border: 1px dashed color-mix(in srgb, #b9c89e 65%, transparent); border-radius: 12px; background: color-mix(in srgb, #eff5e4 35%, var(--surface)); }
@@ -1214,6 +1310,7 @@ onBeforeUnmount(cancelGrowthReplay)
 @media (max-width: 420px) { .badges-level,.badges-momentum { padding: 14px; }.badges-level__steps small { font-size: 8px; }.badges-momentum__grid div { padding: 8px 7px; } }
 @media (max-width: 980px) { .field-hero { grid-template-columns: minmax(0, 1.2fr) minmax(180px, .8fr); }.field-hero__progress { grid-column: 1 / -1; } .badges-category-index { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 620px) { .field-hero { grid-template-columns: 1fr; gap: 13px; padding: 18px; }.field-hero__copy h2 { font-size: 21px; }.field-hero__plant { order: -1; }.field-hero__facts { margin-top: 12px; }.field-hero__progress { grid-column: auto; }.achievement-month__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }.badges-category-index { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .achievement-day-dialog { padding: 14px; }.achievement-day-dialog__panel { max-height: calc(100vh - 28px); padding: 16px; }.achievement-day-dialog__hero { grid-template-columns: 106px 1fr; }.achievement-day-dialog__hero :deep(.focus-plant) { width: 106px; }.achievement-day-dialog__stats { grid-template-columns: 1fr; }.achievement-day-dialog__stats div { grid-template-columns: 1fr auto; align-items: center; }.achievement-day-dialog__tasks li { align-items: flex-start; flex-direction: column; gap: 3px; } }
 @media (max-width: 760px) { .badges-featured { grid-template-columns: 1fr; gap: 14px; padding: 16px; }.badges-featured__progress { width: auto; } }
 
 /* 修复：WebView2 上鼠标点完花朵后系统会强制显示深色 outline（Chromium 桌面版默认
