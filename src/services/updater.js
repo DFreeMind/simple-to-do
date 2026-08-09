@@ -6,10 +6,6 @@ function isTauri() {
   return typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__)
 }
 
-function isMacOS() {
-  return typeof navigator !== 'undefined' && /Macintosh|Mac OS X/.test(navigator.userAgent)
-}
-
 /**
  * 应用更新共享状态。SettingsPanel 与数据保护页共用同一份状态，
  * 避免两处各自维护检查/下载逻辑导致状态不一致。
@@ -60,13 +56,9 @@ export async function checkForUpdates({ skippedVersion = '', force = false, sile
   try {
     const update = await invoke('check_for_update', { source })
     if (!update) {
-      // macOS 从未发布签名更新包时 check 返回 null，误显示「已是最新」会误导用户。
-      if (isMacOS()) {
-        updaterState.status = 'unsupported'
-        updaterState.error = '当前平台暂未发布自动更新包，请到下载页手动安装最新版本。'
-      } else {
-        updaterState.status = 'upToDate'
-      }
+      // Tauri 对“当前已是最新版”返回 null；Mac 现已提供架构专属更新包，
+      // 不能再把空结果一律解释成“平台不支持”。
+      updaterState.status = 'upToDate'
       return false
     }
     if (!force && skippedVersion && update.version === skippedVersion) {
