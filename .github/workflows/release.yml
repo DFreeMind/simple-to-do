@@ -25,7 +25,6 @@ jobs:
   build:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
-    if: ${{ inputs.include_windows || matrix.id != 'windows-x64' }}
     permissions:
       contents: read
     strategy:
@@ -46,28 +45,37 @@ jobs:
             bundles: dmg
     steps:
       - uses: actions/checkout@v4
+        if: ${{ matrix.id != 'windows-x64' || inputs.include_windows }}
       - uses: actions/setup-node@v4
+        if: ${{ matrix.id != 'windows-x64' || inputs.include_windows }}
         with:
           node-version: 22
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
+        if: ${{ matrix.id != 'windows-x64' || inputs.include_windows }}
       - uses: Swatinem/rust-cache@v2
+        if: ${{ matrix.id != 'windows-x64' || inputs.include_windows }}
         with:
           workspaces: ./src-tauri -> target
       - name: 安装前端依赖
+        if: ${{ matrix.id != 'windows-x64' || inputs.include_windows }}
         run: npm ci
       - name: 校验发布配置
+        if: ${{ matrix.id != 'windows-x64' || inputs.include_windows }}
         env:
           CI: true
         run: node scripts/release-preflight.mjs ${{ inputs.version }} --ci
       - name: 构建签名产物
+        if: ${{ matrix.id != 'windows-x64' || inputs.include_windows }}
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run tauri:build -- --bundles ${{ matrix.bundles }}
       - name: 整理发布资产
+        if: ${{ matrix.id != 'windows-x64' || inputs.include_windows }}
         run: node scripts/stage-release-assets.mjs --platform ${{ matrix.id }} --out-dir release-assets/${{ matrix.id }}
       - uses: actions/upload-artifact@v4
+        if: ${{ matrix.id != 'windows-x64' || inputs.include_windows }}
         with:
           name: release-${{ matrix.id }}
           path: release-assets/${{ matrix.id }}/*
