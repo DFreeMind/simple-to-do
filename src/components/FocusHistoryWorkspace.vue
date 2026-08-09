@@ -1,27 +1,28 @@
 <template>
   <main ref="workspaceRef" class="clock-workspace review-workspace">
     <div class="review-shell">
-      <section v-if="activeTab === 'overview'" class="review-range-toolbar" aria-label="专注回顾时间范围">
-        <span class="review-range-toolbar__label"><Calendar :size="14" />查看范围</span>
-        <div class="review-range-toolbar__control">
-          <ReviewRangeControl
-            :range="range"
-            :custom-start="customStart"
-            :custom-end="customEnd"
-            @update:range="range = $event"
-            @update:custom-start="customStart = $event"
-            @update:custom-end="customEnd = $event"
-          />
-        </div>
-      </section>
-
-      <nav class="review-tabs" aria-label="回顾内容">
-        <button v-for="tab in tabs" :key="tab.id" type="button" :class="{ active: activeTab === tab.id }" :aria-current="activeTab === tab.id ? 'page' : undefined" @click="selectTab(tab.id)">
-          <component :is="tab.icon" :size="17" />
-          {{ tab.label }}
-          <span>{{ tab.count }}</span>
-        </button>
-      </nav>
+      <div class="review-controls">
+        <nav class="review-tabs" aria-label="回顾内容">
+          <button v-for="tab in tabs" :key="tab.id" type="button" :class="{ active: activeTab === tab.id }" :aria-current="activeTab === tab.id ? 'page' : undefined" @click="selectTab(tab.id)">
+            <component :is="tab.icon" :size="17" />
+            {{ tab.label }}
+            <span>{{ tab.count }}</span>
+          </button>
+        </nav>
+        <section v-if="activeTab === 'overview'" class="review-range-toolbar" aria-label="专注回顾时间范围">
+          <span class="review-range-toolbar__label"><Calendar :size="14" />查看范围</span>
+          <div class="review-range-toolbar__control">
+            <ReviewRangeControl
+              :range="range"
+              :custom-start="customStart"
+              :custom-end="customEnd"
+              @update:range="range = $event"
+              @update:custom-start="customStart = $event"
+              @update:custom-end="customEnd = $event"
+            />
+          </div>
+        </section>
+      </div>
 
       <section v-if="!store.focusHistory.length && !store.rhythmHistory.length" class="review-empty review-empty--zero">
         <span><History :size="25" /></span>
@@ -41,37 +42,6 @@
       </section>
 
       <template v-else-if="activeTab === 'overview'">
-        <section v-if="insights.length" class="review-insights" aria-label="本周期亮点">
-          <header>
-            <Lightbulb :size="15" />
-            <span>本期亮点</span>
-            <small>基于当前{{ selectedRangeLabel }}的数据自动生成</small>
-          </header>
-          <div class="review-insights__list">
-            <div v-for="(item, idx) in insights" :key="idx" :class="['review-insight', `is-${item.type}`, { 'is-clickable': !!item.item }]">
-              <button v-if="item.item" type="button" class="review-insight__click" :aria-label="`查看详情：${item.text}`" @click="openDetail(item.kind, item.item)">
-                <span class="review-insight__icon"><component :is="item.icon" :size="16" /></span>
-                <div class="review-insight__body">
-                  <strong>{{ item.text }}</strong>
-                  <small v-if="item.detail">{{ item.detail }}</small>
-                  <small v-if="item.when" class="review-insight__when">{{ item.when }} · 点击查看详情</small>
-                </div>
-              </button>
-              <div v-else class="review-insight__click">
-                <span class="review-insight__icon"><component :is="item.icon" :size="16" /></span>
-                <div class="review-insight__body">
-                  <strong>{{ item.text }}</strong>
-                  <small v-if="item.detail">{{ item.detail }}</small>
-                  <div v-if="item.bar" class="review-insight__bar" :title="`当前 vs 上 ${previousRangeStart?.days || ''} 天`">
-                    <i class="is-prev" :style="{ width: `${item.bar.prev}%` }"></i>
-                    <i class="is-current" :style="{ width: `${item.bar.current}%` }"></i>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
         <section class="review-card review-summary" aria-label="本周期概览">
           <header><div><span>数据摘要</span><h2>{{ selectedRangeLabel }}的专注与节律</h2><p>下面的趋势和最近记录使用同一时间范围</p></div><div class="review-summary-actions"><small>{{ focusEntries.length + rhythmEntries.length }} 条记录</small>
             <div class="review-export-menu">
@@ -86,6 +56,36 @@
               </div>
             </div>
           </div></header>
+          <section v-if="insights.length" class="review-insights" aria-label="本周期亮点">
+            <header>
+              <Lightbulb :size="15" />
+              <span>本期亮点</span>
+              <small>基于当前{{ selectedRangeLabel }}的数据自动生成</small>
+            </header>
+            <div class="review-insights__list">
+              <div v-for="(item, idx) in insights" :key="idx" :class="['review-insight', `is-${item.type}`, { 'is-clickable': !!item.item }]">
+                <button v-if="item.item" type="button" class="review-insight__click" :aria-label="`查看详情：${item.text}`" @click="openDetail(item.kind, item.item)">
+                  <span class="review-insight__icon"><component :is="item.icon" :size="16" /></span>
+                  <div class="review-insight__body">
+                    <strong>{{ item.text }}</strong>
+                    <small v-if="item.detail">{{ item.detail }}</small>
+                    <small v-if="item.when" class="review-insight__when">{{ item.when }} · 点击查看详情</small>
+                  </div>
+                </button>
+                <div v-else class="review-insight__click">
+                  <span class="review-insight__icon"><component :is="item.icon" :size="16" /></span>
+                  <div class="review-insight__body">
+                    <strong>{{ item.text }}</strong>
+                    <small v-if="item.detail">{{ item.detail }}</small>
+                    <div v-if="item.bar" class="review-insight__bar" :title="`当前 vs 上 ${previousRangeStart?.days || ''} 天`">
+                      <i class="is-prev" :style="{ width: `${item.bar.prev}%` }"></i>
+                      <i class="is-current" :style="{ width: `${item.bar.current}%` }"></i>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
           <div class="review-metrics">
             <article class="review-metric review-metric--primary">
               <span class="review-metric__label" :title="`已记录的专注阶段（不含休息；中断或放弃的实际投入也会保留）`"><Timer :size="13" />专注投入</span>
@@ -2991,9 +2991,10 @@ onBeforeUnmount(() => {
   background-clip: padding-box;
 }
 .review-shell { width: min(100%, 1120px); margin: 0 auto; }
-.review-range-toolbar { display: flex; align-items: center; justify-content: flex-end; gap: 10px; min-height: 44px; margin-bottom: 10px; padding: 5px 8px 5px 12px; border: 1px solid var(--divider-soft); border-radius: 13px; background: color-mix(in srgb, var(--surface) 88%, transparent); box-shadow: 0 6px 16px var(--text-4-fallback); }
+.review-controls { display: flex; align-items: center; gap: 10px; min-height: 48px; margin-bottom: 14px; padding: 4px 6px; border: 1px solid var(--divider-soft); border-radius: 14px; background: color-mix(in srgb, var(--surface) 88%, transparent); box-shadow: 0 6px 16px var(--text-4-fallback); }
+.review-range-toolbar { display: flex; flex: 1; align-items: center; justify-content: flex-end; gap: 10px; min-width: 0; padding: 0 2px 0 8px; }
 .review-range-toolbar__label { display: inline-flex; align-items: center; gap: 5px; margin-right: auto; color: var(--text-muted); font-size: 11px; font-weight: 650; }.review-range-toolbar__label svg { color: var(--accent-strong); }.review-range-toolbar__control { min-width: 0; }
-.review-tabs { display: flex; gap: 5px; margin-bottom: 14px; padding: 5px; border: 1px solid var(--divider-soft); border-radius: 15px; background: color-mix(in srgb, var(--surface) 88%, transparent); box-shadow: 0 6px 16px var(--text-4-fallback); }
+.review-tabs { display: flex; flex: 0 0 auto; gap: 5px; padding: 0; }
 .review-tabs button { display: inline-flex; min-height: 42px; align-items: center; gap: 7px; padding: 0 13px; border-radius: 10px; color: var(--text-muted); font-size: 12px; font-weight: 680; }
 .review-tabs button:hover { color: var(--text); background: var(--surface-muted); }
 .review-tabs button.active { color: var(--accent-strong); background: linear-gradient(135deg, var(--accent-soft), color-mix(in srgb, var(--accent-soft) 48%, var(--surface))); box-shadow: inset 0 0 0 1px var(--accent-20-border-fallback), 0 3px 9px var(--text-4-fallback); }
@@ -3012,7 +3013,7 @@ onBeforeUnmount(() => {
 .review-metric--primary > strong { font-size: clamp(25px, 2.5vw, 32px); }
 .review-metric--rhythm { background: linear-gradient(145deg, var(--surface), color-mix(in srgb, var(--accent-soft) 30%, var(--surface))); }
 .review-metric--rhythm .review-metric__delta.is-up { background: var(--accent-soft); color: var(--accent-strong); }
-.review-overview-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(330px, 1fr); gap: 12px; margin-top: 12px; }
+.review-overview-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(330px, 1fr); align-items: start; gap: 12px; margin-top: 12px; }
 .review-card { min-width: 0; padding: 20px; transition: border-color var(--transition-fast), box-shadow var(--transition-fast); }
 .review-card:hover { border-color: color-mix(in srgb, var(--accent) 22%, var(--divider-soft)); box-shadow: 0 14px 32px var(--text-7-fallback); }
 .review-card > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
@@ -3403,15 +3404,15 @@ onBeforeUnmount(() => {
 @media (max-width: 900px) {
   .review-filters label { flex-basis: 100%; }
 }
-@media (max-width: 680px) { .review-workspace { padding: 14px; }.review-range-toolbar { align-items: flex-start; padding-left: 10px; }.review-range-toolbar__label { display: none; }.review-range-toolbar__control { width: 100%; }.review-range, .review-tabs { overflow-x: auto; }.review-tabs button { white-space: nowrap; }.review-metrics { grid-template-columns: 1fr 1fr; }.review-metric { min-height: 88px; padding: 12px; }.review-recent__header { display: grid !important; }.review-recent-switch { width: 100%; }.review-recent-switch button { flex: 1; }.review-recent__footer { display: grid; }.review-recent__footer > div { display: grid; grid-template-columns: 1fr 1fr; }.review-filters label { flex-basis: 100%; }.review-filter-summary { gap: 4px 10px; }.review-pagination { flex-wrap: wrap; justify-content: space-between; }.review-detail-hero { grid-template-columns: 1fr; }.review-detail-hero__window { justify-content: space-between; }.review-detail-hero__stats { grid-template-columns: 1fr; }.review-detail-hero__stats > div + div { border-left: 0; border-top: 1px solid var(--divider-soft); }.review-focus-process__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.review-focus-plan__track { grid-template-columns: minmax(0, 1fr) 17px minmax(0, 1fr) 17px minmax(0, 1fr); }.review-focus-plan__track > article { padding: 8px 6px; }.review-focus-plan__track > article strong { font-size: 11px; }.review-rhythm-pattern__stats { grid-template-columns: 1fr; }.review-rhythm-pattern__stats span + span { border-top: 1px solid rgba(79, 127, 166, .13); border-left: 0; }.review-detail-footer__actions { flex-wrap: wrap; } }
+@media (max-width: 680px) { .review-workspace { padding: 14px; }.review-controls { display: grid; gap: 5px; padding: 5px; }.review-range-toolbar { order: -1; padding-left: 5px; }.review-range-toolbar__label { display: none; }.review-range-toolbar__control { width: 100%; }.review-range, .review-tabs { overflow-x: auto; }.review-tabs button { white-space: nowrap; }.review-metrics { grid-template-columns: 1fr 1fr; }.review-metric { min-height: 88px; padding: 12px; }.review-recent__header { display: grid !important; }.review-recent-switch { width: 100%; }.review-recent-switch button { flex: 1; }.review-recent__footer { display: grid; }.review-recent__footer > div { display: grid; grid-template-columns: 1fr 1fr; }.review-filters label { flex-basis: 100%; }.review-filter-summary { gap: 4px 10px; }.review-pagination { flex-wrap: wrap; justify-content: space-between; }.review-detail-hero { grid-template-columns: 1fr; }.review-detail-hero__window { justify-content: space-between; }.review-detail-hero__stats { grid-template-columns: 1fr; }.review-detail-hero__stats > div + div { border-left: 0; border-top: 1px solid var(--divider-soft); }.review-focus-process__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.review-focus-plan__track { grid-template-columns: minmax(0, 1fr) 17px minmax(0, 1fr) 17px minmax(0, 1fr); }.review-focus-plan__track > article { padding: 8px 6px; }.review-focus-plan__track > article strong { font-size: 11px; }.review-rhythm-pattern__stats { grid-template-columns: 1fr; }.review-rhythm-pattern__stats span + span { border-top: 1px solid rgba(79, 127, 166, .13); border-left: 0; }.review-detail-footer__actions { flex-wrap: wrap; } }
 @media (max-width: 680px) { .review-detail-hero.is-focus { grid-template-columns: minmax(0, 1fr) auto; }.review-detail-hero__illustration { display: none; }.review-focus-plan__connector { width: 17px; height: 17px; } }
 /* 新增：本期亮点洞察 */
-.review-insights { display: grid; gap: clamp(8px, 1.2vw, 12px); margin-bottom: clamp(10px, 1.4vw, 16px); padding: clamp(12px, 1.6vw, 16px); border: 1px solid var(--accent-34-fallback); border-radius: 16px; background: linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 70%, var(--surface)) 0%, var(--surface) 100%); }
+.review-insights { display: grid; gap: 8px; margin-top: 14px; padding: 10px 0; border-top: 1px solid color-mix(in srgb, var(--accent) 18%, var(--divider-soft)); border-bottom: 1px solid color-mix(in srgb, var(--accent) 12%, var(--divider-soft)); }
 .review-insights > header { display: flex; align-items: center; gap: 7px; color: var(--accent-strong); }
 .review-insights > header > span { font-size: 12px; font-weight: 750; letter-spacing: .04em; }
 .review-insights > header > small { margin-left: auto; color: var(--text-muted); font-size: 11px; font-weight: 500; }
-.review-insights__list { display: grid; gap: 8px; }
-.review-insight { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--surface); }
+.review-insights__list { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 8px; }
+.review-insight { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; border-radius: 10px; background: var(--surface-muted); }
 .review-insight__icon { display: grid; width: 32px; height: 32px; flex: 0 0 auto; place-items: center; border-radius: 10px; }
 .review-insight.is-positive .review-insight__icon { background: var(--accent-soft); color: var(--accent-strong); }
 .review-insight.is-caution .review-insight__icon { background: #fff0e1; color: #b6741a; }
