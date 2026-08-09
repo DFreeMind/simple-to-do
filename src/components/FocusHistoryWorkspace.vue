@@ -1,13 +1,9 @@
 <template>
   <main ref="workspaceRef" class="clock-workspace review-workspace">
     <div class="review-shell">
-      <header v-if="activeTab === 'overview'" class="review-header">
-        <div>
-          <p class="eyebrow">专注与节律回顾</p>
-          <h1>看见投入，也看见恢复</h1>
-          <p>按本机时区统计。专注记录推进，节律记录你如何停下来。点击任意记录可查看完整详情，下方数据全部按所选范围聚合。</p>
-        </div>
-        <div class="review-range-block">
+      <section v-if="activeTab === 'overview'" class="review-range-toolbar" aria-label="专注回顾时间范围">
+        <span class="review-range-toolbar__label"><Calendar :size="14" />查看范围</span>
+        <div class="review-range-toolbar__control">
           <ReviewRangeControl
             :range="range"
             :custom-start="customStart"
@@ -17,7 +13,7 @@
             @update:custom-end="customEnd = $event"
           />
         </div>
-      </header>
+      </section>
 
       <nav class="review-tabs" aria-label="回顾内容">
         <button v-for="tab in tabs" :key="tab.id" type="button" :class="{ active: activeTab === tab.id }" :aria-current="activeTab === tab.id ? 'page' : undefined" @click="selectTab(tab.id)">
@@ -2995,37 +2991,8 @@ onBeforeUnmount(() => {
   background-clip: padding-box;
 }
 .review-shell { width: min(100%, 1120px); margin: 0 auto; }
-.review-header {
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 24px;
-  overflow: hidden;
-  margin-bottom: 14px;
-  padding: clamp(20px, 2.4vw, 28px);
-  border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--divider-soft));
-  border-radius: 22px;
-  background: linear-gradient(128deg, color-mix(in srgb, var(--accent-tint) 92%, var(--surface)) 0%, var(--surface) 68%);
-  box-shadow: 0 16px 38px var(--text-4-fallback);
-}
-.review-header::after {
-  position: absolute;
-  top: -72px;
-  right: -52px;
-  width: 210px;
-  height: 210px;
-  border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
-  border-radius: 50%;
-  box-shadow: 0 0 0 22px color-mix(in srgb, var(--accent) 5%, transparent), 0 0 0 54px color-mix(in srgb, var(--accent) 3%, transparent);
-  content: '';
-  pointer-events: none;
-}
-.review-header > div:first-child { min-width: 0; }
-.review-header .eyebrow { margin: 0 0 7px; color: var(--accent-strong); font-size: 10px; font-weight: 800; letter-spacing: .11em; }
-.review-header h1 { position: relative; z-index: 1; margin: 0; color: var(--text); font-size: clamp(27px, 3vw, 36px); letter-spacing: -.055em; line-height: 1.13; }
-.review-header > div > p:last-child { position: relative; z-index: 1; max-width: 640px; margin: 10px 0 0; color: var(--text-muted); font-size: 12.5px; line-height: 1.65; }
-.review-range-block { position: relative; z-index: 1; display: flex; justify-content: flex-end; flex-shrink: 0; padding-top: 2px; }
+.review-range-toolbar { display: flex; align-items: center; justify-content: flex-end; gap: 10px; min-height: 44px; margin-bottom: 10px; padding: 5px 8px 5px 12px; border: 1px solid var(--divider-soft); border-radius: 13px; background: color-mix(in srgb, var(--surface) 88%, transparent); box-shadow: 0 6px 16px var(--text-4-fallback); }
+.review-range-toolbar__label { display: inline-flex; align-items: center; gap: 5px; margin-right: auto; color: var(--text-muted); font-size: 11px; font-weight: 650; }.review-range-toolbar__label svg { color: var(--accent-strong); }.review-range-toolbar__control { min-width: 0; }
 .review-tabs { display: flex; gap: 5px; margin-bottom: 14px; padding: 5px; border: 1px solid var(--divider-soft); border-radius: 15px; background: color-mix(in srgb, var(--surface) 88%, transparent); box-shadow: 0 6px 16px var(--text-4-fallback); }
 .review-tabs button { display: inline-flex; min-height: 42px; align-items: center; gap: 7px; padding: 0 13px; border-radius: 10px; color: var(--text-muted); font-size: 12px; font-weight: 680; }
 .review-tabs button:hover { color: var(--text); background: var(--surface-muted); }
@@ -3436,7 +3403,7 @@ onBeforeUnmount(() => {
 @media (max-width: 900px) {
   .review-filters label { flex-basis: 100%; }
 }
-@media (max-width: 680px) { .review-workspace { padding: 14px; }.review-header { display: grid; gap: 14px; }.review-range, .review-tabs { overflow-x: auto; }.review-tabs button { white-space: nowrap; }.review-metrics { grid-template-columns: 1fr 1fr; }.review-metric { min-height: 88px; padding: 12px; }.review-recent__header { display: grid !important; }.review-recent-switch { width: 100%; }.review-recent-switch button { flex: 1; }.review-recent__footer { display: grid; }.review-recent__footer > div { display: grid; grid-template-columns: 1fr 1fr; }.review-filters label { flex-basis: 100%; }.review-filter-summary { gap: 4px 10px; }.review-pagination { flex-wrap: wrap; justify-content: space-between; }.review-detail-hero { grid-template-columns: 1fr; }.review-detail-hero__window { justify-content: space-between; }.review-detail-hero__stats { grid-template-columns: 1fr; }.review-detail-hero__stats > div + div { border-left: 0; border-top: 1px solid var(--divider-soft); }.review-focus-process__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.review-focus-plan__track { grid-template-columns: minmax(0, 1fr) 17px minmax(0, 1fr) 17px minmax(0, 1fr); }.review-focus-plan__track > article { padding: 8px 6px; }.review-focus-plan__track > article strong { font-size: 11px; }.review-rhythm-pattern__stats { grid-template-columns: 1fr; }.review-rhythm-pattern__stats span + span { border-top: 1px solid rgba(79, 127, 166, .13); border-left: 0; }.review-detail-footer__actions { flex-wrap: wrap; } }
+@media (max-width: 680px) { .review-workspace { padding: 14px; }.review-range-toolbar { align-items: flex-start; padding-left: 10px; }.review-range-toolbar__label { display: none; }.review-range-toolbar__control { width: 100%; }.review-range, .review-tabs { overflow-x: auto; }.review-tabs button { white-space: nowrap; }.review-metrics { grid-template-columns: 1fr 1fr; }.review-metric { min-height: 88px; padding: 12px; }.review-recent__header { display: grid !important; }.review-recent-switch { width: 100%; }.review-recent-switch button { flex: 1; }.review-recent__footer { display: grid; }.review-recent__footer > div { display: grid; grid-template-columns: 1fr 1fr; }.review-filters label { flex-basis: 100%; }.review-filter-summary { gap: 4px 10px; }.review-pagination { flex-wrap: wrap; justify-content: space-between; }.review-detail-hero { grid-template-columns: 1fr; }.review-detail-hero__window { justify-content: space-between; }.review-detail-hero__stats { grid-template-columns: 1fr; }.review-detail-hero__stats > div + div { border-left: 0; border-top: 1px solid var(--divider-soft); }.review-focus-process__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.review-focus-plan__track { grid-template-columns: minmax(0, 1fr) 17px minmax(0, 1fr) 17px minmax(0, 1fr); }.review-focus-plan__track > article { padding: 8px 6px; }.review-focus-plan__track > article strong { font-size: 11px; }.review-rhythm-pattern__stats { grid-template-columns: 1fr; }.review-rhythm-pattern__stats span + span { border-top: 1px solid rgba(79, 127, 166, .13); border-left: 0; }.review-detail-footer__actions { flex-wrap: wrap; } }
 @media (max-width: 680px) { .review-detail-hero.is-focus { grid-template-columns: minmax(0, 1fr) auto; }.review-detail-hero__illustration { display: none; }.review-focus-plan__connector { width: 17px; height: 17px; } }
 /* 新增：本期亮点洞察 */
 .review-insights { display: grid; gap: clamp(8px, 1.2vw, 12px); margin-bottom: clamp(10px, 1.4vw, 16px); padding: clamp(12px, 1.6vw, 16px); border: 1px solid var(--accent-34-fallback); border-radius: 16px; background: linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 70%, var(--surface)) 0%, var(--surface) 100%); }
