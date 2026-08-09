@@ -1297,6 +1297,18 @@ function buildTrendTooltip(day) {
   const secondaryValue = trendMetric.value === 'sessions' ? formatDuration(day.seconds) : `${day.sessionCount} 段专注`
   return `<div style="display:grid;gap:5px;max-width:256px;line-height:1.35"><b>${escapeHtml(day.label)}${day.isCurrent ? '（当前）' : ''}</b><strong style="font-size:13px">${escapeHtml(formatTrendValue(trendValue(day)))}</strong><span style="color:#687674">${escapeHtml(secondaryValue)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(summary.outcomeText)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#687674">${escapeHtml(summary.taskText)}</span><small style="color:#687674">点击查看完整记录</small></div>`
 }
+function positionTrendTooltip(point, _params, _dom, _rect, size) {
+  const [pointerX, pointerY] = point
+  const [viewWidth, viewHeight] = size?.viewSize || [0, 0]
+  const [contentWidth, contentHeight] = size?.contentSize || [256, 136]
+  const gap = 12
+  const maxLeft = Math.max(gap, viewWidth - contentWidth - gap)
+  const maxTop = Math.max(gap, viewHeight - contentHeight - gap)
+  // 首尾柱子向内侧展开，中间柱子也优先避开鼠标与当前柱体。
+  const preferredLeft = pointerX <= viewWidth / 2 ? pointerX + gap : pointerX - contentWidth - gap
+  const preferredTop = pointerY > contentHeight + gap ? pointerY - contentHeight - gap : pointerY + gap
+  return [Math.min(maxLeft, Math.max(gap, preferredLeft)), Math.min(maxTop, Math.max(gap, preferredTop))]
+}
 // 趋势图：ECharts 柱状图实例管理；按范围自动切换日 / 周 / 月粒度。
 const trendChartEl = ref(null)
 let trendChartInstance = null
@@ -1309,6 +1321,10 @@ function buildTrendChartOption() {
     grid: { left: 46, right: 10, top: 24, bottom: 24 },
     tooltip: {
       trigger: 'axis',
+      appendToBody: true,
+      confine: true,
+      z: 1000,
+      position: positionTrendTooltip,
       ...chartTooltipStyle(colors),
       formatter: (params) => {
         const day = params?.[0]?.data?.day
