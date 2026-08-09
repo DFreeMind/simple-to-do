@@ -94,6 +94,9 @@ const achievementTab = page.getByRole('button', { name: '专注成就' }).first(
 if (await achievementTab.count()) {
   await achievementTab.click()
   await page.waitForTimeout(800)
+  // 把"近期足迹"段滚到视口里再拍，让 1280×800 的截图能看到 4 项核心结构和 近期足迹
+  await page.locator('.achievement-trail').first().scrollIntoViewIfNeeded()
+  await page.waitForTimeout(300)
   await capture('focus-achievement')
 }
 
