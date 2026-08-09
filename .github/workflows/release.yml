@@ -1,0 +1,113 @@
+name: 发布桌面应用
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 必须与 package.json、Cargo.toml、tauri.conf.json 一致
+        required: true
+        type: string
+      release_notes:
+        description: 中文 Release Notes
+        required: true
+        type: string
+      include_windows:
+        description: 是否重新构建 Windows x64（仅补 macOS 资产时关闭）
+        required: true
+        default: true
+        type: boolean
+
+concurrency:
+  group: release-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    if: ${{ inputs.include_windows || matrix.id != 'windows-x64' }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: windows-x64
+            name: 构建 Windows x64
+            runner: windows-latest
+            bundles: nsis
+          - id: macos-x64
+            name: 构建 macOS Intel
+            runner: macos-15-intel
+            bundles: dmg
+          - id: macos-aarch64
+            name: 构建 macOS Apple Silicon
+            runner: macos-latest
+            bundles: dmg
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+      - name: 安装前端依赖
+        run: npm ci
+      - name: 校验发布配置
+        env:
+          CI: true
+        run: node scripts/release-preflight.mjs ${{ inputs.version }} --ci
+      - name: 构建签名产物
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run tauri:build -- --bundles ${{ matrix.bundles }}
+      - name: 整理发布资产
+        run: node scripts/stage-release-assets.mjs --platform ${{ matrix.id }} --out-dir release-assets/${{ matrix.id }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.id }}
+          path: release-assets/${{ matrix.id }}/*
+          if-no-files-found: error
+
+  publish:
+    name: 发布 Release、更新清单和自建下载源
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          pattern: release-*
+          merge-multiple: true
+      - name: 创建或更新 GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          RELEASE_NOTES: ${{ inputs.release_notes }}
+        run: |
+          tag="v${VERSION}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release edit "$tag" --title "$VERSION" --notes "$RELEASE_NOTES"
+          else
+            gh release create "$tag" --title "$VERSION" --notes "$RELEASE_NOTES"
+          fi
+          gh release upload "$tag" release-assets/* --clobber
+      - name: 生成统一更新清单
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/publish-updater-manifest.mjs --tag v${{ inputs.version }} --require windows-x86_64,darwin-x86_64,darwin-aarch64
+      - name: 同步到自建下载源
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+          DEPLOY_SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
+        run: node scripts/sync-update-source.mjs --version ${{ inputs.version }} --base-url https://simpletodo.duqimeng.cn/releases

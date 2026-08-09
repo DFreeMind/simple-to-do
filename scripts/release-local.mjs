@@ -126,30 +126,7 @@ async function main() {
   verifyKeyId(sigStaged)
   console.log(`签名校验通过: keyid=403511B997506DCC`)
 
-  // latest.json：tauri 本地构建只生成 exe + sig，不生成/不覆盖 latest.json
-  // （bundle/nsis/latest.json 是旧版本残留，不能使用）。这里手动构造：
-  // version/notes 取本次发布，signature 从 exe.sig 读取，url 先指向 GitHub
-  // 资产，第 6 步 sync-update-source.mjs 会改写为自建服务器 /releases/ 路径。
-  const latestStaged = path.join(staging, 'latest.json')
-  const sigContent = fs.readFileSync(sigStaged, 'utf8').trim()
   const notes = fs.readFileSync(notesFile, 'utf8').trim()
-  const latestJson = {
-    version,
-    notes,
-    pub_date: new Date().toISOString(),
-    platforms: {
-      'windows-x86_64': {
-        signature: sigContent,
-        url: `https://github.com/${repo}/releases/download/${tag}/${assetBase}.exe`
-      },
-      'windows-x86_64-nsis': {
-        signature: sigContent,
-        url: `https://github.com/${repo}/releases/download/${tag}/${assetBase}.exe`
-      }
-    }
-  }
-  fs.writeFileSync(latestStaged, JSON.stringify(latestJson, null, 2) + '\n')
-  console.log(`latest.json 已构造: version=${latestJson.version}, platforms=${Object.keys(latestJson.platforms).length}（手动构造，不依赖 tauri 残留文件）`)
 
   // 4. 创建/更新 GitHub Release 并上传 Windows 资产
   console.log('\n--- 4/7 GitHub Release ---')
@@ -164,15 +141,15 @@ async function main() {
   if (releaseExists) {
     console.log(`Release ${tag} 已存在，更新 notes 与资产`)
     run('gh', ['release', 'edit', tag, '--notes-file', notesFile])
-    run('gh', ['release', 'upload', tag, exeStaged, sigStaged, latestStaged, '--clobber'])
+    run('gh', ['release', 'upload', tag, exeStaged, sigStaged, '--clobber'])
   } else {
     console.log(`创建 Release ${tag}`)
-    run('gh', ['release', 'create', tag, exeStaged, sigStaged, latestStaged, '--title', version, '--notes-file', notesFile])
+    run('gh', ['release', 'create', tag, exeStaged, sigStaged, '--title', version, '--notes-file', notesFile])
   }
 
-  // 5. 修复 latest.json（notes 对齐 Release body + 无 BOM）
-  console.log('\n--- 5/7 修复 latest.json ---')
-  run('node', ['scripts/fix-updater-json.mjs', '--tag', tag])
+  // 5. 从同一 Release 的资产重新生成 latest.json；未来 CI 追加 macOS 后会自动并入。
+  console.log('\n--- 5/7 生成统一 latest.json ---')
+  run('node', ['scripts/publish-updater-manifest.mjs', '--tag', tag, '--require', 'windows-x86_64'])
 
   // 6. 同步自建服务器
   console.log('\n--- 6/7 同步自建服务器 ---')
