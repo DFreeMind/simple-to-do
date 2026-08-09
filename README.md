@@ -10,7 +10,7 @@
 
 [下载最新版本](https://github.com/DFreeMind/simple-to-do/releases/latest) · [查看功能](#核心功能) · [开发文档](#开发)
 
-![易简清单今日视图：清单、任务、计划与重要分组](public/screenshots/today-view.webp)
+![易简清单今日视图：今日任务、清单侧栏与快速添加输入框](public/screenshots/today-view.webp)
 
 ## 为什么是易简清单
 
@@ -67,7 +67,7 @@
 
 <p align="center">
   <img src="public/screenshots/focus-workspace.webp" alt="专注工作台：今日花（小雏菊·种子）、今日目标与 3 个内置专注方式" width="49%" />
-  <img src="public/screenshots/focus-achievement.webp" alt="专注成就：花田总览、花种图鉴与成长徽章" width="49%" />
+  <img src="public/screenshots/focus-achievement.webp" alt="专注成就：年/月格温室花田、累计成长环形图与近期足迹" width="49%" />
 </p>
 
 时钟模块把专注计时、节律提醒、回顾和成就放在同一处：今日花按专注分钟自然成长，长期投入会逐步解锁 12 种花和成长徽章；所有记录与成长数据保存在本机，不依赖外部账号。
@@ -89,7 +89,7 @@
 ### 节律提醒，让屏幕时间有节奏
 
 <p align="center">
-  <img src="public/screenshots/rhythm-workspace.webp" alt="节律提醒：按间隔、固定时刻或连续使用触发，最对同时开启 3 项" width="49%" />
+  <img src="public/screenshots/rhythm-workspace.webp" alt="节律提醒：按间隔、固定时刻或连续使用触发，最多同时开启 3 项" width="49%" />
   <img src="public/screenshots/settings-notifications.webp" alt="通知与反馈：系统提醒与操作音效" width="49%" />
 </p>
 
