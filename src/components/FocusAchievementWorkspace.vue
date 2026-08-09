@@ -98,40 +98,39 @@
           </div>
         </section>
 
-        <aside class="achievement-summary card-surface" aria-label="专注成长摘要">
-          <header><span>成长仪表</span><Leaf :size="18" /></header>
-          <!-- 环形图：当前等级进度，中心显示累计专注 -->
-          <div class="achievement-summary__ring" :title="`距离${nextGrowthRank ? nextGrowthRank.name : '盛放花田'}还差 ${nextGrowthRank ? nextGrowthRank.threshold - store.focusGardenTotals.totalMinutes : 0} 分钟`">
+        <aside class="achievement-summary card-surface" aria-label="年度花田档案">
+          <header><span>年度档案</span><Leaf :size="18" /></header>
+          <div class="achievement-summary__ring" :title="`${selectedYear} 年有 ${yearSummary.activeMonths} 个月留下成长`">
             <svg viewBox="0 0 64 64" aria-hidden="true">
               <circle cx="32" cy="32" r="27" class="achievement-summary__ring-track" />
-              <circle cx="32" cy="32" r="27" class="achievement-summary__ring-fill" :style="{ '--p': growthRankProgress }" />
+              <circle cx="32" cy="32" r="27" class="achievement-summary__ring-fill" :style="{ '--p': yearSummary.monthProgress }" />
             </svg>
             <div>
-              <small>累计专注</small>
-              <strong>{{ durationHuman(store.focusGardenTotals.totalMinutes) }}</strong>
-              <em>距离 {{ nextGrowthRank ? nextGrowthRank.name : '盛放花田' }} {{ nextGrowthRank ? `${Math.max(0, nextGrowthRank.threshold - store.focusGardenTotals.totalMinutes)} 分` : '已达成' }}</em>
+              <small>{{ selectedYear }} 年</small>
+              <strong>{{ yearSummary.activeMonths }} / 12 月</strong>
+              <em>留下专注成长</em>
             </div>
           </div>
           <dl>
             <div>
+              <span class="achievement-summary__icon"><Timer :size="14" /></span>
+              <dt>年度投入</dt>
+              <dd>{{ durationHuman(yearSummary.minutes) }}</dd>
+            </div>
+            <div>
               <span class="achievement-summary__icon"><Flower2 :size="14" /></span>
               <dt>完整盛放</dt>
-              <dd>{{ store.focusGardenTotals.bloomCount }} 朵</dd>
+              <dd>{{ yearSummary.blooms }} 朵</dd>
             </div>
             <div>
               <span class="achievement-summary__icon"><Trees :size="14" /></span>
-              <dt>已培养花种</dt>
-              <dd>{{ store.focusGardenTotals.speciesCount }} 种</dd>
+              <dt>常种花</dt>
+              <dd>{{ yearSummary.favoriteSpeciesName }}</dd>
             </div>
             <div>
-              <span class="achievement-summary__icon"><Trophy :size="14" /></span>
-              <dt>已获得徽章</dt>
-              <dd>{{ unlockedAchievements.length }} 枚</dd>
-            </div>
-            <div>
-              <span class="achievement-summary__icon"><Flame :size="14" /></span>
-              <dt>最长连续</dt>
-              <dd>{{ store.focusGardenTotals.longestStreak }} 天</dd>
+              <span class="achievement-summary__icon"><Sprout :size="14" /></span>
+              <dt>最丰盛月份</dt>
+              <dd>{{ yearSummary.bestMonthLabel }}</dd>
             </div>
           </dl>
         </aside>
@@ -141,6 +140,7 @@
             <div><span>月度花圃</span><h2>{{ selectedYear }} 年 {{ selectedMonth + 1 }} 月</h2><p>未完成目标的幼苗和花苞也会被如实保留。</p></div>
             <div class="achievement-month__nav">
               <button type="button" aria-label="上一个月" @click="shiftMonth(-1)"><ChevronLeft :size="16" /></button>
+              <button v-if="!isCurrentMonth" type="button" aria-label="回到本月" @click="goToCurrentMonth"><CalendarDays :size="15" /></button>
               <button type="button" aria-label="下一个月" @click="shiftMonth(1)"><ChevronRight :size="16" /></button>
             </div>
           </header>
@@ -322,6 +322,9 @@
             <button v-if="selectedSpecies.unlocked" class="species-playground__choose" type="button" :disabled="isCurrentSpecies(selectedSpecies.id)" @click="chooseSpecies(selectedSpecies.id)">
               <Sprout :size="15" />{{ speciesButtonLabel(selectedSpecies.id) }}
             </button>
+            <button v-if="selectedSpecies.growthMinutes > 0" class="species-playground__footprint" type="button" @click="openSpeciesFootprint(selectedSpecies.id)">
+              <CalendarDays :size="14" />查看最近种植
+            </button>
             <div v-else class="achievement-progress"><i :style="{ width: `${speciesUnlockProgress(selectedSpecies)}%` }"></i></div>
           </aside>
         </section>
@@ -459,12 +462,12 @@
           </article>
         </section>
 
-        <section class="badges-category-index" aria-label="成就维度总览">
-          <article v-for="group in achievementGroups" :key="`index-${group.id}`" class="badges-category-index__item" :class="`badges-category-index__item--${group.id}`">
+        <section class="badges-category-index" role="tablist" aria-label="按成长维度浏览徽章">
+          <button v-for="group in achievementGroups" :key="`index-${group.id}`" type="button" role="tab" :aria-selected="activeBadgeGroupId === group.id" class="badges-category-index__item" :class="[`badges-category-index__item--${group.id}`, { active: activeBadgeGroupId === group.id }]" @click="selectedBadgeGroupId = group.id">
             <div><span>{{ group.label }}</span><strong>{{ group.items.filter(item => item.unlockedAt).length }} / {{ group.items.length }}</strong></div>
             <small>{{ group.reward.label }}</small>
             <i><b :style="{ width: `${Math.round(group.items.filter(item => item.unlockedAt).length / group.items.length * 100)}%` }"></b></i>
-          </article>
+          </button>
         </section>
 
         <section v-if="nextAchievement" class="badges-next card-surface">
@@ -481,15 +484,24 @@
           <Flower2 :size="22" />
         </section>
 
-        <section v-for="group in achievementGroups" :key="group.id" class="badges-group" :class="`badges-group--${group.id}`">
-          <header><div><span>{{ group.label }}</span><h2>{{ group.description }}</h2><small class="badges-group__reward">{{ group.reward.label }} · {{ group.reward.hint }}</small></div><small><strong>{{ group.items.filter(item => item.unlockedAt).length }}</strong> / {{ group.items.length }} · {{ Math.round(group.items.filter(item => item.unlockedAt).length / group.items.length * 100) }}%</small></header>
+        <section v-for="group in visibleBadgeGroups" :key="group.id" class="badges-group" :class="`badges-group--${group.id}`">
+          <header>
+            <div><span>{{ group.label }}</span><h2>{{ group.description }}</h2><small class="badges-group__reward">{{ group.reward.label }} · {{ group.reward.hint }}</small></div>
+            <div class="badges-group__controls">
+              <div role="group" aria-label="徽章显示范围">
+                <button v-for="option in badgeStatusOptions" :key="option.id" type="button" :class="{ active: badgeStatusFilter === option.id }" @click="badgeStatusFilter = option.id">{{ option.label }}</button>
+              </div>
+              <small><strong>{{ group.items.filter(item => item.unlockedAt).length }}</strong> / {{ group.items.length }} · {{ Math.round(group.items.filter(item => item.unlockedAt).length / group.items.length * 100) }}%</small>
+            </div>
+          </header>
           <div class="badges-grid">
-            <article v-for="item in group.items" :key="item.id" class="badge-card card-surface" :class="[{ unlocked: item.unlockedAt }, `badge-card--${group.id}`]">
+            <article v-for="item in group.visibleItems" :key="item.id" class="badge-card card-surface" :class="[{ unlocked: item.unlockedAt }, `badge-card--${group.id}`]">
               <span class="badge-card__icon"><component :is="achievementBadgeIcon(item)" :size="25" /><small v-if="badgeTier(item)">{{ badgeTier(item) }}</small></span>
               <div><span class="badge-card__reward">{{ group.reward.label }}</span><h3>{{ item.name }}</h3><p>{{ item.description }}</p></div>
               <span v-if="item.unlockedAt" class="badge-card__date"><Check :size="13" />{{ formatShortDate(item.unlockedAt) }}</span>
               <div v-else class="badge-card__progress"><span>{{ item.progress }} / {{ item.target }}</span><i><b :style="{ width: `${Math.min(100, Math.round(item.progress / item.target * 100))}%` }"></b></i></div>
             </article>
+            <div v-if="!group.visibleItems.length" class="badges-group__empty"><Check v-if="badgeStatusFilter === 'in-progress'" :size="18" /><Trophy v-else :size="18" /><p>{{ badgeStatusFilter === 'in-progress' ? '这一类徽章已经全部获得。' : '这一类还没有获得的徽章。' }}</p></div>
           </div>
         </section>
 
@@ -552,6 +564,8 @@ const store = useTaskStore()
 const activeTab = ref('field')
 const selectedYear = ref(new Date().getFullYear())
 const selectedMonth = ref(new Date().getMonth())
+const selectedBadgeGroupId = ref(null)
+const badgeStatusFilter = ref('in-progress')
 const selectedSpeciesId = ref(store.focusGarden.selectedSpeciesId)
 const selectedStageIndex = ref(5)
 const reactionBurst = ref(0)
@@ -637,7 +651,25 @@ const yearMonths = computed(() => Array.from({ length: 12 }, (_, index) => {
     stage: gardenStageFor((totalGrowth / totalGoal) * 50, 50).id
   }
 }))
+const yearSummary = computed(() => {
+  const entries = yearMonths.value.flatMap(month => month.entries)
+  const speciesMinutes = new Map()
+  entries.forEach(entry => speciesMinutes.set(entry.speciesId, (speciesMinutes.get(entry.speciesId) || 0) + Math.max(0, Number(entry.growthMinutes) || 0)))
+  const favoriteSpeciesId = [...speciesMinutes.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
+  const bestMonth = [...yearMonths.value].sort((a, b) => (
+    b.entries.reduce((sum, entry) => sum + Math.max(0, Number(entry.growthMinutes) || 0), 0) - a.entries.reduce((sum, entry) => sum + Math.max(0, Number(entry.growthMinutes) || 0), 0)
+  ))[0]
+  return {
+    minutes: entries.reduce((sum, entry) => sum + Math.max(0, Number(entry.growthMinutes) || 0), 0),
+    blooms: entries.filter(entry => gardenStageFor(entry.growthMinutes, entry.goalMinutes).id === 'bloom').length,
+    activeMonths: yearMonths.value.filter(month => month.entries.some(entry => entry.growthMinutes > 0)).length,
+    monthProgress: Math.round(yearMonths.value.filter(month => month.entries.some(entry => entry.growthMinutes > 0)).length / 12 * 100),
+    favoriteSpeciesName: favoriteSpeciesId ? daySpeciesName(favoriteSpeciesId) : '等待第一株花',
+    bestMonthLabel: bestMonth?.entries.length ? `${bestMonth.index + 1} 月` : '静待生长'
+  }
+})
 const monthCells = computed(() => monthGardenCells(selectedYear.value, selectedMonth.value, store.focusGarden.days))
+const isCurrentMonth = computed(() => selectedYear.value === new Date().getFullYear() && selectedMonth.value === new Date().getMonth())
 const selectedMonthSummary = computed(() => {
   const entries = monthCells.value.map(cell => cell.entry).filter(Boolean)
   return {
@@ -744,6 +776,11 @@ const achievementGroups = computed(() => [
   { id: 'deep', label: '深入', description: '记录真正沉浸的一段时间', icon: TimerReset },
   { id: 'variety', label: '多样', description: '培养不同花种留下的色彩', icon: Leaf }
 ].map(group => ({ ...group, reward: FOCUS_GARDEN_ACHIEVEMENT_REWARDS[group.id], items: store.focusGardenAchievements.filter(item => item.kind === group.id) })).filter(group => group.items.length))
+const badgeStatusOptions = [
+  { id: 'in-progress', label: '正在形成' },
+  { id: 'unlocked', label: '已获得' },
+  { id: 'all', label: '全部' }
+]
 const nextAchievement = computed(() => [...store.focusGardenAchievements]
   .filter(item => !item.unlockedAt)
   .sort((a, b) => {
@@ -751,6 +788,15 @@ const nextAchievement = computed(() => [...store.focusGardenAchievements]
     const remainingB = b.target ? Math.max(0, b.target - b.progress) / b.target : 1
     return remainingA - remainingB
   })[0] || null)
+const activeBadgeGroupId = computed(() => selectedBadgeGroupId.value || nextAchievement.value?.kind || achievementGroups.value[0]?.id || '')
+const visibleBadgeGroups = computed(() => achievementGroups.value
+  .filter(group => group.id === activeBadgeGroupId.value)
+  .map(group => ({
+    ...group,
+    visibleItems: group.items.filter(item => (
+      badgeStatusFilter.value === 'all' || (badgeStatusFilter.value === 'unlocked' ? item.unlockedAt : !item.unlockedAt)
+    ))
+  })))
 const nextAchievementProgress = computed(() => nextAchievement.value
   ? Math.min(100, Math.round(nextAchievement.value.progress / Math.max(1, nextAchievement.value.target) * 100))
   : 100)
@@ -793,6 +839,11 @@ function shiftMonth(delta) {
   selectedYear.value = date.getFullYear()
   selectedMonth.value = date.getMonth()
 }
+function goToCurrentMonth() {
+  const now = new Date()
+  selectedYear.value = now.getFullYear()
+  selectedMonth.value = now.getMonth()
+}
 function dayCellLabel(cell) {
   if (cell.entry) return `${cell.date}，${daySpeciesName(cell.entry.speciesId)}，${stageName(cell.entry.stage)}，${cell.entry.growthMinutes}/${cell.entry.goalMinutes} 分钟。查看详情`
   return cell.date > todayKey ? `${cell.date}，未来日期` : `${cell.date}，没有专注成长。查看说明`
@@ -814,6 +865,17 @@ function goToMonth(monthIndex) {
   nextTick(() => {
     document.querySelector('.achievement-month')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   })
+}
+function openSpeciesFootprint(speciesId) {
+  const latestDay = [...store.focusGarden.days]
+    .filter(day => day.speciesId === speciesId && day.growthMinutes > 0)
+    .sort((a, b) => b.date.localeCompare(a.date))[0]
+  if (!latestDay) return
+  const [year, month] = latestDay.date.split('-').map(Number)
+  selectedYear.value = year
+  selectedMonth.value = month - 1
+  activeTab.value = 'field'
+  nextTick(() => document.querySelector('.achievement-month')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
 }
 // 月份 → 季节：3-5 春 / 6-8 夏 / 9-11 秋 / 12-2 冬
 function seasonOf(monthIndex) {
@@ -1281,7 +1343,7 @@ onBeforeUnmount(cancelGrowthReplay)
 .species-playground__info h2 { margin: 0; color: var(--text); font-size: 28px; letter-spacing: -.04em; }.species-playground__info > p { min-height: 42px; margin: -5px 0 0; color: var(--text-muted); font-size: 12px; line-height: 1.65; }
 .species-playground__info dl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 2px 0; }.species-playground__info dl div { display: grid; gap: 4px; padding: 10px; border: 1px solid color-mix(in srgb, var(--species-accent) 13%, var(--divider-soft)); border-radius: 12px; background: rgba(255,255,255,.68); }.species-playground__info dt { color: var(--text-muted); font-size: 9px; }.species-playground__info dd { margin: 0; color: var(--text); font-size: 12px; font-weight: 750; }
 .species-detail__status { display: inline-flex; align-items: center; gap: 5px; width: fit-content; padding: 6px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-strong); font-size: 10px; font-weight: 700; }.species-detail__status.is-locked { background: var(--surface-muted); color: var(--text-muted); }
-.species-playground__choose { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 39px; border-radius: 11px; background: linear-gradient(135deg, var(--accent), var(--accent-strong)); color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 18px color-mix(in srgb, var(--accent) 25%, transparent); }.species-playground__choose:disabled { background: var(--surface-muted); color: var(--text-muted); box-shadow: none; cursor: default; }
+.species-playground__choose { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 39px; border-radius: 11px; background: linear-gradient(135deg, var(--accent), var(--accent-strong)); color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 18px color-mix(in srgb, var(--accent) 25%, transparent); }.species-playground__choose:disabled { background: var(--surface-muted); color: var(--text-muted); box-shadow: none; cursor: default; }.species-playground__footprint { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 35px; border: 1px solid color-mix(in srgb, var(--species-accent) 28%, var(--divider-soft)); border-radius: 10px; color: var(--species-accent); font-size: 11px; font-weight: 700; cursor: pointer; }.species-playground__footprint:hover { background: color-mix(in srgb, var(--species-accent) 10%, var(--surface)); }
 .species-replay { padding: 18px 20px 20px; }.species-replay__actions { display: flex; align-items: center; gap: 12px; }.species-replay__actions button { display: inline-flex; align-items: center; gap: 5px; padding: 6px 9px; border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--divider-soft)); border-radius: 999px; background: var(--accent-soft); color: var(--accent-strong); font-size: 10px; font-weight: 700; cursor: pointer; }.species-replay__actions small { color: var(--accent-strong); font-size: 11px; font-weight: 750; }.species-replay__range { display: block; margin: 17px 13px 4px; }.species-replay__range input { width: 100%; accent-color: var(--accent); cursor: grab; }.species-replay__range input:active { cursor: grabbing; }
 .species-replay__steps { position: relative; display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }.species-replay__steps::before { position: absolute; top: 15px; right: 7%; left: 7%; height: 2px; background: var(--divider-soft); content: ''; }.species-replay__steps button { position: relative; z-index: 1; display: grid; justify-items: center; gap: 5px; padding: 3px; color: var(--text-muted); font-size: 10px; cursor: pointer; }.species-replay__steps button i { display: grid; width: 30px; height: 30px; place-items: center; border: 2px solid var(--surface); border-radius: 50%; background: var(--surface-muted); box-shadow: 0 0 0 1px var(--divider-soft); }.species-replay__steps button.reached i { background: var(--accent-soft); color: var(--accent-strong); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent); }.species-replay__steps button.active { color: var(--accent-strong); font-weight: 750; }.species-replay__steps button.active i { color: #fff; background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); transform: scale(1.06); }
 .species-collection { padding: 18px 18px 14px; overflow: hidden; background: linear-gradient(180deg, var(--surface), color-mix(in srgb, var(--collection-scene) 54%, var(--surface))); }.species-collection > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }.species-collection > header span { color: var(--accent-strong); font-size: 11px; font-weight: 800; letter-spacing: .06em; }.species-collection > header h2 { margin: 4px 0 0; color: var(--text-muted); font-size: 11px; font-weight: 500; }.species-collection > header small { padding: 5px 8px; border-radius: 999px; background: rgba(255,255,255,.7); color: var(--text-muted); font-size: 9px; }
@@ -1295,10 +1357,10 @@ onBeforeUnmount(cancelGrowthReplay)
 .badges-overview { display: grid; grid-template-columns: minmax(230px, 1.15fr) minmax(220px, .9fr) minmax(210px, .85fr); align-items: center; gap: 18px; padding: 20px; border-color: color-mix(in srgb, var(--accent) 15%, var(--divider-soft)); background: linear-gradient(120deg, color-mix(in srgb, var(--accent-soft) 50%, var(--surface)), var(--surface) 48%, color-mix(in srgb, #e8f0d9 26%, var(--surface))); }
 .badges-overview__main { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }.badges-overview__mark { display: grid; flex: 0 0 auto; width: 46px; height: 46px; place-items: center; border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent); border-radius: 15px; background: var(--accent-soft); color: var(--accent-strong); }.badges-overview__main h2 { margin: 2px 0 3px; color: var(--text); font-size: 21px; letter-spacing: -.04em; }.badges-overview__main p { margin: 0; color: var(--text-muted); font-size: 11px; line-height: 1.55; }.badges-overview__main .badges-overview__eyebrow { color: var(--accent-strong); font-size: 10px; font-weight: 800; letter-spacing: .05em; }.badges-overview__stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }.badges-overview__stats div { display: grid; gap: 5px; min-width: 0; padding: 9px 8px; border: 1px solid var(--divider-soft); border-radius: 11px; background: rgba(255,255,255,.52); }.badges-overview__stats small { color: var(--text-muted); font-size: 9px; white-space: nowrap; }.badges-overview__stats strong { overflow: hidden; color: var(--text); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }.badges-overview__today { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 8px 10px; border: 1px solid color-mix(in srgb, #9bbf85 25%, var(--divider-soft)); border-radius: 13px; background: color-mix(in srgb, #f2f7e9 64%, var(--surface)); }.badges-overview__today :deep(.focus-species-preview) { width: 66px; height: 66px; flex: 0 0 auto; object-fit: contain; }.badges-overview__today > div { display: grid; min-width: 0; gap: 3px; }.badges-overview__today small { color: var(--text-muted); font-size: 9px; }.badges-overview__today strong { overflow: hidden; color: var(--text); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }.badges-overview__today span { overflow: hidden; color: var(--text-muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }.badges-overview__today i { display: block; width: 100%; height: 4px; overflow: hidden; border-radius: 99px; background: color-mix(in srgb, #a8c18e 22%, var(--surface-muted)); }.badges-overview__today i b { display: block; height: 100%; border-radius: inherit; background: #8fac70; }
 .badges-next { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(150px, .45fr); align-items: center; gap: 16px; padding: 15px 18px; border-color: color-mix(in srgb, var(--accent) 18%, var(--divider-soft)); background: var(--surface); }.badges-next__label { display: grid; gap: 5px; min-width: 87px; }.badges-next__label span { color: var(--accent-strong); font-size: 10px; font-weight: 800; }.badges-next__label small { color: var(--text-muted); font-size: 9px; white-space: nowrap; }.badges-next__copy { min-width: 0; }.badges-next__copy h2 { margin: 0 0 3px; color: var(--text); font-size: 15px; }.badges-next__copy p { overflow: hidden; margin: 0; color: var(--text-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }.badges-next__progress { display: grid; gap: 5px; }.badges-next__progress strong { color: var(--text); font-size: 11px; text-align: right; }.badges-next__progress i { height: 6px; overflow: hidden; border-radius: 99px; background: var(--surface-muted); }.badges-next__progress b { display: block; height: 100%; border-radius: inherit; background: var(--accent); }.badges-next--complete { grid-template-columns: auto minmax(0, 1fr) auto; }.badges-next--complete > svg { color: #8fac70; }
-.badges-group > header { align-items: center; }.badges-group header small { display: inline-flex; align-items: baseline; gap: 2px; padding: 4px 8px; border: 1px solid var(--divider-soft); border-radius: 999px; background: var(--surface); }.badges-group header small strong { color: var(--text); font-size: 11px; }.badge-card { position: relative; min-height: 137px; border-color: var(--divider-soft); background: color-mix(in srgb, var(--surface-muted) 22%, var(--surface)); transition: border-color .2s ease, background .2s ease, transform .2s ease; }.badge-card:hover { border-color: color-mix(in srgb, var(--accent) 28%, var(--divider-soft)); background: var(--surface); transform: translateY(-2px); }.badge-card.unlocked { border-color: color-mix(in srgb, #9daf70 28%, var(--divider-soft)); background: color-mix(in srgb, #f3f7e7 48%, var(--surface)); }.badge-card__icon { border: 1px solid var(--divider-soft); }.badge-card.unlocked .badge-card__icon { background: color-mix(in srgb, #f5d66e 24%, var(--accent-soft)); color: #8b7429; box-shadow: inset 0 0 0 1px rgba(194,159,61,.18); }.badge-card h3 { letter-spacing: -.01em; }.badge-card__date { font-weight: 650; }.badge-card__progress i { background: color-mix(in srgb, var(--accent) 8%, var(--surface-muted)); }.badge-card__progress b { background: color-mix(in srgb, var(--accent) 82%, #8fac70); }
+.badges-group > header { align-items: center; }.badges-group header small { display: inline-flex; align-items: baseline; gap: 2px; padding: 4px 8px; border: 1px solid var(--divider-soft); border-radius: 999px; background: var(--surface); }.badges-group header small strong { color: var(--text); font-size: 11px; }.badges-group__controls { display: grid; justify-items: end; gap: 7px; }.badges-group__controls > div { display: inline-flex; gap: 3px; padding: 3px; border: 1px solid var(--divider-soft); border-radius: 9px; background: var(--surface-muted); }.badges-group__controls button { min-height: 27px; padding: 0 8px; border: 0; border-radius: 6px; color: var(--text-muted); font: inherit; font-size: 10px; cursor: pointer; }.badges-group__controls button.active { background: var(--surface); color: var(--accent-strong); font-weight: 750; box-shadow: 0 1px 3px rgba(36, 85, 73, .09); }.badges-group__empty { display: grid; min-height: 112px; place-content: center; justify-items: center; gap: 7px; grid-column: 1 / -1; border: 1px dashed var(--divider-soft); border-radius: 13px; color: var(--accent-strong); }.badges-group__empty p { margin: 0; color: var(--text-muted); font-size: 11px; }.badge-card { position: relative; min-height: 137px; border-color: var(--divider-soft); background: color-mix(in srgb, var(--surface-muted) 22%, var(--surface)); transition: border-color .2s ease, background .2s ease, transform .2s ease; }.badge-card:hover { border-color: color-mix(in srgb, var(--accent) 28%, var(--divider-soft)); background: var(--surface); transform: translateY(-2px); }.badge-card.unlocked { border-color: color-mix(in srgb, #9daf70 28%, var(--divider-soft)); background: color-mix(in srgb, #f3f7e7 48%, var(--surface)); }.badge-card__icon { border: 1px solid var(--divider-soft); }.badge-card.unlocked .badge-card__icon { background: color-mix(in srgb, #f5d66e 24%, var(--accent-soft)); color: #8b7429; box-shadow: inset 0 0 0 1px rgba(194,159,61,.18); }.badge-card h3 { letter-spacing: -.01em; }.badge-card__date { font-weight: 650; }.badge-card__progress i { background: color-mix(in srgb, var(--accent) 8%, var(--surface-muted)); }.badge-card__progress b { background: color-mix(in srgb, var(--accent) 82%, #8fac70); }
 .badges-growth-panorama { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(260px, .8fr); gap: 12px; }.badges-level,.badges-momentum { min-width: 0; padding: 16px 18px; }.badges-level { display: grid; gap: 13px; background: color-mix(in srgb, #f7f3d9 22%, var(--surface)); }.badges-level > header,.badges-momentum > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }.badges-level > header span,.badges-momentum > header span { color: var(--accent-strong); font-size: 10px; font-weight: 800; letter-spacing: .04em; }.badges-level h2 { margin: 3px 0 2px; color: var(--text); font-size: 18px; }.badges-level p { margin: 0; color: var(--text-muted); font-size: 10px; line-height: 1.5; }.badges-level > header > strong { padding: 5px 8px; border-radius: 9px; background: var(--accent-soft); color: var(--accent-strong); font-size: 12px; white-space: nowrap; }.badges-level__progress { display: grid; gap: 6px; }.badges-level__progress i { display: block; height: 7px; overflow: hidden; border-radius: 99px; background: var(--surface-muted); }.badges-level__progress b { display: block; height: 100%; border-radius: inherit; background: color-mix(in srgb, #9eae72 82%, var(--accent)); }.badges-level__progress span { color: var(--text-muted); font-size: 9px; }.badges-level__steps { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }.badges-level__steps span { display: grid; justify-items: center; gap: 5px; min-width: 0; color: var(--text-muted); }.badges-level__steps i { display: block; width: 9px; height: 9px; border: 2px solid var(--divider-soft); border-radius: 50%; background: var(--surface); }.badges-level__steps span.active i { border-color: #9eae72; background: #9eae72; }.badges-level__steps span.current i { box-shadow: 0 0 0 4px color-mix(in srgb, #9eae72 22%, transparent); }.badges-level__steps small { overflow: hidden; max-width: 100%; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }.badges-level__steps span.active small { color: var(--text); font-weight: 650; }.badges-momentum { display: grid; gap: 12px; }.badges-momentum > header svg { color: #9eae72; }.badges-momentum__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }.badges-momentum__grid div { display: grid; grid-template-columns: 17px 1fr; gap: 2px 5px; padding: 9px; border: 1px solid var(--divider-soft); border-radius: 11px; background: color-mix(in srgb, var(--surface-muted) 32%, var(--surface)); }.badges-momentum__grid svg { grid-row: span 2; align-self: center; color: var(--accent-strong); }.badges-momentum__grid small { color: var(--text-muted); font-size: 9px; }.badges-momentum__grid strong { overflow: hidden; color: var(--text); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .badges-overview__score { display: inline-flex; width: fit-content; margin: 1px 0 4px; padding: 4px 7px; border-radius: 7px; background: color-mix(in srgb, #d6b55b 15%, var(--surface)); color: #92752a; font-size: 9px; font-weight: 750; letter-spacing: .02em; }.badges-group__reward { display: block !important; width: fit-content; margin-top: 5px; padding: 0 !important; border: 0 !important; border-radius: 0 !important; background: transparent !important; color: var(--text-muted) !important; font-size: 9px !important; font-weight: 500 !important; }.badge-card { --badge-accent: var(--accent); }.badge-card--start { --badge-accent: #bd9841; }.badge-card--streak { --badge-accent: #6f9d75; }.badge-card--accumulate { --badge-accent: #c47f45; }.badge-card--deep { --badge-accent: #7081b6; }.badge-card--variety { --badge-accent: #a477ae; }.badge-card__icon { position: relative; border-color: color-mix(in srgb, var(--badge-accent) 20%, var(--divider-soft)); color: color-mix(in srgb, var(--badge-accent) 78%, var(--text-muted)); }.badge-card__icon small { position: absolute; right: -4px; bottom: -3px; display: grid; width: 17px; height: 17px; place-items: center; border: 2px solid var(--surface); border-radius: 50%; background: color-mix(in srgb, var(--badge-accent) 82%, var(--text)); color: #fff; font-size: 7px; font-weight: 800; line-height: 1; }.badge-card.unlocked .badge-card__icon { background: color-mix(in srgb, var(--badge-accent) 18%, var(--surface)); color: var(--badge-accent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--badge-accent) 24%, transparent), 0 5px 14px color-mix(in srgb, var(--badge-accent) 14%, transparent); }.badge-card__reward { display: block; margin-bottom: 2px; color: var(--badge-accent); font-size: 9px; font-weight: 750; letter-spacing: .03em; }.badge-card.unlocked .badge-card__reward { color: color-mix(in srgb, var(--badge-accent) 84%, var(--text)); }.badge-card.unlocked { border-color: color-mix(in srgb, var(--badge-accent) 28%, var(--divider-soft)); background: color-mix(in srgb, var(--badge-accent) 5%, var(--surface)); }
-.badges-category-index { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }.badges-category-index__item { --category-accent: var(--accent); display: grid; gap: 6px; padding: 10px 11px; border: 1px solid var(--divider-soft); border-radius: 12px; background: var(--surface); }.badges-category-index__item--start { --category-accent: #bd9841; }.badges-category-index__item--streak { --category-accent: #6f9d75; }.badges-category-index__item--accumulate { --category-accent: #c47f45; }.badges-category-index__item--deep { --category-accent: #7081b6; }.badges-category-index__item--variety { --category-accent: #a477ae; }.badges-category-index__item > div { display: flex; align-items: center; justify-content: space-between; gap: 5px; }.badges-category-index__item span { color: var(--category-accent); font-size: 10px; font-weight: 800; }.badges-category-index__item strong { color: var(--text); font-size: 10px; }.badges-category-index__item small { overflow: hidden; color: var(--text-muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }.badges-category-index__item > i { height: 4px; overflow: hidden; border-radius: 99px; background: var(--surface-muted); }.badges-category-index__item > i b { display: block; height: 100%; border-radius: inherit; background: var(--category-accent); }
+.badges-category-index { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }.badges-category-index__item { --category-accent: var(--accent); display: grid; gap: 6px; padding: 10px 11px; border: 1px solid var(--divider-soft); border-radius: 12px; background: var(--surface); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: transform .16s ease, border-color .16s ease, background-color .16s ease; }.badges-category-index__item:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--category-accent) 35%, var(--divider-soft)); }.badges-category-index__item.active { border-color: color-mix(in srgb, var(--category-accent) 52%, var(--divider-soft)); background: color-mix(in srgb, var(--category-accent) 8%, var(--surface)); box-shadow: 0 7px 16px color-mix(in srgb, var(--category-accent) 12%, transparent); }.badges-category-index__item--start { --category-accent: #bd9841; }.badges-category-index__item--streak { --category-accent: #6f9d75; }.badges-category-index__item--accumulate { --category-accent: #c47f45; }.badges-category-index__item--deep { --category-accent: #7081b6; }.badges-category-index__item--variety { --category-accent: #a477ae; }.badges-category-index__item > div { display: flex; align-items: center; justify-content: space-between; gap: 5px; }.badges-category-index__item span { color: var(--category-accent); font-size: 10px; font-weight: 800; }.badges-category-index__item strong { color: var(--text); font-size: 10px; }.badges-category-index__item small { overflow: hidden; color: var(--text-muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }.badges-category-index__item > i { height: 4px; overflow: hidden; border-radius: 99px; background: var(--surface-muted); }.badges-category-index__item > i b { display: block; height: 100%; border-radius: inherit; background: var(--category-accent); }
 .badges-featured { --featured-accent: #bd9841; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(220px, .75fr); align-items: center; gap: 22px; padding: 18px 22px; border-color: color-mix(in srgb, var(--featured-accent) 24%, var(--divider-soft)); background: radial-gradient(circle at 14% 50%, color-mix(in srgb, var(--featured-accent) 13%, transparent), transparent 32%), color-mix(in srgb, var(--featured-accent) 3%, var(--surface)); }.badges-featured.unlocked { --featured-accent: #8c9f61; }.badges-featured__identity { display: flex; align-items: center; gap: 14px; min-width: 0; }.badges-featured__seal { position: relative; display: grid; flex: 0 0 auto; width: 72px; height: 72px; place-items: center; border: 1px solid color-mix(in srgb, var(--featured-accent) 34%, var(--divider-soft)); border-radius: 22px; background: color-mix(in srgb, var(--featured-accent) 13%, var(--surface)); color: var(--featured-accent); box-shadow: inset 0 0 0 7px color-mix(in srgb, var(--featured-accent) 6%, transparent), 0 8px 18px color-mix(in srgb, var(--featured-accent) 13%, transparent); }.badges-featured__seal::before,.badges-featured__seal::after { position: absolute; width: 9px; height: 9px; border: 1px solid color-mix(in srgb, var(--featured-accent) 38%, transparent); border-radius: 50%; content: ''; }.badges-featured__seal::before { top: 9px; right: 12px; }.badges-featured__seal::after { bottom: 10px; left: 12px; }.badges-featured__seal small { position: absolute; right: -6px; bottom: -5px; display: grid; width: 20px; height: 20px; place-items: center; border: 2px solid var(--surface); border-radius: 50%; background: var(--featured-accent); color: #fff; font-size: 8px; font-weight: 800; }.badges-featured__identity > div { min-width: 0; }.badges-featured__eyebrow { display: block; overflow: hidden; color: var(--featured-accent); font-size: 10px; font-weight: 800; letter-spacing: .04em; text-overflow: ellipsis; white-space: nowrap; }.badges-featured h2 { margin: 4px 0 3px; color: var(--text); font-size: 19px; letter-spacing: -.03em; }.badges-featured p { margin: 0; color: var(--text-muted); font-size: 11px; line-height: 1.5; }.badges-featured__progress { display: grid; gap: 7px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--featured-accent) 20%, var(--divider-soft)); border-radius: 13px; background: color-mix(in srgb, var(--featured-accent) 5%, var(--surface)); }.badges-featured__progress > div { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }.badges-featured__progress small { color: var(--text-muted); font-size: 9px; }.badges-featured__progress strong { color: var(--text); font-size: 12px; }.badges-featured__progress > i { height: 6px; overflow: hidden; border-radius: 99px; background: var(--surface-muted); }.badges-featured__progress > i b { display: block; height: 100%; border-radius: inherit; background: var(--featured-accent); }.badges-featured__progress > span { color: var(--text-muted); font-size: 9px; }
 .badge-card::before { position: absolute; top: -1px; right: 16px; left: 16px; height: 3px; border-radius: 0 0 99px 99px; background: var(--badge-accent); opacity: .12; content: ''; }.badge-card.unlocked::before { opacity: .72; }.badge-card.unlocked:hover { transform: translateY(-3px); box-shadow: 0 12px 25px color-mix(in srgb, var(--badge-accent) 12%, transparent); }
 @media (prefers-reduced-motion: reduce) { .species-playground__particle { animation: none; }.species-replay__steps button.active i { transform: none; } }
@@ -1323,9 +1385,12 @@ onBeforeUnmount(cancelGrowthReplay)
 .achievement-recent .achievement-section-heading > button,
 .species-playground__hint,
 .species-playground__choose,
+.species-playground__footprint,
 .species-replay__actions button,
 .species-replay__steps button,
 .species-collection__garden > button,
+.badges-category-index__item,
+.badges-group__controls button,
 .focus-plant,
 .field-hero__plant > div {
   outline: none;
