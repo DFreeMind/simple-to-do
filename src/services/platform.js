@@ -251,7 +251,11 @@ function buildWebStorageMock() {
   const quarantinedAttachments = [
     { id: 'web-quarantine-1', relativePath: 'attachments/2024-06/note.txt', name: '旧笔记.txt', sizeBytes: 6291, kind: 'file', quarantinedAt: '2024-06-21T15:00:00.000Z' }
   ]
-  const totalBytes = 12_847_503
+  const migrationBackups = [
+    { id: 'web-migration-1', name: 'simple-to-do-0.4.3-to-0.4.4.bak', sizeBytes: 1_512_840, modifiedAt: '2026-07-04T09:12:00.000Z' },
+    { id: 'web-migration-2', name: 'simple-to-do-0.4.4-to-0.4.5.bak', sizeBytes: 1_248_196, modifiedAt: '2026-08-06T11:30:00.000Z' }
+  ]
+  const totalBytes = 15_608_539
   const attachmentBytes = orphanAttachments.reduce((sum, item) => sum + item.sizeBytes, 0)
     + quarantinedAttachments.reduce((sum, item) => sum + item.sizeBytes, 0)
     + 9_822_270
@@ -270,8 +274,8 @@ function buildWebStorageMock() {
     referencedFileBytes: 1_443_120,
     profileBytes: 412_870,
     backupBytes: 2_148_006,
-    migrationBackupBytes: 0,
-    migrationBackups: [],
+    migrationBackupBytes: migrationBackups.reduce((sum, item) => sum + item.sizeBytes, 0),
+    migrationBackups,
     otherBytes: 102_502,
     missingReferences: []
   }
