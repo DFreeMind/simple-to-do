@@ -30,7 +30,7 @@
 
       <template v-else-if="activeTab === 'overview'">
         <section class="review-card review-summary" aria-label="本周期概览">
-          <header><div><span>数据摘要</span><h2>{{ selectedRangeLabel }}的专注与节律</h2><p>下面的趋势和最近记录使用同一时间范围</p></div><div class="review-summary-actions"><div class="review-summary-range" aria-label="专注回顾时间范围"><span><Calendar :size="13" />查看范围</span><ReviewRangeControl :range="range" :custom-start="customStart" :custom-end="customEnd" @update:range="range = $event" @update:custom-start="customStart = $event" @update:custom-end="customEnd = $event" /></div><small>{{ focusEntries.length + rhythmEntries.length }} 条记录</small>
+          <header><div><span>数据摘要</span><h2>{{ selectedRangeLabel }}回顾</h2></div><div class="review-summary-actions"><div class="review-summary-range" aria-label="专注回顾时间范围"><ReviewRangeControl :range="range" :custom-start="customStart" :custom-end="customEnd" @update:range="range = $event" @update:custom-start="customStart = $event" @update:custom-end="customEnd = $event" /></div><small>{{ focusEntries.length + rhythmEntries.length }} 条</small>
             <div class="review-export-menu">
               <button type="button" class="review-export-btn" :class="{ active: exportMenuOpen.overview }" :aria-expanded="exportMenuOpen.overview" aria-haspopup="menu" @click.stop="toggleExportMenu('overview')">
                 <Download :size="14" />导出
@@ -46,8 +46,7 @@
           <section v-if="insights.length" class="review-insights" aria-label="本周期亮点">
             <header>
               <Lightbulb :size="15" />
-              <span>本期亮点</span>
-              <small>基于当前{{ selectedRangeLabel }}的数据自动生成</small>
+              <span>亮点</span>
             </header>
             <div class="review-insights__list">
               <div v-for="(item, idx) in insights" :key="idx" :class="['review-insight', `is-${item.type}`, { 'is-clickable': !!item.item }]">
@@ -131,7 +130,7 @@
                 <button type="button" :class="{ active: trendMetric === 'duration' }" :aria-pressed="trendMetric === 'duration'" @click="trendMetric = 'duration'">投入时长</button>
                 <button type="button" :class="{ active: trendMetric === 'sessions' }" :aria-pressed="trendMetric === 'sessions'" @click="trendMetric = 'sessions'">专注段数</button>
               </div>
-              <small>点击柱子查看该时段记录</small>
+              <small>点击柱子看记录</small>
             </div>
             <div v-if="trendGranularity === 'day'" class="review-chart-legend" aria-hidden="true">
               <span><i class="is-weekday"></i>工作日</span>
@@ -148,7 +147,7 @@
                 </tr>
               </tbody>
             </table>
-            <p v-if="!totalFocusSeconds" class="review-chart-empty">这段时间没有专注记录。试试切换到「全部」或更宽的范围。</p>
+            <p v-if="!totalFocusSeconds" class="review-chart-empty">暂无专注记录。可切换到「全部」查看历史。</p>
           </article>
 
           <article class="review-card review-rhythm-card" :class="{ 'is-collapsed': !rhythmEntries.length }">
@@ -244,7 +243,7 @@
 
         <section v-if="focusEntries.length" class="review-card review-focus-map" aria-label="本期专注地图">
           <header>
-            <div><span>专注地图</span><h2>这段时间，你把精力放在了哪里？</h2><p>{{ focusMapNarrative }}</p></div>
+            <div><span>专注地图</span><h2>精力去向</h2><p>{{ focusMapNarrative }}</p></div>
             <span class="review-focus-map__total"><Timer :size="15" />{{ formatCompactDuration(totalFocusSeconds) }}</span>
           </header>
           <div class="review-focus-map__signals">
@@ -1115,8 +1114,8 @@ const focusMapNarrative = computed(() => {
   const task = focusMapPrimaryTask.value
   const profile = focusProfileSummary.value[0]
   const time = focusTimePeak.value
-  if (!task || !profile || !time?.count) return '随着更多专注记录出现，这里会逐渐形成你的投入地图。'
-  return `主要投入在「${task.label}」，最常使用${profile.label}，${time.label}是最常开始专注的时段。`
+  if (!task || !profile || !time?.count) return '更多记录会让这里更清晰。'
+  return `主要：${task.label} · 方式：${profile.label} · 高峰：${time.label}`
 })
 const completedRhythmEntries = computed(() => rhythmEntries.value.filter(item => ['completed', 'natural-break'].includes(item.action)))
 const rhythmCompletionRate = computed(() => rhythmEntries.value.length ? Math.round(completedRhythmEntries.value.length / rhythmEntries.value.length * 100) : 0)
@@ -1229,9 +1228,9 @@ const trendPeakLabel = computed(() => trendPeak.value && trendValue(trendPeak.va
 const trendPeriodLabel = computed(() => ({ day: '每日', week: '每周', month: '每月' }[trendGranularity.value]))
 const trendChartAriaLabel = computed(() => `${trendPeriodLabel.value}${trendMetricLabel.value}柱状图，共 ${trendDays.value.length} 个时间段；点击柱子可查看该时段的原始记录。`)
 const trendDescription = computed(() => {
-  const noun = trendMetric.value === 'sessions' ? '专注段数，能看出切换与开始的密度' : '投入时长，能看出时间主要集中在哪里'
-  const scope = { day: '按天查看', week: '按周汇总', month: '按月回看' }[trendGranularity.value]
-  return `${scope}${noun}；点击柱子即可回看该时段的原始记录。${trendGranularity.value === 'day' ? '周末以蓝色区分。' : ''}`
+  const scope = { day: '按天', week: '按周', month: '按月' }[trendGranularity.value]
+  const noun = trendMetric.value === 'sessions' ? '看专注段数' : '看投入时长'
+  return `${scope}${noun}${trendGranularity.value === 'day' ? '；周末为蓝色' : ''}。`
 })
 function shortenTrendTooltipText(value, limit = 18) {
   const text = String(value || '').trim()
