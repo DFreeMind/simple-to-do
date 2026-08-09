@@ -135,23 +135,33 @@
             <header>
               <div><span>投入节奏</span><h2>{{ trendTitle }}</h2></div>
               <div class="review-chart-meta">
-                <strong>{{ formatCompactDuration(totalFocusSeconds) }}</strong>
-                <small v-if="focusActiveDays">{{ focusActiveDays }} 天有投入 · {{ trendPeakLabel }}</small>
+                <strong>{{ trendTotalLabel }}</strong>
+                <button v-if="trendPeak?.records.length" type="button" class="review-chart-meta__peak" @click="openTrendPeriod(trendPeak)">
+                  {{ trendPeakLabel }}<ChevronRight :size="12" />
+                </button>
+                <small v-else>{{ trendPeakLabel }}</small>
               </div>
             </header>
             <p class="review-chart-description">{{ trendDescription }}</p>
+            <div class="review-trend-tools">
+              <div class="review-trend-metric" role="group" aria-label="投入节奏统计维度">
+                <button type="button" :class="{ active: trendMetric === 'duration' }" :aria-pressed="trendMetric === 'duration'" @click="trendMetric = 'duration'">投入时长</button>
+                <button type="button" :class="{ active: trendMetric === 'sessions' }" :aria-pressed="trendMetric === 'sessions'" @click="trendMetric = 'sessions'">专注段数</button>
+              </div>
+              <small>点击柱子查看该时段记录</small>
+            </div>
             <div v-if="trendGranularity === 'day'" class="review-chart-legend" aria-hidden="true">
               <span><i class="is-weekday"></i>工作日</span>
               <span><i class="is-weekend"></i>周末</span>
             </div>
-            <div ref="trendChartEl" class="review-trend-chart" role="img" :aria-label="`${trendPeriodLabel}专注投入柱状图，共 ${trendDays.length} 个时间段`"></div>
-            <table class="sr-only" :aria-label="`${trendPeriodLabel}专注时长明细`">
-              <caption>{{ trendPeriodLabel }}专注时长</caption>
-              <thead><tr><th scope="col">日期</th><th scope="col">投入</th></tr></thead>
+            <div ref="trendChartEl" class="review-trend-chart" role="img" :aria-label="trendChartAriaLabel"></div>
+            <table class="sr-only" :aria-label="`${trendPeriodLabel}${trendMetricLabel}明细`">
+              <caption>{{ trendPeriodLabel }}{{ trendMetricLabel }}</caption>
+              <thead><tr><th scope="col">日期</th><th scope="col">{{ trendMetricLabel }}</th></tr></thead>
               <tbody>
                 <tr v-for="day in trendDays" :key="day.key">
                   <th scope="row">{{ day.label }}{{ day.isCurrent ? '（当前）' : '' }}</th>
-                  <td>{{ day.seconds ? formatDuration(day.seconds) : '无投入' }}</td>
+                  <td>{{ trendValue(day) ? formatTrendValue(trendValue(day)) : '无投入' }}</td>
                 </tr>
               </tbody>
             </table>
@@ -1180,6 +1190,11 @@ function addTrendPeriod(date, granularity) {
   else next.setMonth(next.getMonth() + 1)
   return next
 }
+function trendPeriodEnd(date, granularity) {
+  const nextPeriod = addTrendPeriod(date, granularity)
+  nextPeriod.setDate(nextPeriod.getDate() - 1)
+  return nextPeriod
+}
 function trendPeriodStart(value, granularity) {
   if (granularity === 'day') return dayStart(value)
   if (granularity === 'week') return weekStart(value)
@@ -1208,7 +1223,7 @@ const trendDays = computed(() => {
   while (cursor <= trendRangeEnd.value) {
     const key = dateKey(cursor)
     const records = recordsByPeriod.get(key) || []
-    const end = granularity === 'week' ? new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 6) : cursor
+    const end = trendPeriodEnd(cursor, granularity)
     const dayOfWeek = cursor.getDay()
     const label = granularity === 'day'
       ? new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', weekday: 'short' }).format(cursor)
@@ -1220,6 +1235,8 @@ const trendDays = computed(() => {
       seconds: records.reduce((total, item) => total + item.elapsedSeconds, 0),
       records,
       date: cursor,
+      end,
+      sessionCount: records.length,
       label,
       shortLabel: granularity === 'day' ? `周${'日一二三四五六'[dayOfWeek]}` : granularity === 'week' ? `${cursor.getMonth() + 1}/${cursor.getDate()}` : `${cursor.getFullYear()}/${cursor.getMonth() + 1}`,
       isCurrent: key === dateKey(currentPeriod),
@@ -1229,21 +1246,28 @@ const trendDays = computed(() => {
   }
   return result
 })
-const trendPeak = computed(() => trendDays.value.reduce((peak, item) => item.seconds > (peak?.seconds || 0) ? item : peak, null))
-const trendPeakLabel = computed(() => trendPeak.value?.seconds ? `峰值 ${trendPeak.value.label} · ${formatCompactDuration(trendPeak.value.seconds)}` : '还没有投入')
+const trendMetric = ref('duration')
+const trendMetricLabel = computed(() => trendMetric.value === 'sessions' ? '专注段数' : '投入时长')
+function trendValue(item) { return trendMetric.value === 'sessions' ? item.sessionCount : item.seconds }
+function formatTrendValue(value) { return trendMetric.value === 'sessions' ? `${value} 段` : formatDuration(value) }
+function formatCompactTrendValue(value) { return trendMetric.value === 'sessions' ? `${value} 段` : formatCompactDuration(value) }
+const trendTotalLabel = computed(() => trendMetric.value === 'sessions' ? `${focusEntries.value.length} 段` : formatCompactDuration(totalFocusSeconds.value))
+const trendPeak = computed(() => trendDays.value.reduce((peak, item) => trendValue(item) > (peak ? trendValue(peak) : 0) ? item : peak, null))
+const trendPeakLabel = computed(() => trendPeak.value && trendValue(trendPeak.value) ? `峰值 ${trendPeak.value.label} · ${formatCompactTrendValue(trendValue(trendPeak.value))}` : '还没有投入')
 const trendPeriodLabel = computed(() => ({ day: '每日', week: '每周', month: '每月' }[trendGranularity.value]))
-const trendDescription = computed(() => ({
-  day: '按天查看投入，周末以蓝色区分；悬停柱子可查看当天的专注记录。',
-  week: '按周汇总投入，让间隔与集中出现得更清楚；悬停柱子可查看这一周的专注记录。',
-  month: '按月回看长期投入，不把早期记录截断成一段空白。'
-}[trendGranularity.value]))
+const trendChartAriaLabel = computed(() => `${trendPeriodLabel.value}${trendMetricLabel.value}柱状图，共 ${trendDays.value.length} 个时间段；点击柱子可查看该时段的原始记录。`)
+const trendDescription = computed(() => {
+  const noun = trendMetric.value === 'sessions' ? '专注段数，能看出切换与开始的密度' : '投入时长，能看出时间主要集中在哪里'
+  const scope = { day: '按天查看', week: '按周汇总', month: '按月回看' }[trendGranularity.value]
+  return `${scope}${noun}；点击柱子即可回看该时段的原始记录。${trendGranularity.value === 'day' ? '周末以蓝色区分。' : ''}`
+})
 // 趋势图：ECharts 柱状图实例管理；按范围自动切换日 / 周 / 月粒度。
 const trendChartEl = ref(null)
 let trendChartInstance = null
 function buildTrendChartOption() {
   const colors = readChartColors()
   const days = trendDays.value
-  const data = days.map(day => (day.seconds ? { value: day.seconds, day } : null))
+  const data = days.map(day => (trendValue(day) ? { value: trendValue(day), day } : null))
   return {
     animationDuration: 280,
     grid: { left: 46, right: 10, top: 24, bottom: 24 },
@@ -1255,7 +1279,7 @@ function buildTrendChartOption() {
         if (!day) return ''
         let html = `<b>${escapeHtml(day.label)}${day.isCurrent ? '（当前）' : ''}</b>`
         if (day.seconds) {
-          html += `<br/><b>${escapeHtml(formatDuration(day.seconds))}</b> · ${day.records.length} 段专注`
+          html += `<br/><b>${escapeHtml(formatTrendValue(trendValue(day)))}</b> · ${escapeHtml(trendMetric.value === 'sessions' ? formatDuration(day.seconds) : `${day.sessionCount} 段专注`)}`
           if (day.records.length) {
             html += '<br/>' + day.records.slice(0, 3).map(r => escapeHtml(focusTitle(r))).join('<br/>')
             if (day.records.length > 3) html += `<br/>还有 ${day.records.length - 3} 段…`
@@ -1284,13 +1308,14 @@ function buildTrendChartOption() {
     },
     yAxis: {
       type: 'value',
-      axisLabel: { color: colors.textMuted, fontSize: 9, formatter: value => formatCompactDuration(value) },
+      axisLabel: { color: colors.textMuted, fontSize: 9, formatter: value => formatCompactTrendValue(value) },
       splitLine: { lineStyle: { color: colors.border } }
     },
     series: [{
       type: 'bar',
       data,
       barMaxWidth: 16,
+      cursor: 'pointer',
       itemStyle: {
         borderRadius: [3, 3, 0, 0],
         color: (params) => (params.data?.day?.isWeekend ? '#6a9bc3' : colors.accent)
@@ -1308,8 +1333,13 @@ function renderTrendChart() {
   }
   if (!trendChartInstance) trendChartInstance = initChart(el)
   trendChartInstance.setOption(buildTrendChartOption(), true)
+  trendChartInstance.off('click')
+  trendChartInstance.on('click', params => {
+    const period = params?.data?.day
+    if (period?.records?.length) openTrendPeriod(period)
+  })
 }
-watch([trendDays, () => store.settings.theme, activeTab], () => renderTrendChart(), { flush: 'post' })
+watch([trendDays, trendMetric, () => store.settings.theme, activeTab], () => renderTrendChart(), { flush: 'post' })
 function resizeCharts() {
   trendChartInstance?.resize()
   rhythmChartInstances.forEach(({ chart }) => chart.resize())
@@ -2674,6 +2704,19 @@ function openFocusSlice(query) {
   focusSearch.value = query || ''
   void selectTab('focus')
 }
+function openTrendPeriod(period) {
+  if (!period?.records?.length) return
+  const end = period.end > trendRangeEnd.value ? trendRangeEnd.value : period.end
+  range.value = 'custom'
+  customStart.value = dateKey(period.date)
+  customEnd.value = dateKey(end)
+  focusPhase.value = 'focus'
+  focusResult.value = 'all'
+  focusPause.value = 'all'
+  focusSearch.value = ''
+  focusPage.value = 1
+  void selectTab('focus')
+}
 function openDetail(kind, item) {
   // 从概览页点开时，自动切到对应的管理 tab，让 prev/next 导航能在完整筛选列表里走
   if (activeTab.value === 'overview') activeTab.value = kind
@@ -3425,6 +3468,10 @@ onBeforeUnmount(() => {
 .review-chart-meta { display: grid; gap: 2px; text-align: right; }
 .review-chart-meta strong { color: var(--text); font-size: 16px; font-variant-numeric: tabular-nums; }
 .review-chart-meta small { color: var(--text-muted); font-size: 10px; }
+.review-chart-meta__peak { display: inline-flex; justify-self: end; align-items: center; gap: 1px; max-width: 100%; padding: 0; border: 0; background: transparent; color: var(--text-muted); font: inherit; font-size: 10px; cursor: pointer; }
+.review-chart-meta__peak:hover { color: var(--accent-strong); }.review-chart-meta__peak:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+.review-trend-tools { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }.review-trend-tools > small { color: var(--text-muted); font-size: 10px; white-space: nowrap; }
+.review-trend-metric { display: inline-flex; min-height: 28px; padding: 2px; border-radius: 8px; background: var(--surface-muted); }.review-trend-metric button { min-height: 24px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: var(--text-muted); font: inherit; font-size: 10px; font-weight: 650; cursor: pointer; }.review-trend-metric button:hover { color: var(--text); }.review-trend-metric button.active { background: var(--surface); box-shadow: 0 1px 3px color-mix(in srgb, var(--text) 10%, transparent); color: var(--accent-strong); }.review-trend-metric button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .review-chart-note { margin: 0 0 10px; padding: 6px 10px; border-radius: 8px; background: color-mix(in srgb, var(--accent-soft) 50%, transparent); color: var(--accent-strong); font-size: 11px; }
 .review-chart-note__btn { display: inline-flex; align-items: center; min-height: 24px; margin: 0 2px; padding: 0 8px; border: 0; border-radius: 6px; background: var(--surface); color: var(--accent-strong); font: inherit; font-size: 10.5px; font-weight: 650; cursor: pointer; }
 .review-chart-note__btn:hover { background: var(--accent-soft); }
