@@ -9,19 +9,6 @@
             <span>{{ tab.count }}</span>
           </button>
         </nav>
-        <section v-if="activeTab === 'overview'" class="review-range-toolbar" aria-label="专注回顾时间范围">
-          <span class="review-range-toolbar__label"><Calendar :size="14" />查看范围</span>
-          <div class="review-range-toolbar__control">
-            <ReviewRangeControl
-              :range="range"
-              :custom-start="customStart"
-              :custom-end="customEnd"
-              @update:range="range = $event"
-              @update:custom-start="customStart = $event"
-              @update:custom-end="customEnd = $event"
-            />
-          </div>
-        </section>
       </div>
 
       <section v-if="!store.focusHistory.length && !store.rhythmHistory.length" class="review-empty review-empty--zero">
@@ -43,7 +30,7 @@
 
       <template v-else-if="activeTab === 'overview'">
         <section class="review-card review-summary" aria-label="本周期概览">
-          <header><div><span>数据摘要</span><h2>{{ selectedRangeLabel }}的专注与节律</h2><p>下面的趋势和最近记录使用同一时间范围</p></div><div class="review-summary-actions"><small>{{ focusEntries.length + rhythmEntries.length }} 条记录</small>
+          <header><div><span>数据摘要</span><h2>{{ selectedRangeLabel }}的专注与节律</h2><p>下面的趋势和最近记录使用同一时间范围</p></div><div class="review-summary-actions"><div class="review-summary-range" aria-label="专注回顾时间范围"><span><Calendar :size="13" />查看范围</span><ReviewRangeControl :range="range" :custom-start="customStart" :custom-end="customEnd" @update:range="range = $event" @update:custom-start="customStart = $event" @update:custom-end="customEnd = $event" /></div><small>{{ focusEntries.length + rhythmEntries.length }} 条记录</small>
             <div class="review-export-menu">
               <button type="button" class="review-export-btn" :class="{ active: exportMenuOpen.overview }" :aria-expanded="exportMenuOpen.overview" aria-haspopup="menu" @click.stop="toggleExportMenu('overview')">
                 <Download :size="14" />导出
@@ -260,33 +247,21 @@
             <div><span>专注地图</span><h2>这段时间，你把精力放在了哪里？</h2><p>{{ focusMapNarrative }}</p></div>
             <span class="review-focus-map__total"><Timer :size="15" />{{ formatCompactDuration(totalFocusSeconds) }}</span>
           </header>
-          <div class="review-focus-map__grid">
-            <section class="review-focus-map__section">
-              <header><span>主要投入</span><small>按有效时长</small></header>
-              <button v-for="item in focusTaskSummary.filter(item => item.query).slice(0, 3)" :key="item.key" type="button" class="review-focus-map__row" :aria-label="`查看${item.label}的专注记录`" @click="openFocusSlice(item.query)">
-                <span><strong>{{ item.label }}</strong><small>{{ item.count }} 段 · {{ formatCompactDuration(item.seconds) }}</small></span>
-                <i><b :style="{ width: `${item.percent}%` }"></b></i>
-                <em>{{ item.percent }}%</em>
-              </button>
-              <p v-if="!focusTaskSummary.some(item => item.query)" class="review-focus-map__empty">本期专注尚未关联任务，时长仍会被完整保留。</p>
-            </section>
-            <section class="review-focus-map__section review-focus-map__section--profiles">
-              <header><span>专注方式</span><small>按有效时长</small></header>
-              <button v-for="item in focusProfileSummary.slice(0, 3)" :key="item.key" type="button" class="review-focus-map__row" :aria-label="`查看${item.label}方式的专注记录`" @click="openFocusSlice(item.query)">
-                <span><strong>{{ item.label }}</strong><small>{{ item.count }} 段 · {{ formatCompactDuration(item.seconds) }}</small></span>
-                <i><b :style="{ width: `${item.percent}%` }"></b></i>
-                <em>{{ item.percent }}%</em>
-              </button>
-            </section>
-            <section class="review-focus-map__section review-focus-map__section--times">
-              <header><span>发生时段</span><small>按开始时间</small></header>
-              <div class="review-focus-map__times">
-                <div v-for="item in focusTimeSummary" :key="item.id" :class="{ active: item.count === focusTimePeak.count && item.count > 0 }">
-                  <small>{{ item.label }}</small><strong>{{ item.count }} 段</strong><span>{{ formatCompactDuration(item.seconds) }}</span>
-                </div>
-              </div>
-            </section>
+          <div class="review-focus-map__signals">
+            <button v-if="focusMapPrimaryTask" type="button" class="review-focus-map__signal" @click="openFocusSlice(focusMapPrimaryTask.query)"><span>主要投入</span><strong>{{ focusMapPrimaryTask.label }}</strong><small>{{ focusMapPrimaryTask.count }} 段 · {{ formatCompactDuration(focusMapPrimaryTask.seconds) }}</small></button>
+            <div v-else class="review-focus-map__signal"><span>主要投入</span><strong>未关联任务</strong><small>本期仍完整计入投入</small></div>
+            <button v-if="focusProfileSummary[0]" type="button" class="review-focus-map__signal" @click="openFocusSlice(focusProfileSummary[0].query)"><span>常用方式</span><strong>{{ focusProfileSummary[0].label }}</strong><small>{{ focusProfileSummary[0].count }} 段 · {{ formatCompactDuration(focusProfileSummary[0].seconds) }}</small></button>
+            <div class="review-focus-map__signal"><span>高峰时段</span><strong>{{ focusTimePeak.label }}</strong><small>{{ focusTimePeak.count }} 段从这里开始</small></div>
           </div>
+          <section class="review-focus-map__breakdown">
+            <header><div><span>任务投入构成</span><small>按有效时长排序；点击查看对应记录</small></div><small>占本期投入</small></header>
+            <button v-for="item in focusTaskSummary.filter(item => item.query).slice(0, 4)" :key="item.key" type="button" class="review-focus-map__row" :aria-label="`查看${item.label}的专注记录`" @click="openFocusSlice(item.query)">
+              <span><strong>{{ item.label }}</strong><small>{{ item.count }} 段 · {{ formatCompactDuration(item.seconds) }}</small></span>
+              <i><b :style="{ width: `${item.percent}%` }"></b></i>
+              <em>{{ item.percent }}%</em>
+            </button>
+            <p v-if="!focusMapPrimaryTask" class="review-focus-map__empty">本期专注尚未关联任务，时长仍会被完整保留。</p>
+          </section>
         </section>
 
         <section class="review-card review-recent">
@@ -1115,6 +1090,7 @@ const focusTaskSummary = computed(() => summarizeFocusDimension(focusEntries.val
   const title = String(item.taskTitle || '').trim()
   return { key: title || '__unlinked__', label: title || '未关联任务', query: title }
 }))
+const focusMapPrimaryTask = computed(() => focusTaskSummary.value.find(item => item.query) || null)
 const focusProfileSummary = computed(() => summarizeFocusDimension(focusEntries.value, item => {
   const label = profileName(item.profileId, item)
   return { key: item.profileId || label, label, query: label }
@@ -1136,7 +1112,7 @@ const focusTimeSummary = computed(() => {
 })
 const focusTimePeak = computed(() => focusTimeSummary.value.reduce((peak, item) => item.count > peak.count ? item : peak, focusTimeSummary.value[0] || { count: 0, label: '—', seconds: 0 }))
 const focusMapNarrative = computed(() => {
-  const task = focusTaskSummary.value[0]
+  const task = focusMapPrimaryTask.value
   const profile = focusProfileSummary.value[0]
   const time = focusTimePeak.value
   if (!task || !profile || !time?.count) return '随着更多专注记录出现，这里会逐渐形成你的投入地图。'
@@ -2991,9 +2967,7 @@ onBeforeUnmount(() => {
   background-clip: padding-box;
 }
 .review-shell { width: min(100%, 1120px); margin: 0 auto; }
-.review-controls { display: flex; align-items: center; gap: 10px; min-height: 48px; margin-bottom: 14px; padding: 4px 6px; border: 1px solid var(--divider-soft); border-radius: 14px; background: color-mix(in srgb, var(--surface) 88%, transparent); box-shadow: 0 6px 16px var(--text-4-fallback); }
-.review-range-toolbar { display: flex; flex: 1; align-items: center; justify-content: flex-end; gap: 10px; min-width: 0; padding: 0 2px 0 8px; }
-.review-range-toolbar__label { display: inline-flex; align-items: center; gap: 5px; margin-right: auto; color: var(--text-muted); font-size: 11px; font-weight: 650; }.review-range-toolbar__label svg { color: var(--accent-strong); }.review-range-toolbar__control { min-width: 0; }
+.review-controls { display: flex; align-items: center; min-height: 48px; margin-bottom: 14px; padding: 4px 6px; border: 1px solid var(--divider-soft); border-radius: 14px; background: color-mix(in srgb, var(--surface) 88%, transparent); box-shadow: 0 6px 16px var(--text-4-fallback); }
 .review-tabs { display: flex; flex: 0 0 auto; gap: 5px; padding: 0; }
 .review-tabs button { display: inline-flex; min-height: 42px; align-items: center; gap: 7px; padding: 0 13px; border-radius: 10px; color: var(--text-muted); font-size: 12px; font-weight: 680; }
 .review-tabs button:hover { color: var(--text); background: var(--surface-muted); }
@@ -3024,11 +2998,9 @@ onBeforeUnmount(() => {
 .review-card > header > small { color: var(--text-muted); font-size: 11px; }
 .review-focus-map { margin-top: 12px; border-color: color-mix(in srgb, var(--accent) 18%, var(--divider-soft)); background: linear-gradient(118deg, color-mix(in srgb, var(--accent-soft) 36%, var(--surface)), var(--surface) 46%, color-mix(in srgb, #e8f1df 28%, var(--surface))); }
 .review-focus-map__total { display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto; padding: 7px 9px; border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--divider-soft)); border-radius: 9px; background: var(--surface); color: var(--accent-strong) !important; font-size: 11px !important; font-weight: 750 !important; letter-spacing: 0 !important; font-variant-numeric: tabular-nums; }
-.review-focus-map__grid { display: grid; grid-template-columns: 1.1fr 1.1fr .82fr; gap: 10px; margin-top: 16px; }
-.review-focus-map__section { min-width: 0; padding: 12px; border: 1px solid color-mix(in srgb, var(--accent) 12%, var(--divider-soft)); border-radius: 13px; background: color-mix(in srgb, var(--surface) 86%, transparent); }
-.review-focus-map__section > header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 9px; }.review-focus-map__section > header span { color: var(--text); font-size: 11px; font-weight: 750; }.review-focus-map__section > header small { color: var(--text-muted); font-size: 9px; }
+.review-focus-map__signals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }.review-focus-map__signal { display: grid; min-width: 0; gap: 3px; padding: 10px 11px; border: 1px solid color-mix(in srgb, var(--accent) 12%, var(--divider-soft)); border-radius: 11px; background: color-mix(in srgb, var(--surface) 86%, transparent); color: inherit; font: inherit; text-align: left; }.review-focus-map__signal:is(button) { cursor: pointer; }.review-focus-map__signal:is(button):hover { border-color: color-mix(in srgb, var(--accent) 34%, var(--divider-soft)); background: var(--surface); }.review-focus-map__signal span { color: var(--text-muted); font-size: 9px; font-weight: 680; }.review-focus-map__signal strong { overflow: hidden; color: var(--text); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }.review-focus-map__signal small { overflow: hidden; color: var(--accent-strong); font-size: 9.5px; text-overflow: ellipsis; white-space: nowrap; }
+.review-focus-map__breakdown { display: grid; gap: 0; margin-top: 12px; padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--accent) 16%, var(--divider-soft)); }.review-focus-map__breakdown > header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 7px; }.review-focus-map__breakdown > header > div { display: grid; gap: 2px; }.review-focus-map__breakdown > header span { color: var(--text); font-size: 11px; font-weight: 750; }.review-focus-map__breakdown > header small { color: var(--text-muted); font-size: 9px; }
 .review-focus-map__row { display: grid; grid-template-columns: minmax(0, 1fr) 48px 31px; align-items: center; gap: 8px; width: 100%; min-height: 42px; padding: 5px 0; border: 0; border-top: 1px solid color-mix(in srgb, var(--divider-soft) 76%, transparent); color: inherit; font: inherit; text-align: left; cursor: pointer; }.review-focus-map__row:first-of-type { border-top: 0; }.review-focus-map__row:hover strong { color: var(--accent-strong); }.review-focus-map__row > span { display: grid; min-width: 0; gap: 2px; }.review-focus-map__row strong { overflow: hidden; color: var(--text); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; transition: color var(--transition-fast); }.review-focus-map__row small { overflow: hidden; color: var(--text-muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }.review-focus-map__row i { height: 5px; overflow: hidden; border-radius: 99px; background: color-mix(in srgb, var(--accent) 10%, var(--surface-muted)); }.review-focus-map__row i b { display: block; height: 100%; border-radius: inherit; background: var(--accent); }.review-focus-map__section--profiles .review-focus-map__row i b { background: #6a9bc3; }.review-focus-map__row em { color: var(--text-muted); font-size: 9px; font-style: normal; font-variant-numeric: tabular-nums; text-align: right; }.review-focus-map__empty { margin: 12px 0 0; color: var(--text-muted); font-size: 10px; line-height: 1.55; }
-.review-focus-map__times { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }.review-focus-map__times > div { display: grid; gap: 3px; min-width: 0; padding: 8px; border: 1px solid var(--divider-soft); border-radius: 10px; background: var(--surface-muted); }.review-focus-map__times > div.active { border-color: color-mix(in srgb, var(--accent) 32%, var(--divider-soft)); background: color-mix(in srgb, var(--accent-soft) 72%, var(--surface)); }.review-focus-map__times small { color: var(--text-muted); font-size: 9px; }.review-focus-map__times strong { color: var(--text); font-size: 12px; font-variant-numeric: tabular-nums; }.review-focus-map__times span { overflow: hidden; color: var(--accent-strong); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 /* 趋势图与节律图：ECharts 容器 */
 .review-chart-description { margin: 8px 0 0; color: var(--text-muted); font-size: 11px; line-height: 1.55; }
 .review-trend-chart { height: 218px; margin-top: 14px; }
@@ -3115,7 +3087,7 @@ onBeforeUnmount(() => {
 .review-recent__actions button:hover { background: var(--accent-soft); }
 .review-card__empty { margin: 0; padding: 34px 16px; color: var(--text-muted); font-size: 12px; line-height: 1.6; text-align: center; }
 .review-records > .review-filter-panel { margin-top: 0; }
-.review-summary-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 12px; }
+.review-summary-actions { display: flex; flex: 0 0 auto; align-items: center; justify-content: flex-end; gap: 10px; }.review-summary-range { display: flex; align-items: center; gap: 7px; min-width: 0; }.review-summary-range > span { display: inline-flex; align-items: center; gap: 4px; color: var(--text-muted); font-size: 10px; font-weight: 650; white-space: nowrap; }.review-summary-range > span svg { color: var(--accent-strong); }
 .review-export-btn { display: inline-flex; min-height: 34px; align-items: center; gap: 5px; padding: 0 12px; border: 1px solid var(--divider-soft); border-radius: 9px; background: var(--surface); color: var(--accent-strong); font: inherit; font-size: 11.5px; font-weight: 650; cursor: pointer; transition: border-color var(--transition-fast), background var(--transition-fast); }
 .review-export-btn:hover, .review-export-btn.active { border-color: var(--accent); background: var(--accent-soft); }
 .review-export-menu { position: relative; }
@@ -3399,8 +3371,8 @@ onBeforeUnmount(() => {
 .review-detail-close { min-width: 86px; background: var(--accent); color: #fff; }
 .review-detail-close:hover { background: var(--accent-strong); }
 @media (max-width: 900px) { .review-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }.review-overview-grid { grid-template-columns: 1fr; }.review-record-table, .review-recent-list { overflow-x: auto; }.review-record-table__head, .review-record-row, .review-recent-row { min-width: 720px; } }
-@media (max-width: 900px) { .review-focus-map__grid { grid-template-columns: 1fr 1fr; }.review-focus-map__section--times { grid-column: 1 / -1; }.review-focus-map__times { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-@media (max-width: 620px) { .review-focus-map__grid { grid-template-columns: 1fr; }.review-focus-map__section--times { grid-column: auto; }.review-focus-map__times { grid-template-columns: repeat(2, minmax(0, 1fr)); }.review-focus-map__total { display: none; } }
+@media (max-width: 900px) { .review-focus-map__signals { grid-template-columns: 1fr 1fr; }.review-summary > header { display: grid; }.review-summary-actions { justify-content: flex-start; flex-wrap: wrap; } }
+@media (max-width: 620px) { .review-focus-map__signals { grid-template-columns: 1fr; }.review-focus-map__total { display: none; } }
 @media (max-width: 900px) {
   .review-filters label { flex-basis: 100%; }
 }
