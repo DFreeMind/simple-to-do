@@ -491,6 +491,46 @@ export async function handleFocusControllerAction(controller, action) {
   })
 }
 
+export async function syncRhythmController(payload = null) {
+  if (!isTauri()) return false
+  try {
+    return await invoke('sync_rhythm_controller', { payload })
+  } catch (error) {
+    console.warn('[Platform] 同步节律控制器失败:', error)
+    return false
+  }
+}
+
+export async function openRhythmController() {
+  if (!isTauri()) return false
+  return invoke('open_rhythm_controller')
+}
+
+export async function getRhythmControllerPayload() {
+  if (!isTauri()) return null
+  return invoke('get_rhythm_controller_payload')
+}
+
+export async function markRhythmControllerReady(revision) {
+  if (!isTauri()) return false
+  return invoke('rhythm_controller_ready', { revision })
+}
+
+export async function setRhythmControllerAlwaysOnTop(alwaysOnTop) {
+  if (!isTauri()) return false
+  return invoke('set_rhythm_controller_always_on_top', { alwaysOnTop })
+}
+
+export async function setRhythmControllerExpanded(expanded) {
+  if (!isTauri()) return false
+  return invoke('set_rhythm_controller_expanded', { expanded })
+}
+
+export async function handleRhythmControllerAction(reminderId, action) {
+  if (!isTauri()) return false
+  return invoke('handle_rhythm_controller_action', { reminderId: reminderId || null, action })
+}
+
 export async function requestFocusNotificationPermission() {
   if (!isTauri()) return false
   try {

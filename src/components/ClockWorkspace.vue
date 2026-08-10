@@ -749,6 +749,10 @@ function groupTaskCount(group) { return group.lists.reduce((count, list) => coun
 function chooseTask(taskId) {
   selectedTaskId.value = taskId
 }
+function applyFocusTaskDraft() {
+  const taskId = store.consumeFocusTaskDraft()
+  if (taskId) selectedTaskId.value = taskId
+}
 function handleSearchHit(hit) {
   if (hit.kind === 'task') chooseTask(hit.id)
   else if (hit.kind === 'list') selectSidebar(hit.target)
@@ -765,6 +769,9 @@ function listNameOf(listId) { return store.lists.find(list => list.id === listId
 function listColorOf(listId) { return store.lists.find(list => list.id === listId)?.color || '#9aa3b7' }
 watch(taskSearchQuery, () => { keyboardIndex.value = 0 })
 watch(sidebarId, () => { keyboardIndex.value = 0 })
+watch(() => store.focusTaskDraftId, (taskId) => {
+  if (taskId) applyFocusTaskDraft()
+}, { immediate: true })
 function formatClock(seconds) { const value = Math.max(0, Math.floor(seconds || 0)); return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}` }
 function formatTime(date) { return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}` }
 function durationText(seconds) { if (seconds === null || seconds === undefined) return '自由计时'; const minutes = Math.round(seconds / 60); return minutes >= 60 ? `${Math.floor(minutes / 60)} 小时` : `${minutes} 分钟` }

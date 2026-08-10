@@ -2,6 +2,7 @@
   <FocusReminderWindow v-if="isFocusReminderWindow" />
   <RhythmReminderWindow v-else-if="isRhythmReminderWindow" />
   <FocusControllerWindow v-else-if="isFocusControllerWindow" />
+  <RhythmControllerWindow v-else-if="isRhythmControllerWindow" />
   <div
     v-else
     class="app"
@@ -117,6 +118,7 @@ import FocusCelebration from './components/FocusCelebration.vue'
 import FocusReminderWindow from './components/FocusReminderWindow.vue'
 import RhythmReminderWindow from './components/RhythmReminderWindow.vue'
 import FocusControllerWindow from './components/FocusControllerWindow.vue'
+import RhythmControllerWindow from './components/RhythmControllerWindow.vue'
 import RhythmReminderPrompt from './components/RhythmReminderPrompt.vue'
 import { useTaskStore } from './stores/task'
 import { useTheme } from './composables/useTheme'
@@ -131,6 +133,9 @@ const isRhythmReminderWindow = typeof window !== 'undefined' && Boolean(window._
 const isFocusControllerWindow = typeof window !== 'undefined'
   && Boolean(window.__TAURI_INTERNALS__)
   && getCurrentWebviewWindow().label === 'focus-controller'
+const isRhythmControllerWindow = typeof window !== 'undefined'
+  && Boolean(window.__TAURI_INTERNALS__)
+  && getCurrentWebviewWindow().label === 'rhythm-controller'
 const appVersion = ref(__APP_VERSION__)
 const isDevelopment = import.meta.env.DEV
 
@@ -152,6 +157,7 @@ let unlistenFocusReminderAction
 let unlistenFocusNotificationOpen
 let unlistenFocusNotificationError
 let unlistenFocusControllerAction
+let unlistenRhythmControllerAction
 let unlistenRhythmElapsed
 let unlistenRhythmReminderOpen
 let unlistenRhythmReminderAction
@@ -206,6 +212,27 @@ function handleFocusControllerAction(event) {
   if (action === 'subtract-five') store.adjustFocusDuration(-5 * 60)
   if (action === 'add-five') store.adjustFocusDuration(5 * 60)
   if (action === 'finish') store.finishFocus('completed')
+}
+
+function handleRhythmControllerAction(event) {
+  const { action, reminderId, alwaysOnTop } = event.payload || {}
+  if (action === 'set-always-on-top') {
+    store.updateSettings({ rhythmControllerAlwaysOnTop: alwaysOnTop !== false })
+    return
+  }
+  if (action === 'pause-all') store.pauseRhythmReminders()
+  if (action === 'resume-all') store.resumeRhythmReminders()
+  if (action === 'pause') store.pauseRhythmReminder(reminderId)
+  if (action === 'resume') store.resumeRhythmReminder(reminderId)
+  if (action === 'subtract-five') store.adjustRhythmReminderTiming(reminderId, -5)
+  if (action === 'add-five') store.adjustRhythmReminderTiming(reminderId, 5)
+  if (action === 'complete') store.completeRhythmReminder(reminderId)
+  if (action === 'snooze') store.snoozeRhythmReminder(reminderId, 5)
+  if (action === 'skip') store.skipRhythmReminderToday(reminderId)
+  if (action === 'open-app') {
+    store.setActiveModule('clock')
+    store.setClockView('rhythm')
+  }
 }
 
 function reportFocusNotificationError(event) {
@@ -350,7 +377,7 @@ async function openReleasePage() {
 }
 
 onMounted(async () => {
-  if (isFocusReminderWindow || isRhythmReminderWindow || isFocusControllerWindow) return
+  if (isFocusReminderWindow || isRhythmReminderWindow || isFocusControllerWindow || isRhythmControllerWindow) return
   if (window.__TAURI_INTERNALS__) {
     getVersion().then(version => { appVersion.value = version }).catch(() => {})
   }
@@ -384,6 +411,9 @@ onMounted(async () => {
     listen('focus-controller:action', handleFocusControllerAction)
       .then(unlisten => { unlistenFocusControllerAction = unlisten })
       .catch(error => console.warn('[App] 注册专注控制器操作失败:', error))
+    listen('rhythm-controller:action', handleRhythmControllerAction)
+      .then(unlisten => { unlistenRhythmControllerAction = unlisten })
+      .catch(error => console.warn('[App] 注册节律控制器操作失败:', error))
   }
   store.loadData()
   // 主窗口启动后静默检查更新：发现新版本在设置面板「关于与更新」显示角标，不打扰当前操作。
@@ -399,6 +429,7 @@ onBeforeUnmount(() => {
   unlistenFocusNotificationOpen?.()
   unlistenFocusNotificationError?.()
   unlistenFocusControllerAction?.()
+  unlistenRhythmControllerAction?.()
   unlistenRhythmElapsed?.()
   unlistenRhythmReminderOpen?.()
   unlistenRhythmReminderAction?.()

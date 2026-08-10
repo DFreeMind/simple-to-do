@@ -87,7 +87,7 @@
           <Clock :size="12" />
           {{ formatCreatedAt(task.createdAt) }}
         </span>
-        <span v-if="task.completed && task.completedAt" class="meta-chip meta-chip--muted" :title="completionTitle">
+        <span v-if="task.completed && task.completedAt" class="meta-chip meta-chip--muted meta-chip--completed" :title="completionTitle">
           <CheckCheck :size="13" />
           {{ formatCreatedAt(task.completedAt) }}<template v-if="completionDuration"> · {{ completionDuration }}</template>
         </span>

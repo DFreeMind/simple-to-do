@@ -353,6 +353,7 @@
 
       <section v-else-if="activeTab === 'focus'" class="review-card review-records">
         <div class="review-filter-panel">
+          <div v-if="focusHistoryScopeTask" class="review-task-scope"><span>仅看「{{ focusHistoryScopeTask.title }}」的专注</span><button type="button" @click="store.clearFocusHistoryTaskScope">查看全部</button></div>
           <div class="review-filters">
             <label><Search :size="16" /><span class="sr-only">搜索专注记录</span><input v-model.trim="focusSearch" type="search" placeholder="搜索任务、方式或备注" /></label>
             <ReviewRangeControl
@@ -1068,7 +1069,9 @@ const rangeEnd = computed(() => {
   if (selectedRange.value.id !== 'custom' || !customEnd.value) return null
   return new Date(`${customEnd.value}T23:59:59.999`)
 })
+const focusHistoryScopeTask = computed(() => store.activeTasks.find(task => task.id === store.focusHistoryTaskId) || null)
 const focusHistory = computed(() => store.focusHistory.filter(item => {
+  if (store.focusHistoryTaskId && item.taskId !== store.focusHistoryTaskId) return false
   const t = new Date(item.finishedAt)
   if (rangeStart.value && t < rangeStart.value) return false
   if (rangeEnd.value && t > rangeEnd.value) return false
@@ -1946,6 +1949,14 @@ const focusPageEnd = computed(() => Math.min(focusPage.value * focusPageSize.val
 const rhythmPageEnd = computed(() => Math.min(rhythmPage.value * rhythmPageSize.value, filteredRhythmRecords.value.length))
 const pagedFocusRecords = computed(() => filteredFocusRecords.value.slice(focusPageStart.value - 1, focusPageEnd.value))
 const pagedRhythmRecords = computed(() => filteredRhythmRecords.value.slice(rhythmPageStart.value - 1, rhythmPageEnd.value))
+
+watch(() => store.focusHistoryTaskId, (taskId) => {
+  if (!taskId) return
+  activeTab.value = 'focus'
+  range.value = 'all'
+  resetFocusFilters()
+  focusPage.value = 1
+}, { immediate: true })
 
 // 批量选择：computed 状态（全选 / 部分选 / 数量）
 const focusSelectionCount = computed(() => selectedFocusIds.value.size)

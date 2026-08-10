@@ -39,6 +39,26 @@
         "skipTaskbar": true,
         "shadow": false,
         "visible": false
+      },
+      {
+        "label": "rhythm-controller",
+        "title": "易简清单 · 节律控制器",
+        "url": "index.html",
+        "width": 390,
+        "height": 86,
+        "minWidth": 390,
+        "minHeight": 86,
+        "maxWidth": 390,
+        "maxHeight": 86,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": false,
+        "visible": false
       }
     ],
     "security": {

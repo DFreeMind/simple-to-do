@@ -163,7 +163,7 @@
       </div>
     </section>
 
-    <section v-else class="readonly-hint">
+    <section v-else-if="store.currentView !== 'completed'" class="readonly-hint">
       <Info :size="18" />
       <span>{{ readonlyHint }}</span>
     </section>
@@ -176,18 +176,135 @@
       @scroll.passive="onContentScroll"
     >
       <template v-if="store.currentView === 'planned' && store.plannedSections.length">
-        <div v-for="section in store.plannedSections" :key="section.id" class="task-section">
-          <h2>{{ section.label }}</h2>
-          <TaskItem
-            v-for="task in section.tasks"
-            :key="task.id"
-            :task="task"
-            :draggable="store.canDragTasks"
-            :is-dragging="taskDrag.draggingId.value === task.id"
-            :is-drop-target="taskDrag.dragOverId.value === task.id"
-            :drop-position="taskDrag.dragOverId.value === task.id ? taskDrag.dropPosition.value : ''"
-          />
-        </div>
+        <section class="week-plan" aria-label="周计划">
+          <header class="week-plan__header"><div class="week-plan__range"><span>本周计划</span><strong>{{ planWeekLabel }}</strong></div><div class="week-plan__controls"><button type="button" aria-label="上一周" @click="store.shiftPlanWeek(-1)"><ChevronLeft :size="16" /></button><button type="button" aria-label="下一周" @click="store.shiftPlanWeek(1)"><ChevronRight :size="16" /></button><button class="week-plan__today" type="button" @click="store.resetPlanWeekToday">回到本周</button></div></header>
+          <div class="week-plan__summary"><span>按日期安排本周任务</span><strong>{{ planWeekTaskCount }} 项 · {{ planWeekScheduledDays.length }} 天</strong></div>
+          <div v-if="planWeekScheduledDays.length" class="week-plan__days"><section v-for="day in planWeekScheduledDays" :key="day.date.toISOString()" class="week-plan__day" :class="{ today: isTodayDate(day.date) }"><header><span><strong>{{ weekDayLabel(day.date) }}</strong><small>{{ weekDateLabel(day.date) }}</small></span><em>{{ day.tasks.length }} 项</em></header><div class="week-plan__tasks"><TaskItem v-for="task in day.tasks" :key="task.id" :task="task" /></div></section></div>
+          <p v-else class="week-plan__empty">这一周还没有安排任务。给任务设置日期后，它会出现在这里。</p>
+        </section>
+        <div v-for="section in plannedOutOfWeekSections" :key="section.id" class="task-section"><h2>{{ section.label }}</h2><TaskItem v-for="task in section.tasks" :key="task.id" :task="task" /></div>
+      </template>
+
+      <template v-else-if="store.currentView === 'today'">
+        <section class="today-workspace" aria-label="今日工作台">
+          <section class="today-workspace__section today-workspace__section--plan">
+            <header class="today-workspace__section-header">
+              <span><Sun :size="16" /><strong>今日计划</strong><small>{{ store.todayPlanTasks.length }} 项</small></span>
+              <em>主动选择今天要推进的事</em>
+            </header>
+            <TaskItem v-for="task in store.todayPlanTasks" :key="task.id" :task="task" />
+            <p v-if="!store.todayPlanTasks.length" class="today-workspace__empty">从下方建议中挑选一两件，给今天一个清晰起点。</p>
+          </section>
+
+          <section v-if="store.todayDueTasks.length" class="today-workspace__section today-workspace__section--due">
+            <header class="today-workspace__section-header">
+              <span><CalendarClock :size="16" /><strong>今天到期</strong><small>{{ store.todayDueTasks.length }} 项</small></span>
+              <em>需要处理，但尚未加入今日计划</em>
+            </header>
+            <TaskItem v-for="task in store.todayDueTasks" :key="task.id" :task="task" />
+          </section>
+
+          <section v-if="store.suggestedTodayTasks.length" class="today-workspace__section today-workspace__section--suggestions">
+            <header class="today-workspace__section-header">
+              <span><Sparkles :size="16" /><strong>建议加入今日</strong></span>
+              <em>来自收集箱、重要或逾期任务</em>
+            </header>
+            <div class="today-suggestions">
+              <article v-for="task in store.suggestedTodayTasks" :key="task.id" class="today-suggestion" @click="store.selectTask(task.id)">
+                <span class="today-suggestion__title">{{ task.title }}</span>
+                <span class="today-suggestion__meta"><Flag v-if="task.priority" :size="12" />{{ task.dueDate ? formatDate(task.dueDate) : '尚未安排' }}</span>
+                <button type="button" :aria-label="`将${task.title}加入今日`" @click.stop="store.toggleMyDay(task.id)"><Sun :size="14" />加入今日</button>
+              </article>
+            </div>
+          </section>
+        </section>
+      </template>
+
+      <template v-else-if="store.currentView === 'inbox'">
+        <section v-if="store.inboxTriageTasks.length" class="inbox-triage" aria-label="收集箱整理">
+          <header class="inbox-triage__header">
+            <span><Inbox :size="17" /><strong>整理收集箱</strong><small>{{ store.inboxTriageTasks.length }} 项还没有去向</small></span>
+            <em>先决定下一步，不必一次清空</em>
+          </header>
+          <div class="inbox-triage__items">
+            <article v-for="task in store.inboxTriageTasks" :key="task.id" class="inbox-triage__item" @click="store.selectTask(task.id)">
+              <strong>{{ task.title }}</strong>
+              <div>
+                <button type="button" :aria-label="`将${task.title}加入今日`" @click.stop="store.toggleMyDay(task.id)"><Sun :size="13" />加入今日</button>
+                <button type="button" :aria-label="`将${task.title}安排到明天`" @click.stop="scheduleInboxTaskTomorrow(task.id)"><CalendarClock :size="13" />明天</button>
+                <button type="button" :aria-label="`打开${task.title}详情以继续整理`" @click.stop="openTaskForTriage(task.id)">整理</button>
+              </div>
+            </article>
+          </div>
+        </section>
+        <TaskItem
+          v-for="task in store.pinnedTasks"
+          :key="`pinned-${task.id}`"
+          :task="task"
+          :draggable="store.canDragTasks"
+          :is-dragging="taskDrag.draggingId.value === task.id"
+          :is-drop-target="taskDrag.dragOverId.value === task.id"
+          :drop-position="taskDrag.dragOverId.value === task.id ? taskDrag.dropPosition.value : ''"
+        />
+        <TaskItem
+          v-for="task in store.unpinnedTasks"
+          :key="task.id"
+          :task="task"
+          :draggable="store.canDragTasks"
+          :is-dragging="taskDrag.draggingId.value === task.id"
+          :is-drop-target="taskDrag.dragOverId.value === task.id"
+          :drop-position="taskDrag.dragOverId.value === task.id ? taskDrag.dropPosition.value : ''"
+        />
+      </template>
+
+      <template v-else-if="store.currentView === 'completed' && store.completedTasks.length">
+        <section class="completed-workspace" aria-label="完成记录">
+          <header class="completed-workspace__hero">
+            <p class="completed-workspace__hero-copy">
+              <CheckCheck :size="20" />
+              所有清单中的完成事项都会留在这里，可随时查看详情或恢复。
+            </p>
+            <dl class="completed-workspace__metrics" aria-label="完成统计">
+              <div><dt>今天</dt><dd>{{ completedTodayCount }}</dd></div>
+              <div><dt>本周</dt><dd>{{ completedWeekCount }}</dd></div>
+              <div><dt>显示</dt><dd>{{ completedFilteredTasks.length }}</dd></div>
+            </dl>
+          </header>
+
+          <div class="completed-workspace__filters">
+            <label class="completed-workspace__search">
+              <Search :size="16" />
+              <input v-model="completedSearch" type="search" placeholder="搜索已完成任务" aria-label="搜索已完成任务" />
+            </label>
+            <label class="completed-workspace__select">
+              <span>清单</span>
+              <select v-model="completedListFilter" aria-label="按清单筛选完成记录">
+                <option value="all">全部清单</option>
+                <option v-for="list in completedListOptions" :key="list.id" :value="list.id">{{ list.name }} · {{ list.count }}</option>
+              </select>
+            </label>
+            <div class="completed-workspace__ranges" aria-label="完成时间范围">
+              <button v-for="option in completedRangeOptions" :key="option.value" type="button" :class="{ active: completedRange === option.value }" :aria-pressed="completedRange === option.value" @click="completedRange = option.value">{{ option.label }}</button>
+            </div>
+          </div>
+
+          <section v-for="group in completedTaskGroups" :key="group.id" class="completed-workspace__group">
+            <header>
+              <span><CheckCircle2 :size="15" />{{ group.label }}</span>
+              <small>{{ group.tasks.length }} 项</small>
+            </header>
+            <div class="completed-workspace__items">
+              <TaskItem v-for="task in group.tasks" :key="task.id" :task="task" :search-query="completedSearch" />
+            </div>
+          </section>
+
+          <div v-if="!completedFilteredTasks.length" class="completed-workspace__empty">
+            <Search v-if="completedSearch" :size="20" />
+            <CheckCircle2 v-else :size="20" />
+            <strong>{{ completedSearch ? '没有匹配的完成记录' : '这个范围内还没有完成记录' }}</strong>
+            <span>{{ completedSearch ? '试试任务标题、标签或备注中的其他关键词。' : '切换时间范围或清单，查看更早的完成事项。' }}</span>
+          </div>
+        </section>
       </template>
 
       <template v-else-if="store.currentView === 'trash'">
@@ -587,6 +704,8 @@ import {
   CheckCheck,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronsDown,
   ChevronsUp,
   Flag,
@@ -594,6 +713,7 @@ import {
   Eye,
   EyeOff,
   Info,
+  Inbox,
   ListChecks,
   MoreHorizontal,
   PanelRight,
@@ -601,7 +721,9 @@ import {
   Repeat2,
   RotateCcw,
   Search,
+  Sparkles,
   Smile,
+  Sun,
   Tags,
   Trash2,
   X
@@ -622,6 +744,10 @@ const newTaskTitle = ref('')
 const quickInput = ref(null)
 const searchInput = ref(null)
 const searchViewMode = ref('list')
+const completedSearch = ref('')
+const completedListFilter = ref('all')
+// 默认保留全部历史；用户可临时收窄到最近一周或一月回顾。
+const completedRange = ref('all')
 const sortMenuOpen = ref(false)
 const filterMenuOpen = ref(false)
 const headerMoreOpen = ref(false)
@@ -931,6 +1057,94 @@ const viewMeta = computed(() => {
     eyebrow: '当前清单'
   }
 })
+const planWeekLabel = computed(() => {
+  const days = store.planWeekDays
+  if (!days.length) return ''
+  return `${days[0].date.getMonth() + 1} 月 ${days[0].date.getDate()} 日 – ${days[6].date.getMonth() + 1} 月 ${days[6].date.getDate()} 日`
+})
+const planWeekScheduledDays = computed(() => store.planWeekDays.filter(day => day.tasks.length))
+const planWeekTaskCount = computed(() => planWeekScheduledDays.value.reduce((total, day) => total + day.tasks.length, 0))
+const plannedOutOfWeekSections = computed(() => {
+  const ids = new Set(store.planWeekDays.flatMap(day => day.tasks.map(task => task.id)))
+  return store.plannedSections.map(section => ({ ...section, tasks: section.tasks.filter(task => !ids.has(task.id)) })).filter(section => section.tasks.length)
+})
+function isTodayDate(date) { return date.toDateString() === new Date().toDateString() }
+function weekDayLabel(date) { return `周${['日', '一', '二', '三', '四', '五', '六'][date.getDay()]}` }
+function weekDateLabel(date) { return `${date.getMonth() + 1}/${date.getDate()}` }
+
+const completedRangeOptions = [
+  { value: '7d', label: '近 7 天' },
+  { value: '30d', label: '近 30 天' },
+  { value: 'all', label: '全部' }
+]
+const completedAllTasks = computed(() => [...store.completedTasks]
+  .sort((a, b) => new Date(b.completedAt || 0) - new Date(a.completedAt || 0)))
+const completedListOptions = computed(() => {
+  const counts = new Map()
+  completedAllTasks.value.forEach(task => counts.set(task.listId || 'unknown', (counts.get(task.listId || 'unknown') || 0) + 1))
+  const options = []
+  if (counts.has('inbox')) options.push({ id: 'inbox', name: '收集箱', count: counts.get('inbox') })
+  store.lists.forEach(list => {
+    const count = counts.get(list.id)
+    if (count) options.push({ id: list.id, name: list.name, count })
+  })
+  if (counts.has('unknown')) options.push({ id: 'unknown', name: '未归属清单', count: counts.get('unknown') })
+  return options
+})
+const completedFilteredTasks = computed(() => {
+  const query = completedSearch.value.trim().toLowerCase()
+  const now = new Date()
+  const rangeStart = new Date(now)
+  if (completedRange.value === '7d') rangeStart.setDate(rangeStart.getDate() - 6)
+  if (completedRange.value === '30d') rangeStart.setDate(rangeStart.getDate() - 29)
+  rangeStart.setHours(0, 0, 0, 0)
+
+  return completedAllTasks.value.filter(task => {
+    if (completedListFilter.value !== 'all' && (task.listId || 'unknown') !== completedListFilter.value) return false
+    if (completedRange.value !== 'all' && new Date(task.completedAt || 0) < rangeStart) return false
+    if (!query) return true
+    const haystack = [task.title, task.note, ...(task.tags || [])].filter(Boolean).join(' ').toLowerCase()
+    return haystack.includes(query)
+  })
+})
+const completedTodayCount = computed(() => completedAllTasks.value.filter(task => isSameCalendarDay(task.completedAt, new Date())).length)
+const completedWeekCount = computed(() => {
+  const weekStart = getWeekStart(new Date())
+  return completedAllTasks.value.filter(task => new Date(task.completedAt || 0) >= weekStart).length
+})
+const completedTaskGroups = computed(() => {
+  const groups = [
+    { id: 'today', label: '今天', tasks: [] },
+    { id: 'yesterday', label: '昨天', tasks: [] },
+    { id: 'week', label: '本周更早', tasks: [] },
+    { id: 'earlier', label: '更早', tasks: [] }
+  ]
+  const today = new Date()
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+  const weekStart = getWeekStart(today)
+  completedFilteredTasks.value.forEach(task => {
+    const completedAt = new Date(task.completedAt || 0)
+    if (isSameCalendarDay(completedAt, today)) groups[0].tasks.push(task)
+    else if (isSameCalendarDay(completedAt, yesterday)) groups[1].tasks.push(task)
+    else if (completedAt >= weekStart) groups[2].tasks.push(task)
+    else groups[3].tasks.push(task)
+  })
+  return groups.filter(group => group.tasks.length)
+})
+
+function isSameCalendarDay(value, date) {
+  const target = new Date(value || 0)
+  return target.getFullYear() === date.getFullYear() && target.getMonth() === date.getMonth() && target.getDate() === date.getDate()
+}
+
+function getWeekStart(date) {
+  const start = new Date(date)
+  const day = start.getDay() || 7
+  start.setDate(start.getDate() - day + 1)
+  start.setHours(0, 0, 0, 0)
+  return start
+}
 
 const listStats = computed(() => {
   const tasks = store.tasks.filter(task => task.listId === store.currentList?.id && !task.deleted)
@@ -1002,7 +1216,8 @@ const listFilterSections = [
 ]
 const listFilterLabel = computed(() => store.isListTaskFilterActive ? '已筛选' : '全部任务')
 
-const showTaskActions = computed(() => true)
+// 完成记录固定按完成时间回看，不继承普通清单的拖拽与排序工具。
+const showTaskActions = computed(() => store.currentView !== 'completed')
 const isSearchView = computed(() => store.currentView === 'search')
 
 const quickPlaceholder = computed(() => {
@@ -1552,6 +1767,23 @@ function formatTrashDate(value) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '删除时间未知'
   return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`
+}
+
+function formatDate(value) {
+  if (!value) return '尚未安排'
+  return new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric' }).format(new Date(value))
+}
+
+function openTaskForTriage(taskId) {
+  store.selectTask(taskId)
+  store.updateSettings({ detailOpen: true })
+}
+
+function scheduleInboxTaskTomorrow(taskId) {
+  const tomorrow = new Date()
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  tomorrow.setHours(9, 0, 0, 0)
+  store.updateTask(taskId, { dueDate: tomorrow.toISOString() })
 }
 
 function deleteListForever(list) {

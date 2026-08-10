@@ -7,6 +7,11 @@
           <h1>{{ rhythmWelcome.title }}</h1>
           <p>{{ rhythmWelcome.description }}</p>
         </div>
+        <div class="rhythm-header__actions">
+          <button class="rhythm-control-btn" type="button" :disabled="!enabledReminders.length" title="打开桌面节律控制器" @click="openDesktopController">
+            <MonitorUp :size="15" />桌面控制器
+          </button>
+        </div>
       </header>
 
       <div class="rhythm-dashboard">
@@ -41,7 +46,7 @@
                   </span>
                   <span v-else class="rhythm-timeline-card__dial-content">
                     <small class="rhythm-timeline-card__dial-label">{{ timingDialLabel(item) }}</small>
-                    <strong :class="{ 'is-status': store.rhythmPaused || item.reminder.pausedIndividually }">{{ timingDialPrimary(item) }}</strong>
+                    <strong :class="timingDialValueClass(item)">{{ timingDialPrimary(item) }}</strong>
                     <small>{{ timingDialSecondary(item) }}</small>
                   </span>
                 </div>
@@ -311,8 +316,10 @@ import {
   X
 } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
+import { openRhythmController } from '@/services/platform'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { getRhythmCopyCategory, getRhythmCopyOptions, pickRhythmCopy } from '@/utils/rhythmCopy'
+import { formatRhythmCountdown } from '@/utils/rhythmController.mjs'
 
 const store = useTaskStore()
 const now = ref(Date.now())
@@ -636,6 +643,15 @@ function timingDialSecondary(item) {
   return '后提醒'
 }
 
+function timingDialValueClass(item) {
+  const value = timingDialPrimary(item)
+  return {
+    'is-status': store.rhythmPaused || item.reminder.pausedIndividually,
+    'is-medium-countdown': value.length === 5,
+    'is-long-countdown': value.length >= 6
+  }
+}
+
 function dialScheduleDay(timestamp) {
   const date = new Date(timestamp)
   const today = new Date(now.value)
@@ -673,7 +689,7 @@ function timingValue(item) {
   if (reminder.skippedDate === localDateKey()) return '今天不再提醒'
   if (reminder.triggerType === 'active-duration') return `还需 ${formatRemaining(Math.max(0, roundDurationSeconds(reminder) - (Number(reminder.activitySeconds) || 0)))}，本轮结束后提醒`
   if (reminder.triggerType === 'fixed-time' || !isWithinSchedule(reminder)) return formatCalendarTime(dueAt)
-  return formatCountdown(Math.max(0, Math.ceil((dueAt - now.value) / 1000)))
+  return formatRhythmCountdown(Math.max(0, Math.ceil((dueAt - now.value) / 1000)))
 }
 
 function timingDetail(item) {
@@ -780,25 +796,12 @@ function formatRemaining(seconds) {
   return `${value} 秒`
 }
 
-function formatCountdown(seconds) {
-  const value = Math.max(0, Math.ceil(Number(seconds) || 0))
-  const hours = Math.floor(value / 3600)
-  const minutes = Math.floor((value % 3600) / 60)
-  const remainingSeconds = value % 60
-  const clock = `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`
-  return hours ? `${hours}:${clock}` : clock
-}
-
 function roundDurationSeconds(reminder) {
   return Math.max(60, Math.min(8 * 60 * 60, (Number(reminder?.intervalSeconds) || 60) + (Number(reminder?.roundAdjustmentSeconds) || 0)))
 }
 
 function formatDialCountdown(seconds) {
-  const value = Math.max(0, Math.ceil(Number(seconds) || 0))
-  if (value < 3600) return formatCountdown(value)
-  const hours = Math.floor(value / 3600)
-  const minutes = Math.floor((value % 3600) / 60)
-  return `${hours}:${String(minutes).padStart(2, '0')}`
+  return formatRhythmCountdown(seconds)
 }
 
 function intervalLabel(minutes) {
@@ -958,6 +961,16 @@ function confirmDelete() {
 
 function pauseAll() {
   store.pauseRhythmReminders()
+}
+
+async function openDesktopController() {
+  try {
+    const opened = await openRhythmController()
+    if (!opened) store.showNotice('当前环境暂不支持桌面节律控制器', 'info')
+  } catch (error) {
+    console.error('[RhythmWorkspace] 打开桌面节律控制器失败:', error)
+    store.showNotice('桌面节律控制器打开失败', 'error')
+  }
 }
 
 onMounted(() => {

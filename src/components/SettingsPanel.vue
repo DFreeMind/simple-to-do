@@ -238,6 +238,11 @@
                 <input type="checkbox" :checked="store.settings.focusControllerAlwaysOnTop" @change="store.updateSettings({ focusControllerAlwaysOnTop: $event.target.checked })" />
                 <span class="switch-control" aria-hidden="true"></span>
               </label>
+              <label class="switch-row focus-controller-top-setting">
+                <span><Waves :size="17" /><span><strong>节律控制器保持在最前面</strong><small>一个窗口聚合所有已开启节律；关闭控制器不会暂停提醒。</small></span></span>
+                <input type="checkbox" :checked="store.settings.rhythmControllerAlwaysOnTop" @change="store.updateSettings({ rhythmControllerAlwaysOnTop: $event.target.checked })" />
+                <span class="switch-control" aria-hidden="true"></span>
+              </label>
             </div>
             <div class="settings-block">
               <div class="settings-block__title"><h4>番茄轮次</h4><span>每 {{ store.clock.focusSettings.focusesBeforeLongBreak }} 轮长休息</span></div>
@@ -884,7 +889,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { Bell, Check, Compass, Database, Download, ExternalLink, File, Folder, Globe, HardDrive, Image, Info, PanelTop, Palette, Pin, ShieldCheck, SlidersHorizontal, Tag, Timer, Trash2, UserRound, Volume2, X, CheckSquare } from 'lucide-vue-next'
+import { Bell, Check, Compass, Database, Download, ExternalLink, File, Folder, Globe, HardDrive, Image, Info, PanelTop, Palette, Pin, ShieldCheck, SlidersHorizontal, Tag, Timer, Trash2, UserRound, Volume2, Waves, X, CheckSquare } from 'lucide-vue-next'
 import { checkForUpdates as checkForUpdatesService, installUpdate as installUpdateService, skipCurrentUpdate, updaterState, updateNotes as resolveUpdateNotes } from '@/services/updater'
 import { currentReleaseHighlights, releaseHistory } from '@/data/releases'
 import { useTaskStore } from '@/stores/task'

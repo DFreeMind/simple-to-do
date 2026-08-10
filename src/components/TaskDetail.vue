@@ -78,7 +78,7 @@
               <CheckCheck :size="13" />
               <span :title="formatTaskCompletionTitle(task)">{{ formatCreatedAt(task.completedAt) }}<template v-if="formatTaskDuration(task)"> · {{ formatTaskDuration(task) }}</template></span>
             </div>
-            <button ref="dateTrigger" class="detail-meta-action" :class="{ empty: !task.dueDate }" type="button" @click.stop="toggleDatePicker('dueDate')">
+            <button v-if="!task.completed" ref="dateTrigger" class="detail-meta-action" :class="{ empty: !task.dueDate }" type="button" @click.stop="toggleDatePicker('dueDate')">
               <CalendarClock :size="14" />
               <span>{{ task.dueDate ? dateSummaryText : '设置日期' }}</span>
               <Bell v-if="task.reminderAt" :size="12" :title="`提醒 ${formatTime(task.reminderAt)}`" />
@@ -113,7 +113,7 @@
           </button>
         </div>
         <DatePicker
-          v-if="openDatePicker === 'dueDate'"
+          v-if="openDatePicker === 'dueDate' && !task.completed"
           class="detail-global-datepicker"
           :style="popoverStyles.date"
           :task="task"
@@ -246,6 +246,28 @@
         <RichTextEditor ref="richTextEditor" v-model="editorContent" placeholder="写下背景、链接、待办块或粘贴图片..." />
       </section>
 
+      <section class="detail-section detail-section--focus-link">
+        <template v-if="hasLinkedFocus">
+          <div class="section-heading">
+            <h2><Timer :size="15" />专注投入</h2>
+            <button type="button" class="focus-link__history" @click="openFocusHistory">查看全部 {{ linkedFocusRecords.length }} 段</button>
+          </div>
+          <div class="focus-link-panel">
+            <span class="focus-link-panel__icon"><Timer :size="16" /></span>
+            <strong>{{ formatFocusDuration(linkedFocusSeconds) }}</strong>
+            <small>{{ linkedFocusRecords.length }} 段已完成专注 · 最近 {{ formatFocusDate(linkedFocusRecords[0].finishedAt) }}</small>
+          </div>
+          <div class="focus-link-records">
+            <div v-for="record in linkedFocusRecords" :key="record.id"><span>{{ formatFocusDate(record.finishedAt) }}</span><strong>{{ formatFocusDuration(record.elapsedSeconds) }}</strong></div>
+          </div>
+        </template>
+        <div v-else class="focus-link-start">
+          <span><Timer :size="16" /></span>
+          <div><strong>专注这项任务</strong><small>先选择时长和专注方式，完成后会自动归档到此任务。</small></div>
+          <button type="button" @click="prepareFocusForTask"><Play :size="14" fill="currentColor" />开始专注</button>
+        </div>
+      </section>
+
       <footer class="detail-footer">
         <button class="pill-btn" type="button" @click="copyTask">
           <Copy :size="16" />
@@ -290,11 +312,13 @@ import {
   ListChecks,
   PanelRightOpen,
   Pin,
+  Play,
   Plus,
   Repeat2,
   Star,
   Sun,
   Tags,
+  Timer,
   Trash2,
   X
 } from 'lucide-vue-next'
@@ -397,6 +421,14 @@ function isSubtaskDragIgnored(target) {
 
 const task = computed(() => store.selectedTask)
 const completedSubtasks = computed(() => task.value?.subtasks.filter(item => item.completed).length || 0)
+const linkedFocusRecords = computed(() => {
+  if (!task.value?.id) return []
+  return store.focusHistory
+    .filter(item => item.taskId === task.value.id && item.phase === 'focus' && item.result === 'completed')
+    .sort((a, b) => new Date(b.finishedAt).getTime() - new Date(a.finishedAt).getTime())
+})
+const linkedFocusSeconds = computed(() => linkedFocusRecords.value.reduce((total, item) => total + Math.max(0, Number(item.elapsedSeconds) || 0), 0))
+const hasLinkedFocus = computed(() => linkedFocusSeconds.value > 0)
 const subtaskProgressPercent = computed(() => {
   const total = task.value?.subtasks.length || 0
   if (!total) return 0
@@ -458,6 +490,35 @@ function formatTime(value) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+function formatFocusDuration(seconds) {
+  const totalMinutes = Math.max(0, Math.round((Number(seconds) || 0) / 60))
+  if (totalMinutes < 60) return `${totalMinutes} 分钟`
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  return minutes ? `${hours} 小时 ${minutes} 分钟` : `${hours} 小时`
+}
+
+function formatFocusDate(value) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '时间未知'
+  const now = new Date()
+  const isToday = date.getFullYear() === now.getFullYear()
+    && date.getMonth() === now.getMonth()
+    && date.getDate() === now.getDate()
+  const prefix = isToday ? '今天' : `${date.getMonth() + 1}月${date.getDate()}日`
+  return `${prefix} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+function focusProfileName(record) { return store.focusProfiles.find(item => item.id === record.profileId)?.name || '专注' }
+
+function openFocusHistory() {
+  if (task.value?.id) store.openFocusHistoryForTask(task.value.id)
+}
+
+function prepareFocusForTask() {
+  if (task.value?.id) store.prepareFocusForTask(task.value.id)
 }
 
 function formatSubtaskTime(value) {
@@ -642,7 +703,8 @@ function autoResize(element) {
 }
 
 function handleSelectKeydown(event) {
-  if (event.key === 'Escape') closeSelect()
+  if (event.key !== 'Escape') return
+  closeSelect()
 }
 
 onMounted(() => {

@@ -18,11 +18,13 @@ import {
   scheduleFocusCompletion,
   cancelFocusCompletion,
   syncFocusController,
+  syncRhythmController,
   requestFocusNotificationPermission,
   sendFocusCompletionTestNotification,
   hasNativeFocusScheduler,
   hasNativeRhythmScheduler
 } from '@/services/platform'
+import { sortRhythmControllerItems } from '@/utils/rhythmController.mjs'
 import {
   playCompleteSound,
   playTaskUndoSound,
@@ -115,6 +117,7 @@ const DEFAULT_SETTINGS = {
   focusReminderAlwaysOnTop: true,
   focusControllerAlwaysOnTop: true,
   focusControllerStyle: 'orbit',
+  rhythmControllerAlwaysOnTop: true,
   windowCloseBehavior: 'hide',
   dailyGuidanceEnabled: true,
   dailyGuidanceStyle: 'practical',
@@ -320,6 +323,9 @@ export const useTaskStore = defineStore('task', () => {
   const helpCenterOpen = ref(false)
   const ungroupedCollapsed = ref(false)
   const calendarCursor = ref(new Date())
+  const planWeekCursor = ref(new Date())
+  const focusTaskDraftId = ref(null)
+  const focusHistoryTaskId = ref(null)
   const viewOrders = ref({})
   let pendingSavePayload = null
   let activeSavePromise = null
@@ -516,8 +522,19 @@ export const useTaskStore = defineStore('task', () => {
     return activeTasks.value
       .filter(task => !task.completed && !isInMyDay(task))
       .filter(task => task.listId === 'inbox' || task.pinned || task.important || getPlanBucket(task) === 'overdue')
+      .filter(task => getPlanBucket(task) !== 'today')
       .slice(0, 5)
   })
+
+  // “今日”把主动承诺与日期提醒分开呈现，避免任务因为设了今天日期就被误当作今日计划。
+  const todayPlanTasks = computed(() => sortTasks(activeTasks.value
+    .filter(task => !task.completed && isInMyDay(task))))
+  const todayDueTasks = computed(() => sortTasks(activeTasks.value
+    .filter(task => !task.completed && !isInMyDay(task) && getPlanBucket(task) === 'today')))
+  const inboxTriageTasks = computed(() => activeTasks.value
+    .filter(task => !task.completed && task.listId === 'inbox')
+    .filter(task => !isInMyDay(task) && !task.dueDate && !task.important && !task.pinned)
+    .slice(0, 5))
 
   const plannedSections = computed(() => {
     const buckets = [
@@ -532,6 +549,18 @@ export const useTaskStore = defineStore('task', () => {
       label,
       tasks: filteredTasks.value.filter(task => getPlanBucket(task) === id)
     })).filter(section => section.tasks.length)
+  })
+
+  const planWeekDays = computed(() => {
+    const cursor = startOfDay(planWeekCursor.value)
+    const weekday = cursor.getDay() || 7
+    cursor.setDate(cursor.getDate() - weekday + 1)
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(cursor)
+      date.setDate(cursor.getDate() + index)
+      const dayStart = startOfDay(date).getTime()
+      return { date, tasks: sortTasks(activeTasks.value.filter(task => task.dueDate && startOfDay(task.dueDate).getTime() === dayStart)) }
+    })
   })
 
   const calendarYear = computed(() => calendarCursor.value.getFullYear())
@@ -746,6 +775,7 @@ export const useTaskStore = defineStore('task', () => {
       if (updates.focusCompletionNotificationsEnabled === false) showNotice('专注完成后台提醒已关闭', 'info')
     }
     if ('focusControllerAlwaysOnTop' in updates || 'focusControllerStyle' in updates) syncNativeFocusController()
+    if ('rhythmControllerAlwaysOnTop' in updates) syncNativeRhythmController()
     if ('windowCloseBehavior' in updates) {
       setWindowCloseBehavior(settings.value.windowCloseBehavior)
         .catch(error => console.warn('[Store] 同步窗口关闭方式失败:', error))
@@ -761,6 +791,30 @@ export const useTaskStore = defineStore('task', () => {
   function setClockView(view) {
     if (!['focus', 'rhythm', 'history', 'achievement'].includes(view)) return
     updateSettings({ clockView: view, activeModule: 'clock' })
+  }
+
+  function prepareFocusForTask(taskId) {
+    if (!activeTasks.value.some(task => task.id === taskId)) return false
+    focusTaskDraftId.value = taskId
+    setClockView('focus')
+    return true
+  }
+
+  function consumeFocusTaskDraft() {
+    const taskId = focusTaskDraftId.value
+    focusTaskDraftId.value = null
+    return activeTasks.value.some(task => task.id === taskId) ? taskId : null
+  }
+
+  function openFocusHistoryForTask(taskId) {
+    if (!activeTasks.value.some(task => task.id === taskId)) return false
+    focusHistoryTaskId.value = taskId
+    setClockView('history')
+    return true
+  }
+
+  function clearFocusHistoryTaskScope() {
+    focusHistoryTaskId.value = null
   }
 
   function updateFocusGardenSettings(updates = {}) {
@@ -1571,6 +1625,14 @@ export const useTaskStore = defineStore('task', () => {
   function resetCalendarToday() {
     calendarCursor.value = new Date()
   }
+
+  function shiftPlanWeek(delta) {
+    const next = new Date(planWeekCursor.value)
+    next.setDate(next.getDate() + Number(delta || 0) * 7)
+    planWeekCursor.value = next
+  }
+
+  function resetPlanWeekToday() { planWeekCursor.value = new Date() }
 
   function setSearch(query = searchQuery.value) {
     searchQuery.value = query
@@ -2601,11 +2663,75 @@ export const useTaskStore = defineStore('task', () => {
     rhythmTimer = null
     rhythmClockNow.value = Date.now()
     syncNativeRhythmReminder()
+    syncNativeRhythmController()
     void runRhythmSync()
     rhythmTimer = window.setInterval(() => {
       rhythmClockNow.value = Date.now()
       void runRhythmSync()
     }, 30 * 1000)
+  }
+
+  function syncNativeRhythmController() {
+    const now = rhythmClockNow.value || Date.now()
+    const enabled = rhythmReminders.value.filter(reminder => reminder.enabled)
+    if (!enabled.length) {
+      void syncRhythmController(null)
+      return
+    }
+    const hasPending = enabled.some(reminder => reminder.pendingSince)
+    const items = sortRhythmControllerItems(enabled.map(reminder => {
+      const manuallyRunning = Boolean(reminder.manualCycleStartedAt) && reminder.triggerType !== 'fixed-time'
+      const inSchedule = manuallyRunning || isReminderInSchedule(reminder, new Date(now))
+      const globallyPaused = rhythmPaused.value
+      const individuallyPaused = Boolean(reminder.pausedIndividually)
+      const pendingSince = reminder.pendingSince ? new Date(reminder.pendingSince).getTime() : null
+      let dueAt = null
+      let remainingSeconds = 0
+      let state = 'running'
+
+      if (reminder.triggerType === 'active-duration') {
+        remainingSeconds = Math.max(0, rhythmRoundIntervalSeconds(reminder) - (Number(reminder.activitySeconds) || 0))
+        dueAt = now + remainingSeconds * 1000
+      } else {
+        dueAt = getNativeRhythmDueAt(reminder, now)
+        if (individuallyPaused || globallyPaused) {
+          remainingSeconds = Math.max(0, Number(reminder.pausedRemainingSeconds) || Math.ceil(((dueAt || now) - now) / 1000))
+        } else {
+          remainingSeconds = Math.max(0, Math.ceil(((dueAt || now) - now) / 1000))
+        }
+      }
+
+      if (pendingSince) state = 'due'
+      else if (globallyPaused || individuallyPaused) state = 'paused'
+      else if (hasPending && remainingSeconds === 0) state = 'waiting'
+      else if (!inSchedule && reminder.triggerType !== 'fixed-time') state = 'outside-schedule'
+
+      return {
+        id: reminder.id,
+        title: reminder.title,
+        message: reminder.message,
+        icon: reminder.icon,
+        color: reminder.color,
+        triggerType: reminder.triggerType,
+        triggerLabel: rhythmReminderTriggerLabel(reminder),
+        state,
+        remainingSeconds,
+        durationSeconds: reminder.triggerType === 'fixed-time' ? Math.max(remainingSeconds, 60) : rhythmRoundIntervalSeconds(reminder),
+        dueAt,
+        pendingSince,
+        counting: state === 'running' && !globallyPaused && !individuallyPaused && (reminder.triggerType === 'fixed-time' || inSchedule),
+        pausedIndividually: individuallyPaused
+      }
+    }))
+    void syncRhythmController({
+      revision: 0,
+      globalPaused: rhythmPaused.value,
+      runningCount: items.filter(item => item.state === 'running').length,
+      pendingCount: items.filter(item => item.state === 'due').length,
+      syncedAt: Date.now(),
+      alwaysOnTop: settings.value.rhythmControllerAlwaysOnTop !== false,
+      items
+    })
   }
 
   async function runRhythmSync() {
@@ -2638,6 +2764,7 @@ export const useTaskStore = defineStore('task', () => {
     dueReminder.pendingSince = nowIso()
     dueReminder.lastNotifiedAt = nowIso()
     showNotice(`${dueReminder.title}：${dueReminder.message || '该给自己一点时间了。'}`, 'info')
+    syncNativeRhythmController()
     return true
   }
 
@@ -3260,6 +3387,7 @@ export const useTaskStore = defineStore('task', () => {
     const focusControllerStyle = ['orbit', 'island', 'classic'].includes(rawSettings.focusControllerStyle)
       ? rawSettings.focusControllerStyle
       : DEFAULT_SETTINGS.focusControllerStyle
+    const rhythmControllerAlwaysOnTop = rawSettings.rhythmControllerAlwaysOnTop !== false
     const windowCloseBehavior = ['hide', 'quit'].includes(rawSettings.windowCloseBehavior)
       ? rawSettings.windowCloseBehavior
       : DEFAULT_SETTINGS.windowCloseBehavior
@@ -3301,6 +3429,7 @@ export const useTaskStore = defineStore('task', () => {
       focusReminderAlwaysOnTop,
       focusControllerAlwaysOnTop,
       focusControllerStyle,
+      rhythmControllerAlwaysOnTop,
       windowCloseBehavior,
       dailyGuidanceEnabled,
       dailyGuidanceStyle,
@@ -3473,6 +3602,9 @@ export const useTaskStore = defineStore('task', () => {
     isListTaskFilterActive,
     viewOrders,
     calendarCursor,
+    planWeekCursor,
+    focusTaskDraftId,
+    focusHistoryTaskId,
     searchQuery,
     saveError,
     migrationBlocked,
@@ -3501,7 +3633,11 @@ export const useTaskStore = defineStore('task', () => {
     listTaskCounts,
     groupedLists,
     suggestedTodayTasks,
+    todayPlanTasks,
+    todayDueTasks,
+    inboxTriageTasks,
     plannedSections,
+    planWeekDays,
     calendarYear,
     calendarMonth,
     calendarMonthDays,
@@ -3581,6 +3717,8 @@ export const useTaskStore = defineStore('task', () => {
     shiftCalendarMonth,
     shiftCalendarYear,
     resetCalendarToday,
+    shiftPlanWeek,
+    resetPlanWeekToday,
     setSearch,
     selectTask,
     showNotice,
@@ -3593,6 +3731,10 @@ export const useTaskStore = defineStore('task', () => {
     updateSettings,
     setActiveModule,
     setClockView,
+    prepareFocusForTask,
+    consumeFocusTaskDraft,
+    openFocusHistoryForTask,
+    clearFocusHistoryTaskScope,
     previewSound,
     updateProfile,
     startFocus,

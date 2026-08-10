@@ -81,6 +81,14 @@ struct FocusControllerState {
     pending: Mutex<Option<FocusControllerPayload>>,
 }
 
+struct RhythmControllerState {
+    revision: AtomicU64,
+    ready_revision: AtomicU64,
+    visible_requested: AtomicBool,
+    expanded: AtomicBool,
+    pending: Mutex<Option<RhythmControllerPayload>>,
+}
+
 struct ReminderWindowCoordinator {
     state: Mutex<ReminderWindowState>,
 }
@@ -145,6 +153,18 @@ impl Default for FocusControllerState {
             ready_revision: AtomicU64::new(0),
             visible_requested: AtomicBool::new(false),
             island_expanded: AtomicBool::new(false),
+            pending: Mutex::new(None),
+        }
+    }
+}
+
+impl Default for RhythmControllerState {
+    fn default() -> Self {
+        Self {
+            revision: AtomicU64::new(0),
+            ready_revision: AtomicU64::new(0),
+            visible_requested: AtomicBool::new(false),
+            expanded: AtomicBool::new(false),
             pending: Mutex::new(None),
         }
     }
@@ -244,6 +264,37 @@ struct FocusControllerPayload {
     synced_at: i64,
     always_on_top: bool,
     style: String,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RhythmControllerItem {
+    id: String,
+    title: String,
+    message: String,
+    icon: String,
+    color: String,
+    trigger_type: String,
+    trigger_label: String,
+    state: String,
+    remaining_seconds: u64,
+    duration_seconds: u64,
+    due_at: Option<i64>,
+    pending_since: Option<i64>,
+    counting: bool,
+    paused_individually: bool,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RhythmControllerPayload {
+    revision: u64,
+    global_paused: bool,
+    running_count: u64,
+    pending_count: u64,
+    synced_at: i64,
+    always_on_top: bool,
+    items: Vec<RhythmControllerItem>,
 }
 
 impl Default for WindowCloseBehavior {
@@ -648,6 +699,122 @@ fn apply_focus_controller_geometry(
     Ok(())
 }
 
+fn rhythm_controller_expanded_height(item_count: usize) -> f64 {
+    // 控制器最多展示三项；每项独占一段稳定的操作高度，避免少量节律时留下大块空白。
+    228.0 + (item_count.clamp(1, 3).saturating_sub(1) as f64 * 96.0)
+}
+
+fn rhythm_controller_size(expanded: bool, item_count: usize) -> tauri::LogicalSize<f64> {
+    let height = if expanded {
+        rhythm_controller_expanded_height(item_count)
+    } else {
+        86.0
+    };
+    tauri::LogicalSize::new(390.0, height)
+}
+
+fn apply_rhythm_controller_geometry(
+    window: &tauri::WebviewWindow,
+    expanded: bool,
+    item_count: usize,
+    preserve_top_edge: bool,
+) -> Result<(), String> {
+    let size = rhythm_controller_size(expanded, item_count);
+    let previous_position = window.outer_position().ok();
+    let previous_size = window.outer_size().ok();
+    let scale_factor = window.scale_factor().unwrap_or(1.0);
+
+    let _ = window.set_min_size(None::<tauri::Size>);
+    let _ = window.set_max_size(None::<tauri::Size>);
+    window
+        .set_size(size)
+        .map_err(|error| format!("调整节律控制器尺寸失败: {error}"))?;
+    let _ = window.set_min_size(Some(size));
+    let _ = window.set_max_size(Some(size));
+
+    if preserve_top_edge {
+        if let (Some(position), Some(previous_size)) = (previous_position, previous_size) {
+            let next_width = (size.width * scale_factor).round() as i64;
+            let next_height = (size.height * scale_factor).round() as i64;
+            let previous_right = i64::from(position.x) + i64::from(previous_size.width);
+            let mut x = previous_right - next_width;
+            let mut y = i64::from(position.y);
+            if let Some(monitor) = window.current_monitor().ok().flatten() {
+                let monitor_position = monitor.position();
+                let monitor_size = monitor.size();
+                let left = i64::from(monitor_position.x);
+                let top = i64::from(monitor_position.y);
+                let right = left + i64::from(monitor_size.width);
+                let bottom = top + i64::from(monitor_size.height);
+                x = x.clamp(left, (right - next_width).max(left));
+                y = y.clamp(top, (bottom - next_height).max(top));
+            }
+            let _ = window.set_position(tauri::PhysicalPosition::new(x as i32, y as i32));
+        }
+    }
+    Ok(())
+}
+
+fn position_rhythm_controller_initially(window: &tauri::WebviewWindow) {
+    let monitor = window
+        .current_monitor()
+        .ok()
+        .flatten()
+        .or_else(|| window.primary_monitor().ok().flatten());
+    let Some(monitor) = monitor else {
+        return;
+    };
+    let Ok(window_size) = window.outer_size() else {
+        return;
+    };
+    let monitor_position = monitor.position();
+    let monitor_size = monitor.size();
+    let margin = 24_i64;
+    let x = i64::from(monitor_position.x) + i64::from(monitor_size.width)
+        - i64::from(window_size.width)
+        - margin;
+    let y = i64::from(monitor_position.y) + margin;
+    let _ = window.set_position(tauri::PhysicalPosition::new(x as i32, y as i32));
+}
+
+fn separate_rhythm_from_focus_controller(app: &tauri::AppHandle) {
+    let (Some(rhythm), Some(focus)) = (
+        app.get_webview_window("rhythm-controller"),
+        app.get_webview_window("focus-controller"),
+    ) else {
+        return;
+    };
+    if !rhythm.is_visible().unwrap_or(false) || !focus.is_visible().unwrap_or(false) {
+        return;
+    }
+    let (Ok(rhythm_position), Ok(rhythm_size), Ok(focus_position), Ok(focus_size)) = (
+        rhythm.outer_position(),
+        rhythm.outer_size(),
+        focus.outer_position(),
+        focus.outer_size(),
+    ) else {
+        return;
+    };
+    if !windows_overlap(rhythm_position, rhythm_size, focus_position, focus_size) {
+        return;
+    }
+    let monitor = rhythm
+        .current_monitor()
+        .ok()
+        .flatten()
+        .or_else(|| rhythm.primary_monitor().ok().flatten());
+    let Some(monitor) = monitor else {
+        return;
+    };
+    let monitor_left = monitor.position().x;
+    let monitor_right = i64::from(monitor.position().x) + i64::from(monitor.size().width);
+    let preferred_left = i64::from(focus_position.x) - i64::from(rhythm_size.width) - 12;
+    let max_left = monitor_right - i64::from(rhythm_size.width) - 24;
+    let x = preferred_left
+        .clamp(i64::from(monitor_left) + 24, max_left.max(i64::from(monitor_left) + 24));
+    let _ = rhythm.set_position(tauri::PhysicalPosition::new(x as i32, rhythm_position.y));
+}
+
 fn show_coordinated_reminder(
     app: &tauri::AppHandle,
     kind: ReminderWindowKind,
@@ -910,6 +1077,7 @@ fn focus_controller_ready(app: tauri::AppHandle, revision: u64) -> Result<bool, 
     if let Some(active_reminder) = active_reminder {
         separate_reminder_from_focus_controller(&app, active_reminder.label());
     }
+    separate_rhythm_from_focus_controller(&app);
     Ok(true)
 }
 
@@ -955,6 +1123,7 @@ fn set_focus_controller_style(app: tauri::AppHandle, style: String) -> Result<bo
         .get_webview_window("focus-controller")
         .ok_or_else(|| "专注控制器窗口不存在".to_string())?;
     apply_focus_controller_geometry(&window, &style, false, true)?;
+    separate_rhythm_from_focus_controller(&app);
     let _ = app.emit_to(
         "main",
         "focus-controller:action",
@@ -984,6 +1153,7 @@ fn set_focus_controller_island_expanded(
         .ok_or_else(|| "专注控制器窗口不存在".to_string())?;
     apply_focus_controller_geometry(&window, &style, expanded, true)?;
     state.island_expanded.store(expanded, Ordering::Relaxed);
+    separate_rhythm_from_focus_controller(&app);
     Ok(true)
 }
 
@@ -1025,6 +1195,270 @@ fn handle_focus_controller_action(
         }),
     )
     .map_err(|error| format!("发送专注控制器操作失败: {error}"))?;
+    Ok(true)
+}
+
+#[tauri::command]
+fn sync_rhythm_controller(
+    app: tauri::AppHandle,
+    payload: Option<RhythmControllerPayload>,
+) -> Result<bool, String> {
+    let state = app.state::<RhythmControllerState>();
+    let Some(mut payload) = payload else {
+        state.visible_requested.store(false, Ordering::Relaxed);
+        state.ready_revision.store(0, Ordering::Relaxed);
+        state.expanded.store(false, Ordering::Relaxed);
+        state
+            .pending
+            .lock()
+            .map_err(|_| "节律控制器状态不可用".to_string())?
+            .take();
+        if let Some(window) = app.get_webview_window("rhythm-controller") {
+            let _ = window.hide();
+        }
+        return Ok(true);
+    };
+    let revision = state.revision.fetch_add(1, Ordering::Relaxed) + 1;
+    payload.revision = revision;
+    let item_count = payload.items.len();
+    let expanded = state.expanded.load(Ordering::Relaxed);
+    state
+        .pending
+        .lock()
+        .map_err(|_| "节律控制器状态不可用".to_string())?
+        .replace(payload);
+    if let Some(window) = app.get_webview_window("rhythm-controller") {
+        let _ = apply_rhythm_controller_geometry(&window, expanded, item_count, true);
+        let _ = app.emit_to(
+            "rhythm-controller",
+            "rhythm-controller:refresh",
+            serde_json::json!({ "revision": revision }),
+        );
+        separate_rhythm_from_focus_controller(&app);
+    }
+    Ok(true)
+}
+
+#[tauri::command]
+fn open_rhythm_controller(app: tauri::AppHandle) -> Result<bool, String> {
+    let state = app.state::<RhythmControllerState>();
+    let payload = state
+        .pending
+        .lock()
+        .map_err(|_| "节律控制器状态不可用".to_string())?
+        .clone()
+        .filter(|payload| !payload.items.is_empty())
+        .ok_or_else(|| "当前没有已开启的节律".to_string())?;
+    state.visible_requested.store(true, Ordering::Relaxed);
+    state.ready_revision.store(0, Ordering::Relaxed);
+    state.expanded.store(false, Ordering::Relaxed);
+
+    if let Some(window) = app.get_webview_window("rhythm-controller") {
+        window
+            .set_always_on_top(payload.always_on_top)
+            .map_err(|error| format!("设置节律控制器置顶状态失败: {error}"))?;
+        apply_rhythm_controller_geometry(&window, false, payload.items.len(), false)?;
+        position_rhythm_controller_initially(&window);
+        window
+            .show()
+            .map_err(|error| format!("显示节律控制器失败: {error}"))?;
+        let _ = window.set_focus();
+        let _ = app.emit_to(
+            "rhythm-controller",
+            "rhythm-controller:collapse",
+            serde_json::json!({}),
+        );
+        let _ = app.emit_to(
+            "rhythm-controller",
+            "rhythm-controller:refresh",
+            serde_json::json!({ "revision": payload.revision }),
+        );
+        return Ok(true);
+    }
+
+    let window = WebviewWindowBuilder::new(
+        &app,
+        "rhythm-controller",
+        WebviewUrl::App("index.html".into()),
+    )
+    .title("易简清单 · 节律控制器")
+    .inner_size(390.0, 86.0)
+    .min_inner_size(390.0, 86.0)
+    .max_inner_size(390.0, 86.0)
+    .resizable(false)
+    .maximizable(false)
+    .minimizable(false)
+    .decorations(false)
+    .transparent(true)
+    .always_on_top(payload.always_on_top)
+    .skip_taskbar(true)
+    .shadow(false)
+    .visible(false)
+    .build()
+    .map_err(|error| format!("创建节律控制器失败: {error}"))?;
+    position_rhythm_controller_initially(&window);
+    window
+        .show()
+        .map_err(|error| format!("显示节律控制器失败: {error}"))?;
+    let _ = window.set_focus();
+    Ok(true)
+}
+
+#[tauri::command]
+fn get_rhythm_controller_payload(
+    app: tauri::AppHandle,
+) -> Result<Option<RhythmControllerPayload>, String> {
+    app.state::<RhythmControllerState>()
+        .pending
+        .lock()
+        .map(|payload| payload.clone())
+        .map_err(|_| "节律控制器状态不可用".to_string())
+}
+
+#[tauri::command]
+fn rhythm_controller_ready(app: tauri::AppHandle, revision: u64) -> Result<bool, String> {
+    let state = app.state::<RhythmControllerState>();
+    if !state.visible_requested.load(Ordering::Relaxed) {
+        return Ok(false);
+    }
+    let presentation = state
+        .pending
+        .lock()
+        .map_err(|_| "节律控制器状态不可用".to_string())?
+        .as_ref()
+        .filter(|payload| payload.revision == revision)
+        .map(|payload| (payload.always_on_top, payload.items.len()));
+    let Some((always_on_top, item_count)) = presentation else {
+        return Ok(false);
+    };
+    let expanded = state.expanded.load(Ordering::Relaxed);
+    let window = app
+        .get_webview_window("rhythm-controller")
+        .ok_or_else(|| "节律控制器窗口不存在".to_string())?;
+    window
+        .set_always_on_top(always_on_top)
+        .map_err(|error| format!("设置节律控制器置顶状态失败: {error}"))?;
+    apply_rhythm_controller_geometry(&window, expanded, item_count, true)?;
+    window
+        .show()
+        .map_err(|error| format!("显示节律控制器失败: {error}"))?;
+    state.ready_revision.store(revision, Ordering::Relaxed);
+    separate_rhythm_from_focus_controller(&app);
+    Ok(true)
+}
+
+#[tauri::command]
+fn set_rhythm_controller_always_on_top(
+    app: tauri::AppHandle,
+    always_on_top: bool,
+) -> Result<bool, String> {
+    let state = app.state::<RhythmControllerState>();
+    if let Ok(mut pending) = state.pending.lock() {
+        if let Some(payload) = pending.as_mut() {
+            payload.always_on_top = always_on_top;
+        }
+    }
+    let window = app
+        .get_webview_window("rhythm-controller")
+        .ok_or_else(|| "节律控制器窗口不存在".to_string())?;
+    window
+        .set_always_on_top(always_on_top)
+        .map_err(|error| format!("切换节律控制器置顶状态失败: {error}"))?;
+    let _ = app.emit_to(
+        "main",
+        "rhythm-controller:action",
+        serde_json::json!({
+            "action": "set-always-on-top",
+            "alwaysOnTop": always_on_top
+        }),
+    );
+    Ok(true)
+}
+
+#[tauri::command]
+fn set_rhythm_controller_expanded(
+    app: tauri::AppHandle,
+    expanded: bool,
+) -> Result<bool, String> {
+    let state = app.state::<RhythmControllerState>();
+    let item_count = state
+        .pending
+        .lock()
+        .map_err(|_| "节律控制器状态不可用".to_string())?
+        .as_ref()
+        .map(|payload| payload.items.len())
+        .unwrap_or(0);
+    let window = app
+        .get_webview_window("rhythm-controller")
+        .ok_or_else(|| "节律控制器窗口不存在".to_string())?;
+    apply_rhythm_controller_geometry(&window, expanded, item_count, true)?;
+    state.expanded.store(expanded, Ordering::Relaxed);
+    separate_rhythm_from_focus_controller(&app);
+    Ok(true)
+}
+
+#[tauri::command]
+fn handle_rhythm_controller_action(
+    app: tauri::AppHandle,
+    reminder_id: Option<String>,
+    action: String,
+) -> Result<bool, String> {
+    if !matches!(
+        action.as_str(),
+        "pause-all"
+            | "resume-all"
+            | "pause"
+            | "resume"
+            | "subtract-five"
+            | "add-five"
+            | "complete"
+            | "snooze"
+            | "skip"
+            | "open-app"
+            | "close"
+    ) {
+        return Err("无效的节律控制器操作".to_string());
+    }
+    let state = app.state::<RhythmControllerState>();
+    if action == "close" {
+        state.visible_requested.store(false, Ordering::Relaxed);
+        state.expanded.store(false, Ordering::Relaxed);
+        if let Some(window) = app.get_webview_window("rhythm-controller") {
+            let _ = window.hide();
+        }
+        return Ok(true);
+    }
+    if action == "open-app" {
+        show_main_window(&app);
+    }
+    let item_action = matches!(
+        action.as_str(),
+        "pause" | "resume" | "subtract-five" | "add-five" | "complete" | "snooze" | "skip"
+    );
+    if item_action {
+        let matches_item = state
+            .pending
+            .lock()
+            .map_err(|_| "节律控制器状态不可用".to_string())?
+            .as_ref()
+            .is_some_and(|payload| {
+                reminder_id
+                    .as_ref()
+                    .is_some_and(|id| payload.items.iter().any(|item| item.id == *id))
+            });
+        if !matches_item {
+            return Ok(false);
+        }
+    }
+    app.emit_to(
+        "main",
+        "rhythm-controller:action",
+        serde_json::json!({
+            "reminderId": reminder_id,
+            "action": action
+        }),
+    )
+    .map_err(|error| format!("发送节律控制器操作失败: {error}"))?;
     Ok(true)
 }
 
@@ -4538,6 +4972,15 @@ mod tests {
         assert!(!migration_backup_name_is_safe("../simpletodo.db"));
         assert!(!migration_backup_name_is_safe("migration-backup.exe"));
     }
+
+    #[test]
+    fn rhythm_controller_expanded_height_matches_visible_item_count() {
+        assert_eq!(rhythm_controller_expanded_height(0), 228.0);
+        assert_eq!(rhythm_controller_expanded_height(1), 228.0);
+        assert_eq!(rhythm_controller_expanded_height(2), 324.0);
+        assert_eq!(rhythm_controller_expanded_height(3), 420.0);
+        assert_eq!(rhythm_controller_expanded_height(8), 420.0);
+    }
 }
 
 fn main() {
@@ -4546,6 +4989,7 @@ fn main() {
         .manage(FocusCompletionScheduler::default())
         .manage(RhythmReminderScheduler::default())
         .manage(FocusControllerState::default())
+        .manage(RhythmControllerState::default())
         .manage(ReminderWindowCoordinator::default())
         .manage(FocusReminderState::default())
         .manage(RhythmReminderState::default())
@@ -4630,6 +5074,13 @@ fn main() {
             set_focus_controller_style,
             set_focus_controller_island_expanded,
             handle_focus_controller_action,
+            sync_rhythm_controller,
+            open_rhythm_controller,
+            get_rhythm_controller_payload,
+            rhythm_controller_ready,
+            set_rhythm_controller_always_on_top,
+            set_rhythm_controller_expanded,
+            handle_rhythm_controller_action,
             schedule_rhythm_reminder,
             cancel_rhythm_reminder,
             request_focus_notification_permission,
@@ -4685,6 +5136,19 @@ fn main() {
                         .visible_requested
                         .store(false, Ordering::Relaxed);
                     if let Some(window) = _app.get_webview_window("focus-controller") {
+                        let _ = window.hide();
+                    }
+                } else if label == "rhythm-controller" {
+                    api.prevent_close();
+                    let state = _app.state::<RhythmControllerState>();
+                    state.visible_requested.store(false, Ordering::Relaxed);
+                    state.expanded.store(false, Ordering::Relaxed);
+                    let _ = _app.emit_to(
+                        "rhythm-controller",
+                        "rhythm-controller:collapse",
+                        serde_json::json!({}),
+                    );
+                    if let Some(window) = _app.get_webview_window("rhythm-controller") {
                         let _ = window.hide();
                     }
                 } else if label == "main"
