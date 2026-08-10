@@ -1552,13 +1552,13 @@ body.is-resizing {
 }
 .clock-free-time__overlay .clock-free-time__editor {
   position: absolute;
-  top: calc(50% + 48px);
-  right: 28px;
+  top: var(--free-time-editor-top);
+  left: var(--free-time-editor-left);
   width: min(280px, calc(100vw - 48px));
   max-height: calc(100vh - 48px);
   padding: 18px;
   pointer-events: auto;
-  transform: translateY(-50%);
+  transform: none;
   box-shadow: 0 24px 60px rgba(38, 63, 118, .22), 0 0 0 1px rgba(255, 255, 255, .72);
 }
 .clock-stage__dial::before {

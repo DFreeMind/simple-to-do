@@ -48,7 +48,7 @@
 
           <Teleport to=".app">
             <div v-if="freeDurationEditing" class="clock-free-time__overlay" @click.self="freeDurationEditing = false">
-              <div class="clock-free-time__editor" role="dialog" aria-label="设定本次倒计时" @click.stop>
+              <div class="clock-free-time__editor" :style="freeDurationEditorStyle" role="dialog" aria-label="设定本次倒计时" @click.stop>
                 <p>设定本次倒计时</p>
                 <div class="clock-free-time__presets"><button v-for="minutes in [15, 25, 45, 60]" :key="minutes" type="button" @click="setFreeDuration(minutes)">{{ minutes }} 分钟</button></div>
                 <label>自定义 <input v-model.number="freeDurationMinutes" type="number" min="1" max="480" /> 分钟</label>
@@ -411,6 +411,7 @@ const selectedTaskId = ref(null)
 const freeDurationMinutes = ref(15)
 const freeDurationEditing = ref(false)
 const freeDurationEditor = ref(null)
+const freeDurationEditorStyle = ref({})
 const finishNote = ref('')
 const endConfirmOpen = ref(false)
 const taskPicker = ref(null)
@@ -683,7 +684,22 @@ async function openDesktopController() {
 }
 function setFreeDuration(minutes) { freeDurationMinutes.value = minutes }
 function confirmFreeDuration() { freeDurationMinutes.value = Math.max(1, Math.min(480, Math.round(Number(freeDurationMinutes.value) || 15))); freeDurationEditing.value = false }
-function toggleFreeDurationEditor() { freeDurationEditing.value = !freeDurationEditing.value }
+function positionFreeDurationEditor() {
+  const anchor = freeDurationEditor.value
+  if (!anchor || typeof window === 'undefined') return
+  const rect = anchor.getBoundingClientRect()
+  const editorWidth = Math.min(280, window.innerWidth - 48)
+  const margin = 24
+  const left = Math.max(margin, Math.min(window.innerWidth - editorWidth - margin, rect.left + rect.width / 2 - editorWidth / 2))
+  freeDurationEditorStyle.value = {
+    '--free-time-editor-left': `${Math.round(left)}px`,
+    '--free-time-editor-top': `${Math.round(rect.bottom + 13)}px`
+  }
+}
+function toggleFreeDurationEditor() {
+  freeDurationEditing.value = !freeDurationEditing.value
+  if (freeDurationEditing.value) nextTick(positionFreeDurationEditor)
+}
 function closeFreeDurationEditor(event) {
   if (!freeDurationEditing.value) return
   if (freeDurationEditor.value?.contains(event.target)) return
@@ -763,10 +779,12 @@ watch(taskPickerOpen, (open) => {
 })
 onMounted(() => {
   window.addEventListener('pointerdown', closeFreeDurationEditor)
+  window.addEventListener('resize', positionFreeDurationEditor)
   visualClockFrame = window.requestAnimationFrame(syncVisualClock)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('pointerdown', closeFreeDurationEditor)
+  window.removeEventListener('resize', positionFreeDurationEditor)
   if (visualClockFrame) window.cancelAnimationFrame(visualClockFrame)
   if (typeof document !== 'undefined') document.body.style.overflow = ''
 })
