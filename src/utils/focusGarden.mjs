@@ -6,17 +6,17 @@ export const FOCUS_GARDEN_COLLECTIONS = [
 
 export const FOCUS_GARDEN_SPECIES = [
   { id: 'daisy', name: '小雏菊', unlockMinutes: 0, collectionId: 'morning', description: '清爽而坚定，从第一段专注开始陪伴。', accent: '#e8bb45', tone: '#fffdf2', scene: '#fff9dc', horizon: '#e4efc9', ground: '#cbdcaf', sun: '#ffe78f', motionDuration: 4.4 },
-  { id: 'tulip', name: '郁金香', unlockMinutes: 60, collectionId: 'morning', description: '叶片环抱花茎，花苞会沿着晨光舒展。', accent: '#e98882', tone: '#fff3f1', scene: '#fff0e9', horizon: '#f3d9cb', ground: '#d8dcb5', sun: '#ffd1a8', motionDuration: 4.8 },
-  { id: 'cosmos', name: '波斯菊', unlockMinutes: 180, collectionId: 'morning', description: '纤细花茎与轻盈花瓣，微风一来便点头。', accent: '#e78fac', tone: '#fff2f7', scene: '#fff1f6', horizon: '#efd7e5', ground: '#cfe0c3', sun: '#ffd8df', motionDuration: 3.8 },
-  { id: 'sunflower', name: '向日葵', unlockMinutes: 360, collectionId: 'morning', description: '追随光线抬头，用完整盛放回应投入。', accent: '#e3ad3f', tone: '#fff9e8', scene: '#fff1bd', horizon: '#ead69a', ground: '#b9cc8d', sun: '#ffd44f', motionDuration: 5.1 },
-  { id: 'poppy', name: '虞美人', unlockMinutes: 600, collectionId: 'breeze', description: '薄软花瓣像纸一样舒展，动作轻而有弹性。', accent: '#e36f62', tone: '#fff0ec', scene: '#fff0e6', horizon: '#efd0bf', ground: '#bcd7b6', sun: '#ffc8a6', motionDuration: 3.6 },
-  { id: 'lavender', name: '薰衣草', unlockMinutes: 900, collectionId: 'breeze', description: '细密花穗沿着茎干逐段点亮。', accent: '#8d83bd', tone: '#f6f3ff', scene: '#eeeaff', horizon: '#d7d0ee', ground: '#b8cdb4', sun: '#d8ccff', motionDuration: 4.2 },
-  { id: 'iris', name: '鸢尾花', unlockMinutes: 1200, collectionId: 'breeze', description: '剑形叶托起层叠花瓣，线条挺拔而舒展。', accent: '#7c79be', tone: '#f2f1ff', scene: '#e8f1ff', horizon: '#cbdceb', ground: '#accabf', sun: '#d4ddff', motionDuration: 4.7 },
-  { id: 'hydrangea', name: '绣球花', unlockMinutes: 1800, collectionId: 'twilight', description: '许多小花共同聚成一团温柔的云。', accent: '#759dc9', tone: '#f0f7ff', scene: '#e7f1f7', horizon: '#c8dce7', ground: '#adc9bd', sun: '#d8e8f1', motionDuration: 5.2 },
-  { id: 'lily', name: '百合', unlockMinutes: 2700, collectionId: 'breeze', description: '修长花瓣向外展开，盛放时舒展而从容。', accent: '#e8a990', tone: '#fff5ef', scene: '#fff4e9', horizon: '#eadfd2', ground: '#c8d7b8', sun: '#ffe2c3', motionDuration: 5 },
-  { id: 'camellia', name: '山茶花', unlockMinutes: 3900, collectionId: 'twilight', description: '厚实叶片围住层层花瓣，安静而饱满。', accent: '#cf7181', tone: '#fff1f4', scene: '#f6e8ea', horizon: '#ddcdd1', ground: '#aebfa9', sun: '#f2c7cd', motionDuration: 5.4 },
-  { id: 'peony', name: '牡丹', unlockMinutes: 5400, collectionId: 'twilight', description: '花瓣逐层打开，积累越久越显丰盛。', accent: '#d77a9c', tone: '#fff0f6', scene: '#fae6ef', horizon: '#e5c8d6', ground: '#b8c6aa', sun: '#f4bfd3', motionDuration: 5.6 },
-  { id: 'moonflower', name: '月光花', unlockMinutes: 7200, collectionId: 'twilight', description: '在暮色中发出柔和微光，记录长久投入。', accent: '#8e91d2', tone: '#f1f2ff', scene: '#252b52', horizon: '#3f4875', ground: '#5b6b72', sun: '#e7e9ff', night: true, motionDuration: 6 }
+  { id: 'tulip', name: '郁金香', unlockMinutes: 150, collectionId: 'morning', description: '叶片环抱花茎，花苞会沿着晨光舒展。', accent: '#e98882', tone: '#fff3f1', scene: '#fff0e9', horizon: '#f3d9cb', ground: '#d8dcb5', sun: '#ffd1a8', motionDuration: 4.8 },
+  { id: 'cosmos', name: '波斯菊', unlockMinutes: 450, collectionId: 'morning', description: '纤细花茎与轻盈花瓣，微风一来便点头。', accent: '#e78fac', tone: '#fff2f7', scene: '#fff1f6', horizon: '#efd7e5', ground: '#cfe0c3', sun: '#ffd8df', motionDuration: 3.8 },
+  { id: 'sunflower', name: '向日葵', unlockMinutes: 900, collectionId: 'morning', description: '追随光线抬头，用完整盛放回应投入。', accent: '#e3ad3f', tone: '#fff9e8', scene: '#fff1bd', horizon: '#ead69a', ground: '#b9cc8d', sun: '#ffd44f', motionDuration: 5.1 },
+  { id: 'poppy', name: '虞美人', unlockMinutes: 1500, collectionId: 'breeze', description: '薄软花瓣像纸一样舒展，动作轻而有弹性。', accent: '#e36f62', tone: '#fff0ec', scene: '#fff0e6', horizon: '#efd0bf', ground: '#bcd7b6', sun: '#ffc8a6', motionDuration: 3.6 },
+  { id: 'lavender', name: '薰衣草', unlockMinutes: 2250, collectionId: 'breeze', description: '细密花穗沿着茎干逐段点亮。', accent: '#8d83bd', tone: '#f6f3ff', scene: '#eeeaff', horizon: '#d7d0ee', ground: '#b8cdb4', sun: '#d8ccff', motionDuration: 4.2 },
+  { id: 'iris', name: '鸢尾花', unlockMinutes: 3300, collectionId: 'breeze', description: '剑形叶托起层叠花瓣，线条挺拔而舒展。', accent: '#7c79be', tone: '#f2f1ff', scene: '#e8f1ff', horizon: '#cbdceb', ground: '#accabf', sun: '#d4ddff', motionDuration: 4.7 },
+  { id: 'hydrangea', name: '绣球花', unlockMinutes: 4800, collectionId: 'twilight', description: '许多小花共同聚成一团温柔的云。', accent: '#759dc9', tone: '#f0f7ff', scene: '#e7f1f7', horizon: '#c8dce7', ground: '#adc9bd', sun: '#d8e8f1', motionDuration: 5.2 },
+  { id: 'lily', name: '百合', unlockMinutes: 6600, collectionId: 'breeze', description: '修长花瓣向外展开，盛放时舒展而从容。', accent: '#e8a990', tone: '#fff5ef', scene: '#fff4e9', horizon: '#eadfd2', ground: '#c8d7b8', sun: '#ffe2c3', motionDuration: 5 },
+  { id: 'camellia', name: '山茶花', unlockMinutes: 8700, collectionId: 'twilight', description: '厚实叶片围住层层花瓣，安静而饱满。', accent: '#cf7181', tone: '#fff1f4', scene: '#f6e8ea', horizon: '#ddcdd1', ground: '#aebfa9', sun: '#f2c7cd', motionDuration: 5.4 },
+  { id: 'peony', name: '牡丹', unlockMinutes: 11400, collectionId: 'twilight', description: '花瓣逐层打开，积累越久越显丰盛。', accent: '#d77a9c', tone: '#fff0f6', scene: '#fae6ef', horizon: '#e5c8d6', ground: '#b8c6aa', sun: '#f4bfd3', motionDuration: 5.6 },
+  { id: 'moonflower', name: '月光花', unlockMinutes: 15000, collectionId: 'twilight', description: '在暮色中发出柔和微光，记录长久投入。', accent: '#8e91d2', tone: '#f1f2ff', scene: '#252b52', horizon: '#3f4875', ground: '#5b6b72', sun: '#e7e9ff', night: true, motionDuration: 6 }
 ]
 
 const LEGACY_FOCUS_GARDEN_UNLOCK_MINUTES = {

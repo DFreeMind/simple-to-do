@@ -28,11 +28,11 @@ test('花种目录包含 12 种且解锁门槛形成递增阶梯', () => {
   assert.ok(FOCUS_GARDEN_SPECIES.every(item => collectionIds.has(item.collectionId)))
   assert.deepEqual(
     Object.fromEntries(FOCUS_GARDEN_SPECIES.filter(item => ['daisy', 'tulip', 'sunflower', 'lavender', 'hydrangea'].includes(item.id)).map(item => [item.id, item.unlockMinutes])),
-    { daisy: 0, tulip: 60, sunflower: 360, lavender: 900, hydrangea: 1800 }
+    { daisy: 0, tulip: 150, sunflower: 900, lavender: 2250, hydrangea: 4800 }
   )
   const thresholds = FOCUS_GARDEN_SPECIES.map(item => item.unlockMinutes)
   assert.deepEqual(thresholds, [...thresholds].sort((a, b) => a - b))
-  assert.deepEqual(thresholds, [0, 60, 180, 360, 600, 900, 1200, 1800, 2700, 3900, 5400, 7200])
+  assert.deepEqual(thresholds, [0, 150, 450, 900, 1500, 2250, 3300, 4800, 6600, 8700, 11400, 15000])
   assert.ok(thresholds.slice(1).every((value, index, values) => index === 0 || value > values[index - 1]))
   assert.equal(FOCUS_GARDEN_SPECIES[1].unlockMinutes > FOCUS_GARDEN_SPECIES[0].unlockMinutes, true)
 })
@@ -75,7 +75,7 @@ test('跨过累计门槛时只报告本轮新解锁花种', () => {
       date: '2026-07-28',
       speciesId: 'daisy',
       goalMinutes: 50,
-      growthMinutes: 175,
+      growthMinutes: 445,
       stage: 'bloom',
       finalizedAt: null
     }]
@@ -110,7 +110,7 @@ test('培养 6 种与 12 种花会解锁收藏徽章', () => {
 
 test('已有成长后切换花种只影响明日', () => {
   const now = new Date('2026-07-28T10:00:00+08:00')
-  const grown = recordFocusGardenGrowth(createDefaultFocusGarden(now), { elapsedSeconds: 60 * 60, finishedAt: now.toISOString() }, now).garden
+  const grown = recordFocusGardenGrowth(createDefaultFocusGarden(now), { elapsedSeconds: 150 * 60, finishedAt: now.toISOString() }, now).garden
   const updated = updateFocusGardenPreference(grown, { speciesId: 'tulip' }, now)
   assert.equal(updated.selectedSpeciesId, 'daisy')
   assert.equal(updated.nextSpeciesId, 'tulip')

@@ -59,8 +59,8 @@ const hasPlant = computed(() => Boolean(props.speciesId) && props.stage && props
   height: var(--terrarium-total-height, 73px);
   isolation: isolate;
   color: #8a7e5e;
-  /* 关键：裁掉超出罩子的植物 SVG 内容 */
-  overflow: hidden;
+  /* 仅植物层自行裁切；外层需保留底座两侧伸出的装饰叶。 */
+  overflow: visible;
   border-radius: 8px;
   /* 抑制 SVG 自身的焦点黑框 */
   outline: none;
