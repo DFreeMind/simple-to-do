@@ -1,6 +1,7 @@
 import { reactive } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import { updateNotesFallback } from '@/utils/updateNotes'
 
 function isTauri() {
   return typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__)
@@ -11,7 +12,7 @@ function isTauri() {
  * 避免两处各自维护检查/下载逻辑导致状态不一致。
  */
 export const updaterState = reactive({
-  // idle | checking | upToDate | available | skipped | downloading | installing | error | unsupported
+  // idle | checking | upToDate | available | skipped | downloading | verifying | installing | error | unsupported
   status: 'idle',
   update: null,
   error: '',
@@ -32,8 +33,8 @@ function classifyError(error) {
 /** 更新说明：latest.json 的 notes 可能被发布流程写坏（mojibake），此时降级为通用文案。 */
 export function updateNotes() {
   const notes = updaterState.update?.notes?.trim()
-  if (!notes) return '本次更新已准备就绪。'
-  if (/\uFFFD/.test(notes) || /[\u0080-\u00FF]{4,}/.test(notes)) return '本次更新已准备就绪。'
+  if (!notes) return updateNotesFallback()
+  if (/\uFFFD/.test(notes) || /[\u0080-\u00FF]{4,}/.test(notes)) return updateNotesFallback()
   return notes
 }
 
@@ -93,12 +94,13 @@ export async function installUpdate() {
           downloaded: updaterState.progress.downloaded + (payload.chunkLength || 0),
           total: payload.contentLength ?? updaterState.progress.total
         }
-      } else if (payload.event === 'Finished') {
+      } else if (payload.event === 'Verifying') {
+        updaterState.status = 'verifying'
+      } else if (payload.event === 'Installing') {
         updaterState.status = 'installing'
       }
     })
     await invoke('install_pending_update')
-    updaterState.status = 'installing'
     return true
   } catch (error) {
     updaterState.status = 'error'

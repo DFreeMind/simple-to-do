@@ -1,19 +1,23 @@
 <template>
-  <div v-if="store.settingsOpen" class="settings-layer" role="dialog" aria-modal="true" aria-label="设置" @keydown.esc.stop="store.closeSettings">
+  <div v-if="store.settingsOpen" class="settings-layer" @keydown.esc.stop="store.closeSettings" @keydown.tab="trapSettingsFocus">
     <button class="settings-scrim" type="button" aria-label="关闭设置" @click="store.closeSettings"></button>
-    <aside class="settings-panel">
+    <aside ref="settingsPanel" class="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title" tabindex="-1">
       <header class="settings-panel__header">
         <div>
           <p class="eyebrow">偏好设置</p>
-          <h2>设置</h2>
+          <h2 id="settings-title">设置</h2>
         </div>
+        <span class="settings-save-status" :class="{ error: store.saveError }" aria-live="polite">
+          <Check v-if="!store.isSaving && !store.saveError" :size="14" />
+          {{ store.saveError ? '保存失败' : store.isSaving ? '正在保存…' : '已自动保存' }}
+        </span>
         <button class="icon-btn" type="button" aria-label="关闭设置" @click="store.closeSettings">
           <X :size="18" />
         </button>
       </header>
 
       <div class="settings-layout">
-        <nav class="settings-nav" aria-label="设置分类">
+        <nav class="settings-nav" aria-label="设置分类" @keydown="handleSectionKeydown">
           <button
             v-for="section in sections"
             :key="section.id"
@@ -21,6 +25,7 @@
             :class="{ active: activeSection === section.id }"
             :aria-current="activeSection === section.id ? 'page' : undefined"
             :title="section.summary"
+            :data-settings-section="section.id"
             type="button"
             @click="activeSection = section.id"
           >
@@ -45,8 +50,8 @@
             <div class="settings-section__head settings-section__head--accent">
               <span class="settings-section__icon"><Palette :size="20" /></span>
               <div>
-                <h3>外观与布局</h3>
-                <p>调整配色、信息密度和界面显示方式。</p>
+                <h3>外观与显示</h3>
+                <p>调整配色、信息密度、面板和任务展示方式。</p>
               </div>
             </div>
 
@@ -55,13 +60,17 @@
                 <h4>配色</h4>
                 <span>{{ currentThemeLabel }}</span>
               </div>
-              <div class="theme-grid">
+              <div class="theme-grid" role="radiogroup" aria-label="应用配色" @keydown="handleThemeKeydown">
                 <button
                   v-for="theme in themes"
                   :key="theme.id"
                   class="theme-card"
                   :class="{ active: store.settings.theme === theme.id }"
                   type="button"
+                  role="radio"
+                  :aria-checked="store.settings.theme === theme.id"
+                  :tabindex="store.settings.theme === theme.id ? 0 : -1"
+                  :data-theme-id="theme.id"
                   @click="store.updateSettings({ theme: theme.id })"
                 >
                   <span class="theme-swatch" :style="{ background: theme.swatch }"></span>
@@ -118,8 +127,8 @@
               </div>
               <label class="switch-row">
                 <span>
-                  <strong>侧栏显示导航栏</strong>
-                  <small>折叠后只显示图标，任务列表获得更多空间</small>
+                  <strong>默认展开任务侧栏</strong>
+                  <small>关闭后只显示图标，为任务列表留出更多空间</small>
                 </span>
                 <input
                   type="checkbox"
@@ -141,17 +150,10 @@
                 <span class="switch-control" aria-hidden="true"></span>
               </label>
             </div>
-          </section>
-
-          <section v-else-if="activeSection === 'task-display'" class="settings-section">
-            <div class="settings-section__head settings-section__head--accent">
-              <span class="settings-section__icon"><CheckSquare :size="20" /></span>
-              <div>
-                <h3>任务与清单</h3>
-                <p>统一设置任务、分组和已完成项的展示方式。</p>
-              </div>
+            <div class="settings-subsection-heading">
+              <span><CheckSquare :size="16" /></span>
+              <div><h4>任务与清单</h4><p>控制已完成任务在列表和分组中的呈现方式。</p></div>
             </div>
-
             <div class="settings-block completed-display-settings">
               <div class="settings-block__title">
                 <h4>已完成任务</h4>
@@ -213,11 +215,11 @@
           <section v-else-if="activeSection === 'focus'" class="settings-section">
             <div class="settings-section__head settings-section__head--accent">
               <span class="settings-section__icon"><Timer :size="20" /></span>
-              <div><h3>专注与休息</h3><p>设置番茄节奏，以及每轮完成后的休息安排。</p></div>
+              <div><h3>专注与节律</h3><p>设置桌面控制器、番茄节奏和每轮休息安排。</p></div>
             </div>
             <div class="settings-block">
               <div class="settings-block__title"><h4>桌面专注控制器</h4><span>{{ focusControllerStyleLabel }}</span></div>
-              <div class="focus-controller-style-grid" role="radiogroup" aria-label="桌面专注控制器形态">
+              <div class="focus-controller-style-grid" role="radiogroup" aria-label="桌面专注控制器形态" @keydown="handleFocusStyleKeydown">
                 <button
                   v-for="style in focusControllerStyles"
                   :key="style.id"
@@ -226,6 +228,8 @@
                   type="button"
                   role="radio"
                   :aria-checked="store.settings.focusControllerStyle === style.id"
+                  :tabindex="store.settings.focusControllerStyle === style.id ? 0 : -1"
+                  :data-focus-style="style.id"
                   @click="store.updateSettings({ focusControllerStyle: style.id })"
                 >
                   <span class="focus-controller-style-card__preview" aria-hidden="true"><i></i><b></b><em></em></span>
@@ -259,7 +263,7 @@
             <div class="settings-section__head settings-section__head--accent">
               <span class="settings-section__icon"><SlidersHorizontal :size="20" /></span>
               <div>
-                <h3>应用行为</h3>
+                <h3>通用</h3>
                 <p>设置启动方式、日常引导和关闭窗口后的行为。</p>
               </div>
             </div>
@@ -269,7 +273,6 @@
                 <header class="preference-category__head">
                   <span class="preference-category__icon"><PanelTop :size="18" /></span>
                   <span>
-                    <small>应用行为 · 01</small>
                     <h4 id="preference-startup-title">启动、提示与窗口</h4>
                     <p>决定打开应用后的落点、日常提示和关闭窗口后的去向。</p>
                   </span>
@@ -358,7 +361,7 @@
             <div class="settings-section__head settings-section__head--accent">
               <span class="settings-section__icon"><Bell :size="20" /></span>
               <div>
-                <h3>通知与反馈</h3>
+                <h3>通知与声音</h3>
                 <p>设置到期提醒、系统权限和操作声音。</p>
               </div>
             </div>
@@ -368,17 +371,12 @@
                 <header class="preference-category__head">
                   <span class="preference-category__icon"><Bell :size="18" /></span>
                   <span>
-                    <small>到期提醒 · 01</small>
                     <h4 id="preference-reminder-title">系统提醒</h4>
                     <p>管理到期通知、提醒声音和系统权限测试。</p>
                   </span>
                   <strong>{{ reminderSummary }}</strong>
                 </header>
             <div class="settings-block">
-              <div class="settings-block__title">
-                <h4>提醒</h4>
-                <span>{{ reminderSummary }}</span>
-              </div>
               <div class="sound-settings">
                 <label class="switch-row sound-master">
                   <span class="sound-label">
@@ -414,7 +412,7 @@
                     <span class="switch-control" aria-hidden="true"></span>
                   </label>
 
-                  <label class="sound-item">
+                  <label class="sound-item" :class="{ disabled: !store.settings.reminderNotificationsEnabled }">
                     <span class="sound-item-icon">
                       <Volume2 :size="16" />
                     </span>
@@ -439,7 +437,7 @@
                     </span>
                   </button>
 
-                  <label class="sound-item">
+                  <label class="sound-item" :class="{ disabled: !store.settings.focusCompletionNotificationsEnabled }">
                     <span class="sound-item-icon">
                       <Volume2 :size="16" />
                     </span>
@@ -456,7 +454,7 @@
                     <span class="switch-control" aria-hidden="true"></span>
                   </label>
 
-                  <label class="sound-item">
+                  <label class="sound-item" :class="{ disabled: !store.settings.focusCompletionNotificationsEnabled }">
                     <span class="sound-item-icon">
                       <Pin :size="16" />
                     </span>
@@ -502,17 +500,12 @@
                 <header class="preference-category__head">
                   <span class="preference-category__icon"><Volume2 :size="18" /></span>
                   <span>
-                    <small>操作反馈 · 02</small>
                     <h4 id="preference-sound-title">操作音效</h4>
                     <p>配置操作反馈，并试听每一种提示声音。</p>
                   </span>
                   <strong>{{ soundSummary }}</strong>
                 </header>
             <div class="settings-block">
-              <div class="settings-block__title">
-                <h4>音效</h4>
-                <span>{{ soundSummary }}</span>
-              </div>
               <div class="sound-settings">
                 <label class="switch-row sound-master">
                   <span class="sound-label">
@@ -530,7 +523,7 @@
                   <span class="switch-control" aria-hidden="true"></span>
                 </label>
 
-                <div class="sound-preview-row">
+                <div v-if="store.settings.soundEnabled" class="sound-preview-row">
                   <span><strong>试听与语义</strong><small>只为有结果的操作发声；删除使用低调的短提示</small></span>
                   <div class="sound-preview-grid">
                     <button class="small-btn" type="button" :disabled="!store.settings.soundEnabled || !store.settings.soundTaskEnabled" @click="store.previewSound('complete')"><Check :size="14" />完成铃音</button>
@@ -617,132 +610,6 @@
             </div>
           </section>
 
-          <section v-else-if="activeSection === 'data'" class="settings-section">
-            <div class="settings-section__head settings-section__head--accent">
-              <span class="settings-section__icon"><Database :size="20" /></span>
-              <div>
-                <h3>数据与维护</h3>
-                <p>管理本机保存、垃圾桶保留期和附件维护操作。</p>
-              </div>
-            </div>
-
-            <div class="data-feature-strip">
-              <div class="data-feature">
-                <Database :size="18" />
-                <span>
-                  <strong>{{ store.isSaving ? '正在保存' : '本地自动保存' }}</strong>
-                  <small>{{ store.saveError || '数据保存在本机，无需手动保存。' }}</small>
-                </span>
-              </div>
-              <div class="data-feature">
-                <ShieldCheck :size="18" />
-                <span>
-                  <strong>本地优先</strong>
-                  <small>数据仅保存在当前设备。</small>
-                </span>
-              </div>
-            </div>
-
-            <div class="settings-block">
-              <div class="settings-block__title">
-                <h4>垃圾桶</h4>
-                <span>{{ store.settings.trashRetentionDays }} 天</span>
-              </div>
-              <label class="setting-select-card">
-                <span class="setting-select-card__icon"><Trash2 :size="17" /></span>
-                <span class="setting-select-card__copy">
-                  <strong>保留时间</strong>
-                  <small>到期的删除项会在本机自动清理</small>
-                </span>
-                <select :value="store.settings.trashRetentionDays" @change="store.updateSettings({ trashRetentionDays: Number($event.target.value) })">
-                  <option :value="7">7 天</option>
-                  <option :value="30">30 天</option>
-                  <option :value="60">60 天</option>
-                  <option :value="90">90 天</option>
-                  <option :value="180">180 天</option>
-                  <option :value="365">365 天</option>
-                </select>
-              </label>
-            </div>
-
-            <div class="settings-block settings-block--maintenance storage-manager">
-              <div class="settings-block__title">
-                <h4>空间管理</h4>
-                <span>{{ storageSummary }}</span>
-              </div>
-              <p class="storage-manager__hint">扫描只读取本机数据，不会自动删除。任务、备注图片及回收站中的有效引用都会保留。</p>
-              <div class="storage-manager__toolbar">
-                <span><strong>查看本机空间</strong><small>统计数据、附件、头像、恢复点与可释放空间</small></span>
-                <button class="small-btn" type="button" :disabled="storageLoading" @click="scanStorage">{{ storageLoading ? '正在扫描…' : storageReport ? '重新扫描' : '开始扫描' }}</button>
-              </div>
-
-              <template v-if="storageReport">
-                <div class="storage-overview" aria-live="polite">
-                  <div class="storage-overview__total">
-                    <span class="storage-overview__icon"><Database :size="20" /></span>
-                    <span><small>应用已占用</small><strong>{{ formatBytes(storageReport.totalBytes) }}</strong><em>本机数据总计</em></span>
-                  </div>
-                  <div class="storage-overview__reclaim">
-                    <span><strong>可释放 {{ formatBytes(reclaimableBytes) }}</strong><small>{{ storageReport.orphanAttachments.length }} 项未引用附件 · 先移入清理站再决定是否删除</small></span>
-                    <button v-if="storageReport.orphanAttachments.length" class="text-btn" type="button" :disabled="storageAction" @click="quarantineAll">整理附件</button>
-                  </div>
-                </div>
-
-                <div class="storage-breakdown" aria-label="本机空间分类">
-                  <div v-for="category in storageCategories" :key="category.id" class="storage-breakdown__item" :class="{ 'is-reclaimable': category.reclaimable }">
-                    <span class="storage-breakdown__icon"><component :is="category.icon" :size="16" /></span>
-                    <span><strong>{{ category.label }}</strong><small>{{ category.description }}</small></span>
-                    <b>{{ formatBytes(category.bytes) }}</b>
-                  </div>
-                </div>
-
-                <div v-if="storageReport.orphanAttachments.length" class="storage-result">
-                  <div class="storage-result__head">
-                    <span><strong>待处理附件</strong><small>{{ storageReport.orphanAttachments.length }} 项 · {{ formatBytes(storageReport.orphanBytes) }} · {{ orphanTypeSummary }}</small></span>
-                    <span class="storage-result__actions"><button v-if="storageReport.orphanAttachments.length > inlineLimit" class="text-btn" type="button" @click="openStorageBrowser('orphan')">查看全部</button><button class="small-btn" type="button" :disabled="storageAction" @click="quarantineAll">移入清理站</button></span>
-                  </div>
-                  <p class="storage-manager__hint storage-result__note">这些文件没有被当前任务、备注或回收站引用。移入清理站后仍可恢复，不会直接删除。</p>
-                  <section v-for="group in inlineOrphanGroups" :key="group.id" class="storage-type-group">
-                    <p v-if="orphanGroups.length > 1" class="storage-type-group__title">{{ group.label }} · {{ group.items.length }} 项</p>
-                    <div class="storage-item-list">
-                      <article v-for="item in group.items" :key="item.id" class="storage-item">
-                        <button v-if="item.isImage && previews[item.relativePath]" class="storage-item__preview" type="button" title="查看大图" @click="openPreview(item)"><img :src="previews[item.relativePath]" alt="" /></button>
-                        <span v-else class="storage-item__file"><Database :size="16" /></span>
-                        <span><strong :title="item.relativePath">{{ item.name }}</strong><small :title="item.relativePath">{{ formatBytes(item.sizeBytes) }} · {{ item.relativePath }}</small></span>
-                        <button class="text-btn" type="button" :disabled="storageAction" @click="quarantineItem(item)">清理</button>
-                      </article>
-                    </div>
-                  </section>
-                </div>
-                <p v-else class="storage-manager__empty">附件引用状态正常，暂时没有可整理的附件。</p>
-
-                <div v-if="storageReport.missingReferences.length" class="storage-warning">
-                  发现 {{ storageReport.missingReferences.length }} 个失效引用：相关文件可能已被手动移走。原任务数据会保留，扫描不会自动修改它。
-                </div>
-
-                <div v-if="storageReport.quarantinedAttachments.length" class="storage-result storage-result--quarantine">
-                  <div class="storage-result__head">
-                    <span><strong>清理站</strong><small>{{ storageReport.quarantinedAttachments.length }} 项 · {{ formatBytes(storageReport.quarantinedBytes) }} · 可恢复</small></span>
-                    <span class="storage-result__actions"><button v-if="storageReport.quarantinedAttachments.length > inlineLimit" class="text-btn" type="button" @click="openStorageBrowser('quarantine')">查看全部</button><button class="text-btn" type="button" :disabled="storageAction" @click="restoreAll">全部恢复</button><button class="text-btn danger" type="button" :disabled="storageAction" @click="requestPurge(storageReport.quarantinedAttachments)">永久删除</button></span>
-                  </div>
-                  <p class="storage-manager__hint storage-result__note">这是一个可恢复的暂存区。恢复后文件回到附件目录；若仍无引用，下次扫描仍会显示为可清理项。</p>
-                  <section v-for="group in inlineQuarantinedGroups" :key="group.id" class="storage-type-group">
-                    <p v-if="quarantinedGroups.length > 1" class="storage-type-group__title">{{ group.label }} · {{ group.items.length }} 项</p>
-                    <div class="storage-item-list">
-                      <article v-for="item in group.items" :key="item.id" class="storage-item">
-                        <button v-if="item.isImage && quarantinedPreviews[item.id]" class="storage-item__preview" type="button" title="查看大图" @click="openQuarantinedPreview(item)"><img :src="quarantinedPreviews[item.id]" alt="" /></button>
-                        <span v-else class="storage-item__file"><Database :size="16" /></span>
-                        <span><strong :title="item.relativePath">{{ item.name }}</strong><small :title="item.relativePath">{{ formatBytes(item.sizeBytes) }} · {{ item.relativePath }}</small></span>
-                        <span class="storage-item__actions"><button class="text-btn" type="button" :disabled="storageAction" @click="restoreItem(item)">恢复</button><button class="text-btn danger" type="button" :disabled="storageAction" @click="requestPurge([item])">删除</button></span>
-                      </article>
-                    </div>
-                  </section>
-                </div>
-              </template>
-            </div>
-            <ImageLightbox :visible="previewOpen" :images="previewImages" :start-index="previewIndex" @close="previewOpen = false" />
-          </section>
-
           <section v-else class="settings-section about-section">
             <header class="about-hero">
               <img :src="appIcon" alt="" />
@@ -791,7 +658,7 @@
               <article class="update-card" :class="`update-card--${updateState}`">
                 <div class="update-card__head">
                   <span class="update-card__icon">
-                    <Download v-if="['available', 'downloading', 'installing'].includes(updateState)" :size="18" />
+                    <Download v-if="['available', 'downloading', 'verifying', 'installing'].includes(updateState)" :size="18" />
                     <Check v-else-if="updateState === 'upToDate'" :size="18" />
                     <Info v-else :size="18" />
                   </span>
@@ -801,8 +668,19 @@
                   </span>
                 </div>
                 <div v-if="updateState === 'available'" class="update-card__release">
-                  <strong>v{{ updaterState.update?.version }}</strong>
-                  <p>{{ updateNotes }}</p>
+                  <div class="update-card__release-head">
+                    <span>更新说明</span>
+                    <strong>v{{ updaterState.update?.version }}</strong>
+                  </div>
+                  <div class="update-card__notes" aria-label="更新内容">
+                    <template v-for="(block, index) in updateNoteBlocks" :key="`${block.type}-${index}`">
+                      <h5 v-if="block.type === 'heading'">{{ block.text }}</h5>
+                      <ul v-else-if="block.type === 'list'">
+                        <li v-for="(item, itemIndex) in block.items" :key="`${index}-${itemIndex}`">{{ item }}</li>
+                      </ul>
+                      <p v-else>{{ block.text }}</p>
+                    </template>
+                  </div>
                 </div>
                 <div v-if="updateState === 'downloading'" class="update-card__progress" aria-label="更新下载进度">
                   <span :style="{ width: `${updateProgressPercent}%` }"></span>
@@ -826,8 +704,13 @@
                       跳过此版本
                     </button>
                   </template>
+                  <template v-else-if="updateState === 'installing'">
+                    <button class="text-btn" type="button" @click="openManualInstall">
+                      改用手动安装
+                    </button>
+                  </template>
                   <button
-                    v-else
+                    v-else-if="updateState !== 'installing'"
                     class="small-btn update-card__action"
                     type="button"
                     :disabled="updateActionDisabled"
@@ -855,68 +738,24 @@
       </div>
     </aside>
   </div>
-  <Teleport to="body">
-    <div v-if="storageBrowserOpen" class="storage-browser-layer" role="dialog" aria-modal="true" aria-label="清理附件" @keydown.esc.stop="closeStorageBrowser">
-      <button class="storage-browser-layer__scrim" type="button" aria-label="关闭" @click="closeStorageBrowser"></button>
-      <section class="storage-browser">
-        <header><div><h2>清理附件</h2><small>检查未引用附件，恢复或清理暂存文件。</small></div><button class="icon-btn" type="button" aria-label="关闭" @click="closeStorageBrowser"><X :size="18" /></button></header>
-        <div class="storage-browser__toolbar"><div class="storage-browser__tabs"><button :class="{ active: storageBrowserTab === 'orphan' }" type="button" @click="setStorageBrowserTab('orphan')">未引用 {{ storageReport?.orphanAttachments.length || 0 }}</button><button :class="{ active: storageBrowserTab === 'quarantine' }" type="button" @click="setStorageBrowserTab('quarantine')">清理站 {{ storageReport?.quarantinedAttachments.length || 0 }}</button></div><div class="segmented storage-browser__filter"><button type="button" :class="{ active: storageFilter === 'all' }" @click="setStorageFilter('all')">全部</button><button type="button" :class="{ active: storageFilter === 'image' }" @click="setStorageFilter('image')">图片</button><button type="button" :class="{ active: storageFilter === 'file' }" @click="setStorageFilter('file')">文件</button></div><span class="storage-browser__count">{{ browserItems.length }} 项</span><span class="storage-browser__actions"><button v-if="storageBrowserTab === 'orphan'" class="small-btn" type="button" :disabled="storageAction || !browserItems.length" @click="quarantineAll">全部移入</button><template v-else><button class="text-btn" type="button" :disabled="storageAction || !browserItems.length" @click="restoreAll">全部恢复</button><button class="text-btn danger storage-browser__purge" type="button" :disabled="storageAction || !browserItems.length" @click="requestPurge(storageReport?.quarantinedAttachments || [])">清空清理站</button></template></span></div>
-        <div class="storage-browser__list">
-          <article v-for="item in browserPageItems" :key="item.id" class="storage-item">
-            <button v-if="item.isImage && browserPreview(item)" class="storage-item__preview" type="button" @click="openBrowserPreview(item)"><img :src="browserPreview(item)" alt="" /></button><span v-else class="storage-item__file"><Database :size="16" /></span>
-            <span><strong :title="item.relativePath">{{ item.name }}</strong><small :title="item.relativePath">{{ formatBytes(item.sizeBytes) }} · {{ item.relativePath }}</small></span>
-            <span class="storage-item__actions"><button v-if="storageBrowserTab === 'quarantine'" class="text-btn" type="button" @click="restoreItem(item)">恢复</button><button v-if="storageBrowserTab === 'orphan'" class="text-btn" type="button" @click="quarantineItem(item)">清理</button><button v-else class="text-btn danger" type="button" @click="requestPurge([item])">删除</button></span>
-          </article>
-        </div>
-        <footer v-if="browserPageCount > 1" class="storage-browser__pagination"><button class="text-btn" type="button" :disabled="storageBrowserPage === 0" @click="changeBrowserPage(-1)">上一页</button><span>{{ storageBrowserPage + 1 }} / {{ browserPageCount }}</span><button class="text-btn" type="button" :disabled="storageBrowserPage + 1 >= browserPageCount" @click="changeBrowserPage(1)">下一页</button></footer>
-      </section>
-    </div>
-  </Teleport>
-  <ConfirmDialog
-    :visible="pendingPurgeIds.length > 0"
-    title="确认永久删除？"
-    :message="`将从本机删除 ${pendingPurgeIds.length} 项文件，共 ${formatBytes(purgeBytes)}。删除后无法恢复。`"
-    tag="清理站"
-    :details="purgeDetails"
-    :confirm-text="storageAction ? '正在删除…' : `永久删除 ${pendingPurgeIds.length} 项`"
-    cancel-text="暂不删除"
-    type="danger"
-    :z-index="3400"
-    @confirm="confirmPurge"
-    @cancel="pendingPurgeIds = []"
-  />
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
-import { Bell, Check, Compass, Database, Download, ExternalLink, File, Folder, Globe, HardDrive, Image, Info, PanelTop, Palette, Pin, ShieldCheck, SlidersHorizontal, Tag, Timer, Trash2, UserRound, Volume2, Waves, X, CheckSquare } from 'lucide-vue-next'
+import { computed, nextTick, ref, watch } from 'vue'
+import { Bell, Check, CheckSquare, Compass, Download, ExternalLink, Folder, Globe, Info, PanelTop, Palette, Pin, SlidersHorizontal, Tag, Timer, Trash2, Volume2, Waves, X } from 'lucide-vue-next'
 import { checkForUpdates as checkForUpdatesService, installUpdate as installUpdateService, skipCurrentUpdate, updaterState, updateNotes as resolveUpdateNotes } from '@/services/updater'
 import { currentReleaseHighlights, releaseHistory } from '@/data/releases'
 import { useTaskStore } from '@/stores/task'
-import { openReleasePage as openReleasePageInBrowser, openSystemNotificationSettings, purgeQuarantinedAttachments, quarantineOrphanAttachments, readAttachment, readQuarantinedAttachment, restoreQuarantinedAttachments, scanStorageHealth } from '@/services/platform'
-import ImageLightbox from './ImageLightbox.vue'
-import ConfirmDialog from './ConfirmDialog.vue'
+import { openReleasePage as openReleasePageInBrowser, openSystemNotificationSettings } from '@/services/platform'
+import { parseUpdateNotes } from '@/utils/updateNotes'
 import appIcon from '@/assets/app-icon.svg'
 
 const version = __APP_VERSION__
 
 const store = useTaskStore()
 const activeSection = ref('appearance')
-const storageReport = ref(null)
-const storageLoading = ref(false)
-const storageAction = ref(false)
-const previews = ref({})
-const quarantinedPreviews = ref({})
-const previewOpen = ref(false)
-const previewImages = ref([])
-const previewIndex = ref(0)
-const pendingPurgeIds = ref([])
-const storageBrowserOpen = ref(false)
-const storageBrowserTab = ref('orphan')
-const storageBrowserPage = ref(0)
-const storageFilter = ref('all')
-const inlineLimit = 3
-const browserPageSize = 40
+const settingsPanel = ref(null)
+let settingsTrigger = null
 const isDevelopment = import.meta.env.DEV
 const updateState = computed(() => updaterState.status)
 
@@ -926,11 +765,10 @@ async function openNotificationSettings() {
 }
 
 const sections = [
-  { id: 'appearance', label: '外观与布局', summary: '主题、密度与面板', icon: Palette },
-  { id: 'task-display', label: '任务与清单', summary: '完成项与分组显示', icon: CheckSquare },
-  { id: 'focus', label: '专注与休息', summary: '番茄轮次与休息', icon: Timer },
-  { id: 'app-behavior', label: '应用行为', summary: '启动、提示与窗口', icon: SlidersHorizontal },
-  { id: 'notifications', label: '通知与反馈', summary: '提醒、权限与声音', icon: Bell },
+  { id: 'appearance', label: '外观与显示', summary: '主题、界面与任务', icon: Palette },
+  { id: 'focus', label: '专注与节律', summary: '控制器、番茄与休息', icon: Timer },
+  { id: 'notifications', label: '通知与声音', summary: '提醒、权限与声音', icon: Bell },
+  { id: 'app-behavior', label: '通用', summary: '启动、提示与窗口', icon: SlidersHorizontal },
   { id: 'about', label: '关于与更新', summary: '版本、指南与更新', icon: Info }
 ]
 
@@ -938,7 +776,9 @@ const themes = [
   { id: 'mint', label: '青绿', description: '默认清爽', swatch: 'linear-gradient(135deg, #2f8f86 0%, #8ed6cb 58%, #f3fbf9 100%)' },
   { id: 'blue', label: '海蓝', description: '冷静专注', swatch: 'linear-gradient(135deg, #346fd8 0%, #8db7ff 58%, #f4f8ff 100%)' },
   { id: 'violet', label: '紫罗兰', description: '柔和醒目', swatch: 'linear-gradient(135deg, #6d5bd7 0%, #b0a7ff 58%, #f8f6ff 100%)' },
-  { id: 'graphite', label: '石墨', description: '克制低调', swatch: 'linear-gradient(135deg, #475569 0%, #9aa7b8 58%, #f7f9fc 100%)' }
+  { id: 'graphite', label: '石墨', description: '克制低调', swatch: 'linear-gradient(135deg, #475569 0%, #9aa7b8 58%, #f7f9fc 100%)' },
+  { id: 'amber', label: '琥珀橙', description: '温暖专注', swatch: 'linear-gradient(135deg, #b97822 0%, #edbe79 58%, #fffaf3 100%)' },
+  { id: 'coral', label: '珊瑚红', description: '亲和轻快', swatch: 'linear-gradient(135deg, #c85e63 0%, #ec9ea2 58%, #fff8f8 100%)' }
 ]
 
 const focusControllerStyles = [
@@ -946,6 +786,86 @@ const focusControllerStyles = [
   { id: 'island', label: '专注岛', description: '紧凑常驻，按需展开' },
   { id: 'classic', label: '经典卡片', description: '所有操作始终可见' }
 ]
+
+const focusableSelector = [
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'a[href]',
+  '[tabindex]:not([tabindex="-1"])'
+].join(',')
+
+watch(() => store.settingsOpen, async (open) => {
+  if (open) {
+    settingsTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    await nextTick()
+    settingsPanel.value?.querySelector(`[data-settings-section="${activeSection.value}"]`)?.focus()
+    return
+  }
+  await nextTick()
+  settingsTrigger?.focus?.()
+  settingsTrigger = null
+})
+
+function trapSettingsFocus(event) {
+  const focusable = [...(settingsPanel.value?.querySelectorAll(focusableSelector) || [])]
+    .filter(element => element.getClientRects().length > 0)
+  if (!focusable.length) {
+    event.preventDefault()
+    settingsPanel.value?.focus()
+    return
+  }
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault()
+    first.focus()
+  }
+}
+
+function handleSectionKeydown(event) {
+  const keys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End']
+  if (!keys.includes(event.key)) return
+  const buttons = [...settingsPanel.value.querySelectorAll('[data-settings-section]')]
+  const currentIndex = buttons.indexOf(event.target.closest('[data-settings-section]'))
+  if (currentIndex < 0) return
+  event.preventDefault()
+  const delta = ['ArrowUp', 'ArrowLeft'].includes(event.key) ? -1 : 1
+  const nextIndex = event.key === 'Home'
+    ? 0
+    : event.key === 'End'
+      ? buttons.length - 1
+      : (currentIndex + delta + buttons.length) % buttons.length
+  activeSection.value = buttons[nextIndex].dataset.settingsSection
+  nextTick(() => buttons[nextIndex].focus())
+}
+
+function handleRadioKeydown(event, items, currentId, dataAttribute, update) {
+  const keys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End']
+  if (!keys.includes(event.key)) return
+  event.preventDefault()
+  const currentIndex = Math.max(0, items.findIndex(item => item.id === currentId))
+  const delta = ['ArrowUp', 'ArrowLeft'].includes(event.key) ? -1 : 1
+  const nextIndex = event.key === 'Home'
+    ? 0
+    : event.key === 'End'
+      ? items.length - 1
+      : (currentIndex + delta + items.length) % items.length
+  const nextId = items[nextIndex].id
+  update(nextId)
+  nextTick(() => settingsPanel.value?.querySelector(`[${dataAttribute}="${nextId}"]`)?.focus())
+}
+
+function handleThemeKeydown(event) {
+  handleRadioKeydown(event, themes, store.settings.theme, 'data-theme-id', theme => store.updateSettings({ theme }))
+}
+
+function handleFocusStyleKeydown(event) {
+  handleRadioKeydown(event, focusControllerStyles, store.settings.focusControllerStyle, 'data-focus-style', focusControllerStyle => store.updateSettings({ focusControllerStyle }))
+}
 
 const startViewLabels = {
   today: '今日',
@@ -979,30 +899,6 @@ const dailyGuidanceSummary = computed(() => {
   if (!store.settings.dailyGuidanceEnabled) return '已关闭'
   return ({ calm: '轻松', practical: '务实', encouraging: '鼓励' }[store.settings.dailyGuidanceStyle] || '务实')
 })
-const storageSummary = computed(() => storageReport.value ? `已扫描 · ${formatBytes(storageReport.value.totalBytes)}` : '按需扫描')
-const reclaimableBytes = computed(() => (storageReport.value?.orphanBytes || 0) + (storageReport.value?.quarantinedBytes || 0))
-const orphanTypeSummary = computed(() => {
-  const report = storageReport.value
-  if (!report) return ''
-  const parts = []
-  if (report.orphanImageBytes) parts.push(`图片 ${formatBytes(report.orphanImageBytes)}`)
-  if (report.orphanFileBytes) parts.push(`文件 ${formatBytes(report.orphanFileBytes)}`)
-  return parts.join(' · ')
-})
-const storageCategories = computed(() => {
-  const report = storageReport.value
-  if (!report) return []
-  return [
-    { id: 'database', label: '任务数据', description: '任务、清单与设置', bytes: report.databaseBytes, icon: Database },
-    { id: 'images', label: '已用图片', description: '被任务或备注引用', bytes: report.referencedImageBytes, icon: Image },
-    { id: 'files', label: '已用文件', description: '被任务引用的非图片附件', bytes: report.referencedFileBytes, icon: File },
-    { id: 'orphan', label: '待处理附件', description: '未被引用，可移入清理站', bytes: report.orphanBytes, icon: Trash2, reclaimable: true },
-    { id: 'quarantine', label: '清理站', description: '已暂存，可恢复或永久删除', bytes: report.quarantinedBytes, icon: Trash2, reclaimable: true },
-    { id: 'profile', label: '个人资料', description: '头像等本机资料', bytes: report.profileBytes, icon: UserRound },
-    { id: 'backup', label: '本机恢复点', description: '数据恢复快照', bytes: report.backupBytes, icon: ShieldCheck },
-    { id: 'other', label: '其他应用数据', description: '应用运行所需文件', bytes: report.otherBytes, icon: HardDrive }
-  ].filter(item => item.bytes > 0)
-})
 const updateStatusText = computed(() => ({
   development: '开发环境',
   idle: '手动检查',
@@ -1011,6 +907,7 @@ const updateStatusText = computed(() => ({
   available: `可更新至 ${updaterState.update?.version || ''}`,
   skipped: '已跳过',
   downloading: '正在下载',
+  verifying: '正在校验',
   installing: '正在安装',
   error: '自动更新不可用',
   unsupported: '平台不支持'
@@ -1023,7 +920,8 @@ const updateTitle = computed(() => ({
   available: '发现可用更新',
   skipped: `已跳过 v${updaterState.update?.version || ''}`,
   downloading: '正在下载更新',
-  installing: '安装程序即将启动',
+  verifying: '正在校验更新签名',
+  installing: '正在替换应用',
   error: '自动更新暂不可用',
   unsupported: '当前平台暂不支持自动更新'
 }[updateState.value] || '检查稳定版本'))
@@ -1032,7 +930,8 @@ const updateDescription = computed(() => {
   if (updateState.value === 'available') return '更新包已通过签名验证，下载完成后将自动完成安装。'
   if (updateState.value === 'skipped') return '本次更新已跳过；新版本发布后或重新检查时会再次提示。'
   if (updateState.value === 'downloading') return updateProgressText.value
-  if (updateState.value === 'installing') return '下载已完成，应用将自动重新打开并完成安装。'
+  if (updateState.value === 'verifying') return '下载完成，正在校验更新包的签名。'
+  if (updateState.value === 'installing') return '正在替换应用。macOS 可能会弹出管理员授权窗口；完成后应用会自动重新打开。'
   if (updateState.value === 'error' || updateState.value === 'unsupported') return updaterState.error
   if (updateState.value === 'upToDate') return '当前已安装最新的稳定版本。'
   return '从自建服务器或 GitHub Release 检查经过签名验证的稳定版本。'
@@ -1041,14 +940,15 @@ const updateActionText = computed(() => ({
   development: '开发模式不检查',
   checking: '正在检查…',
   downloading: updateProgressText.value,
-  installing: '正在启动安装程序…',
+  verifying: '正在校验签名…',
+  installing: '正在完成安装…',
   upToDate: '重新检查',
   error: '重试检查',
   skipped: '重新检查',
   unsupported: '打开下载页',
   idle: '检查更新'
 }[updateState.value] || '检查更新'))
-const updateActionDisabled = computed(() => isDevelopment || ['checking', 'downloading', 'installing'].includes(updateState.value))
+const updateActionDisabled = computed(() => isDevelopment || ['checking', 'downloading', 'verifying', 'installing'].includes(updateState.value))
 const updateBadgeVisible = computed(() => updateState.value === 'available')
 const updateProgressText = computed(() => {
   const { downloaded, total } = updaterState.progress
@@ -1060,52 +960,7 @@ const updateProgressPercent = computed(() => {
   return total ? Math.min(100, Math.round(downloaded / total * 100)) : 0
 })
 const updateNotes = computed(() => resolveUpdateNotes())
-const orphanGroups = computed(() => {
-  const items = storageReport.value?.orphanAttachments || []
-  const images = items.filter(item => item.isImage)
-  const files = items.filter(item => !item.isImage)
-  const groups = []
-  if (images.length) groups.push({ id: 'images', label: '图片', items: images })
-  if (files.length) groups.push({ id: 'files', label: '文件', items: files })
-  return groups
-})
-const quarantinedGroups = computed(() => groupAttachments(storageReport.value?.quarantinedAttachments || []))
-const inlineOrphanGroups = computed(() => groupAttachments((storageReport.value?.orphanAttachments || []).slice(0, inlineLimit)))
-const inlineQuarantinedGroups = computed(() => groupAttachments((storageReport.value?.quarantinedAttachments || []).slice(0, inlineLimit)))
-const browserItems = computed(() => {
-  const items = storageBrowserTab.value === 'orphan' ? (storageReport.value?.orphanAttachments || []) : (storageReport.value?.quarantinedAttachments || [])
-  return storageFilter.value === 'all' ? items : items.filter(item => storageFilter.value === 'image' ? item.isImage : !item.isImage)
-})
-const browserPageCount = computed(() => Math.max(1, Math.ceil(browserItems.value.length / browserPageSize)))
-const browserPageItems = computed(() => browserItems.value.slice(storageBrowserPage.value * browserPageSize, (storageBrowserPage.value + 1) * browserPageSize))
-const purgeTargets = computed(() => (storageReport.value?.quarantinedAttachments || []).filter(item => pendingPurgeIds.value.includes(item.id)).slice(0, 3))
-const purgeBytes = computed(() => (storageReport.value?.quarantinedAttachments || []).filter(item => pendingPurgeIds.value.includes(item.id)).reduce((total, item) => total + item.sizeBytes, 0))
-const purgeDetails = computed(() => [
-  { label: '文件数量', value: `${pendingPurgeIds.value.length} 项`, type: 'danger' },
-  { label: '可释放空间', value: formatBytes(purgeBytes.value), type: 'info' },
-  { label: '文件示例', value: purgeTargets.value.map(item => item.name).join('、') || '无', type: 'default' }
-])
-
-function groupAttachments(items) {
-  const images = items.filter(item => item.isImage)
-  const files = items.filter(item => !item.isImage)
-  const groups = []
-  if (images.length) groups.push({ id: 'images', label: '图片', items: images })
-  if (files.length) groups.push({ id: 'files', label: '文件', items: files })
-  return groups
-}
-
-function formatBytes(value = 0) {
-  if (value < 1024) return `${value} B`
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
-  return `${(value / (1024 * 1024)).toFixed(1)} MB`
-}
-
-function formatDate(value) {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '未知时间' : date.toLocaleDateString('zh-CN')
-}
-
+const updateNoteBlocks = computed(() => parseUpdateNotes(updateNotes.value))
 async function checkForUpdates() {
   await checkForUpdatesService({
     skippedVersion: store.settings.skippedUpdateVersion,
@@ -1134,61 +989,13 @@ async function installUpdate() {
   await installUpdateService()
 }
 
-async function scanStorage() {
-  storageLoading.value = true
+async function openManualInstall() {
   try {
-    const report = await scanStorageHealth()
-    storageReport.value = report
-    previews.value = {}
-    quarantinedPreviews.value = {}
-    await hydrateVisiblePreviews(report.orphanAttachments.slice(0, inlineLimit), 'orphan')
-    await hydrateVisiblePreviews(report.quarantinedAttachments.slice(0, inlineLimit), 'quarantine')
-    pendingPurgeIds.value = []
+    await openReleasePageInBrowser()
   } catch (error) {
-    store.showNotice(error?.message || '扫描本机存储失败', 'error')
-  } finally { storageLoading.value = false }
+    updaterState.status = 'error'
+    updaterState.error = error?.message || '无法打开下载页，请稍后重试。'
+  }
 }
 
-async function runStorageAction(action, successText) {
-  if (!storageReport.value) return
-  storageAction.value = true
-  try {
-    const result = await action()
-    store.showNotice(`${successText} ${result.affectedCount} 项，${formatBytes(result.affectedBytes)}`, 'success')
-    await scanStorage()
-  } catch (error) {
-    store.showNotice(error?.message || '操作失败', 'error')
-  } finally { storageAction.value = false }
-}
-
-function quarantineAll() { return runStorageAction(() => quarantineOrphanAttachments(storageReport.value.orphanAttachments.map(item => item.relativePath)), '已移入清理站') }
-function quarantineItem(item) { return runStorageAction(() => quarantineOrphanAttachments([item.relativePath]), '已移入清理站') }
-function restoreAll() { return runStorageAction(() => restoreQuarantinedAttachments(storageReport.value.quarantinedAttachments.map(item => item.id)), '已恢复') }
-function restoreItem(item) { return runStorageAction(() => restoreQuarantinedAttachments([item.id]), '已恢复') }
-function requestPurge(items) { pendingPurgeIds.value = items.map(item => item.id) }
-function confirmPurge() { if (storageAction.value || !pendingPurgeIds.value.length) return; return runStorageAction(() => purgeQuarantinedAttachments(pendingPurgeIds.value), '已永久删除') }
-function openPreview(item) {
-  const images = (storageReport.value?.orphanAttachments || []).filter(candidate => candidate.isImage).map(candidate => previews.value[candidate.relativePath]).filter(Boolean)
-  previewIndex.value = images.indexOf(previews.value[item.relativePath])
-  previewImages.value = images
-  previewOpen.value = true
-}
-function openQuarantinedPreview(item) {
-  const images = (storageReport.value?.quarantinedAttachments || []).filter(candidate => candidate.isImage).map(candidate => quarantinedPreviews.value[candidate.id]).filter(Boolean)
-  previewIndex.value = images.indexOf(quarantinedPreviews.value[item.id])
-  previewImages.value = images
-  previewOpen.value = true
-}
-async function hydrateVisiblePreviews(items, kind) {
-  const pairs = await Promise.all(items.filter(item => item.isImage).map(async (item) => [kind === 'orphan' ? item.relativePath : item.id, kind === 'orphan' ? await readAttachment(item.relativePath) : await readQuarantinedAttachment(item.id)]))
-  const target = kind === 'orphan' ? previews : quarantinedPreviews
-  target.value = { ...target.value, ...Object.fromEntries(pairs.filter(([, url]) => url)) }
-}
-async function openStorageBrowser(tab) { storageBrowserTab.value = tab; storageFilter.value = 'all'; storageBrowserPage.value = 0; storageBrowserOpen.value = true; await hydrateVisiblePreviews(browserPageItems.value, tab) }
-function closeStorageBrowser() { pendingPurgeIds.value = []; storageBrowserOpen.value = false }
-async function setStorageBrowserTab(tab) { storageBrowserTab.value = tab; storageBrowserPage.value = 0; await hydrateVisiblePreviews(browserPageItems.value, tab) }
-async function setStorageFilter(filter) { storageFilter.value = filter; storageBrowserPage.value = 0; await hydrateVisiblePreviews(browserPageItems.value, storageBrowserTab.value) }
-async function changeBrowserPage(delta) { storageBrowserPage.value = Math.max(0, Math.min(browserPageCount.value - 1, storageBrowserPage.value + delta)); await hydrateVisiblePreviews(browserPageItems.value, storageBrowserTab.value) }
-function browserPreview(item) { return storageBrowserTab.value === 'orphan' ? previews.value[item.relativePath] : quarantinedPreviews.value[item.id] }
-function openBrowserPreview(item) { storageBrowserTab.value === 'orphan' ? openPreview(item) : openQuarantinedPreview(item) }
 </script>
