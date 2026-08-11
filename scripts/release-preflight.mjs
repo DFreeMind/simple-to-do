@@ -1,5 +1,5 @@
-// 本地发布前置检查：发布前校验版本一致性、签名密钥、Git 状态与发布脚本就绪。
-// 发布流程已固定为本地执行（scripts/release-local.mjs），不再依赖 GitHub Actions。
+// 本地应急发布前置检查：校验版本一致性、签名密钥、Git 状态与发布脚本就绪。
+// 正式三平台发布优先使用 GitHub Actions；本检查只服务于 scripts/release-local.mjs 的本地兜底流程。
 //
 // 用法：
 //   node scripts/release-preflight.mjs 0.4.5

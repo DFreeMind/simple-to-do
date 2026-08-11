@@ -1,5 +1,5 @@
-// 本地一条龙发布脚本：构建 → 发布 GitHub Release → 修复 latest.json → 同步自建服务器 → 验证。
-// 发布流程已固定为本地执行，不再依赖 GitHub Actions。
+// 本地 Windows 应急发布脚本：构建 → 发布 GitHub Release → 修复 latest.json → 同步自建服务器 → 验证。
+// 正式三平台发布优先使用 GitHub Actions 的“发布桌面应用”工作流；本脚本仅用于工作流不可用时的兜底。
 //
 // 用法（Windows PowerShell，仓库根目录）：
 //   node scripts/release-local.mjs --version 0.4.5 --notes-file tmp/release-0.4.5-notes.md
