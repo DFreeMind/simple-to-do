@@ -42,6 +42,20 @@
         </button>
       </nav>
 
+      <nav class="rail-nav" aria-label="完成记录">
+        <button
+          class="rail-item"
+          :class="{ active: store.currentView === completedView.id }"
+          type="button"
+          :title="completedView.label"
+          :aria-label="completedView.label"
+          :aria-current="store.currentView === completedView.id ? 'page' : undefined"
+          @click="store.setView(completedView.id)"
+        >
+          <component :is="completedView.icon" :size="20" />
+        </button>
+      </nav>
+
       <div class="rail-divider"></div>
 
       <div class="rail-flyout-anchor">
@@ -185,6 +199,18 @@
           <component :is="item.icon" :size="18" />
           <span class="nav-label">{{ item.label }}</span>
           <span v-if="store.listTaskCounts[item.id]" class="nav-badge">{{ store.listTaskCounts[item.id] }}</span>
+        </button>
+      </nav>
+
+      <nav class="sidebar__completed" aria-label="完成记录">
+        <button
+          class="nav-item"
+          :class="{ active: store.currentView === completedView.id }"
+          type="button"
+          @click="store.setView(completedView.id)"
+        >
+          <component :is="completedView.icon" :size="18" />
+          <span class="nav-label">{{ completedView.label }}</span>
         </button>
       </nav>
 
@@ -344,6 +370,8 @@
           <span class="nav-label">{{ item.label }}</span>
           <span v-if="store.listTaskCounts[item.id]" class="nav-badge">{{ store.listTaskCounts[item.id] }}</span>
         </button>
+      </nav>
+      <nav class="sidebar__help" aria-label="帮助">
         <button class="nav-item nav-item--utility" type="button" @click="store.openHelpCenter">
           <Compass :size="18" />
           <span class="nav-label">使用指南</span>
@@ -619,8 +647,9 @@ const primaryViews = [
   { id: 'important', label: '重要', icon: Star }
 ]
 
+const completedView = { id: 'completed', label: '完成记录', icon: CheckCircle2 }
+
 const utilityViews = [
-  { id: 'completed', label: '已完成', icon: CheckCircle2 },
   { id: 'trash', label: '垃圾桶', icon: Trash2 }
 ]
 

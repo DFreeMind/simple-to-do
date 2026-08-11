@@ -50,6 +50,28 @@ const THEME_PALETTES = {
     detailCardBg:'#dce5ee',
     detailCardTint:'#eaf0f5',
   },
+  amber: {
+    accent:      '#b97822',
+    accentStrong:'#8d5814',
+    accentSoft:  '#fff1dc',
+    accentTint:  '#fffaf3',
+    sidebarBg:   '#f8f1e6',
+    mainBg:      '#fffcf8',
+    detailBg:    '#fbf5ec',
+    detailCardBg:'#f6d8ad',
+    detailCardTint:'#fbead1',
+  },
+  coral: {
+    accent:      '#c85e63',
+    accentStrong:'#9f4148',
+    accentSoft:  '#fdebed',
+    accentTint:  '#fff8f8',
+    sidebarBg:   '#f8eff0',
+    mainBg:      '#fffbfb',
+    detailBg:    '#fbf3f4',
+    detailCardBg:'#f4cfd2',
+    detailCardTint:'#fbe7e8',
+  },
 }
 
 // ─── 颜色工具 ───

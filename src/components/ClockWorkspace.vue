@@ -74,7 +74,17 @@
           </Teleport>
 
           <section class="clock-stage__garden-companion" aria-label="今日花成长">
-            <div class="clock-stage__garden-art">
+            <div
+              ref="gardenPreviewAnchor"
+              class="clock-stage__garden-art"
+              role="img"
+              tabindex="0"
+              :aria-label="`今日花「${gardenSpeciesName}」${gardenStageName}阶段缩略图；悬停或聚焦可查看大图`"
+              @mouseenter="showGardenPreview"
+              @mouseleave="hideGardenPreview"
+              @focusin="showGardenPreview"
+              @focusout="hideGardenPreview"
+            >
               <FocusStageArtwork :species-id="gardenToday.speciesId" :stage="gardenToday.stage" motion="static" />
             </div>
             <div class="clock-stage__garden-copy">
@@ -96,6 +106,13 @@
               </div>
             </div>
           </section>
+
+          <Teleport to=".app">
+            <section v-if="gardenPreviewOpen" class="app-popover-surface clock-garden-preview" :style="gardenPreviewStyle" role="tooltip" aria-hidden="true">
+              <span>{{ gardenSpeciesName }} · {{ gardenStageName }}</span>
+              <FocusStageArtwork :species-id="gardenToday.speciesId" :stage="gardenToday.stage" motion="static" />
+            </section>
+          </Teleport>
 
           <div v-if="activeSession" class="clock-stage__actions">
             <button v-if="activeSession.status === 'running'" class="clock-button clock-button--primary" type="button" @click="store.pauseFocus"><Pause :size="18" fill="currentColor" />暂停专注</button>
@@ -412,6 +429,9 @@ const freeDurationMinutes = ref(15)
 const freeDurationEditing = ref(false)
 const freeDurationEditor = ref(null)
 const freeDurationEditorStyle = ref({})
+const gardenPreviewAnchor = ref(null)
+const gardenPreviewOpen = ref(false)
+const gardenPreviewStyle = ref({})
 const finishNote = ref('')
 const endConfirmOpen = ref(false)
 const taskPicker = ref(null)
@@ -700,6 +720,25 @@ function toggleFreeDurationEditor() {
   freeDurationEditing.value = !freeDurationEditing.value
   if (freeDurationEditing.value) nextTick(positionFreeDurationEditor)
 }
+function positionGardenPreview() {
+  const anchor = gardenPreviewAnchor.value
+  if (!anchor || typeof window === 'undefined') return
+  const rect = anchor.getBoundingClientRect()
+  const width = Math.min(240, window.innerWidth - 32)
+  const estimatedHeight = 330
+  const margin = 16
+  const left = Math.max(margin, Math.min(window.innerWidth - width - margin, rect.left + rect.width / 2 - width / 2))
+  const top = Math.max(margin, rect.top - estimatedHeight - 12)
+  gardenPreviewStyle.value = {
+    '--garden-preview-left': `${Math.round(left)}px`,
+    '--garden-preview-top': `${Math.round(top)}px`
+  }
+}
+function showGardenPreview() {
+  gardenPreviewOpen.value = true
+  nextTick(positionGardenPreview)
+}
+function hideGardenPreview() { gardenPreviewOpen.value = false }
 function closeFreeDurationEditor(event) {
   if (!freeDurationEditing.value) return
   if (freeDurationEditor.value?.contains(event.target)) return
@@ -787,11 +826,13 @@ watch(taskPickerOpen, (open) => {
 onMounted(() => {
   window.addEventListener('pointerdown', closeFreeDurationEditor)
   window.addEventListener('resize', positionFreeDurationEditor)
+  window.addEventListener('resize', positionGardenPreview)
   visualClockFrame = window.requestAnimationFrame(syncVisualClock)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('pointerdown', closeFreeDurationEditor)
   window.removeEventListener('resize', positionFreeDurationEditor)
+  window.removeEventListener('resize', positionGardenPreview)
   if (visualClockFrame) window.cancelAnimationFrame(visualClockFrame)
   if (typeof document !== 'undefined') document.body.style.overflow = ''
 })

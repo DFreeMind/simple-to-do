@@ -52,7 +52,10 @@
               >
                 <Pin :size="16" />
               </button>
-              <button class="detail-icon-action detail-icon-action--close" type="button" aria-label="关闭详情" title="关闭详情" @click="store.updateSettings({ detailOpen: false })">
+              <button class="detail-icon-action" type="button" aria-label="恢复推荐详情宽度" title="恢复推荐详情宽度" @click="resetDetailWidth">
+                <RotateCcw :size="15" />
+              </button>
+              <button class="detail-icon-action detail-icon-action--close" type="button" aria-label="关闭详情" title="关闭详情（Esc）" @click="closeDetail">
                 <X :size="18" />
               </button>
             </div>
@@ -315,6 +318,7 @@ import {
   Play,
   Plus,
   Repeat2,
+  RotateCcw,
   Star,
   Sun,
   Tags,
@@ -336,6 +340,7 @@ const RichTextEditor = defineAsyncComponent({
 })
 
 const store = useTaskStore()
+const emit = defineEmits(['close'])
 const detailEmptyMessage = computed(() => {
   if (!store.settings.dailyGuidanceEnabled) {
     return { title: '选择任务查看详情', text: '任务属性、子任务和富文本备注会显示在这里。' }
@@ -577,6 +582,10 @@ function updateTitle(event) {
   autoResize(event.target)
 }
 
+function resetDetailWidth() {
+  store.updateSettings({ detailWidth: 380 })
+}
+
 function toggleSelect(name) {
   openSelect.value = openSelect.value === name ? '' : name
   openDatePicker.value = ''
@@ -704,7 +713,16 @@ function autoResize(element) {
 
 function handleSelectKeydown(event) {
   if (event.key !== 'Escape') return
+  if (openSelect.value || openDatePicker.value) {
+    closeSelect()
+    return
+  }
+  closeDetail()
+}
+
+function closeDetail() {
   closeSelect()
+  emit('close')
 }
 
 onMounted(() => {

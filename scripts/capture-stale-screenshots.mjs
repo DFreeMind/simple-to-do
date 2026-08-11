@@ -4,7 +4,7 @@
  * 重新拍摄 3 张过期的使用指南截图：
  *   - focus-history.webp     专注回顾（ECharts + 概览/管理 + 导出 + 批量 + 周期对比）
  *   - focus-achievement.webp 专注成就（温室化年/月格 + 累计成长 + 近期足迹）
- *   - space-management.webp  空间管理（含历史迁移备份新功能）
+ *   - space-management.webp  存储与清理（含历史迁移备份新功能）
  *
  * 只针对过期图，不动其他 23 张未变更的截图。这样可以让 git diff 干净，
  * 也避免重新生成 byte-identical 的 23 张图污染提交。
@@ -100,8 +100,8 @@ if (await achievementTab.count()) {
   await capture('focus-achievement')
 }
 
-console.log('3/3 重拍 space-management（空间管理）')
-// 切回任务模块打开个人空间 → 空间管理
+console.log('3/3 重拍 space-management（存储与清理）')
+// 切回任务模块打开个人空间 → 存储与清理
 const taskTab = page.locator('button[aria-label="任务"]').first()
 if (await taskTab.count()) {
   await taskTab.click()
@@ -111,7 +111,7 @@ const profileButton = page.locator('button[aria-label*="打开个人资料"]').f
 if (await profileButton.count()) {
   await profileButton.click()
   await waitForUi()
-  await clickText('空间管理')
+  await clickText('存储与清理')
   const scanButton = page.locator('button:has-text("开始扫描"), button:has-text("重新扫描"), button:has-text("开始查看本机空间")').first()
   if (await scanButton.count()) {
     await scanButton.click()

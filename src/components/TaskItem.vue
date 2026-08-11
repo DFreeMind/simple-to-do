@@ -9,14 +9,17 @@
       'is-dragging': isDragging,
       'drop-target-before': isDropTarget && dropPosition === 'before',
       'drop-target-after': isDropTarget && dropPosition === 'after',
-      'no-drag-handle': !draggable || isTrash
+      'no-drag-handle': !draggable || isTrash,
+      'is-inbox': inboxMode,
+      'is-completed-archive': archiveMode,
+      'needs-inbox-triage': needsInboxTriage
     }"
     tabindex="0"
     role="button"
     :aria-label="`${task.completed ? '已完成' : '未完成'}任务：${task.title}`"
-    @click="store.selectTask(task.id)"
-    @keydown.enter.prevent="store.selectTask(task.id)"
-    @keydown.space.prevent="store.selectTask(task.id)"
+    @click="store.toggleTaskDetail(task.id)"
+    @keydown.enter.prevent="store.toggleTaskDetail(task.id)"
+    @keydown.space.prevent="store.toggleTaskDetail(task.id)"
   >
     <span
       v-if="draggable && !isTrash"
@@ -56,6 +59,10 @@
         命中：{{ searchMatchKinds.join('、') }}
       </div>
       <div class="task-meta">
+        <span v-if="archiveMode && task.completed && task.completedAt" class="meta-chip meta-chip--completed" :title="completionTitle">
+          <CheckCheck :size="13" />
+          完成于 {{ formatCompletedAt(task.completedAt) }}<template v-if="completionDuration"> · {{ completionDuration }}</template>
+        </span>
         <span v-if="list && !shouldHideListMeta" class="meta-chip">
           <span class="color-dot" :style="{ backgroundColor: list.color }"></span>
           {{ list.name }}
@@ -63,9 +70,10 @@
         <span v-if="showTaskGroup && taskGroup" class="meta-chip">
           {{ taskGroup.emoji || '📂' }} {{ taskGroup.name }}
         </span>
-        <span v-if="task.dueDate" class="meta-chip" :class="{ overdue: isOverdue }">
+        <span v-if="task.dueDate" class="meta-chip" :class="{ overdue: isOverdue, 'meta-chip--archive-due': archiveMode }">
           <CalendarClock :size="13" />
-          {{ formatDate(task.dueDate) }}
+          <template v-if="archiveMode">原截止：{{ formatDate(task.dueDate) }}</template>
+          <template v-else>{{ formatDate(task.dueDate) }}</template>
         </span>
         <span v-if="store.isInMyDay(task)" class="meta-chip">
           <Sun :size="13" />
@@ -83,11 +91,11 @@
           <Paperclip :size="13" />
           {{ task.attachments.length }}
         </span>
-        <span v-if="task.createdAt" class="meta-chip meta-chip--muted" :title="`创建于 ${formatFullDate(task.createdAt)}`">
+        <span v-if="task.createdAt && !archiveMode" class="meta-chip meta-chip--muted" :title="`创建于 ${formatFullDate(task.createdAt)}`">
           <Clock :size="12" />
           {{ formatCreatedAt(task.createdAt) }}
         </span>
-        <span v-if="task.completed && task.completedAt" class="meta-chip meta-chip--muted meta-chip--completed" :title="completionTitle">
+        <span v-if="task.completed && task.completedAt && !archiveMode" class="meta-chip meta-chip--muted meta-chip--completed" :title="completionTitle">
           <CheckCheck :size="13" />
           {{ formatCreatedAt(task.completedAt) }}<template v-if="completionDuration"> · {{ completionDuration }}</template>
         </span>
@@ -102,8 +110,24 @@
         </span>
       </div>
     </div>
+    <div v-if="needsInboxTriage" class="task-inbox-actions" aria-label="决定任务下一步">
+      <span>还没决定下一步</span>
+      <button type="button" @click.stop="store.toggleMyDay(task.id)"><Sun :size="13" />加入今日</button>
+      <button type="button" @click.stop="scheduleInboxTaskTomorrow"><CalendarClock :size="13" />明天</button>
+      <button type="button" @click.stop="openMoveModal"><FolderInput :size="13" />决定去向</button>
+    </div>
 
-    <div v-if="!isTrash" class="task-actions">
+    <div v-if="!isTrash" class="task-actions" :class="{ 'task-actions--visible': archiveMode }">
+      <template v-if="archiveMode">
+        <button class="ghost-icon completed-restore" type="button" title="恢复为未完成" aria-label="恢复为未完成" @click.stop="store.completeTask(task.id)">
+          <RotateCcw :size="16" />
+          <span>恢复</span>
+        </button>
+        <button class="ghost-icon" type="button" title="更多" aria-label="更多任务操作" @click.stop="openMenu">
+          <MoreHorizontal :size="17" />
+        </button>
+      </template>
+      <template v-else>
       <button
         class="ghost-icon"
         type="button"
@@ -127,6 +151,7 @@
       <button class="ghost-icon" type="button" title="更多" aria-label="更多任务操作" @click.stop="openMenu">
         <MoreHorizontal :size="17" />
       </button>
+      </template>
     </div>
 
     <div v-else class="task-actions task-actions--visible">
@@ -248,7 +273,9 @@ const props = defineProps({
   task: { type: Object, required: true },
   searchQuery: { type: String, default: '' },
   hideListMeta: Boolean,
+  inboxMode: Boolean,
   isTrash: Boolean,
+  archiveMode: Boolean,
   draggable: Boolean,
   isDragging: Boolean,
   isDropTarget: Boolean,
@@ -275,6 +302,7 @@ const confirmDialog = reactive({
 
 const list = computed(() => store.lists.find(item => item.id === props.task.listId))
 const taskGroup = computed(() => store.taskGroups.find(group => group.id === props.task.taskGroupId) || null)
+const needsInboxTriage = computed(() => props.inboxMode && !props.task.completed && !store.isInMyDay(props.task) && !props.task.dueDate && !props.task.important && !props.task.pinned)
 // 在用户当前打开的清单视图下，任务属于该清单时不需要再显示清单名
 // 收集箱视图（inbox）也走相同规则
 // 全局视图（计划/重要/今日/已完成/垃圾桶）保留清单名提示任务归属
@@ -333,6 +361,18 @@ const repeatLabel = computed(() => {
 
 function formatDate(date) {
   return fmtDate(date)
+}
+
+function formatCompletedAt(value) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return formatCreatedAt(value)
+  const now = new Date()
+  const time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  if (date.toDateString() === now.toDateString()) return `今天 ${time}`
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  if (date.toDateString() === yesterday.toDateString()) return `昨天 ${time}`
+  return `${date.getMonth() + 1}月${date.getDate()}日 ${time}`
 }
 
 function highlightSegments(value) {
@@ -415,6 +455,14 @@ function moveToList(listId) {
   store.updateTask(props.task.id, { listId, taskGroupId: null })
   store.showNotice('任务已移动', 'success')
   closeMenu()
+}
+
+function scheduleInboxTaskTomorrow() {
+  const tomorrow = new Date()
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  tomorrow.setHours(9, 0, 0, 0)
+  store.updateTask(props.task.id, { dueDate: tomorrow.toISOString() })
+  store.showNotice('已安排到明天', 'success')
 }
 
 function rescheduleOverdue(days) {

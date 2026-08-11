@@ -235,4 +235,11 @@ onBeforeUnmount(() => {
 .rhythm-dock:not(.expanded) .rhythm-dock__quick button:hover { border-color: rgba(31, 111, 104, .25); color: #176d62; background: #edf8f5; transform: translateY(-1px); }
 
 .rhythm-dock.expanded .rhythm-dock-item.is-running { border-color: rgba(47, 143, 134, .19); }.rhythm-dock.expanded .rhythm-dock-item.is-waiting { background: #f9fbfa; }.rhythm-dock.expanded .rhythm-dock-item__actions button:last-child { margin-left: auto; }.rhythm-dock.expanded .rhythm-dock-item__due-actions button.primary { min-width: 84px; }.rhythm-dock.expanded .rhythm-dock__footer { background: rgba(246, 252, 250, .72); }
+
+/* 控制器窗口仅预留极窄的透明圆角空间，外阴影会被窗口边界裁切成脏边。 */
+.rhythm-dock,
+.rhythm-dock.expanded,
+.rhythm-dock:not(.expanded) {
+  box-shadow: none;
+}
 </style>

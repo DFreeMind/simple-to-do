@@ -15,6 +15,7 @@ import {
   presentRhythmReminder,
   scheduleRhythmReminder,
   cancelRhythmReminder,
+  dismissRhythmReminderWindow,
   scheduleFocusCompletion,
   cancelFocusCompletion,
   syncFocusController,
@@ -71,7 +72,7 @@ import {
 
 const SYSTEM_VIEW_IDS = ['today', 'inbox', 'planned', 'important', 'completed', 'trash', 'search']
 const READONLY_VIEWS = ['planned', 'completed', 'trash']
-const THEME_IDS = ['mint', 'blue', 'violet', 'graphite']
+const THEME_IDS = ['mint', 'blue', 'violet', 'graphite', 'amber', 'coral']
 const TASK_GROUP_COLOR_IDS = ['auto', 'accent', 'blue', 'violet', 'amber', 'rose', 'green', 'cyan', 'coral', 'indigo', 'teal', 'brick', 'custom']
 const DETAIL_WIDTH_MIN = 320
 const DETAIL_WIDTH_MAX = 800
@@ -531,11 +532,6 @@ export const useTaskStore = defineStore('task', () => {
     .filter(task => !task.completed && isInMyDay(task))))
   const todayDueTasks = computed(() => sortTasks(activeTasks.value
     .filter(task => !task.completed && !isInMyDay(task) && getPlanBucket(task) === 'today')))
-  const inboxTriageTasks = computed(() => activeTasks.value
-    .filter(task => !task.completed && task.listId === 'inbox')
-    .filter(task => !isInMyDay(task) && !task.dueDate && !task.important && !task.pinned)
-    .slice(0, 5))
-
   const plannedSections = computed(() => {
     const buckets = [
       ['overdue', '已逾期'],
@@ -1643,6 +1639,16 @@ export const useTaskStore = defineStore('task', () => {
   function selectTask(id) {
     selectedTaskId.value = id
     if (id && !settings.value.detailOpen) settings.value.detailOpen = true
+  }
+
+  // 从任务列表再次点击当前任务时收起详情；其他入口继续使用 selectTask，
+  // 避免提醒、复制等程序化跳转意外变成关闭操作。
+  function toggleTaskDetail(id) {
+    if (id && selectedTaskId.value === id && settings.value.detailOpen) {
+      settings.value.detailOpen = false
+      return
+    }
+    selectTask(id)
   }
 
   async function loadData() {
@@ -3062,7 +3068,7 @@ export const useTaskStore = defineStore('task', () => {
 
   function completeRhythmReminder(reminderId) {
     const reminder = clock.value.rhythm.reminders.find(item => item.id === reminderId)
-    if (!reminder) return false
+    if (!reminder?.pendingSince) return false
     appendRhythmHistory(reminder, 'completed')
     reminder.lastCompletedAt = nowIso()
     reminder.lastNotifiedAt = nowIso()
@@ -3077,25 +3083,27 @@ export const useTaskStore = defineStore('task', () => {
     }
     if (reminder.triggerType === 'active-duration') reminder.activitySeconds = 0
     showNotice(`${reminder.title}已完成`, 'success')
+    void dismissRhythmReminderWindow(reminderId)
     syncRhythmTimer()
     return true
   }
 
   function snoozeRhythmReminder(reminderId, minutes = 5) {
     const reminder = clock.value.rhythm.reminders.find(item => item.id === reminderId)
-    if (!reminder) return false
+    if (!reminder?.pendingSince) return false
     const snoozeMinutes = Math.max(1, Number(minutes) || 5)
     appendRhythmHistory(reminder, 'snoozed', { snoozeMinutes, snoozeAt: nowIso() })
     reminder.snoozedUntil = new Date(Date.now() + snoozeMinutes * 60 * 1000).toISOString()
     reminder.lastNotifiedAt = null
     reminder.pendingSince = null
+    void dismissRhythmReminderWindow(reminderId)
     syncRhythmTimer()
     return true
   }
 
   function skipRhythmReminderToday(reminderId) {
     const reminder = clock.value.rhythm.reminders.find(item => item.id === reminderId)
-    if (!reminder) return false
+    if (!reminder?.pendingSince) return false
     appendRhythmHistory(reminder, 'skipped-today')
     reminder.skippedDate = localDateKey()
     reminder.snoozedUntil = null
@@ -3107,13 +3115,14 @@ export const useTaskStore = defineStore('task', () => {
       reminder.cycleStartedAt = nowIso()
       reminder.nextDueAt = new Date(Date.now() + reminder.intervalSeconds * 1000).toISOString()
     }
+    void dismissRhythmReminderWindow(reminderId)
     syncRhythmTimer()
     return true
   }
 
   function dismissRhythmReminder(reminderId) {
     const reminder = clock.value.rhythm.reminders.find(item => item.id === reminderId)
-    if (!reminder) return false
+    if (!reminder?.pendingSince) return false
     appendRhythmHistory(reminder, 'dismissed')
     reminder.pendingSince = null
     reminder.snoozedUntil = null
@@ -3128,6 +3137,7 @@ export const useTaskStore = defineStore('task', () => {
       reminder.activitySeconds = 0
       reminder.lastActivitySampleAt = nowIso()
     }
+    void dismissRhythmReminderWindow(reminderId)
     syncRhythmTimer()
     return true
   }
@@ -3635,7 +3645,6 @@ export const useTaskStore = defineStore('task', () => {
     suggestedTodayTasks,
     todayPlanTasks,
     todayDueTasks,
-    inboxTriageTasks,
     plannedSections,
     planWeekDays,
     calendarYear,
@@ -3721,6 +3730,7 @@ export const useTaskStore = defineStore('task', () => {
     resetPlanWeekToday,
     setSearch,
     selectTask,
+    toggleTaskDetail,
     showNotice,
     clearNotice,
     dismissFocusCelebration,

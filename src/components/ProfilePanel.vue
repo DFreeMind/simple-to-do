@@ -1,14 +1,14 @@
 <template>
-  <div class="profile-layer" role="dialog" aria-modal="true" aria-label="个人资料" @keydown.esc.stop="$emit('close')">
-    <button class="profile-layer__scrim" type="button" aria-label="关闭个人资料" @click="$emit('close')" />
-    <aside class="profile-panel">
+  <div class="profile-layer" @keydown.esc.stop="handleEscape" @keydown.tab="trapProfileFocus">
+    <button class="profile-layer__scrim" type="button" aria-label="关闭个人空间" @click="closePanel" />
+    <aside ref="profilePanel" class="profile-panel" role="dialog" aria-modal="true" aria-labelledby="profile-title" tabindex="-1">
       <header class="profile-panel__header">
-        <div class="profile-panel__title"><span class="profile-panel__title-mark"><HardDrive :size="16" /></span><div><strong>个人空间</strong><small><i></i>本地数据</small></div></div>
-        <button class="icon-btn profile-panel__close" type="button" aria-label="关闭个人空间" title="关闭" @click="$emit('close')"><X :size="18" /></button>
+        <div class="profile-panel__title"><span class="profile-panel__title-mark"><HardDrive :size="16" /></span><div><strong id="profile-title">个人空间</strong><small>本机身份与数据</small></div></div>
+        <button class="icon-btn profile-panel__close" type="button" aria-label="关闭个人空间" title="关闭" @click="closePanel"><X :size="18" /></button>
       </header>
       <div class="profile-layout">
-        <nav class="profile-nav" aria-label="个人空间分类">
-          <button v-for="section in sections" :key="section.id" class="profile-nav__item" :class="{ active: activeSection === section.id }" type="button" :aria-current="activeSection === section.id ? 'page' : undefined" @click="activeSection = section.id">
+        <nav class="profile-nav" aria-label="个人空间分类" @keydown="handleSectionKeydown">
+          <button v-for="section in sections" :key="section.id" class="profile-nav__item" :class="{ active: activeSection === section.id }" type="button" :aria-current="activeSection === section.id ? 'page' : undefined" :data-profile-section="section.id" @click="activeSection = section.id">
             <component :is="section.icon" :size="17" />
             <span><strong>{{ section.label }}</strong><small>{{ section.summary }}</small></span>
           </button>
@@ -16,39 +16,31 @@
         <div class="profile-panel__body">
         <section v-if="activeSection === 'profile'" class="profile-section profile-section--first">
           <section class="profile-person-card">
-            <div class="profile-person-card__visual"><div ref="avatarPickerAnchor" class="profile-avatar-picker-anchor"><button class="profile-avatar-button" type="button" :disabled="uploading" title="更换头像" aria-label="更换头像" @click="avatarPickerOpen = !avatarPickerOpen"><img v-if="avatarSrc" class="profile-avatar profile-avatar--hero" :src="avatarSrc" alt="当前头像" /><span v-else class="profile-avatar profile-avatar--hero">{{ avatarLetter }}</span><span class="profile-avatar-button__mask">{{ uploading ? '保存中' : '更换' }}</span></button><div v-if="avatarPickerOpen" class="profile-avatar-picker"><header><strong>选择头像</strong><button class="text-btn" type="button" :disabled="uploading" @click="chooseAvatar">上传本地头像</button></header><div class="profile-avatar-options"><button v-for="avatar in builtInAvatars" :key="avatar.id" type="button" :disabled="uploading" :class="{ active: selectedBuiltInId === avatar.id }" :title="`${avatar.label}（悬停预览）`" @mouseenter="showAvatarPreview(avatar, $event)" @mouseleave="hideAvatarPreview" @focus="showAvatarPreview(avatar, $event)" @blur="hideAvatarPreview" @click="selectBuiltIn(avatar.id)"><img :src="avatar.src" :alt="avatar.label" /></button></div></div></div><span class="profile-person-card__device"><HardDrive :size="12" />本机</span></div>
-            <div class="profile-person-card__copy"><p>你的个人空间</p><label class="profile-name-input"><span class="sr-only">昵称</span><input v-model="nickname" maxlength="24" aria-label="昵称" @blur="saveNickname" @keydown.enter.prevent="saveNickname" /></label><div class="profile-person-card__badges"><span><i></i>本地资料</span><span>仅此设备</span></div></div>
+            <div class="profile-person-card__visual"><div ref="avatarPickerAnchor" class="profile-avatar-picker-anchor"><button class="profile-avatar-button" type="button" :disabled="uploading" title="更换头像" aria-label="更换头像" :aria-expanded="avatarPickerOpen" @click="avatarPickerOpen = !avatarPickerOpen"><img v-if="avatarSrc" class="profile-avatar profile-avatar--hero" :src="avatarSrc" alt="当前头像" /><span v-else class="profile-avatar profile-avatar--hero">{{ avatarLetter }}</span><span class="profile-avatar-button__mask">{{ uploading ? '保存中' : '更换' }}</span></button><div v-if="avatarPickerOpen" class="profile-avatar-picker"><header><strong>选择头像</strong><button class="text-btn" type="button" :disabled="uploading" @click="chooseAvatar">上传本地头像</button></header><div class="profile-avatar-options"><button v-for="avatar in builtInAvatars" :key="avatar.id" type="button" :disabled="uploading" :class="{ active: selectedBuiltInId === avatar.id }" :aria-pressed="selectedBuiltInId === avatar.id" :title="`${avatar.label}（悬停预览）`" @mouseenter="showAvatarPreview(avatar, $event)" @mouseleave="hideAvatarPreview" @focus="showAvatarPreview(avatar, $event)" @blur="hideAvatarPreview" @click="selectBuiltIn(avatar.id)"><img :src="avatar.src" :alt="avatar.label" /></button></div></div></div></div>
+            <div class="profile-person-card__copy"><p>本机身份</p><label class="profile-name-input"><span class="sr-only">昵称</span><input v-model="nickname" maxlength="24" aria-label="昵称" @blur="saveNickname" @keydown.enter.prevent="saveNickname" /></label><div class="profile-person-card__badges"><span><HardDrive :size="11" />仅此设备</span><span class="profile-name-save" :class="{ 'is-error': store.saveError }" aria-live="polite"><Check v-if="!store.isSaving && !store.saveError" :size="11" />{{ store.saveError ? '保存失败' : store.isSaving ? '正在保存…' : '已自动保存' }}</span></div></div>
             <div class="profile-person-card__art" aria-hidden="true"><i></i><span><HardDrive :size="20" /></span><b></b><em></em></div>
           </section>
-          <div class="profile-section__head profile-overview-head"><h3>使用概览</h3><p>你的节奏</p></div>
-          <div class="profile-overview-grid">
-            <article><span class="profile-overview-grid__icon"><ListTodo :size="16" /></span><span><small>未完成</small><strong>{{ activeTaskCount }}</strong></span></article>
-            <article><span class="profile-overview-grid__icon"><Folder :size="16" /></span><span><small>我的清单</small><strong>{{ store.lists.length }}</strong></span></article>
-            <article><span class="profile-overview-grid__icon"><CheckCircle2 :size="16" /></span><span><small>已完成</small><strong>{{ completedTaskCount }}</strong></span></article>
+          <div class="profile-section__head profile-overview-head"><h3>数据概览</h3><p>当前设备</p></div>
+          <div class="profile-health-grid">
+            <article class="profile-health-card"><span class="profile-health-card__icon"><HardDrive :size="17" /></span><span><small>保存方式</small><strong>仅保存在本机</strong><em>不会上传到服务器</em></span></article>
+            <button class="profile-health-card profile-health-card--action" type="button" @click="activeSection = 'security'"><span class="profile-health-card__icon"><ShieldCheck :size="17" /></span><span><small>恢复保护</small><strong>{{ latestBackupSummary }}</strong><em>{{ backupOverviewDetail }}</em></span><ChevronRight :size="16" /></button>
+            <button class="profile-health-card profile-health-card--action" type="button" @click="activeSection = 'space'"><span class="profile-health-card__icon"><HardDrive :size="17" /></span><span><small>存储维护</small><strong>按需检查空间</strong><em>查找可安全整理的附件</em></span><ChevronRight :size="16" /></button>
           </div>
         </section>
         <p v-if="activeSection === 'profile' && errorMessage" class="profile-editor__error">{{ errorMessage }}</p>
         <SpaceManagement v-else-if="activeSection === 'space'" @open-security="activeSection = 'security'" />
-        <section v-else-if="activeSection === 'connection'" class="profile-section profile-section--first profile-section--capabilities">
-          <div class="profile-section__head"><h3>连接与协作</h3><p>准备中</p></div>
-          <div class="profile-capability-list">
-            <article class="profile-capability"><span class="profile-capability__icon">账</span><div><strong>账号与同步</strong><small>连接账号后，在这里管理同步状态、设备和冲突处理</small></div><span>未连接</span></article>
-            <article class="profile-capability"><span class="profile-capability__icon">协</span><div><strong>协作空间</strong><small>局域网或云端协作时，在这里切换空间、成员和权限</small></div><span>未加入</span></article>
-          </div>
-        </section>
-        <section v-else-if="activeSection === 'security'" class="profile-section profile-section--first profile-section--capabilities">
-          <div class="profile-section__head"><h3>数据与安全</h3><p>本地优先</p></div>
+        <section v-else-if="activeSection === 'security'" class="profile-section profile-section--first">
+          <div class="profile-section__head"><h3>备份与恢复</h3><p>{{ latestBackupSummary }}</p></div>
           <div class="data-backup-toolbar">
             <span><strong>本机恢复点</strong><small>包含任务、附件和头像；恢复前会自动创建安全点</small></span>
-            <span class="data-backup-toolbar__actions"><button class="text-btn" type="button" :disabled="backupWorking" @click="openBackupLocation">打开位置</button><button class="small-btn" type="button" :disabled="backupWorking" @click="createBackup">{{ backupWorking ? '处理中…' : '创建恢复点' }}</button></span>
+            <span class="data-backup-toolbar__actions"><button class="small-btn" type="button" :disabled="backupWorking" @click="createBackup">{{ backupWorking ? '处理中…' : '创建恢复点' }}</button></span>
           </div>
-          <p v-if="backupLocation" class="data-backup-location" :title="backupLocation">恢复点保存于：<code>{{ backupLocation }}</code></p>
           <p v-if="backupError" class="profile-editor__error">{{ backupError }}</p>
           <div v-if="backups.length" class="data-backup-list">
             <article v-for="backup in backups" :key="backup.id" class="data-backup-item">
-              <span class="profile-capability__icon">备</span>
+              <span class="profile-capability__icon"><ShieldCheck :size="16" /></span>
               <span><strong>{{ backupLabel(backup) }}</strong><small>{{ formatBytes(backup.sizeBytes) }}</small></span>
-              <span class="data-backup-item__actions"><button class="text-btn" type="button" :disabled="backupWorking" @click="openBackup(backup)">打开</button><button class="text-btn" type="button" :disabled="backupWorking" @click="requestRestore(backup)">恢复</button><button class="text-btn data-backup-item__delete" type="button" :disabled="backupWorking" @click="requestDelete(backup)">删除</button></span>
+              <span class="data-backup-item__actions"><button class="text-btn" type="button" :disabled="backupWorking" @click="openBackup(backup)">打开</button><button class="small-btn" type="button" :disabled="backupWorking" @click="requestRestore(backup)">恢复</button><button class="text-btn data-backup-item__delete" type="button" :disabled="backupWorking" @click="requestDelete(backup)">删除</button></span>
             </article>
           </div>
           <p v-else class="profile-capability__empty">还没有恢复点。建议在大批量整理或安装更新前创建一个。</p>
@@ -57,9 +49,7 @@
             <small>当前数据将先保存为新的“恢复前安全点”，然后重新加载此恢复点。</small>
             <span><button class="text-btn" type="button" :disabled="backupWorking" @click="pendingRestore = null">取消</button><button class="small-btn" type="button" :disabled="backupWorking" @click="restoreBackup">确认恢复</button></span>
           </div>
-          <div class="profile-capability-list">
-            <article class="profile-capability"><span class="profile-capability__icon">安</span><div><strong>当前设备</strong><small>数据仅保存在本机；不会上传到服务器</small></div><span class="profile-capability__status is-safe">仅此设备</span></article>
-          </div>
+          <details v-if="backupLocation" class="data-backup-location-details"><summary><span><HardDrive :size="15" />恢复点存储位置</span><span>查看</span></summary><div><code :title="backupLocation">{{ backupLocation }}</code><button class="text-btn" type="button" :disabled="backupWorking" @click="openBackupLocation">打开文件夹</button></div></details>
         </section>
         </div>
       </div>
@@ -86,8 +76,8 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { CheckCircle2, Folder, HardDrive, ListTodo, RefreshCw, ShieldCheck, UserRound, X } from 'lucide-vue-next'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { Check, ChevronRight, HardDrive, ShieldCheck, UserRound, X } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import { cleanupProfileAvatars, createDataBackup, deleteDataBackup, getDataBackupLocation, importProfileAvatar, listDataBackups, openDataBackup, openDataBackupLocation, readProfileAvatar, restoreDataBackup, selectImage } from '@/services/platform'
 import SpaceManagement from './SpaceManagement.vue'
@@ -121,8 +111,9 @@ import alienGardener from '@/assets/avatars/alien-gardener.png'
 import snailLibrarian from '@/assets/avatars/snail-librarian.png'
 import lemonRobot from '@/assets/avatars/lemon-robot.png'
 
-defineEmits(['close'])
+const emit = defineEmits(['close'])
 const store = useTaskStore()
+const profilePanel = ref(null)
 const nickname = ref(store.profile.nickname)
 const avatarUrl = ref('')
 const avatarPickerOpen = ref(false)
@@ -138,14 +129,11 @@ const uploading = ref(false)
 const errorMessage = ref('')
 const activeSection = ref('profile')
 const sections = [
-  { id: 'profile', label: '个人资料', summary: '头像与昵称', icon: UserRound },
-  { id: 'space', label: '空间管理', summary: '数据与维护', icon: HardDrive },
-  { id: 'connection', label: '连接与协作', summary: '同步与成员', icon: RefreshCw },
-  { id: 'security', label: '数据与安全', summary: '备份与设备', icon: ShieldCheck }
+  { id: 'profile', label: '概览', summary: '资料与数据状态', icon: UserRound },
+  { id: 'space', label: '存储与清理', summary: '占用与附件维护', icon: HardDrive },
+  { id: 'security', label: '备份与恢复', summary: '恢复点与设备', icon: ShieldCheck }
 ]
 const avatarLetter = computed(() => Array.from(store.profile.nickname?.trim() || '易')[0] || '易')
-const activeTaskCount = computed(() => store.tasks.filter(task => !task.completed && !task.deleted).length)
-const completedTaskCount = computed(() => store.tasks.filter(task => task.completed && !task.deleted).length)
 const backups = ref([])
 const backupWorking = ref(false)
 const backupError = ref('')
@@ -157,9 +145,22 @@ const deleteBackupDetails = computed(() => pendingDelete.value ? [
   { label: '包含内容', value: '任务、附件和头像', type: 'info' }
 ] : [])
 let nicknameTimer = null
+let profileTrigger = null
+const focusableSelector = ['button:not([disabled])', 'input:not([disabled])', 'select:not([disabled])', 'a[href]', '[tabindex]:not([tabindex="-1"])'].join(',')
+const latestBackupSummary = computed(() => backups.value.length ? relativeBackupTime(backups.value[0]?.createdAt) : '尚未创建恢复点')
+const backupOverviewDetail = computed(() => backups.value.length ? `${backups.value.length} 个本机恢复点` : '建议在大批量整理前创建')
 
-onMounted(() => { loadAvatar(); loadBackups(); loadBackupLocation(); document.addEventListener('pointerdown', closeAvatarPickerOnOutside) })
-onBeforeUnmount(() => { if (nicknameTimer) window.clearTimeout(nicknameTimer); document.removeEventListener('pointerdown', closeAvatarPickerOnOutside) })
+onMounted(async () => {
+  profileTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  loadAvatar(); loadBackups(); loadBackupLocation(); document.addEventListener('pointerdown', closeAvatarPickerOnOutside)
+  await nextTick()
+  profilePanel.value?.querySelector(`[data-profile-section="${activeSection.value}"]`)?.focus()
+})
+onBeforeUnmount(() => {
+  if (nicknameTimer) window.clearTimeout(nicknameTimer)
+  document.removeEventListener('pointerdown', closeAvatarPickerOnOutside)
+  profileTrigger?.focus?.()
+})
 watch(nickname, () => {
   if (nicknameTimer) window.clearTimeout(nicknameTimer)
   nicknameTimer = window.setTimeout(() => saveNickname(), 550)
@@ -205,6 +206,66 @@ function formatBytes(value = 0) {
 function formatBackupDate(value) {
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? '未知时间' : date.toLocaleString('zh-CN', { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+function relativeBackupTime(value) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '已有本机恢复点'
+  const elapsed = Date.now() - date.getTime()
+  if (elapsed < 60 * 60 * 1000) return '最近一小时内已备份'
+  if (elapsed < 24 * 60 * 60 * 1000) return `${Math.max(1, Math.floor(elapsed / (60 * 60 * 1000)))} 小时前已备份`
+  if (elapsed < 7 * 24 * 60 * 60 * 1000) return `${Math.floor(elapsed / (24 * 60 * 60 * 1000))} 天前已备份`
+  return `${date.getMonth() + 1}月${date.getDate()}日已备份`
+}
+
+function closePanel() {
+  emit('close')
+}
+
+function handleEscape() {
+  if (avatarPickerOpen.value) {
+    avatarPickerOpen.value = false
+    hideAvatarPreview()
+    avatarPickerAnchor.value?.querySelector('button')?.focus()
+    return
+  }
+  closePanel()
+}
+
+function trapProfileFocus(event) {
+  const focusable = [...(profilePanel.value?.querySelectorAll(focusableSelector) || [])]
+    .filter(element => element.getClientRects().length > 0)
+  if (!focusable.length) {
+    event.preventDefault()
+    profilePanel.value?.focus()
+    return
+  }
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault()
+    first.focus()
+  }
+}
+
+function handleSectionKeydown(event) {
+  const keys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End']
+  if (!keys.includes(event.key)) return
+  const buttons = [...(profilePanel.value?.querySelectorAll('[data-profile-section]') || [])]
+  const currentIndex = buttons.indexOf(event.target.closest('[data-profile-section]'))
+  if (currentIndex < 0) return
+  event.preventDefault()
+  const delta = ['ArrowUp', 'ArrowLeft'].includes(event.key) ? -1 : 1
+  const nextIndex = event.key === 'Home'
+    ? 0
+    : event.key === 'End'
+      ? buttons.length - 1
+      : (currentIndex + delta + buttons.length) % buttons.length
+  activeSection.value = buttons[nextIndex].dataset.profileSection
+  nextTick(() => buttons[nextIndex].focus())
 }
 
 function backupLabel(backup) {

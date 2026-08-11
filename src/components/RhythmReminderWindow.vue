@@ -9,13 +9,34 @@
   </NativeReminderWindowShell>
 </template>
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { listen } from '@tauri-apps/api/event'
 import { BellRing, Check, Clock3, X } from 'lucide-vue-next'
 import { getRhythmReminderPayload, handleRhythmReminderAction } from '@/services/platform'
 import NativeReminderWindowShell from './NativeReminderWindowShell.vue'
 const reminder = ref(null); const busy = ref(false)
-onMounted(async () => { reminder.value = await getRhythmReminderPayload() })
-async function perform(action) { if (!reminder.value || busy.value) return; busy.value = true; try { await handleRhythmReminderAction(reminder.value, action) } finally { busy.value = false } }
+let unlistenRefresh
+
+async function loadReminder() {
+  reminder.value = await getRhythmReminderPayload()
+}
+
+onMounted(async () => {
+  unlistenRefresh = await listen('rhythm-reminder:refresh', event => {
+    reminder.value = event.payload || null
+  })
+  await loadReminder()
+})
+onBeforeUnmount(() => { unlistenRefresh?.() })
+
+async function perform(action) {
+  if (!reminder.value || busy.value) return
+  busy.value = true
+  try {
+    const handled = await handleRhythmReminderAction(reminder.value, action)
+    if (!handled) await loadReminder()
+  } finally { busy.value = false }
+}
 function hide() { return perform('hide') }
 </script>
 <style scoped>

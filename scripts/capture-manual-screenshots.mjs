@@ -337,11 +337,11 @@ if (await settingsButton.count()) {
   await settingsButton.click()
   await waitForUi()
   await capture('settings-appearance')
-  await clickText('专注与休息')
+  await clickText('专注与节律')
   await capture('settings-focus')
-  await clickText('通知与反馈')
+  await clickText('通知与声音')
   await capture('settings-notifications')
-  await clickText('应用行为')
+  await clickText('通用')
   await capture('settings-behavior')
   await closeSettings()
 }
@@ -359,7 +359,7 @@ if (await profileButton.count()) {
     await avatarButton.click()
     await waitForUi()
   }
-  await clickText('空间管理')
+  await clickText('存储与清理')
   // 触发扫描，让"应用总占用"和各分类明细都展示出来，而不是停在初始"开始查看"状态。
   const scanButton = page.locator('button:has-text("开始扫描"), button:has-text("重新扫描"), button:has-text("开始查看本机空间")').first()
   if (await scanButton.count()) {
@@ -367,7 +367,7 @@ if (await profileButton.count()) {
     await page.waitForTimeout(1500)
   }
   await capture('space-management')
-  await clickText('数据与安全')
+  await clickText('备份与恢复')
   await capture('profile-security')
   const profileClose = page.locator('button.profile-panel__close, button[aria-label="关闭个人空间"]').first()
   if (await profileClose.count()) await profileClose.click()

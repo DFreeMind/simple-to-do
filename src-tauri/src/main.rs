@@ -12,7 +12,6 @@ use std::{
     process::Command,
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
-        Arc,
         Mutex,
     },
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -416,6 +415,86 @@ fn set_window_close_behavior(app: tauri::AppHandle, behavior: String) -> Result<
     Ok(true)
 }
 
+/// 为任务详情预留窗口空间。只在普通窗口且右侧工作区足够时生效：
+/// 保持窗口左边缘不动，详情展开时向右增长，收起时由前端按同一增量恢复。
+#[tauri::command]
+fn resize_main_window_for_task_detail(
+    app: tauri::AppHandle,
+    delta_width: f64,
+) -> Result<bool, String> {
+    if !delta_width.is_finite() || delta_width.abs() < f64::EPSILON {
+        return Ok(false);
+    }
+    let Some(window) = app.get_webview_window("main") else {
+        return Ok(false);
+    };
+    if window
+        .is_maximized()
+        .map_err(|error| format!("读取主窗口最大化状态失败: {error}"))?
+        || window
+            .is_fullscreen()
+            .map_err(|error| format!("读取主窗口全屏状态失败: {error}"))?
+    {
+        return Ok(false);
+    }
+
+    let scale_factor = window.scale_factor().unwrap_or(1.0);
+    let delta = (delta_width * scale_factor).round() as i64;
+    if delta == 0 {
+        return Ok(false);
+    }
+    // set_size 使用的是客户区尺寸；不能把 outer_size 的标题栏和边框高度传回去，
+    // 否则每次展开/收起都会把窗口装饰再累加一遍。
+    let outer_size = window
+        .outer_size()
+        .map_err(|error| format!("读取主窗口尺寸失败: {error}"))?;
+    let inner_size = window
+        .inner_size()
+        .map_err(|error| format!("读取主窗口内容区尺寸失败: {error}"))?;
+    let next_width = i64::from(inner_size.width) + delta;
+    if next_width <= 0 {
+        return Ok(false);
+    }
+
+    if delta > 0 {
+        let position = window
+            .outer_position()
+            .map_err(|error| format!("读取主窗口位置失败: {error}"))?;
+        let monitor = window
+            .current_monitor()
+            .map_err(|error| format!("读取当前屏幕失败: {error}"))?
+            .or_else(|| window.primary_monitor().ok().flatten());
+        let Some(monitor) = monitor else {
+            return Ok(false);
+        };
+        let work_area = monitor.work_area();
+        let work_left = i64::from(work_area.position.x);
+        let work_right = work_left + i64::from(work_area.size.width);
+        // 留出一点边缘，避免 Windows 贴边/分屏时被误当作普通浮动窗口。
+        const SCREEN_EDGE_GUARD: i64 = 16;
+        let next_outer_width = i64::from(outer_size.width) + delta;
+        let available_outer_width = work_right - work_left - SCREEN_EDGE_GUARD * 2;
+        // 屏幕本身放不下时才降级为应用内详情；右侧不够时可以向左腾出空间。
+        if next_outer_width > available_outer_width {
+            return Ok(false);
+        }
+        let max_left = work_right - SCREEN_EDGE_GUARD - next_outer_width;
+        let next_left = i64::from(position.x)
+            .max(work_left + SCREEN_EDGE_GUARD)
+            .min(max_left);
+        if next_left != i64::from(position.x) {
+            window
+                .set_position(tauri::PhysicalPosition::new(next_left as i32, position.y))
+                .map_err(|error| format!("为任务详情腾出窗口空间失败: {error}"))?;
+        }
+    }
+
+    window
+        .set_size(tauri::PhysicalSize::new(next_width as u32, inner_size.height))
+        .map_err(|error| format!("调整主窗口宽度失败: {error}"))?;
+    Ok(true)
+}
+
 /// 检查更新。source 为前端选择的更新源：auto / github / self。
 /// 有可用更新时将 Update 存入 PendingUpdate，供 install_pending_update 消费。
 #[tauri::command]
@@ -447,6 +526,10 @@ async fn check_for_update(app: tauri::AppHandle, source: String) -> Result<Optio
 }
 
 /// 下载并安装 check_for_update 暂存的更新，进度通过 updater:progress 事件回传前端。
+///
+/// 不使用 `download_and_install`，以便把传输完成、签名校验和实际替换应用
+/// 分开反馈。尤其在 macOS 上，替换位于“应用程序”目录的应用可能会等待系统
+/// 授权；前端不能把下载完成误报为“安装程序即将启动”。
 #[tauri::command]
 async fn install_pending_update(app: tauri::AppHandle) -> Result<bool, String> {
     let update = app
@@ -456,10 +539,10 @@ async fn install_pending_update(app: tauri::AppHandle) -> Result<bool, String> {
         .map_err(|_| "更新状态不可用".to_string())?
         .take()
         .ok_or_else(|| "没有待安装的更新".to_string())?;
-    let emit_app = Arc::new(app.clone());
-    let emit_progress = emit_app.clone();
-    update
-        .download_and_install(
+    let emit_progress = app.clone();
+    let emit_verifying = app.clone();
+    let bytes = update
+        .download(
             move |chunk_length, content_length| {
                 let _ = emit_progress.emit(
                     "updater:progress",
@@ -471,12 +554,27 @@ async fn install_pending_update(app: tauri::AppHandle) -> Result<bool, String> {
                 );
             },
             move || {
-                let _ = emit_app.emit("updater:progress", serde_json::json!({ "event": "Finished" }));
+                // 下载回调发生在签名校验之前，不能把它当作“安装已开始”。
+                let _ = emit_verifying.emit(
+                    "updater:progress",
+                    serde_json::json!({ "event": "Verifying" }),
+                );
             },
         )
         .await
-        .map_err(|error| format!("更新下载或安装失败: {error}"))?;
-    Ok(true)
+        .map_err(|error| format!("更新下载或签名校验失败: {error}"))?;
+
+    let _ = app.emit(
+        "updater:progress",
+        serde_json::json!({ "event": "Installing" }),
+    );
+    update
+        .install(bytes)
+        .map_err(|error| format!("更新安装失败: {error}"))?;
+
+    // Windows 的 updater 会自行退出并交给安装器重开应用；macOS 等平台在
+    // 原地替换成功后仍需显式重启，避免界面永久停留在“正在安装”。
+    app.restart()
 }
 
 fn main_window_is_focused(app: &tauri::AppHandle) -> bool {
@@ -1908,19 +2006,21 @@ fn show_global_rhythm_reminder(
 ) -> Result<(), String> {
     let state = app.state::<RhythmReminderState>();
     let revision = state.revision.fetch_add(1, Ordering::Relaxed) + 1;
+    let payload = RhythmReminderPayload {
+        revision,
+        reminder_id,
+        title,
+        message,
+        trigger_label,
+        sound_enabled,
+    };
     state
         .pending
         .lock()
         .map_err(|_| "节律提醒窗口状态不可用".to_string())?
-        .replace(RhythmReminderPayload {
-            revision,
-            reminder_id,
-            title,
-            message,
-            trigger_label,
-            sound_enabled,
-        });
+        .replace(payload.clone());
     let window = if let Some(window) = app.get_webview_window("rhythm-reminder") {
+        let _ = window.hide();
         window
     } else {
         WebviewWindowBuilder::new(
@@ -1944,6 +2044,7 @@ fn show_global_rhythm_reminder(
         .build()
         .map_err(|error| format!("创建节律提醒窗口失败: {error}"))?
     };
+    let _ = app.emit_to("rhythm-reminder", "rhythm-reminder:refresh", payload);
     window
         .show()
         .map_err(|error| format!("显示节律提醒窗口失败: {error}"))?;
@@ -1972,17 +2073,29 @@ fn handle_rhythm_reminder_action(
     if !matches!(action.as_str(), "complete" | "snooze" | "skip" | "hide") {
         return Err("无效的节律提醒操作".to_string());
     }
-    let handled = app
-        .state::<RhythmReminderState>()
-        .pending
-        .lock()
-        .map_err(|_| "节律提醒窗口状态不可用".to_string())?
-        .take_if(|item| item.revision == revision && item.reminder_id == reminder_id)
-        .is_some();
+    let state = app.state::<RhythmReminderState>();
+    let handled = {
+        let mut pending = state
+            .pending
+            .lock()
+            .map_err(|_| "节律提醒窗口状态不可用".to_string())?;
+        take_matching_rhythm_reminder(&mut pending, revision, &reminder_id)
+    };
+    if !handled {
+        if let Some(payload) = state
+            .pending
+            .lock()
+            .map_err(|_| "节律提醒窗口状态不可用".to_string())?
+            .clone()
+        {
+            let _ = app.emit_to("rhythm-reminder", "rhythm-reminder:refresh", payload);
+        }
+        return Ok(false);
+    }
     if let Some(window) = app.get_webview_window("rhythm-reminder") {
         let _ = window.hide();
     }
-    if handled && action != "hide" {
+    if action != "hide" {
         app.emit_to(
             "main",
             "rhythm-reminder:action",
@@ -1991,6 +2104,51 @@ fn handle_rhythm_reminder_action(
         .map_err(|error| format!("发送节律提醒操作失败: {error}"))?;
     }
     Ok(handled)
+}
+
+fn take_matching_rhythm_reminder(
+    pending: &mut Option<RhythmReminderPayload>,
+    revision: u64,
+    reminder_id: &str,
+) -> bool {
+    pending
+        .take_if(|item| item.revision == revision && item.reminder_id == reminder_id)
+        .is_some()
+}
+
+fn clear_rhythm_reminder_for_id(
+    pending: &mut Option<RhythmReminderPayload>,
+    reminder_id: &str,
+) -> bool {
+    match pending.as_ref() {
+        Some(item) if item.reminder_id == reminder_id => {
+            pending.take();
+            true
+        }
+        None => true,
+        Some(_) => false,
+    }
+}
+
+#[tauri::command]
+fn dismiss_rhythm_reminder_window(
+    app: tauri::AppHandle,
+    reminder_id: String,
+) -> Result<bool, String> {
+    let state = app.state::<RhythmReminderState>();
+    let should_hide = {
+        let mut pending = state
+            .pending
+            .lock()
+            .map_err(|_| "节律提醒窗口状态不可用".to_string())?;
+        clear_rhythm_reminder_for_id(&mut pending, &reminder_id)
+    };
+    if should_hide {
+        if let Some(window) = app.get_webview_window("rhythm-reminder") {
+            let _ = window.hide();
+        }
+    }
+    Ok(should_hide)
 }
 
 #[tauri::command]
@@ -4981,6 +5139,39 @@ mod tests {
         assert_eq!(rhythm_controller_expanded_height(3), 420.0);
         assert_eq!(rhythm_controller_expanded_height(8), 420.0);
     }
+
+    fn rhythm_reminder_payload(revision: u64, reminder_id: &str) -> RhythmReminderPayload {
+        RhythmReminderPayload {
+            revision,
+            reminder_id: reminder_id.to_string(),
+            title: "久坐提醒".to_string(),
+            message: "起来活动一下".to_string(),
+            trigger_label: "每 60 分钟".to_string(),
+            sound_enabled: true,
+        }
+    }
+
+    #[test]
+    fn stale_rhythm_reminder_action_keeps_current_payload() {
+        let mut pending = Some(rhythm_reminder_payload(2, "stand-up"));
+        assert!(!take_matching_rhythm_reminder(&mut pending, 1, "stand-up"));
+        assert_eq!(pending.as_ref().map(|item| item.revision), Some(2));
+        assert!(take_matching_rhythm_reminder(&mut pending, 2, "stand-up"));
+        assert!(pending.is_none());
+    }
+
+    #[test]
+    fn in_app_resolution_only_clears_the_matching_rhythm_reminder() {
+        let mut pending = Some(rhythm_reminder_payload(3, "drink-water"));
+        assert!(!clear_rhythm_reminder_for_id(&mut pending, "stand-up"));
+        assert_eq!(
+            pending.as_ref().map(|item| item.reminder_id.as_str()),
+            Some("drink-water")
+        );
+        assert!(clear_rhythm_reminder_for_id(&mut pending, "drink-water"));
+        assert!(pending.is_none());
+        assert!(clear_rhythm_reminder_for_id(&mut pending, "drink-water"));
+    }
 }
 
 fn main() {
@@ -5093,7 +5284,9 @@ fn main() {
             present_rhythm_reminder,
             get_rhythm_reminder_payload,
             handle_rhythm_reminder_action,
+            dismiss_rhythm_reminder_window,
             set_window_close_behavior,
+            resize_main_window_for_task_detail,
             get_system_idle_seconds,
             check_for_update,
             install_pending_update

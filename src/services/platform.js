@@ -63,6 +63,18 @@ export async function setWindowCloseBehavior(behavior) {
   return invoke('set_window_close_behavior', { behavior })
 }
 
+// 任务详情作为独立阅读区时，由原生窗口向右扩出所需空间，避免挤压任务列表。
+// 返回 false 代表当前窗口不适合调整（例如已最大化或屏幕可用区域不足），调用方保留应用内回退布局。
+export async function resizeMainWindowForTaskDetail(deltaWidth) {
+  if (!isTauri() || !Number.isFinite(deltaWidth) || deltaWidth === 0) return false
+  try {
+    return await invoke('resize_main_window_for_task_detail', { deltaWidth })
+  } catch (error) {
+    console.warn('[Platform] 调整任务详情窗口宽度失败:', error)
+    return false
+  }
+}
+
 export async function getSystemIdleSeconds() {
   if (!isTauri()) return null
   try {
@@ -634,6 +646,16 @@ export async function getRhythmReminderPayload() {
 export async function handleRhythmReminderAction(reminder, action) {
   if (!isTauri() || !reminder?.reminderId) return false
   return invoke('handle_rhythm_reminder_action', { revision: reminder.revision, reminderId: reminder.reminderId, action })
+}
+
+export async function dismissRhythmReminderWindow(reminderId) {
+  if (!isTauri() || !reminderId) return false
+  try {
+    return await invoke('dismiss_rhythm_reminder_window', { reminderId })
+  } catch (error) {
+    console.warn('[Platform] 关闭全局节律提醒失败:', error)
+    return false
+  }
 }
 
 export async function sendReminderTestNotification(settings = {}) {

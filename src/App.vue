@@ -46,21 +46,25 @@
       class="app-shell"
       :class="{
         'app-shell--clock': store.settings.activeModule === 'clock',
-        'app-shell--detail-closed': !store.settings.detailOpen,
+        'app-shell--detail-closed': !detailLayoutOpen,
+        'app-shell--task-list-locked': lockedTaskListWidth > 0,
         'app-shell--sidebar-closed': store.settings.sidebarCollapsed
       }"
-      :style="{ '--detail-w': layoutDetailWidth + 'px' }"
+      :style="{
+        '--detail-w': layoutDetailWidth + 'px',
+        '--task-list-w': lockedTaskListWidth + 'px'
+      }"
     >
       <AppRail />
       <template v-if="store.settings.activeModule === 'tasks'">
         <Sidebar v-if="!store.settings.sidebarCollapsed" />
         <TaskList />
         <div
-          v-if="store.settings.detailOpen"
+          v-if="detailLayoutOpen"
           class="col-resizer"
           @pointerdown="onResizeStart"
         />
-        <TaskDetail v-if="store.settings.detailOpen" />
+        <TaskDetail v-if="detailLayoutOpen" @close="closeTaskDetail" />
       </template>
       <template v-else>
         <ClockSidebar v-if="!store.settings.sidebarCollapsed" />
@@ -73,10 +77,10 @@
     <FocusCelebration :celebration="store.focusCelebration" @dismiss="store.dismissFocusCelebration" @start-break="startBreakFromInApp" />
     <RhythmReminderPrompt
       :reminder="store.pendingRhythmReminder"
-      @complete="store.completeRhythmReminder(store.pendingRhythmReminder?.id)"
-      @snooze="store.snoozeRhythmReminder(store.pendingRhythmReminder?.id, 5)"
-      @skip="store.skipRhythmReminderToday(store.pendingRhythmReminder?.id)"
-      @dismiss="store.dismissRhythmReminder(store.pendingRhythmReminder?.id)"
+      @complete="handleInAppRhythmAction('complete')"
+      @snooze="handleInAppRhythmAction('snooze')"
+      @skip="handleInAppRhythmAction('skip')"
+      @dismiss="handleInAppRhythmAction('dismiss')"
     />
 
     <div
@@ -123,7 +127,11 @@ import RhythmReminderPrompt from './components/RhythmReminderPrompt.vue'
 import { useTaskStore } from './stores/task'
 import { useTheme } from './composables/useTheme'
 import { checkForUpdates as checkForUpdatesService, installUpdate as installUpdateService, updaterState } from './services/updater'
-import { openDataBackupLocation, openReleasePage as openReleasePageInBrowser } from './services/platform'
+import {
+  openDataBackupLocation,
+  openReleasePage as openReleasePageInBrowser,
+  resizeMainWindowForTaskDetail
+} from './services/platform'
 
 const store = useTaskStore()
 const isFocusReminderWindow = typeof window !== 'undefined'
@@ -136,6 +144,9 @@ const isFocusControllerWindow = typeof window !== 'undefined'
 const isRhythmControllerWindow = typeof window !== 'undefined'
   && Boolean(window.__TAURI_INTERNALS__)
   && getCurrentWebviewWindow().label === 'rhythm-controller'
+const isMainWindow = typeof window !== 'undefined'
+  && Boolean(window.__TAURI_INTERNALS__)
+  && getCurrentWebviewWindow().label === 'main'
 const appVersion = ref(__APP_VERSION__)
 const isDevelopment = import.meta.env.DEV
 
@@ -149,6 +160,9 @@ const TASK_LIST_WIDTH_MIN = 300
 const RESIZER_WIDTH = 12
 
 const detailWidth = ref(store.settings.detailWidth || 380)
+// 原生窗口先扩展/收起，详情列后显示/隐藏，避免两次网格重排造成视觉跳动。
+const detailLayoutOpen = ref(!isMainWindow && store.settings.detailOpen)
+const lockedTaskListWidth = ref(0)
 const shellRef = ref(null)
 const shellWidth = ref(0)
 let unlistenReminderAction
@@ -162,6 +176,9 @@ let unlistenRhythmElapsed
 let unlistenRhythmReminderOpen
 let unlistenRhythmReminderAction
 let shellResizeObserver
+let taskDetailWindowExpansion = null
+let taskDetailWindowResizeVersion = 0
+let taskDetailWindowOpening = false
 
 function handleFocusElapsed(event) {
   const sessionId = event.payload?.sessionId
@@ -194,7 +211,25 @@ function openRhythmReminder(event) {
   if (!reminder) return
   store.setClockView('rhythm')
 }
-function handleRhythmReminderAction(event) { const { reminderId, action } = event.payload || {}; if (!reminderId) return; store[action === 'complete' ? 'completeRhythmReminder' : action === 'snooze' ? 'snoozeRhythmReminder' : 'skipRhythmReminderToday']?.(reminderId, action === 'snooze' ? 5 : undefined); store.setClockView('rhythm') }
+function applyRhythmReminderAction(reminderId, action) {
+  if (!reminderId) return false
+  if (action === 'complete') return store.completeRhythmReminder(reminderId)
+  if (action === 'snooze') return store.snoozeRhythmReminder(reminderId, 5)
+  if (action === 'skip') return store.skipRhythmReminderToday(reminderId)
+  if (action === 'dismiss') return store.dismissRhythmReminder(reminderId)
+  return false
+}
+
+function handleInAppRhythmAction(action) {
+  const reminderId = store.pendingRhythmReminder?.id
+  applyRhythmReminderAction(reminderId, action)
+}
+
+function handleRhythmReminderAction(event) {
+  const { reminderId, action } = event.payload || {}
+  if (!applyRhythmReminderAction(reminderId, action)) return
+  store.setClockView('rhythm')
+}
 
 function handleFocusControllerAction(event) {
   const { action, sessionId, alwaysOnTop, style } = event.payload || {}
@@ -247,7 +282,7 @@ function startBreakFromInApp() {
 }
 
 const layoutDetailWidth = computed(() => clampDetailWidth(detailWidth.value, getDetailMaxWidth()))
-const isCheckingRecoveryUpdate = computed(() => ['checking', 'downloading', 'installing'].includes(recoveryUpdateState.value))
+const isCheckingRecoveryUpdate = computed(() => ['checking', 'downloading', 'verifying', 'installing'].includes(recoveryUpdateState.value))
 const recoveryUpdateState = computed(() => {
   if (isDevelopment) return 'development'
   // 恢复页必须能安装最新版，跳过记录不适用于该场景（force 检查不会进入 skipped）。
@@ -259,14 +294,16 @@ const recoveryUpdateAction = computed(() => ({
   checking: '正在检查…',
   available: '安装更新',
   downloading: '正在下载…',
-  installing: '正在启动安装程序…',
+  verifying: '正在校验签名…',
+  installing: '正在完成安装…',
   upToDate: '重新检查更新',
   error: '重试检查更新'
 }[recoveryUpdateState.value] || '检查并安装更新'))
 const recoveryDescription = computed(() => {
   if (recoveryUpdateState.value === 'available') return `发现可用版本 v${updaterState.update?.version || ''}，安装后可再次打开本机数据。`
   if (recoveryUpdateState.value === 'downloading') return recoveryUpdateProgressText.value
-  if (recoveryUpdateState.value === 'installing') return '下载完成，应用将自动重新打开并完成安装。'
+  if (recoveryUpdateState.value === 'verifying') return '下载完成，正在校验更新包的签名。'
+  if (recoveryUpdateState.value === 'installing') return '正在替换应用。macOS 可能会弹出管理员授权窗口；完成后应用会自动重新打开。'
   if (recoveryUpdateState.value === 'upToDate') return '当前已是最新稳定版；请保留数据和备份后联系支持。'
   if (recoveryUpdateState.value === 'error') return updaterState.error
   if (isDevelopment) return '当前为开发环境，请使用新版正式安装包验证数据兼容性。'
@@ -290,8 +327,129 @@ function openReminderTask(event) {
 }
 
 watch(() => store.settings.detailWidth, (v) => {
-  if (typeof v === 'number') detailWidth.value = clampDetailWidth(v)
+  if (typeof v !== 'number') return
+  const nextWidth = clampDetailWidth(v)
+  if (detailWidth.value === nextWidth) return
+  detailWidth.value = nextWidth
+  if (isMainWindow && store.settings.detailOpen && taskDetailWindowExpansion) {
+    nextTick(() => { void syncTaskDetailWindowPanelWidth() })
+  }
 })
+
+function closeTaskDetail() {
+  store.updateSettings({ detailOpen: false })
+  const selectedTaskId = store.selectedTaskId
+  nextTick(() => {
+    const taskItem = Array.from(document.querySelectorAll('.task-item'))
+      .find(item => item.dataset.taskId === selectedTaskId)
+    taskItem?.focus()
+  })
+}
+
+watch(() => store.settings.detailOpen, (isOpen) => {
+  void syncTaskDetailWindowWidth(isOpen)
+})
+
+// 旧数据会把“详情默认开启”恢复为 true，而主窗口启动时不会渲染空详情列。
+// 因此首次选中任务时，即使偏好值没有发生变化，也必须补走原生扩窗流程。
+watch(() => store.selectedTaskId, (taskId) => {
+  if (taskId && store.settings.detailOpen && !detailLayoutOpen.value) {
+    void syncTaskDetailWindowWidth(true)
+  }
+})
+
+async function syncTaskDetailWindowWidth(isOpen) {
+  if (!isMainWindow) {
+    detailLayoutOpen.value = isOpen
+    if (!isOpen) lockedTaskListWidth.value = 0
+    return
+  }
+  if (isOpen) {
+    if (taskDetailWindowExpansion) {
+      detailLayoutOpen.value = true
+      return
+    }
+    if (taskDetailWindowOpening) return
+    const requestVersion = ++taskDetailWindowResizeVersion
+    taskDetailWindowOpening = true
+    try {
+      const width = layoutDetailWidth.value + RESIZER_WIDTH
+      lockedTaskListWidth.value = getTaskListWidth()
+      const expanded = await resizeMainWindowForTaskDetail(width)
+
+      // 详情在命令执行过程中被关闭时，立即回收这次刚增加的空间。
+      if (requestVersion !== taskDetailWindowResizeVersion || !store.settings.detailOpen) {
+        if (expanded) await resizeMainWindowForTaskDetail(-width)
+        return
+      }
+      if (expanded) {
+        const outerSize = await getCurrentWebviewWindow().outerSize().catch(() => null)
+        taskDetailWindowExpansion = outerSize
+          ? { width, expectedOuterWidth: outerSize.width }
+          : { width, expectedOuterWidth: null }
+      } else {
+        lockedTaskListWidth.value = 0
+      }
+      detailLayoutOpen.value = true
+      return
+    } finally {
+      taskDetailWindowOpening = false
+    }
+  }
+
+  const requestVersion = ++taskDetailWindowResizeVersion
+  // 先将详情替换成锁宽的空白轨道，再收原生窗口；中间任务列表不会接管被收回的空间。
+  detailLayoutOpen.value = false
+  const expansion = taskDetailWindowExpansion
+  if (!expansion) {
+    detailLayoutOpen.value = false
+    lockedTaskListWidth.value = 0
+    return
+  }
+
+  const outerSize = await getCurrentWebviewWindow().outerSize().catch(() => null)
+  // 仅在窗口仍保持自动展开后的尺寸时恢复，避免覆盖用户主动改变的窗口大小。
+  if (
+    expansion.expectedOuterWidth !== null
+    && (!outerSize || Math.abs(outerSize.width - expansion.expectedOuterWidth) > 2)
+  ) {
+    taskDetailWindowExpansion = null
+    detailLayoutOpen.value = false
+    lockedTaskListWidth.value = 0
+    return
+  }
+  // 用户快速重新打开详情时，保留已展开的窗口，不造成一次不必要的收缩与再展开。
+  if (requestVersion !== taskDetailWindowResizeVersion || store.settings.detailOpen) return
+  const shrunk = await resizeMainWindowForTaskDetail(-expansion.width)
+  taskDetailWindowExpansion = null
+  if (shrunk && (requestVersion !== taskDetailWindowResizeVersion || store.settings.detailOpen)) {
+    void syncTaskDetailWindowWidth(true)
+    return
+  }
+  detailLayoutOpen.value = false
+  lockedTaskListWidth.value = 0
+}
+
+async function syncTaskDetailWindowPanelWidth() {
+  if (!isMainWindow || !store.settings.detailOpen || !taskDetailWindowExpansion) return
+  const expansion = taskDetailWindowExpansion
+  const nextWidth = layoutDetailWidth.value + RESIZER_WIDTH
+  const delta = nextWidth - expansion.width
+  if (!delta) return
+
+  const outerSize = await getCurrentWebviewWindow().outerSize().catch(() => null)
+  if (
+    expansion.expectedOuterWidth !== null
+    && (!outerSize || Math.abs(outerSize.width - expansion.expectedOuterWidth) > 2)
+  ) return
+  const resized = await resizeMainWindowForTaskDetail(delta)
+  if (!resized) return
+  const resizedOuterSize = await getCurrentWebviewWindow().outerSize().catch(() => null)
+  taskDetailWindowExpansion = {
+    width: nextWidth,
+    expectedOuterWidth: resizedOuterSize?.width ?? null
+  }
+}
 
 function onResizeStart(e) {
   const startX = e.clientX
@@ -315,7 +473,10 @@ function onResizeStart(e) {
     target.removeEventListener('lostpointercapture', onCancel)
     if (target.hasPointerCapture(e.pointerId)) target.releasePointerCapture(e.pointerId)
     document.body.classList.remove('is-resizing')
-    if (saveWidth) store.settings.detailWidth = detailWidth.value
+    if (saveWidth) {
+      store.settings.detailWidth = detailWidth.value
+      void syncTaskDetailWindowPanelWidth()
+    }
   }
 
   function onUp() {
@@ -343,6 +504,10 @@ function getDetailMaxWidth() {
     DETAIL_WIDTH_MIN,
     Math.min(DETAIL_WIDTH_MAX, currentShellWidth - sidebarWidth - TASK_LIST_WIDTH_MIN - RESIZER_WIDTH)
   )
+}
+
+function getTaskListWidth() {
+  return Math.round(shellRef.value?.querySelector('.task-list')?.clientWidth || 0)
 }
 
 function syncShellWidth() {

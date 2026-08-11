@@ -520,7 +520,7 @@ data.tasks = data.tasks.map(item => item.deleted ? item : { ...item, deleted: fa
 <img src="${atts[0].url}" alt="附件示例 1" data-attachment-src="attachments/demo/preview-1.png" style="max-width: 100%; border-radius: 12px;" />
 <p>多张图片可左右切换查看：</p>
 <img src="${atts[1].url}" alt="附件示例 2" data-attachment-src="attachments/demo/preview-2.png" style="max-width: 100%; border-radius: 12px;" />
-<p>图片附件保存在应用数据目录，扫描后可在"个人空间 → 空间管理"中查看引用情况。</p>`
+<p>图片附件保存在应用数据目录，扫描后可在"个人空间 → 存储与清理"中查看引用情况。</p>`
   const test3 = data.tasks.find(t => t.id === 'test-3')
   if (test3) {
     test3.descriptionHtml = descriptionHtml
