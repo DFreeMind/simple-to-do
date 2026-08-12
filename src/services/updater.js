@@ -12,12 +12,15 @@ function isTauri() {
  * 避免两处各自维护检查/下载逻辑导致状态不一致。
  */
 export const updaterState = reactive({
-  // idle | checking | upToDate | available | skipped | downloading | verifying | installing | error | unsupported
+  // idle | checking | upToDate | available | skipped | downloading | verifying | installing | installed | restarting | error | unsupported
   status: 'idle',
   update: null,
   error: '',
   progress: { downloaded: 0, total: 0 }
 })
+
+const RESTART_TIMEOUT_MS = 8000
+let restartTimer = null
 
 function classifyError(error) {
   const message = String(error?.message || '')
@@ -100,7 +103,10 @@ export async function installUpdate() {
         updaterState.status = 'installing'
       }
     })
-    await invoke('install_pending_update')
+    const installed = await invoke('install_pending_update')
+    if (!installed) throw new Error('更新器未确认安装成功')
+    updaterState.status = 'installed'
+    void restartUpdateApplication()
     return true
   } catch (error) {
     updaterState.status = 'error'
@@ -109,6 +115,31 @@ export async function installUpdate() {
     return false
   } finally {
     if (unlisten) unlisten()
+  }
+}
+
+/** 请求应用重启；若 macOS 未如期退出，则恢复为可操作的 installed 状态。 */
+export async function restartUpdateApplication() {
+  if (!isTauri()) return false
+  if (restartTimer) clearTimeout(restartTimer)
+  updaterState.status = 'restarting'
+  updaterState.error = ''
+  restartTimer = setTimeout(() => {
+    restartTimer = null
+    if (updaterState.status !== 'restarting') return
+    updaterState.status = 'installed'
+    updaterState.error = '更新已经安装，但应用未能自动重新启动。请退出应用后重新打开。'
+  }, RESTART_TIMEOUT_MS)
+  try {
+    await invoke('restart_application')
+    return true
+  } catch (error) {
+    if (restartTimer) clearTimeout(restartTimer)
+    restartTimer = null
+    updaterState.status = 'installed'
+    updaterState.error = '更新已经安装，但自动重新启动失败。请退出应用后重新打开。'
+    console.warn('[updater] 请求重新启动失败:', error)
+    return false
   }
 }
 
