@@ -61,6 +61,12 @@ function sub(id, title, completed = false) {
 
 const today = localDateKey()
 const yesterday = localDateKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1))
+const focusHistory = [
+  { id: 'focus-demo-1', profileId: 'pomodoro', profileName: '番茄专注', taskId: 'today-2', taskTitle: '完成季度报告初稿', startedAt: atOffset(0, 9), finishedAt: atOffset(0, 9, 25), elapsedSeconds: 1500, phase: 'focus', result: 'completed', note: '完成报告数据整理。' },
+  { id: 'focus-demo-2', profileId: 'deep-work', profileName: '深度专注', taskId: 'tomorrow-2', taskTitle: '准备周五项目评审材料', startedAt: atOffset(-1, 14), finishedAt: atOffset(-1, 14, 50), elapsedSeconds: 3000, phase: 'focus', result: 'completed', note: '梳理评审风险。' },
+  { id: 'focus-demo-3', profileId: 'pomodoro', profileName: '番茄专注', taskId: 'week-1', taskTitle: '本周复盘：整理 7 月目标进展', startedAt: atOffset(-2, 10), finishedAt: atOffset(-2, 10, 22), elapsedSeconds: 1320, phase: 'focus', result: 'interrupted', note: '临时会议打断。' },
+  { id: 'focus-demo-4', profileId: 'free-focus', profileName: '自由时长', taskId: 'today-4', taskTitle: '每日 20 分钟英语听力', startedAt: atOffset(-4, 20), finishedAt: atOffset(-4, 20, 30), elapsedSeconds: 1800, phase: 'focus', result: 'completed', note: '完成精听和生词整理。' }
+]
 
 // 任务分组（list 内部的分组，不同于清单分组）
 const taskGroups = [
@@ -474,7 +480,7 @@ const data = {
       globalQuietHours: { start: '22:00', end: '08:00' }
     },
     garden: {},
-    history: []
+    history: focusHistory
   },
   settings: {
     theme: 'mint',
@@ -513,9 +519,25 @@ const data = {
 // 确保非删除任务的 deleted 字段为 false
 data.tasks = data.tasks.map(item => item.deleted ? item : { ...item, deleted: false, deletedAt: null })
 
-// 给 test-3 注入图片附件 + 富文本引用，演示图片预览
+// 给 test-3 注入图片附件 + 富文本引用，演示图片预览。
+// 截图数据必须可独立生成：本地临时附件文件存在时优先复用，缺失时使用
+// 内嵌 SVG 回退，避免在干净工作区中断整个手册截图流程。
 {
-  const atts = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'tmp', 'demo-attachments.json'), 'utf8'))
+  const attachmentFixture = path.join(process.cwd(), 'tmp', 'demo-attachments.json')
+  const svgAttachment = (id, name, start, end, label, sizeBytes) => ({
+    id,
+    name,
+    url: `data:image/svg+xml;base64,${Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="${start}"/><stop offset="100%" stop-color="${end}"/></linearGradient></defs><rect width="800" height="500" fill="url(#g)"/><text x="400" y="270" text-anchor="middle" font-size="64" fill="white" font-family="system-ui">${label}</text></svg>`).toString('base64')}`,
+    sizeBytes,
+    kind: 'image'
+  })
+  const fallbackAttachments = [
+    svgAttachment('preview-1', '附件示例 1.png', '#7be0c4', '#5a8ce0', '附件示例 1', 184052),
+    svgAttachment('preview-2', '附件示例 2.png', '#7c6ee6', '#3aa6b9', '附件示例 2', 196012)
+  ]
+  const atts = fs.existsSync(attachmentFixture)
+    ? JSON.parse(fs.readFileSync(attachmentFixture, 'utf8'))
+    : fallbackAttachments
   const descriptionHtml = `<p>这是任务里插入的附件图片，点击可在大图模式预览：</p>
 <img src="${atts[0].url}" alt="附件示例 1" data-attachment-src="attachments/demo/preview-1.png" style="max-width: 100%; border-radius: 12px;" />
 <p>多张图片可左右切换查看：</p>

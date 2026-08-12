@@ -5,18 +5,39 @@ export const FOCUS_GARDEN_COLLECTIONS = [
 ]
 
 export const FOCUS_GARDEN_SPECIES = [
-  { id: 'daisy', name: '小雏菊', unlockMinutes: 0, collectionId: 'morning', description: '清爽而坚定，从第一段专注开始陪伴。', accent: '#e8bb45', tone: '#fffdf2', scene: '#fff9dc', horizon: '#e4efc9', ground: '#cbdcaf', sun: '#ffe78f', motionDuration: 4.4 },
-  { id: 'tulip', name: '郁金香', unlockMinutes: 150, collectionId: 'morning', description: '叶片环抱花茎，花苞会沿着晨光舒展。', accent: '#e98882', tone: '#fff3f1', scene: '#fff0e9', horizon: '#f3d9cb', ground: '#d8dcb5', sun: '#ffd1a8', motionDuration: 4.8 },
-  { id: 'cosmos', name: '波斯菊', unlockMinutes: 450, collectionId: 'morning', description: '纤细花茎与轻盈花瓣，微风一来便点头。', accent: '#e78fac', tone: '#fff2f7', scene: '#fff1f6', horizon: '#efd7e5', ground: '#cfe0c3', sun: '#ffd8df', motionDuration: 3.8 },
-  { id: 'sunflower', name: '向日葵', unlockMinutes: 900, collectionId: 'morning', description: '追随光线抬头，用完整盛放回应投入。', accent: '#e3ad3f', tone: '#fff9e8', scene: '#fff1bd', horizon: '#ead69a', ground: '#b9cc8d', sun: '#ffd44f', motionDuration: 5.1 },
-  { id: 'poppy', name: '虞美人', unlockMinutes: 1500, collectionId: 'breeze', description: '薄软花瓣像纸一样舒展，动作轻而有弹性。', accent: '#e36f62', tone: '#fff0ec', scene: '#fff0e6', horizon: '#efd0bf', ground: '#bcd7b6', sun: '#ffc8a6', motionDuration: 3.6 },
-  { id: 'lavender', name: '薰衣草', unlockMinutes: 2250, collectionId: 'breeze', description: '细密花穗沿着茎干逐段点亮。', accent: '#8d83bd', tone: '#f6f3ff', scene: '#eeeaff', horizon: '#d7d0ee', ground: '#b8cdb4', sun: '#d8ccff', motionDuration: 4.2 },
-  { id: 'iris', name: '鸢尾花', unlockMinutes: 3300, collectionId: 'breeze', description: '剑形叶托起层叠花瓣，线条挺拔而舒展。', accent: '#7c79be', tone: '#f2f1ff', scene: '#e8f1ff', horizon: '#cbdceb', ground: '#accabf', sun: '#d4ddff', motionDuration: 4.7 },
-  { id: 'hydrangea', name: '绣球花', unlockMinutes: 4800, collectionId: 'twilight', description: '许多小花共同聚成一团温柔的云。', accent: '#759dc9', tone: '#f0f7ff', scene: '#e7f1f7', horizon: '#c8dce7', ground: '#adc9bd', sun: '#d8e8f1', motionDuration: 5.2 },
-  { id: 'lily', name: '百合', unlockMinutes: 6600, collectionId: 'breeze', description: '修长花瓣向外展开，盛放时舒展而从容。', accent: '#e8a990', tone: '#fff5ef', scene: '#fff4e9', horizon: '#eadfd2', ground: '#c8d7b8', sun: '#ffe2c3', motionDuration: 5 },
-  { id: 'camellia', name: '山茶花', unlockMinutes: 8700, collectionId: 'twilight', description: '厚实叶片围住层层花瓣，安静而饱满。', accent: '#cf7181', tone: '#fff1f4', scene: '#f6e8ea', horizon: '#ddcdd1', ground: '#aebfa9', sun: '#f2c7cd', motionDuration: 5.4 },
-  { id: 'peony', name: '牡丹', unlockMinutes: 11400, collectionId: 'twilight', description: '花瓣逐层打开，积累越久越显丰盛。', accent: '#d77a9c', tone: '#fff0f6', scene: '#fae6ef', horizon: '#e5c8d6', ground: '#b8c6aa', sun: '#f4bfd3', motionDuration: 5.6 },
-  { id: 'moonflower', name: '月光花', unlockMinutes: 15000, collectionId: 'twilight', description: '在暮色中发出柔和微光，记录长久投入。', accent: '#8e91d2', tone: '#f1f2ff', scene: '#252b52', horizon: '#3f4875', ground: '#5b6b72', sun: '#e7e9ff', night: true, motionDuration: 6 }
+  { id: 'daisy', name: '小雏菊', unlockMinutes: 0, collectionId: 'morning', description: '清爽而坚定，从第一段专注开始陪伴。', flowerLanguage: '天真、和平与希望', gardenMessage: '从一小段专注开始，慢慢长出自己的节奏。', accent: '#e8bb45', tone: '#fffdf2', scene: '#fff9dc', horizon: '#e4efc9', ground: '#cbdcaf', sun: '#ffe78f', motionDuration: 4.4 },
+  { id: 'tulip', name: '郁金香', unlockMinutes: 150, collectionId: 'morning', description: '叶片环抱花茎，花苞会沿着晨光舒展。', flowerLanguage: '爱的表白、荣誉与永恒', gardenMessage: '把认真投入的每一分钟，都当作对自己的珍重。', accent: '#e98882', tone: '#fff3f1', scene: '#fff0e9', horizon: '#f3d9cb', ground: '#d8dcb5', sun: '#ffd1a8', motionDuration: 4.8 },
+  { id: 'cosmos', name: '波斯菊', unlockMinutes: 450, collectionId: 'morning', description: '纤细花茎与轻盈花瓣，微风一来便点头。', flowerLanguage: '纯真、自由与永远快乐', gardenMessage: '留一点轻盈，让专注也有呼吸的空间。', accent: '#e78fac', tone: '#fff2f7', scene: '#fff1f6', horizon: '#efd7e5', ground: '#cfe0c3', sun: '#ffd8df', motionDuration: 3.8 },
+  { id: 'sunflower', name: '向日葵', unlockMinutes: 900, collectionId: 'morning', description: '追随光线抬头，用完整盛放回应投入。', flowerLanguage: '信念、光辉与忠诚', gardenMessage: '朝着真正重要的事，持续向前一点点。', accent: '#e3ad3f', tone: '#fff9e8', scene: '#fff1bd', horizon: '#ead69a', ground: '#b9cc8d', sun: '#ffd44f', motionDuration: 5.1 },
+  { id: 'poppy', name: '虞美人', unlockMinutes: 1500, collectionId: 'breeze', description: '薄软花瓣像纸一样舒展，动作轻而有弹性。', flowerLanguage: '生离死别与悲歌', gardenMessage: '轻柔地完成眼前这一件事，也是一种力量。', accent: '#e36f62', tone: '#fff0ec', scene: '#fff0e6', horizon: '#efd0bf', ground: '#bcd7b6', sun: '#ffc8a6', motionDuration: 3.6 },
+  { id: 'lavender', name: '薰衣草', unlockMinutes: 2250, collectionId: 'breeze', description: '细密花穗沿着茎干逐段点亮。', flowerLanguage: '等待爱情', gardenMessage: '安静地守住目标，时间会回应每一次积累。', accent: '#8d83bd', tone: '#f6f3ff', scene: '#eeeaff', horizon: '#d7d0ee', ground: '#b8cdb4', sun: '#d8ccff', motionDuration: 4.2 },
+  { id: 'iris', name: '鸢尾花', unlockMinutes: 3300, collectionId: 'breeze', description: '剑形叶托起层叠花瓣，线条挺拔而舒展。', flowerLanguage: '好消息、希望与勇气', gardenMessage: '下一次突破，常常从现在的坚持开始。', accent: '#7c79be', tone: '#f2f1ff', scene: '#e8f1ff', horizon: '#cbdceb', ground: '#accabf', sun: '#d4ddff', motionDuration: 4.7 },
+  { id: 'hydrangea', name: '绣球花', unlockMinutes: 4800, collectionId: 'twilight', description: '许多小花共同聚成一团温柔的云。', flowerLanguage: '感谢、希望与团聚', gardenMessage: '许多平常的专注日，也能汇成看得见的成长。', accent: '#759dc9', tone: '#f0f7ff', scene: '#e7f1f7', horizon: '#c8dce7', ground: '#adc9bd', sun: '#d8e8f1', motionDuration: 5.2 },
+  { id: 'lily', name: '百合', unlockMinutes: 6600, collectionId: 'breeze', description: '修长花瓣向外展开，盛放时舒展而从容。', flowerLanguage: '顺利、心想事成与祝福', gardenMessage: '稳稳走完这一程，结果会在合适的时候展开。', accent: '#e8a990', tone: '#fff5ef', scene: '#fff4e9', horizon: '#eadfd2', ground: '#c8d7b8', sun: '#ffe2c3', motionDuration: 5 },
+  { id: 'camellia', name: '山茶花', unlockMinutes: 8700, collectionId: 'twilight', description: '厚实叶片围住层层花瓣，安静而饱满。', flowerLanguage: '理想的爱与谦让', gardenMessage: '不张扬地持续投入，也会开出饱满的答案。', accent: '#cf7181', tone: '#fff1f4', scene: '#f6e8ea', horizon: '#ddcdd1', ground: '#aebfa9', sun: '#f2c7cd', motionDuration: 5.4 },
+  { id: 'peony', name: '牡丹', unlockMinutes: 11400, collectionId: 'twilight', description: '花瓣逐层打开，积累越久越显丰盛。', flowerLanguage: '富贵、圆满与吉祥', gardenMessage: '长期的积累，会把普通日子慢慢养成丰盛。', accent: '#d77a9c', tone: '#fff0f6', scene: '#fae6ef', horizon: '#e5c8d6', ground: '#b8c6aa', sun: '#f4bfd3', motionDuration: 5.6 },
+  { id: 'moonflower', name: '月光花', unlockMinutes: 15000, collectionId: 'twilight', description: '在暮色中发出柔和微光，记录长久投入。', flowerLanguage: '梦想常在', gardenMessage: '在不被看见的夜里，也为自己留一盏灯。', accent: '#8e91d2', tone: '#f1f2ff', scene: '#252b52', horizon: '#3f4875', ground: '#5b6b72', sun: '#e7e9ff', night: true, motionDuration: 6 }
+]
+
+export const FOCUS_GARDEN_RANKS = [
+  { id: 'seed', name: '播种者', shortName: '播种', threshold: 0, description: '第一分钟落进土壤，花田从今天开始。' },
+  { id: 'sprout', name: '破土者', shortName: '破土', threshold: 60, description: '稳定的投入让第一株花真正破土。' },
+  { id: 'leaves', name: '舒叶者', shortName: '舒叶', threshold: 180, description: '专注逐渐形成自己的节奏，叶片开始舒展。' },
+  { id: 'bud', name: '花苞守护者', shortName: '花苞', threshold: 600, description: '持续照料每一次投入，花苞正在聚拢。' },
+  { id: 'opening', name: '初绽者', shortName: '初绽', threshold: 1800, description: '积累已经被看见，花田进入初绽阶段。' },
+  { id: 'bloom', name: '盛放园丁', shortName: '盛放', threshold: 5400, description: '长久专注成为一座可以回望的完整花田。' },
+  { id: 'artisan', name: '花田匠人', shortName: '匠心', threshold: 9000, description: '日复一日的照料，让花田有了属于自己的秩序。' },
+  { id: 'keeper', name: '花境守望者', shortName: '守望', threshold: 15000, description: '第一册图鉴已经完整，十二种花共同留下长期投入。' },
+  { id: 'seasons', name: '四季园主', shortName: '四季', threshold: 24000, description: '专注穿过不同季节，花田成为稳定生活的一部分。' },
+  { id: 'years', name: '岁月花匠', shortName: '岁月', threshold: 36000, description: '时间被耐心照料，最终长成一册可以反复翻阅的花园。' }
+]
+
+export const FOCUS_SPECIES_COMPANION_LEVELS = [
+  { id: 'acquainted', name: '初识', minutes: 0, blooms: 0, description: '已收入图鉴，等待第一次共同盛放。' },
+  { id: 'first-bloom', name: '初绽', minutes: 0, blooms: 1, description: '已经亲手陪伴它完成第一次盛放。' },
+  { id: 'companion', name: '相伴', minutes: 300, blooms: 5, description: '多次选择与照料，让陪伴有了清晰痕迹。' },
+  { id: 'familiar', name: '熟稔', minutes: 900, blooms: 12, description: '它已经成为花田里熟悉而稳定的身影。' },
+  { id: 'symbiosis', name: '共生', minutes: 1800, blooms: 30, description: '长久投入凝成这株花独有的最高纪念。' }
 ]
 
 const LEGACY_FOCUS_GARDEN_UNLOCK_MINUTES = {
@@ -51,9 +72,9 @@ export const FOCUS_GARDEN_ACHIEVEMENTS = [
   { id: 'focus-3600', name: '六十小时长青', description: '累计完成 60 小时有效专注', kind: 'accumulate', metric: 'totalMinutes', target: 3600 },
   { id: 'bloom-10', name: '十朵成田', description: '累计收获 10 株盛放花朵', kind: 'accumulate', metric: 'bloomCount', target: 10 },
   { id: 'bloom-25', name: '繁花成簇', description: '累计收获 25 株盛放花朵', kind: 'accumulate', metric: 'bloomCount', target: 25 },
-  { id: 'deep-90', name: '深潜时刻', description: '完成一次 90 分钟专注', kind: 'deep', metric: 'longestSessionMinutes', target: 90 },
-  { id: 'deep-120', name: '静水深流', description: '完成一次 120 分钟专注', kind: 'deep', metric: 'longestSessionMinutes', target: 120 },
-  { id: 'deep-180', name: '长夜有光', description: '完成一次 180 分钟专注', kind: 'deep', metric: 'longestSessionMinutes', target: 180 },
+  { id: 'deep-90', name: '深潜时刻', description: '在同一轮中累计完成 90 分钟有效专注', kind: 'deep', metric: 'longestSessionMinutes', target: 90 },
+  { id: 'deep-120', name: '静水深流', description: '在同一轮中累计完成 120 分钟有效专注，按需暂停休息', kind: 'deep', metric: 'longestSessionMinutes', target: 120 },
+  { id: 'deep-180', name: '长夜有光', description: '在同一轮中累计完成 180 分钟有效专注，按需暂停休息', kind: 'deep', metric: 'longestSessionMinutes', target: 180 },
   { id: 'species-3', name: '三色花圃', description: '实际培养过 3 种花', kind: 'variety', metric: 'speciesCount', target: 3 },
   { id: 'species-6', name: '半园花色', description: '实际培养过 6 种花', kind: 'variety', metric: 'speciesCount', target: 6 },
   { id: 'species-9', name: '九色花境', description: '实际培养过 9 种花', kind: 'variety', metric: 'speciesCount', target: 9 },
@@ -79,6 +100,15 @@ export function gardenStageFor(growthMinutes, goalMinutes = 50) {
   return [...FOCUS_GARDEN_STAGES].reverse().find(stage => ratio >= stage.threshold) || FOCUS_GARDEN_STAGES[0]
 }
 
+// 阶段按今日目标比例计算；所有界面复用该门槛，保证提示与实际成长一致。
+export function focusGardenStageMilestones(goalMinutes = 50) {
+  const goal = Math.max(10, Math.min(240, Math.round(Number(goalMinutes) || 50)))
+  return FOCUS_GARDEN_STAGES.map(stage => ({
+    ...stage,
+    minutes: stage.threshold === 0 ? 0 : Math.max(1, Math.ceil(stage.threshold * goal))
+  }))
+}
+
 export function createDefaultFocusGarden(now = new Date()) {
   return {
     startedAt: new Date(now).toISOString(),
@@ -86,6 +116,7 @@ export function createDefaultFocusGarden(now = new Date()) {
     dailyGoalMinutes: 50,
     selectedSpeciesId: 'daisy',
     nextSpeciesId: null,
+    trackedAchievementId: null,
     longestSessionMinutes: 0,
     days: [],
     achievements: []
@@ -103,6 +134,7 @@ export function normalizeFocusGarden(rawGarden, now = new Date()) {
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(-3660)
   const achievementIds = new Set(FOCUS_GARDEN_ACHIEVEMENTS.map(item => item.id))
+  const trackedAchievementId = achievementIds.has(raw.trackedAchievementId) ? raw.trackedAchievementId : null
   const achievements = Array.isArray(raw.achievements)
     ? raw.achievements
       .filter(item => item && achievementIds.has(item.id) && Number.isFinite(new Date(item.unlockedAt).getTime()))
@@ -116,11 +148,13 @@ export function normalizeFocusGarden(rawGarden, now = new Date()) {
     dailyGoalMinutes: Math.max(10, Math.min(240, Math.round(Number(raw.dailyGoalMinutes) || fallback.dailyGoalMinutes))),
     selectedSpeciesId: speciesIds.has(raw.selectedSpeciesId) ? raw.selectedSpeciesId : fallback.selectedSpeciesId,
     nextSpeciesId: speciesIds.has(raw.nextSpeciesId) ? raw.nextSpeciesId : null,
+    trackedAchievementId,
     longestSessionMinutes: Math.max(0, Math.min(480, Math.round(Number(raw.longestSessionMinutes) || 0))),
     days: uniqueDays,
     achievements
   }
   result.achievements = backfillFocusGardenAchievements(result, now)
+  if (result.achievements.some(item => item.id === result.trackedAchievementId)) result.trackedAchievementId = null
   return prepareFocusGardenForDate(result, now)
 }
 
@@ -200,6 +234,16 @@ export function prepareFocusGardenForDate(garden, now = new Date()) {
   return prepared
 }
 
+export function updateTrackedFocusGardenAchievement(garden, achievementId) {
+  const normalized = normalizeFocusGarden(garden)
+  const validIds = new Set(FOCUS_GARDEN_ACHIEVEMENTS.map(item => item.id))
+  const unlockedIds = new Set(normalized.achievements.map(item => item.id))
+  return {
+    ...normalized,
+    trackedAchievementId: validIds.has(achievementId) && !unlockedIds.has(achievementId) ? achievementId : null
+  }
+}
+
 export function focusGardenTotals(garden) {
   const days = Array.isArray(garden?.days) ? garden.days : []
   const totalMinutes = days.reduce((sum, day) => sum + Math.max(0, Number(day.growthMinutes) || 0), 0)
@@ -229,6 +273,46 @@ export function focusGardenTotals(garden) {
     longestStreak,
     longestSessionMinutes: Math.max(0, Number(garden?.longestSessionMinutes) || 0)
   }
+}
+
+export function focusSpeciesCompanionLevel(growthMinutes = 0, bloomCount = 0, unlocked = true) {
+  if (!unlocked) return null
+  const minutes = Math.max(0, Number(growthMinutes) || 0)
+  const blooms = Math.max(0, Number(bloomCount) || 0)
+  const currentIndex = FOCUS_SPECIES_COMPANION_LEVELS.reduce((index, level, levelIndex) => (
+    minutes >= level.minutes && blooms >= level.blooms ? levelIndex : index
+  ), 0)
+  const current = FOCUS_SPECIES_COMPANION_LEVELS[currentIndex]
+  const next = FOCUS_SPECIES_COMPANION_LEVELS[currentIndex + 1] || null
+  const progress = next
+    ? Math.min(100, Math.round(Math.min(
+      next.minutes ? minutes / next.minutes : 1,
+      next.blooms ? blooms / next.blooms : 1
+    ) * 100))
+    : 100
+  return {
+    ...current,
+    progress,
+    next,
+    remainingMinutes: next ? Math.max(0, next.minutes - minutes) : 0,
+    remainingBlooms: next ? Math.max(0, next.blooms - blooms) : 0
+  }
+}
+
+export function focusGardenCollectionCompletionDate(garden) {
+  const days = [...(Array.isArray(garden?.days) ? garden.days : [])]
+    .filter(day => Number(day.growthMinutes) > 0)
+    .sort((a, b) => a.date.localeCompare(b.date))
+  const isLegacyGarden = Number(garden?.unlockLadderVersion) < 2
+  const finalThreshold = Math.max(...FOCUS_GARDEN_SPECIES.map(species => (
+    isLegacyGarden ? LEGACY_FOCUS_GARDEN_UNLOCK_MINUTES[species.id] : species.unlockMinutes
+  )))
+  let totalMinutes = 0
+  for (const day of days) {
+    totalMinutes += Math.max(0, Number(day.growthMinutes) || 0)
+    if (totalMinutes >= finalThreshold) return day.date
+  }
+  return null
 }
 
 function dateDifference(later, earlier) {
@@ -292,6 +376,7 @@ export function recordFocusGardenGrowth(garden, session, now = new Date()) {
       progressValue: Number(totals[item.metric] || 0)
     }))
   ]
+  if (newlyUnlocked.some(item => item.id === updated.trackedAchievementId)) updated.trackedAchievementId = null
   const unlockedSpeciesIds = unlockedFocusGardenSpecies(updated)
     .filter(item => !unlockedBefore.has(item.id))
     .map(item => item.id)

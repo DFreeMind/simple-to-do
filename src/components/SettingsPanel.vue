@@ -149,6 +149,55 @@
                 />
                 <span class="switch-control" aria-hidden="true"></span>
               </label>
+              <div class="detail-display-setting">
+                <div class="settings-block__title">
+                  <h4>详情展开方式</h4>
+                  <span>{{ detailDisplayModeLabel }}</span>
+                </div>
+                <div class="detail-display-mode-grid" role="radiogroup" aria-label="任务详情展开方式" @keydown="handleDetailDisplayModeKeydown">
+                  <button
+                    class="detail-display-mode-card"
+                    type="button"
+                    role="radio"
+                    :aria-checked="store.settings.detailDisplayMode === 'window'"
+                    :class="{ active: store.settings.detailDisplayMode === 'window' }"
+                    :tabindex="store.settings.detailDisplayMode === 'window' ? 0 : -1"
+                  data-detail-display-mode="window"
+                  @click="store.updateSettings({ detailDisplayMode: 'window' })"
+                  >
+                    <span class="detail-display-mode-card__preview" aria-hidden="true">
+                      <span class="detail-preview-caption">打开详情后</span>
+                      <span class="detail-preview-app detail-preview-app--wide">
+                        <span class="detail-preview-titlebar">窗口变宽</span>
+                        <span class="detail-preview-sidebar"></span><span class="detail-preview-list"><i></i><b></b><em></em><strong>任务列表宽度不变</strong></span><span class="detail-preview-detail"><i></i><b></b><strong>详情</strong></span>
+                      </span>
+                    </span>
+                    <span><strong>窗口变宽（推荐）</strong><small>打开详情时，应用窗口自动加宽；任务列表不被挤压</small></span>
+                    <span v-if="store.settings.detailDisplayMode === 'window'" class="detail-display-mode-card__selected"><Check :size="14" />当前使用</span>
+                  </button>
+                  <button
+                    class="detail-display-mode-card"
+                    type="button"
+                    role="radio"
+                    :aria-checked="store.settings.detailDisplayMode === 'in-app'"
+                    :class="{ active: store.settings.detailDisplayMode === 'in-app' }"
+                    :tabindex="store.settings.detailDisplayMode === 'in-app' ? 0 : -1"
+                  data-detail-display-mode="in-app"
+                  @click="store.updateSettings({ detailDisplayMode: 'in-app' })"
+                  >
+                    <span class="detail-display-mode-card__preview" aria-hidden="true">
+                      <span class="detail-preview-caption">打开详情后</span>
+                      <span class="detail-preview-app detail-preview-app--fixed">
+                        <span class="detail-preview-titlebar">窗口大小不变</span>
+                        <span class="detail-preview-sidebar"></span><span class="detail-preview-list"><i></i><b></b><em></em><strong>任务列表变窄</strong></span><span class="detail-preview-detail"><i></i><b></b><strong>详情</strong></span>
+                      </span>
+                    </span>
+                    <span><strong>窗口大小不变</strong><small>详情在当前窗口右侧打开；任务列表会变窄</small></span>
+                    <span v-if="store.settings.detailDisplayMode === 'in-app'" class="detail-display-mode-card__selected"><Check :size="14" />当前使用</span>
+                  </button>
+                </div>
+                <p class="setting-help">{{ detailDisplayModeDescription }}</p>
+              </div>
             </div>
             <div class="settings-subsection-heading">
               <span><CheckSquare :size="16" /></span>
@@ -658,8 +707,8 @@
               <article class="update-card" :class="`update-card--${updateState}`">
                 <div class="update-card__head">
                   <span class="update-card__icon">
-                    <Download v-if="['available', 'downloading', 'verifying', 'installing'].includes(updateState)" :size="18" />
-                    <Check v-else-if="updateState === 'upToDate'" :size="18" />
+                    <Download v-if="['available', 'downloading', 'verifying', 'installing', 'restarting'].includes(updateState)" :size="18" />
+                    <Check v-else-if="['upToDate', 'installed'].includes(updateState)" :size="18" />
                     <Info v-else :size="18" />
                   </span>
                   <span class="update-card__copy">
@@ -704,13 +753,13 @@
                       跳过此版本
                     </button>
                   </template>
-                  <template v-else-if="updateState === 'installing'">
-                    <button class="text-btn" type="button" @click="openManualInstall">
-                      改用手动安装
+                  <template v-else-if="updateState === 'installed'">
+                    <button class="small-btn update-card__action" type="button" @click="restartUpdate">
+                      立即重新启动
                     </button>
                   </template>
                   <button
-                    v-else-if="updateState !== 'installing'"
+                    v-else-if="!['installing', 'restarting'].includes(updateState)"
                     class="small-btn update-card__action"
                     type="button"
                     :disabled="updateActionDisabled"
@@ -743,7 +792,7 @@
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
 import { Bell, Check, CheckSquare, Compass, Download, ExternalLink, Folder, Globe, Info, PanelTop, Palette, Pin, SlidersHorizontal, Tag, Timer, Trash2, Volume2, Waves, X } from 'lucide-vue-next'
-import { checkForUpdates as checkForUpdatesService, installUpdate as installUpdateService, skipCurrentUpdate, updaterState, updateNotes as resolveUpdateNotes } from '@/services/updater'
+import { checkForUpdates as checkForUpdatesService, installUpdate as installUpdateService, restartUpdateApplication, skipCurrentUpdate, updaterState, updateNotes as resolveUpdateNotes } from '@/services/updater'
 import { currentReleaseHighlights, releaseHistory } from '@/data/releases'
 import { useTaskStore } from '@/stores/task'
 import { openReleasePage as openReleasePageInBrowser, openSystemNotificationSettings } from '@/services/platform'
@@ -785,6 +834,11 @@ const focusControllerStyles = [
   { id: 'orbit', label: '轨道表盘', description: '圆形进度，专注感更强' },
   { id: 'island', label: '专注岛', description: '紧凑常驻，按需展开' },
   { id: 'classic', label: '经典卡片', description: '所有操作始终可见' }
+]
+
+const detailDisplayModes = [
+  { id: 'window' },
+  { id: 'in-app' }
 ]
 
 const focusableSelector = [
@@ -867,6 +921,10 @@ function handleFocusStyleKeydown(event) {
   handleRadioKeydown(event, focusControllerStyles, store.settings.focusControllerStyle, 'data-focus-style', focusControllerStyle => store.updateSettings({ focusControllerStyle }))
 }
 
+function handleDetailDisplayModeKeydown(event) {
+  handleRadioKeydown(event, detailDisplayModes, store.settings.detailDisplayMode, 'data-detail-display-mode', detailDisplayMode => store.updateSettings({ detailDisplayMode }))
+}
+
 const startViewLabels = {
   today: '今日',
   inbox: '收集箱',
@@ -878,6 +936,10 @@ const currentThemeLabel = computed(() => themes.find((theme) => theme.id === sto
 const focusControllerStyleLabel = computed(() => focusControllerStyles.find((style) => style.id === store.settings.focusControllerStyle)?.label || '轨道表盘')
 const startViewLabel = computed(() => startViewLabels[store.settings.startView] || '今日')
 const enabledInterfaceCount = computed(() => Number(!store.settings.sidebarCollapsed) + Number(store.settings.detailOpen))
+const detailDisplayModeLabel = computed(() => store.settings.detailDisplayMode === 'in-app' ? '窗口大小不变' : '窗口变宽')
+const detailDisplayModeDescription = computed(() => store.settings.detailDisplayMode === 'in-app'
+  ? '详情占用当前窗口空间，窗口大小和位置保持不变。'
+  : '打开详情时自动扩大应用窗口；空间不足时会自动保持窗口大小不变。')
 const completedDisplaySummary = computed(() => {
   const listVisible = store.settings.completedVisible ? '列表显示' : '列表隐藏'
   const groupMode = store.settings.groupCompletedDisplayMode === 'in-group' ? '分组保留' : '集中到底部'
@@ -909,6 +971,8 @@ const updateStatusText = computed(() => ({
   downloading: '正在下载',
   verifying: '正在校验',
   installing: '正在安装',
+  installed: '已安装',
+  restarting: '正在重启',
   error: '自动更新不可用',
   unsupported: '平台不支持'
 }[updateState.value] || '手动检查'))
@@ -922,6 +986,8 @@ const updateTitle = computed(() => ({
   downloading: '正在下载更新',
   verifying: '正在校验更新签名',
   installing: '正在替换应用',
+  installed: '更新已安装',
+  restarting: '正在重新启动',
   error: '自动更新暂不可用',
   unsupported: '当前平台暂不支持自动更新'
 }[updateState.value] || '检查稳定版本'))
@@ -931,7 +997,9 @@ const updateDescription = computed(() => {
   if (updateState.value === 'skipped') return '本次更新已跳过；新版本发布后或重新检查时会再次提示。'
   if (updateState.value === 'downloading') return updateProgressText.value
   if (updateState.value === 'verifying') return '下载完成，正在校验更新包的签名。'
-  if (updateState.value === 'installing') return '正在替换应用。macOS 可能会弹出管理员授权窗口；完成后应用会自动重新打开。'
+  if (updateState.value === 'installing') return '正在替换应用。macOS 可能会弹出管理员授权窗口。'
+  if (updateState.value === 'installed') return updaterState.error || '更新已安装完成，请重新启动应用以使用新版本。'
+  if (updateState.value === 'restarting') return '更新已安装，正在关闭并重新打开应用。'
   if (updateState.value === 'error' || updateState.value === 'unsupported') return updaterState.error
   if (updateState.value === 'upToDate') return '当前已安装最新的稳定版本。'
   return '从自建服务器或 GitHub Release 检查经过签名验证的稳定版本。'
@@ -942,13 +1010,15 @@ const updateActionText = computed(() => ({
   downloading: updateProgressText.value,
   verifying: '正在校验签名…',
   installing: '正在完成安装…',
+  installed: '立即重新启动',
+  restarting: '正在重新启动…',
   upToDate: '重新检查',
   error: '重试检查',
   skipped: '重新检查',
   unsupported: '打开下载页',
   idle: '检查更新'
 }[updateState.value] || '检查更新'))
-const updateActionDisabled = computed(() => isDevelopment || ['checking', 'downloading', 'verifying', 'installing'].includes(updateState.value))
+const updateActionDisabled = computed(() => isDevelopment || ['checking', 'downloading', 'verifying', 'installing', 'restarting'].includes(updateState.value))
 const updateBadgeVisible = computed(() => updateState.value === 'available')
 const updateProgressText = computed(() => {
   const { downloaded, total } = updaterState.progress
@@ -989,13 +1059,8 @@ async function installUpdate() {
   await installUpdateService()
 }
 
-async function openManualInstall() {
-  try {
-    await openReleasePageInBrowser()
-  } catch (error) {
-    updaterState.status = 'error'
-    updaterState.error = error?.message || '无法打开下载页，请稍后重试。'
-  }
+async function restartUpdate() {
+  await restartUpdateApplication()
 }
 
 </script>

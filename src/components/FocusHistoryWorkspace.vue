@@ -365,15 +365,17 @@
               @update:custom-start="customStart = $event"
               @update:custom-end="customEnd = $event"
             />
-            <button type="button" class="review-filter-toggle" :class="{ active: focusFiltersOpen }" :aria-expanded="focusFiltersOpen" @click="focusFiltersOpen = !focusFiltersOpen"><SlidersHorizontal :size="14" />筛选<span v-if="focusFilterCount">{{ focusFilterCount }}</span></button>
+            <div class="review-filter-popover">
+              <button type="button" class="review-filter-toggle" :class="{ active: focusFiltersOpen }" :aria-expanded="focusFiltersOpen" @click.stop="focusFiltersOpen = !focusFiltersOpen"><SlidersHorizontal :size="14" />筛选<span v-if="focusFilterCount">{{ focusFilterCount }}</span></button>
+              <div v-if="focusFiltersOpen" class="review-filter-options" @click.stop>
+                <div><span>结果</span><ReviewSelect v-model="focusResult" variant="quiet" :options="FOCUS_RESULT_OPTIONS" aria-label="筛选专注结果" /></div>
+                <div><span>记录类型</span><ReviewSelect v-model="focusPhase" variant="quiet" :options="FOCUS_PHASE_OPTIONS" aria-label="筛选专注类型" /></div>
+                <div><span>暂停情况</span><ReviewSelect v-model="focusPause" variant="quiet" :options="FOCUS_PAUSE_OPTIONS" aria-label="筛选暂停情况" /></div>
+                <div><span>排序</span><ReviewSelect v-model="focusSort" variant="quiet" :options="FOCUS_SORT_OPTIONS" aria-label="专注记录排序" /></div>
+                <footer v-if="focusFilterCount"><button class="review-filter-reset" type="button" @click="resetFocusFilters"><RotateCcw :size="14" />重置筛选</button></footer>
+              </div>
+            </div>
             <button type="button" class="review-manage-toggle" :class="{ active: focusManageMode }" :aria-pressed="focusManageMode" @click="toggleFocusManageMode">{{ focusManageMode ? '完成整理' : '整理记录' }}</button>
-            <template v-if="focusFiltersOpen">
-              <ReviewSelect v-model="focusResult" :options="FOCUS_RESULT_OPTIONS" aria-label="筛选专注结果" />
-              <ReviewSelect v-model="focusPhase" :options="FOCUS_PHASE_OPTIONS" aria-label="筛选专注类型" />
-              <ReviewSelect v-model="focusPause" :options="FOCUS_PAUSE_OPTIONS" aria-label="筛选暂停情况" />
-              <ReviewSelect v-model="focusSort" :options="FOCUS_SORT_OPTIONS" aria-label="专注记录排序" />
-              <button v-if="focusFilterCount" class="review-filter-reset" type="button" @click="resetFocusFilters"><RotateCcw :size="14" />重置筛选</button>
-            </template>
           </div>
         </div>
         <div v-if="!focusHistory.length" class="review-empty review-empty--inline">
@@ -459,14 +461,16 @@
               @update:custom-start="customStart = $event"
               @update:custom-end="customEnd = $event"
             />
-            <button type="button" class="review-filter-toggle" :class="{ active: rhythmFiltersOpen }" :aria-expanded="rhythmFiltersOpen" @click="rhythmFiltersOpen = !rhythmFiltersOpen"><SlidersHorizontal :size="14" />筛选<span v-if="rhythmFilterCount">{{ rhythmFilterCount }}</span></button>
+            <div class="review-filter-popover">
+              <button type="button" class="review-filter-toggle" :class="{ active: rhythmFiltersOpen }" :aria-expanded="rhythmFiltersOpen" @click.stop="rhythmFiltersOpen = !rhythmFiltersOpen"><SlidersHorizontal :size="14" />筛选<span v-if="rhythmFilterCount">{{ rhythmFilterCount }}</span></button>
+              <div v-if="rhythmFiltersOpen" class="review-filter-options" @click.stop>
+                <div><span>处理结果</span><ReviewSelect v-model="rhythmAction" variant="quiet" :options="RHYTHM_ACTION_OPTIONS" aria-label="筛选节律处理结果" /></div>
+                <div><span>触发方式</span><ReviewSelect v-model="rhythmTrigger" variant="quiet" :options="RHYTHM_TRIGGER_OPTIONS" aria-label="筛选节律触发方式" /></div>
+                <div><span>排序</span><ReviewSelect v-model="rhythmSort" variant="quiet" :options="RHYTHM_SORT_OPTIONS" aria-label="节律记录排序" /></div>
+                <footer v-if="rhythmFilterCount"><button class="review-filter-reset" type="button" @click="resetRhythmFilters"><RotateCcw :size="14" />重置筛选</button></footer>
+              </div>
+            </div>
             <button type="button" class="review-manage-toggle" :class="{ active: rhythmManageMode }" :aria-pressed="rhythmManageMode" @click="toggleRhythmManageMode">{{ rhythmManageMode ? '完成整理' : '整理记录' }}</button>
-            <template v-if="rhythmFiltersOpen">
-              <ReviewSelect v-model="rhythmAction" :options="RHYTHM_ACTION_OPTIONS" aria-label="筛选节律处理结果" />
-              <ReviewSelect v-model="rhythmTrigger" :options="RHYTHM_TRIGGER_OPTIONS" aria-label="筛选节律触发方式" />
-              <ReviewSelect v-model="rhythmSort" :options="RHYTHM_SORT_OPTIONS" aria-label="节律记录排序" />
-              <button v-if="rhythmFilterCount" class="review-filter-reset" type="button" @click="resetRhythmFilters"><RotateCcw :size="14" />重置筛选</button>
-            </template>
           </div>
         </div>
         <div v-if="!rhythmHistory.length" class="review-empty review-empty--inline">
@@ -1950,6 +1954,16 @@ const rhythmPageEnd = computed(() => Math.min(rhythmPage.value * rhythmPageSize.
 const pagedFocusRecords = computed(() => filteredFocusRecords.value.slice(focusPageStart.value - 1, focusPageEnd.value))
 const pagedRhythmRecords = computed(() => filteredRhythmRecords.value.slice(rhythmPageStart.value - 1, rhythmPageEnd.value))
 
+const historyNavigation = store.consumeFocusHistoryNavigation()
+if (historyNavigation) {
+  activeTab.value = historyNavigation.tab
+  range.value = historyNavigation.range
+  if (historyNavigation.resetFilters) {
+    resetFocusFilters()
+    resetRhythmFilters()
+  }
+}
+
 watch(() => store.focusHistoryTaskId, (taskId) => {
   if (!taskId) return
   activeTab.value = 'focus'
@@ -2164,15 +2178,28 @@ async function exportRhythmCsv() {
 const exportMenuOpen = ref({ overview: false, focus: false, rhythm: false })
 function toggleExportMenu(key) { exportMenuOpen.value[key] = !exportMenuOpen.value[key] }
 function closeAllExportMenus() { exportMenuOpen.value = { overview: false, focus: false, rhythm: false } }
-function onDocClickExport(event) {
+function onGlobalPointerDown(event) {
   if (!event.target.closest('.review-export-menu')) closeAllExportMenus()
+  // ReviewSelect 的选项列表经 Teleport 渲染；它仍属于筛选浮层的交互范围。
+  if (!event.target.closest('.review-filter-popover, .review-select__menu')) {
+    focusFiltersOpen.value = false
+    rhythmFiltersOpen.value = false
+  }
+}
+function onGlobalKeydown(event) {
+  if (event.key !== 'Escape') return
+  focusFiltersOpen.value = false
+  rhythmFiltersOpen.value = false
+  closeAllExportMenus()
 }
 onMounted(() => {
-  document.addEventListener('click', onDocClickExport)
+  document.addEventListener('pointerdown', onGlobalPointerDown, true)
+  document.addEventListener('keydown', onGlobalKeydown, true)
   document.addEventListener('click', onDocClickBucket)
 })
 onBeforeUnmount(() => {
-  document.removeEventListener('click', onDocClickExport)
+  document.removeEventListener('pointerdown', onGlobalPointerDown, true)
+  document.removeEventListener('keydown', onGlobalKeydown, true)
   document.removeEventListener('click', onDocClickBucket)
 })
 async function exportFocusJson() {
@@ -3096,7 +3123,7 @@ onBeforeUnmount(() => {
 .review-export-menu__panel button:hover { background: var(--accent-soft); color: var(--accent-strong); }
 .review-filter-panel { margin: 12px 0 8px; padding: 8px; border: 1px solid var(--divider-soft); border-radius: 12px; background: var(--surface-muted); }
 .review-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; padding: 0; }
-.review-filters label { display: flex; flex: 1 1 190px; min-width: 150px; height: 34px; align-items: center; gap: 7px; padding: 0 10px; border: 1px solid var(--divider-soft); border-radius: 9px; background: var(--surface); color: var(--text-muted); }
+.review-filters label { display: flex; flex: 0 1 260px; width: min(260px, 100%); min-width: 170px; height: 34px; align-items: center; gap: 7px; padding: 0 10px; border: 1px solid var(--divider-soft); border-radius: 9px; background: var(--surface); color: var(--text-muted); }
 .review-filters input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; font-size: 12px; }
 .review-filter-toggle, .review-manage-toggle { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; gap: 5px; padding: 0 10px; border: 1px solid var(--divider-soft); border-radius: 9px; background: var(--surface); color: var(--text-muted); font: inherit; font-size: 11.5px; font-weight: 650; cursor: pointer; transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast); }
 .review-filter-toggle span { display: grid; min-width: 16px; height: 16px; place-items: center; padding: 0 3px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-strong); font-size: 9px; }
@@ -3105,6 +3132,10 @@ onBeforeUnmount(() => {
 .review-filters label:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .review-filter-reset { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; gap: 5px; padding: 0 14px; border: 0; border-radius: 8px; background: transparent; color: var(--accent-strong); font-size: 11px; font-weight: 680; white-space: nowrap; }
 .review-filter-reset:hover { background: var(--accent-soft); }
+.review-filter-popover { position: relative; }
+.review-filter-options { position: absolute; z-index: 8; top: calc(100% + 7px); right: 0; display: grid; width: 300px; padding: 7px 10px; border: 1px solid var(--divider-soft); border-radius: 12px; background: var(--surface); box-shadow: 0 16px 36px rgba(27, 49, 44, .16); }
+.review-filter-options > div { display: grid; min-width: 0; min-height: 44px; grid-template-columns: 82px minmax(0, 1fr); align-items: center; gap: 8px; border-bottom: 1px solid var(--divider-soft); }.review-filter-options > div:last-of-type { border-bottom: 0; }.review-filter-options > div > span { color: var(--text-muted); font-size: 10.5px; font-weight: 650; }.review-filter-options .review-select { width: 100%; }
+.review-filter-options > footer { display: flex; justify-content: flex-end; margin: 3px 2px 0; padding-top: 6px; border-top: 1px solid var(--divider-soft); }.review-filter-options .review-filter-reset { min-height: 30px; margin: 0; padding: 0 9px; }
 .review-filter-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 16px; min-height: 30px; padding: 5px 12px; margin: 0 0 10px; border: 1px solid var(--divider-soft); border-radius: 9px; background: var(--surface); }
 .review-filter-summary > div { display: inline-flex; align-items: baseline; gap: 4px; }
 .review-filter-summary__export { display: inline-flex; margin-left: auto; }
@@ -3373,9 +3404,6 @@ onBeforeUnmount(() => {
 @media (max-width: 900px) { .review-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }.review-overview-grid { grid-template-columns: 1fr; }.review-record-table, .review-recent-list { overflow-x: auto; }.review-record-table__head, .review-record-row, .review-recent-row { min-width: 720px; } }
 @media (max-width: 900px) { .review-focus-map__summary { grid-template-columns: 1fr 1fr; }.review-summary > header { display: grid; }.review-summary-actions { justify-content: flex-start; flex-wrap: wrap; } }
 @media (max-width: 620px) { .review-focus-map__summary, .review-focus-map__legend { grid-template-columns: 1fr; }.review-focus-map__total { display: none; } }
-@media (max-width: 900px) {
-  .review-filters label { flex-basis: 100%; }
-}
 @media (max-width: 680px) { .review-workspace { padding: 14px; }.review-controls { display: grid; gap: 5px; padding: 5px; }.review-range-toolbar { order: -1; padding-left: 5px; }.review-range-toolbar__label { display: none; }.review-range-toolbar__control { width: 100%; }.review-range, .review-tabs { overflow-x: auto; }.review-tabs button { white-space: nowrap; }.review-metrics { grid-template-columns: 1fr 1fr; }.review-metric { min-height: 88px; padding: 12px; }.review-recent__header { display: grid !important; }.review-recent-switch { width: 100%; }.review-recent-switch button { flex: 1; }.review-recent__footer { display: grid; }.review-recent__footer > div { display: grid; grid-template-columns: 1fr 1fr; }.review-filters label { flex-basis: 100%; }.review-filter-summary { gap: 4px 10px; }.review-pagination { flex-wrap: wrap; justify-content: space-between; }.review-detail-hero { grid-template-columns: 1fr; }.review-detail-hero__window { justify-content: space-between; }.review-detail-hero__stats { grid-template-columns: 1fr; }.review-detail-hero__stats > div + div { border-left: 0; border-top: 1px solid var(--divider-soft); }.review-focus-process__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.review-focus-plan__track { grid-template-columns: minmax(0, 1fr) 17px minmax(0, 1fr) 17px minmax(0, 1fr); }.review-focus-plan__track > article { padding: 8px 6px; }.review-focus-plan__track > article strong { font-size: 11px; }.review-rhythm-pattern__stats { grid-template-columns: 1fr; }.review-rhythm-pattern__stats span + span { border-top: 1px solid rgba(79, 127, 166, .13); border-left: 0; }.review-detail-footer__actions { flex-wrap: wrap; } }
 @media (max-width: 680px) { .review-detail-hero.is-focus { grid-template-columns: minmax(0, 1fr) auto; }.review-detail-hero__illustration { display: none; }.review-focus-plan__connector { width: 17px; height: 17px; } }
 /* 新增：本期亮点洞察 */

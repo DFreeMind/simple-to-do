@@ -126,7 +126,7 @@ import RhythmControllerWindow from './components/RhythmControllerWindow.vue'
 import RhythmReminderPrompt from './components/RhythmReminderPrompt.vue'
 import { useTaskStore } from './stores/task'
 import { useTheme } from './composables/useTheme'
-import { checkForUpdates as checkForUpdatesService, installUpdate as installUpdateService, updaterState } from './services/updater'
+import { checkForUpdates as checkForUpdatesService, installUpdate as installUpdateService, restartUpdateApplication, updaterState } from './services/updater'
 import {
   openDataBackupLocation,
   openReleasePage as openReleasePageInBrowser,
@@ -160,8 +160,16 @@ const TASK_LIST_WIDTH_MIN = 300
 const RESIZER_WIDTH = 12
 
 const detailWidth = ref(store.settings.detailWidth || 380)
+// 详情偏好会跨模块保留，但只有清单模块需要为它扩展原生窗口。
+// 让布局和窗口尺寸共同依赖这一个有效状态，避免切到时钟后留下空白区域。
+const shouldShowTaskDetail = computed(() => (
+  store.settings.activeModule === 'tasks' && store.settings.detailOpen
+))
+const shouldExpandTaskDetailWindow = computed(() => (
+  shouldShowTaskDetail.value && store.settings.detailDisplayMode === 'window'
+))
 // 原生窗口先扩展/收起，详情列后显示/隐藏，避免两次网格重排造成视觉跳动。
-const detailLayoutOpen = ref(!isMainWindow && store.settings.detailOpen)
+const detailLayoutOpen = ref(!isMainWindow && shouldShowTaskDetail.value)
 const lockedTaskListWidth = ref(0)
 const shellRef = ref(null)
 const shellWidth = ref(0)
@@ -282,7 +290,7 @@ function startBreakFromInApp() {
 }
 
 const layoutDetailWidth = computed(() => clampDetailWidth(detailWidth.value, getDetailMaxWidth()))
-const isCheckingRecoveryUpdate = computed(() => ['checking', 'downloading', 'verifying', 'installing'].includes(recoveryUpdateState.value))
+const isCheckingRecoveryUpdate = computed(() => ['checking', 'downloading', 'verifying', 'installing', 'restarting'].includes(recoveryUpdateState.value))
 const recoveryUpdateState = computed(() => {
   if (isDevelopment) return 'development'
   // 恢复页必须能安装最新版，跳过记录不适用于该场景（force 检查不会进入 skipped）。
@@ -296,6 +304,8 @@ const recoveryUpdateAction = computed(() => ({
   downloading: '正在下载…',
   verifying: '正在校验签名…',
   installing: '正在完成安装…',
+  installed: '重新启动应用',
+  restarting: '正在重新启动…',
   upToDate: '重新检查更新',
   error: '重试检查更新'
 }[recoveryUpdateState.value] || '检查并安装更新'))
@@ -303,7 +313,9 @@ const recoveryDescription = computed(() => {
   if (recoveryUpdateState.value === 'available') return `发现可用版本 v${updaterState.update?.version || ''}，安装后可再次打开本机数据。`
   if (recoveryUpdateState.value === 'downloading') return recoveryUpdateProgressText.value
   if (recoveryUpdateState.value === 'verifying') return '下载完成，正在校验更新包的签名。'
-  if (recoveryUpdateState.value === 'installing') return '正在替换应用。macOS 可能会弹出管理员授权窗口；完成后应用会自动重新打开。'
+  if (recoveryUpdateState.value === 'installing') return '正在替换应用。macOS 可能会弹出管理员授权窗口。'
+  if (recoveryUpdateState.value === 'installed') return updaterState.error || '更新已安装完成，请重新启动应用后继续。'
+  if (recoveryUpdateState.value === 'restarting') return '更新已安装，正在关闭并重新打开应用。'
   if (recoveryUpdateState.value === 'upToDate') return '当前已是最新稳定版；请保留数据和备份后联系支持。'
   if (recoveryUpdateState.value === 'error') return updaterState.error
   if (isDevelopment) return '当前为开发环境，请使用新版正式安装包验证数据兼容性。'
@@ -331,7 +343,7 @@ watch(() => store.settings.detailWidth, (v) => {
   const nextWidth = clampDetailWidth(v)
   if (detailWidth.value === nextWidth) return
   detailWidth.value = nextWidth
-  if (isMainWindow && store.settings.detailOpen && taskDetailWindowExpansion) {
+  if (isMainWindow && shouldExpandTaskDetailWindow.value && taskDetailWindowExpansion) {
     nextTick(() => { void syncTaskDetailWindowPanelWidth() })
   }
 })
@@ -346,22 +358,31 @@ function closeTaskDetail() {
   })
 }
 
-watch(() => store.settings.detailOpen, (isOpen) => {
-  void syncTaskDetailWindowWidth(isOpen)
+watch([shouldShowTaskDetail, shouldExpandTaskDetailWindow], ([shouldShow, shouldExpand]) => {
+  // 应用内模式无需等待原生窗口操作，直接呈现或收起详情列。
+  if (!shouldExpand) {
+    detailLayoutOpen.value = shouldShow
+    lockedTaskListWidth.value = 0
+  }
+  void syncTaskDetailWindowWidth(shouldExpand)
 })
 
 // 旧数据会把“详情默认开启”恢复为 true，而主窗口启动时不会渲染空详情列。
 // 因此首次选中任务时，即使偏好值没有发生变化，也必须补走原生扩窗流程。
 watch(() => store.selectedTaskId, (taskId) => {
-  if (taskId && store.settings.detailOpen && !detailLayoutOpen.value) {
+  if (taskId && shouldShowTaskDetail.value && !shouldExpandTaskDetailWindow.value) {
+    detailLayoutOpen.value = true
+    return
+  }
+  if (taskId && shouldExpandTaskDetailWindow.value && !detailLayoutOpen.value) {
     void syncTaskDetailWindowWidth(true)
   }
 })
 
 async function syncTaskDetailWindowWidth(isOpen) {
   if (!isMainWindow) {
-    detailLayoutOpen.value = isOpen
-    if (!isOpen) lockedTaskListWidth.value = 0
+    detailLayoutOpen.value = shouldShowTaskDetail.value
+    if (!shouldShowTaskDetail.value) lockedTaskListWidth.value = 0
     return
   }
   if (isOpen) {
@@ -372,14 +393,27 @@ async function syncTaskDetailWindowWidth(isOpen) {
     if (taskDetailWindowOpening) return
     const requestVersion = ++taskDetailWindowResizeVersion
     taskDetailWindowOpening = true
+    let reopenAfterCancelledOpening = false
     try {
+      // 从应用内模式切换到扩展窗口时，先移除详情列，再按任务列表
+      // 的稳定宽度扩窗，避免列表先被挤压、扩窗后又回弹。
+      if (detailLayoutOpen.value) {
+        detailLayoutOpen.value = false
+        await nextTick()
+      }
+      if (!shouldExpandTaskDetailWindow.value) return
       const width = layoutDetailWidth.value + RESIZER_WIDTH
       lockedTaskListWidth.value = getTaskListWidth()
       const expanded = await resizeMainWindowForTaskDetail(width)
 
       // 详情在命令执行过程中被关闭时，立即回收这次刚增加的空间。
-      if (requestVersion !== taskDetailWindowResizeVersion || !store.settings.detailOpen) {
+      if (requestVersion !== taskDetailWindowResizeVersion || !shouldExpandTaskDetailWindow.value) {
         if (expanded) await resizeMainWindowForTaskDetail(-width)
+        detailLayoutOpen.value = shouldShowTaskDetail.value
+        lockedTaskListWidth.value = 0
+        // 原生扩窗尚未结束时可能已经离开又回到清单模块；此时前一次
+        // watcher 会因 opening 防重入而提前返回，需要在 finally 后补一次打开。
+        reopenAfterCancelledOpening = shouldExpandTaskDetailWindow.value
         return
       }
       if (expanded) {
@@ -394,15 +428,16 @@ async function syncTaskDetailWindowWidth(isOpen) {
       return
     } finally {
       taskDetailWindowOpening = false
+      if (reopenAfterCancelledOpening) void syncTaskDetailWindowWidth(true)
     }
   }
 
   const requestVersion = ++taskDetailWindowResizeVersion
   // 先将详情替换成锁宽的空白轨道，再收原生窗口；中间任务列表不会接管被收回的空间。
-  detailLayoutOpen.value = false
+  detailLayoutOpen.value = shouldShowTaskDetail.value
   const expansion = taskDetailWindowExpansion
   if (!expansion) {
-    detailLayoutOpen.value = false
+    detailLayoutOpen.value = shouldShowTaskDetail.value
     lockedTaskListWidth.value = 0
     return
   }
@@ -414,24 +449,24 @@ async function syncTaskDetailWindowWidth(isOpen) {
     && (!outerSize || Math.abs(outerSize.width - expansion.expectedOuterWidth) > 2)
   ) {
     taskDetailWindowExpansion = null
-    detailLayoutOpen.value = false
+    detailLayoutOpen.value = shouldShowTaskDetail.value
     lockedTaskListWidth.value = 0
     return
   }
   // 用户快速重新打开详情时，保留已展开的窗口，不造成一次不必要的收缩与再展开。
-  if (requestVersion !== taskDetailWindowResizeVersion || store.settings.detailOpen) return
+  if (requestVersion !== taskDetailWindowResizeVersion || shouldExpandTaskDetailWindow.value) return
   const shrunk = await resizeMainWindowForTaskDetail(-expansion.width)
   taskDetailWindowExpansion = null
-  if (shrunk && (requestVersion !== taskDetailWindowResizeVersion || store.settings.detailOpen)) {
+  if (shrunk && (requestVersion !== taskDetailWindowResizeVersion || shouldExpandTaskDetailWindow.value)) {
     void syncTaskDetailWindowWidth(true)
     return
   }
-  detailLayoutOpen.value = false
+  detailLayoutOpen.value = shouldShowTaskDetail.value
   lockedTaskListWidth.value = 0
 }
 
 async function syncTaskDetailWindowPanelWidth() {
-  if (!isMainWindow || !store.settings.detailOpen || !taskDetailWindowExpansion) return
+  if (!isMainWindow || !shouldExpandTaskDetailWindow.value || !taskDetailWindowExpansion) return
   const expansion = taskDetailWindowExpansion
   const nextWidth = layoutDetailWidth.value + RESIZER_WIDTH
   const delta = nextWidth - expansion.width
@@ -515,6 +550,10 @@ function syncShellWidth() {
 }
 
 async function checkRecoveryUpdate() {
+  if (updaterState.status === 'installed') {
+    await restartUpdateApplication()
+    return
+  }
   if (updaterState.status === 'available' && updaterState.update) {
     await installUpdateService()
     return

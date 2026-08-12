@@ -62,10 +62,12 @@ import {
   FOCUS_GARDEN_SPECIES,
   createDefaultFocusGarden,
   focusGardenTotals as calculateFocusGardenTotals,
+  focusSpeciesCompanionLevel,
   gardenStageFor,
   localGardenDateKey,
   normalizeFocusGarden,
   recordFocusGardenGrowth,
+  updateTrackedFocusGardenAchievement,
   unlockedFocusGardenSpecies,
   updateFocusGardenPreference
 } from '@/utils/focusGarden.mjs'
@@ -98,6 +100,7 @@ const DEFAULT_SETTINGS = {
   density: 'comfortable',
   sidebarCollapsed: false,
   detailOpen: false,
+  detailDisplayMode: 'window',
   detailWidth: 380,
   startView: 'today',
   completedVisible: true,
@@ -327,6 +330,7 @@ export const useTaskStore = defineStore('task', () => {
   const planWeekCursor = ref(new Date())
   const focusTaskDraftId = ref(null)
   const focusHistoryTaskId = ref(null)
+  const focusHistoryNavigation = ref(null)
   const viewOrders = ref({})
   let pendingSavePayload = null
   let activeSavePromise = null
@@ -383,7 +387,12 @@ export const useTaskStore = defineStore('task', () => {
       ...species,
       unlocked: unlockedIds.has(species.id),
       growthMinutes: usedMinutes.get(species.id) || 0,
-      bloomCount: bloomCounts.get(species.id) || 0
+      bloomCount: bloomCounts.get(species.id) || 0,
+      companion: focusSpeciesCompanionLevel(
+        usedMinutes.get(species.id) || 0,
+        bloomCounts.get(species.id) || 0,
+        unlockedIds.has(species.id)
+      )
     }))
   })
   const focusGardenAchievements = computed(() => {
@@ -789,6 +798,21 @@ export const useTaskStore = defineStore('task', () => {
     updateSettings({ clockView: view, activeModule: 'clock' })
   }
 
+  function openFocusHistory(options = {}) {
+    focusHistoryNavigation.value = {
+      tab: options.tab || 'overview',
+      range: options.range || '7d',
+      resetFilters: Boolean(options.resetFilters)
+    }
+    setClockView('history')
+  }
+
+  function consumeFocusHistoryNavigation() {
+    const navigation = focusHistoryNavigation.value
+    focusHistoryNavigation.value = null
+    return navigation
+  }
+
   function prepareFocusForTask(taskId) {
     if (!activeTasks.value.some(task => task.id === taskId)) return false
     focusTaskDraftId.value = taskId
@@ -805,7 +829,7 @@ export const useTaskStore = defineStore('task', () => {
   function openFocusHistoryForTask(taskId) {
     if (!activeTasks.value.some(task => task.id === taskId)) return false
     focusHistoryTaskId.value = taskId
-    setClockView('history')
+    openFocusHistory({ tab: 'focus', range: 'all', resetFilters: true })
     return true
   }
 
@@ -829,6 +853,15 @@ export const useTaskStore = defineStore('task', () => {
       if (currentGoalMinutes !== previousGoalMinutes) showNotice(`今日目标已设为 ${currentGoalMinutes} 分钟`, 'success')
       else if (previousDay?.growthMinutes > 0 && previousDay.goalAdjustments >= 1) showNotice('今日目标已修正一次，明日可重新设置', 'info')
     }
+  }
+
+  function trackFocusGardenAchievement(achievementId) {
+    const previous = clock.value.garden.trackedAchievementId
+    clock.value.garden = updateTrackedFocusGardenAchievement(
+      clock.value.garden,
+      previous === achievementId ? null : achievementId
+    )
+    showNotice(previous === achievementId ? '已取消追踪成长徽章' : '已追踪成长徽章', 'success')
   }
 
   function previewSound(name) {
@@ -3380,6 +3413,9 @@ export const useTaskStore = defineStore('task', () => {
     const detailWidth = typeof rawSettings.detailWidth === 'number'
       ? Math.max(DETAIL_WIDTH_MIN, Math.min(DETAIL_WIDTH_MAX, rawSettings.detailWidth))
       : DEFAULT_SETTINGS.detailWidth
+    const detailDisplayMode = ['window', 'in-app'].includes(rawSettings.detailDisplayMode)
+      ? rawSettings.detailDisplayMode
+      : DEFAULT_SETTINGS.detailDisplayMode
     const trashRetentionDays = Number.isFinite(Number(rawSettings.trashRetentionDays))
       ? Math.max(1, Math.min(365, Number(rawSettings.trashRetentionDays)))
       : DEFAULT_SETTINGS.trashRetentionDays
@@ -3415,6 +3451,7 @@ export const useTaskStore = defineStore('task', () => {
       density,
       startView,
       detailOpen: rawSettings.detailOpen !== false,
+      detailDisplayMode,
       sidebarCollapsed: !!rawSettings.sidebarCollapsed,
       detailWidth,
       completedVisible: rawSettings.completedVisible !== false,
@@ -3615,6 +3652,7 @@ export const useTaskStore = defineStore('task', () => {
     planWeekCursor,
     focusTaskDraftId,
     focusHistoryTaskId,
+    focusHistoryNavigation,
     searchQuery,
     saveError,
     migrationBlocked,
@@ -3741,6 +3779,8 @@ export const useTaskStore = defineStore('task', () => {
     updateSettings,
     setActiveModule,
     setClockView,
+    openFocusHistory,
+    consumeFocusHistoryNavigation,
     prepareFocusForTask,
     consumeFocusTaskDraft,
     openFocusHistoryForTask,
@@ -3755,6 +3795,7 @@ export const useTaskStore = defineStore('task', () => {
     updateFocusSettings,
     updateFocusProfile,
     updateFocusGardenSettings,
+    trackFocusGardenAchievement,
     startPendingBreak,
     skipPendingBreak,
     addRhythmReminder,

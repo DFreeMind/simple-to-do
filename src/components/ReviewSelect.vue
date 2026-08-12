@@ -1,5 +1,5 @@
 <template>
-  <div class="review-select" :class="{ open }">
+  <div class="review-select" :class="{ open, 'review-select--quiet': variant === 'quiet' }">
     <button
       ref="triggerRef"
       type="button"
@@ -49,6 +49,8 @@ const props = defineProps({
   // [{ value, label }]
   options: { type: Array, required: true },
   ariaLabel: { type: String, default: '' },
+  // 用于筛选面板等紧凑表单，默认保持常规按钮样式
+  variant: { type: String, default: 'default' },
   // 分页等小控件可收窄下拉宽度
   menuWidth: { type: Number, default: 152 }
 })
@@ -103,7 +105,7 @@ function updateRect() {
   triggerRect.value = { left: r.left, top: r.top, width: r.width, bottom: r.bottom }
 }
 
-function handleDocClick(event) {
+function handleOutsidePointerDown(event) {
   if (!open.value) return
   if (triggerRef.value?.contains(event.target)) return
   if (menuRef.value?.contains(event.target)) return
@@ -129,11 +131,12 @@ watch(open, (o) => {
 })
 
 onMounted(() => {
-  document.addEventListener('click', handleDocClick)
+  // 使用捕获阶段，避免父级浮层的 stopPropagation 让选择菜单无法关闭。
+  document.addEventListener('pointerdown', handleOutsidePointerDown, true)
   document.addEventListener('keydown', handleKeydown, true)
 })
 onBeforeUnmount(() => {
-  document.removeEventListener('click', handleDocClick)
+  document.removeEventListener('pointerdown', handleOutsidePointerDown, true)
   document.removeEventListener('keydown', handleKeydown, true)
   if (typeof window !== 'undefined') {
     window.removeEventListener('scroll', updateRect, true)
@@ -183,6 +186,19 @@ onBeforeUnmount(() => {
   transition: transform var(--transition-fast);
 }
 .review-select__trigger svg.is-open { transform: rotate(180deg); }
+
+.review-select--quiet { width: 100%; }
+.review-select--quiet .review-select__trigger {
+  width: 100%;
+  max-width: none;
+  min-height: 32px;
+  justify-content: space-between;
+  padding: 0 7px;
+  border-color: transparent;
+  border-radius: 7px;
+  background: var(--surface-muted);
+}
+.review-select--quiet .review-select__trigger:hover { border-color: transparent; background: var(--accent-soft); color: var(--accent-strong); }
 
 /* 下拉菜单（Teleport 到 .app + fixed，不透明白底） */
 .review-select__menu {

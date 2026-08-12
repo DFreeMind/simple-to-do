@@ -572,9 +572,20 @@ async fn install_pending_update(app: tauri::AppHandle) -> Result<bool, String> {
         .install(bytes)
         .map_err(|error| format!("更新安装失败: {error}"))?;
 
-    // Windows 的 updater 会自行退出并交给安装器重开应用；macOS 等平台在
-    // 原地替换成功后仍需显式重启，避免界面永久停留在“正在安装”。
-    app.restart()
+    // 安装成功必须先返回前端，不能在同一个 IPC command 中调用 app.restart()。
+    // restart() 不返回；macOS 若退出请求未推进，前端会永远停在“正在安装”。
+    Ok(true)
+}
+
+/// 在安装 command 已经向前端确认成功后请求重启。
+/// 短暂延迟确保当前 IPC 响应和 Installed 状态能够送达 WebView。
+#[tauri::command]
+fn restart_application(app: tauri::AppHandle) -> Result<bool, String> {
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(300));
+        app.request_restart();
+    });
+    Ok(true)
 }
 
 fn main_window_is_focused(app: &tauri::AppHandle) -> bool {
@@ -5289,7 +5300,8 @@ fn main() {
             resize_main_window_for_task_detail,
             get_system_idle_seconds,
             check_for_update,
-            install_pending_update
+            install_pending_update,
+            restart_application
         ])
         .build(tauri::generate_context!())
         .expect("初始化 Tauri 应用失败")
