@@ -92,7 +92,7 @@
                 <span><Leaf :size="12" /> 今日花 · {{ gardenSpeciesName }}</span>
                 <strong>{{ gardenStageName }}</strong>
               </div>
-              <p><b>{{ gardenToday.growthMinutes }} / {{ gardenToday.goalMinutes }}</b> 分钟 · 专注会让它继续长大</p>
+              <p><b>{{ gardenToday.growthMinutes }} / {{ gardenToday.goalMinutes }}</b> 分钟 · {{ gardenNextStageHint }}</p>
               <div class="clock-stage__garden-progress" role="progressbar" :aria-valuenow="gardenProgress" aria-valuemin="0" aria-valuemax="100" aria-label="今日花成长进度">
                 <i :style="{ width: `${gardenProgress}%` }" />
               </div>
@@ -101,7 +101,7 @@
                   v-for="(stage, index) in FOCUS_GARDEN_STAGES"
                   :key="stage.id"
                   :class="{ reached: index <= gardenStageIndex, current: index === gardenStageIndex }"
-                  :title="stage.name"
+                  :title="`${stage.name} · 累计 ${gardenStageMilestones[index].minutes} 分钟`"
                 />
               </div>
             </div>
@@ -157,212 +157,91 @@
                 </span>
                 <ChevronRight :size="16" class="clock-task-picker__trigger-chevron" />
               </button>
-              <Teleport to="body">
-                <Transition name="clock-task-picker">
-                  <div v-if="taskPickerOpen" class="clock-task-picker__overlay" @click="closeTaskPicker">
-                    <div class="clock-task-picker__panel" role="dialog" aria-modal="true" aria-label="选择要专注的任务" @click.stop>
-                      <header class="clock-task-picker__hero">
-                        <div class="clock-task-picker__hero-text">
-                          <h3>选择专注任务</h3>
-                        </div>
-                        <div class="clock-task-picker__hero-actions">
-                          <div class="clock-task-picker__search">
-                            <Search :size="14" />
-                            <input
-                              ref="taskSearchInput"
-                              v-model="taskSearchQuery"
-                              type="text"
-                              placeholder="搜索任务…"
-                            />
-                            <kbd v-if="!taskSearchQuery" class="clock-task-picker__search-hint">/</kbd>
-                          </div>
-                          <button class="clock-task-picker__close" type="button" @click="taskPickerOpen = false" aria-label="关闭任务选择器"><X :size="18" /></button>
-                        </div>
-                      </header>
-
-                      <div class="clock-task-picker__body">
-                        <nav class="clock-task-picker__sidebar" aria-label="清单导航">
-                          <button type="button" :class="['clock-task-picker__nav-item', { active: pickerScope === 'all' }]" @click="selectPickerScope('all')">
-                            <LayoutGrid :size="14" /><span>全部</span><small>{{ openTasks.length }}</small>
-                          </button>
-                          <button type="button" :class="['clock-task-picker__nav-item', { active: pickerScope === 'recent' }]" @click="selectPickerScope('recent')">
-                            <History :size="14" /><span>最近使用</span><small>{{ recentTaskCount }}</small>
-                          </button>
-                          <p class="clock-task-picker__nav-label">我的清单</p>
-                          <div class="clock-task-picker__tree">
-                            <section v-for="group in listGroups" :key="group.key" class="clock-task-picker__tree-branch">
-                              <button
-                                type="button"
-                                class="clock-task-picker__tree-group"
-                                :aria-expanded="!isListGroupCollapsed(group.key)"
-                                @click="toggleListGroup(group.key)"
-                              >
-                                <ChevronDown :size="13" :class="{ collapsed: isListGroupCollapsed(group.key) }" />
-                                <span>{{ group.name || '未分组' }}</span>
-                                <small>{{ groupTaskCount(group) }}</small>
-                              </button>
-                              <div v-show="!isListGroupCollapsed(group.key)" class="clock-task-picker__tree-children">
-                                <button
-                                  v-for="list in group.lists"
-                                  :key="list.id"
-                                  type="button"
-                                  :class="['clock-task-picker__nav-item', 'clock-task-picker__nav-item--list', { active: pickerScope === 'list' && sidebarId === list.id }]"
-                                  @click="selectSidebar(list.id)"
-                                >
-                                  <span class="clock-task-picker__list-dot" :style="{ background: list.color }" />
-                                  <span>{{ list.name }}</span>
-                                  <small>{{ list.taskCount }}</small>
-                                </button>
-                              </div>
-                            </section>
-                          </div>
-                        </nav>
-
-                        <div class="clock-task-picker__tasks" :class="{ 'is-searching': taskSearchQuery.trim(), 'is-grouped': viewMode === 'group' && !taskSearchQuery.trim() }">
-                          <template v-if="taskSearchQuery.trim()">
-                            <p class="clock-task-picker__tasks-header">搜索结果 · {{ searchResults.length }} 项</p>
-                            <button
-                              v-for="(hit, index) in searchResults"
-                              :key="hit.key"
-                              type="button"
-                              :class="['clock-task-picker__task', { active: hit.kind === 'task' && selectedTaskId === hit.id, focused: index === keyboardIndex }]"
-                              @click="handleSearchHit(hit)"
-                              @mouseenter="keyboardIndex = index"
-                            >
-                              <span class="clock-task-picker__task-icon">
-                                <span v-if="hit.kind === 'list'" class="clock-task-picker__list-dot" :style="{ background: hit.color }" />
-                                <Folder v-else-if="hit.kind === 'group'" :size="15" />
-                                <ListTodo v-else :size="15" />
-                              </span>
-                              <span>
-                                <strong>{{ hit.title }}</strong>
-                                <small v-if="hit.subtitle">{{ hit.subtitle }}</small>
-                              </span>
-                              <ChevronRight v-if="hit.kind !== 'task'" :size="14" />
-                              <Check v-else-if="selectedTaskId === hit.id" :size="16" />
-                            </button>
-                            <p v-if="!searchResults.length" class="clock-task-picker__empty">没找到「{{ taskSearchQuery }}」相关结果</p>
-                          </template>
-
-                          <template v-else>
-                            <div class="clock-task-picker__tasks-header">
-                              <span class="clock-task-picker__tasks-title">{{ pickerTitle }} · {{ pickerTasks.length }} 项</span>
-                              <div class="clock-task-picker__scope-tabs" role="tablist" aria-label="任务范围">
-                                <button type="button" :class="{ active: pickerScope === 'suggested' }" :aria-selected="pickerScope === 'suggested'" @click="selectPickerScope('suggested')">建议</button>
-                                <button type="button" :class="{ active: pickerScope === 'recent' }" :aria-selected="pickerScope === 'recent'" @click="selectPickerScope('recent')">最近</button>
-                                <button type="button" :class="{ active: pickerScope === 'due' }" :aria-selected="pickerScope === 'due'" @click="selectPickerScope('due')">今天</button>
-                              </div>
-                              <div class="clock-task-picker__view-toggle" role="tablist" aria-label="任务展示方式">
-                                <button type="button" :class="{ active: viewMode === 'list' }" :aria-selected="viewMode === 'list'" @click="viewMode = 'list'"><AlignLeft :size="13" />列表</button>
-                                <button type="button" :class="{ active: viewMode === 'group' }" :aria-selected="viewMode === 'group'" @click="viewMode = 'group'"><LayoutGrid :size="13" />分组</button>
-                              </div>
-                            </div>
-
-                            <template v-if="viewMode === 'group'">
-                              <template v-for="group in groupedPickerTasks" :key="group.id">
-                                <button type="button" class="clock-task-picker__group-card" :style="{ '--group-accent': group.color }" :aria-expanded="isPickerGroupExpanded(group.id)" @click="togglePickerGroup(group.id)">
-                                  <ChevronRight :size="16" :class="{ expanded: isPickerGroupExpanded(group.id) }" />
-                                  <span v-if="group.emoji" class="clock-task-picker__group-card-emoji">{{ group.emoji }}</span>
-                                  <span v-else class="clock-task-picker__tasks-group-dot" />
-                                  <strong>{{ group.name }}</strong>
-                                  <small>{{ group.tasks.length }} 项待处理</small>
-                                </button>
-                                <div v-show="isPickerGroupExpanded(group.id)" class="clock-task-picker__group-tasks">
-                                  <button
-                                    v-for="(task, index) in group.tasks"
-                                    :key="task.id"
-                                    type="button"
-                                    :class="['clock-task-picker__task', { active: selectedTaskId === task.id, focused: index === keyboardIndex }]"
-                                    :style="{ '--task-list-color': listColorOf(task.listId) }"
-                                    @click="chooseTask(task.id)"
-                                    @mouseenter="keyboardIndex = index"
-                                  >
-                                    <span class="clock-task-picker__task-icon"><span class="clock-task-picker__list-dot" :style="{ background: listColorOf(task.listId) }" /></span>
-                                    <span>
-                                      <strong>{{ task.title }}</strong>
-                                      <small class="clock-task-picker__task-meta">
-                                        <span><i class="clock-task-picker__list-dot" :style="{ background: listColorOf(task.listId) }" />{{ listNameOf(task.listId) }}</span>
-                                        <span v-if="task.dueDate" :class="{ overdue: isOverdue(task.dueDate) }"><Calendar :size="11" />{{ formatDueLabel(task.dueDate) }}</span>
-                                        <span v-if="task.priority"><Flag :size="10" />{{ priorityLabel(task.priority) }}</span>
-                                        <span v-if="task.pinned"><Pin :size="10" />置顶</span><span v-else-if="task.important"><Star :size="10" />重要</span>
-                                        <span v-else-if="task.recommendation" class="clock-task-picker__recommendation">{{ task.recommendation }}</span><span v-else class="clock-task-picker__task-status"><i />待处理</span>
-                                      </small>
-                                    </span>
-                                    <span class="clock-task-picker__task-tags"><Check v-if="selectedTaskId === task.id" :size="18" class="clock-task-picker__task-tag clock-task-picker__task-tag--check" /></span>
-                                  </button>
-                                </div>
-                              </template>
-                            </template>
-
-                            <template v-else>
-                              <button
-                                v-for="(task, index) in pickerTasks"
-                                :key="task.id"
-                                type="button"
-                                :class="['clock-task-picker__task', { active: selectedTaskId === task.id, focused: index === keyboardIndex }]"
-                                :style="{ '--task-list-color': listColorOf(task.listId) }"
-                                @click="chooseTask(task.id)"
-                                @mouseenter="keyboardIndex = index"
-                              >
-                                <span class="clock-task-picker__task-icon"><span class="clock-task-picker__list-dot" :style="{ background: listColorOf(task.listId) }" /></span>
-                                <span>
-                                  <strong>{{ task.title }}</strong>
-                                  <small class="clock-task-picker__task-meta">
-                                    <span><i class="clock-task-picker__list-dot" :style="{ background: listColorOf(task.listId) }" />{{ listNameOf(task.listId) }}</span>
-                                    <span v-if="task.dueDate" :class="{ overdue: isOverdue(task.dueDate) }"><Calendar :size="11" />{{ formatDueLabel(task.dueDate) }}</span>
-                                    <span v-if="task.priority"><Flag :size="10" />{{ priorityLabel(task.priority) }}</span>
-                                    <span v-if="task.pinned"><Pin :size="10" />置顶</span><span v-else-if="task.important"><Star :size="10" />重要</span>
-                                    <span v-else-if="task.recommendation" class="clock-task-picker__recommendation">{{ task.recommendation }}</span><span v-else class="clock-task-picker__task-status"><i />待处理</span>
-                                  </small>
-                                </span>
-                                <span class="clock-task-picker__task-tags"><Check v-if="selectedTaskId === task.id" :size="18" class="clock-task-picker__task-tag clock-task-picker__task-tag--check" /></span>
-                              </button>
-                            </template>
-
-                            <p v-if="!(viewMode === 'group' ? groupedPickerTasks.length : pickerTasks.length)" class="clock-task-picker__empty">{{ pickerEmptyText }}</p>
-                          </template>
-                        </div>
-                      </div>
-
-                      <footer class="clock-task-picker__footer">
-                        <div class="clock-task-picker__selection" :class="{ 'is-empty': !selectedTask }" aria-live="polite">
-                          <span class="clock-task-picker__selection-icon">
-                            <ListTodo v-if="!selectedTask" :size="15" />
-                            <span v-else class="clock-task-picker__list-dot clock-task-picker__list-dot--lg" :style="{ background: listColorOf(selectedTask.listId) }" />
-                          </span>
-                          <span>
-                            <small>{{ selectedTask ? '已选择' : '尚未选择任务' }}</small>
-                            <strong>{{ selectedTask ? selectedTask.title : '暂不关联任务' }}</strong>
-                          </span>
-                        </div>
-                        <button v-if="selectedTask" type="button" class="clock-task-picker__selection-clear" title="移除本次专注的任务关联" @click="chooseTask(null)">
-                          <X :size="15" />取消关联
-                        </button>
-                        <button
-                          type="button"
-                          class="clock-task-picker__footer-cta"
-                          @click="confirmAndStart"
-                        >
-                          <Play :size="16" fill="currentColor" />{{ ctaLabel }}
-                        </button>
-                      </footer>
-                    </div>
+              <Transition name="clock-task-picker">
+                <div v-if="taskPickerOpen" class="clock-quick-task-picker" role="dialog" aria-label="选择要专注的任务">
+                  <label class="clock-quick-task-picker__search">
+                    <Search :size="15" /><span class="sr-only">搜索任务</span>
+                    <input ref="taskSearchInput" v-model="taskSearchQuery" type="text" placeholder="搜索任务或清单" />
+                    <button v-if="taskSearchQuery" type="button" aria-label="清空搜索" @click="taskSearchQuery = ''"><X :size="14" /></button>
+                  </label>
+                  <div class="clock-quick-task-picker__list" role="listbox" aria-label="任务列表">
+                    <button v-if="!taskSearchQuery.trim()" type="button" :class="['clock-quick-task-picker__item', 'clock-quick-task-picker__item--none', { active: !selectedTaskId }]" role="option" :aria-selected="!selectedTaskId" @click="chooseTask(null)">
+                      <ListTodo :size="15" /><span><strong>不关联任务</strong><small>直接开始专注</small></span><Check v-if="!selectedTaskId" :size="16" />
+                    </button>
+                    <template v-if="!taskSearchQuery.trim()">
+                      <p v-if="recentTasks.length" class="clock-quick-task-picker__label">最近使用</p>
+                      <button v-for="task in recentTasks" :key="task.id" type="button" :class="['clock-quick-task-picker__item', { active: selectedTaskId === task.id }]" role="option" :aria-selected="selectedTaskId === task.id" @click="chooseTask(task.id)">
+                        <i :style="{ background: listColorOf(task.listId) }" /><span><strong>{{ task.title }}</strong><small>{{ listNameOf(task.listId) }}</small></span><Check v-if="selectedTaskId === task.id" :size="16" />
+                      </button>
+                      <p class="clock-quick-task-picker__label">全部任务</p>
+                    </template>
+                    <button v-for="task in quickPickerTasks" :key="task.id" type="button" :class="['clock-quick-task-picker__item', { active: selectedTaskId === task.id }]" role="option" :aria-selected="selectedTaskId === task.id" @click="chooseTask(task.id)">
+                      <i :style="{ background: listColorOf(task.listId) }" /><span><strong>{{ task.title }}</strong><small>{{ listNameOf(task.listId) }}</small></span><Check v-if="selectedTaskId === task.id" :size="16" />
+                    </button>
+                    <p v-if="taskSearchQuery.trim() && !quickPickerTasks.length" class="clock-quick-task-picker__empty">没有匹配的待处理任务</p>
                   </div>
-                </Transition>
-              </Teleport>
+                </div>
+              </Transition>
             </div>
           </template>
           <template v-else>
             <div class="clock-plan-current">
               <div><span>当前节奏</span><strong>{{ currentPlanMode }}</strong></div>
               <div v-if="activeSession?.phase === 'focus'" class="clock-plan-current__task">
-                <span>正在推进</span>
-                <div>
+                <div class="clock-plan-current__task-header">
+                  <span>正在推进</span>
+                  <div ref="currentTaskPicker" class="clock-current-task-picker">
+                    <button
+                      class="clock-current-task-picker__trigger"
+                      type="button"
+                      :aria-expanded="currentTaskPickerOpen"
+                      aria-label="更换当前专注任务"
+                      @click="toggleCurrentTaskPicker"
+                    >
+                      <span>更换任务</span><ChevronDown :size="15" />
+                    </button>
+                    <div v-if="currentTaskPickerOpen" class="clock-current-task-picker__menu" role="dialog" aria-label="更换当前专注任务">
+                      <label class="clock-current-task-picker__search">
+                        <Search :size="14" /><span class="sr-only">搜索任务</span>
+                        <input ref="currentTaskSearchInput" v-model="currentTaskSearchQuery" type="search" placeholder="搜索任务或清单" />
+                      </label>
+                      <div class="clock-current-task-picker__options" role="listbox" aria-label="可关联的任务">
+                        <button
+                          type="button"
+                          class="clock-current-task-picker__option clock-current-task-picker__option--clear"
+                          :class="{ active: !activeSession.taskId }"
+                          role="option"
+                          :aria-selected="!activeSession.taskId"
+                          @click="setCurrentTask(null)"
+                        >
+                          <span class="clock-current-task-picker__option-icon"><ListTodo :size="15" /></span>
+                          <span><strong>暂不关联任务</strong></span>
+                          <Check v-if="!activeSession.taskId" :size="16" />
+                        </button>
+                        <button
+                          v-for="task in currentTaskSearchResults"
+                          :key="task.id"
+                          type="button"
+                          class="clock-current-task-picker__option"
+                          :class="{ active: activeSession.taskId === task.id }"
+                          role="option"
+                          :aria-selected="activeSession.taskId === task.id"
+                          @click="setCurrentTask(task.id)"
+                        >
+                          <span class="clock-current-task-picker__option-icon"><i :style="{ background: listColorOf(task.listId) }" /></span>
+                          <span><strong>{{ task.title }}</strong><small>{{ listNameOf(task.listId) }}</small></span>
+                          <Check v-if="activeSession.taskId === task.id" :size="16" />
+                        </button>
+                        <p v-if="!currentTaskSearchResults.length" class="clock-current-task-picker__empty">没有匹配的待处理任务</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="clock-plan-current__task-title">
                   <i class="clock-task-picker__list-dot" :style="{ background: currentTask ? listColorOf(currentTask.listId) : 'var(--accent)' }" />
                   <strong :title="currentTaskTitle">{{ currentTaskTitle }}</strong>
                 </div>
-                <small>{{ currentTask ? listNameOf(currentTask.listId) : '暂不关联任务' }}</small>
-                <label><span class="sr-only">更换当前专注任务</span><select :value="activeSession.taskId || ''" @change="changeCurrentTask"><option value="">暂不关联任务</option><option v-for="task in openTasks" :key="task.id" :value="task.id">{{ task.title }} · {{ listNameOf(task.listId) }}</option></select></label>
+                <small>{{ currentTask ? listNameOf(currentTask.listId) : '本轮不关联具体任务' }}</small>
               </div>
               <div v-else><span>关联任务</span><strong>{{ nextFocusTaskTitle }}</strong></div>
             </div>
@@ -371,7 +250,7 @@
         </section>
 
         <section class="clock-side-card clock-side-card--stats">
-          <header><span class="clock-side-card__icon"><BarChart3 :size="19" /></span><span class="clock-side-card__heading"><h2>今日状态</h2><small>当前投入与今日成长</small></span><button class="clock-side-card__history-link" type="button" @click="store.setClockView('history')">回顾 <ChevronDown :size="14" /></button></header>
+          <header><span class="clock-side-card__icon"><BarChart3 :size="19" /></span><span class="clock-side-card__heading"><h2>今日状态</h2><small>当前投入与今日成长</small></span><button class="clock-side-card__history-link" type="button" @click="store.openFocusHistory({ tab: 'overview', range: 'today', resetFilters: true })">回顾 <ChevronDown :size="14" /></button></header>
           <div class="clock-today clock-today--garden">
             <div><span>今日有效专注</span><strong>{{ gardenToday.growthMinutes }} / {{ gardenToday.goalMinutes }} 分钟</strong><small>{{ gardenSpeciesName }} · {{ gardenStageName }} · {{ todayCompletedCount }} 次完成</small></div>
           </div>
@@ -419,7 +298,7 @@ import { openFocusController } from '@/services/platform'
 import RhythmWorkspace from './RhythmWorkspace.vue'
 import FocusHistoryWorkspace from './FocusHistoryWorkspace.vue'
 import FocusAchievementWorkspace from './FocusAchievementWorkspace.vue'
-import { FOCUS_GARDEN_SPECIES, FOCUS_GARDEN_STAGES } from '@/utils/focusGarden.mjs'
+import { FOCUS_GARDEN_SPECIES, FOCUS_GARDEN_STAGES, focusGardenStageMilestones } from '@/utils/focusGarden.mjs'
 
 const FocusStageArtwork = defineAsyncComponent(() => import('./FocusStageArtwork.vue'))
 const store = useTaskStore()
@@ -437,6 +316,10 @@ const endConfirmOpen = ref(false)
 const taskPicker = ref(null)
 const taskPickerOpen = ref(false)
 const taskSearchQuery = ref('')
+const currentTaskPicker = ref(null)
+const currentTaskPickerOpen = ref(false)
+const currentTaskSearchQuery = ref('')
+const currentTaskSearchInput = ref(null)
 const sidebarId = ref('all')
 const pickerScope = ref('suggested')
 const viewMode = ref('list')
@@ -452,6 +335,13 @@ const gardenToday = computed(() => store.focusGardenToday)
 const gardenSpeciesName = computed(() => FOCUS_GARDEN_SPECIES.find(item => item.id === gardenToday.value.speciesId)?.name || '小雏菊')
 const gardenStageName = computed(() => FOCUS_GARDEN_STAGES.find(item => item.id === gardenToday.value.stage)?.name || '种子')
 const gardenStageIndex = computed(() => Math.max(0, FOCUS_GARDEN_STAGES.findIndex(item => item.id === gardenToday.value.stage)))
+const gardenStageMilestones = computed(() => focusGardenStageMilestones(gardenToday.value.goalMinutes))
+const nextGardenStage = computed(() => gardenStageMilestones.value[gardenStageIndex.value + 1] || null)
+const gardenNextStageHint = computed(() => {
+  if (!nextGardenStage.value) return '今日花已盛放'
+  const remaining = Math.max(0, nextGardenStage.value.minutes - gardenToday.value.growthMinutes)
+  return `距${nextGardenStage.value.name}还差 ${remaining} 分钟`
+})
 const gardenProgress = computed(() => Math.min(100, Math.round((gardenToday.value.growthMinutes / gardenToday.value.goalMinutes) * 100)))
 const gardenGoalAdjustments = computed(() => Math.max(0, Number(gardenToday.value.goalAdjustments) || 0))
 const canAdjustGardenGoal = computed(() => gardenToday.value.growthMinutes === 0 || gardenGoalAdjustments.value < 1)
@@ -469,6 +359,17 @@ const currentTaskTitle = computed(() => openTasks.value.find(task => task.id ===
 const selectedTaskTitle = computed(() => openTasks.value.find(task => task.id === selectedTaskId.value)?.title || '不关联任务')
 const selectedTask = computed(() => openTasks.value.find(task => task.id === selectedTaskId.value) || null)
 const currentTask = computed(() => openTasks.value.find(task => task.id === activeSession.value?.taskId) || null)
+const quickPickerTasks = computed(() => {
+  const query = taskSearchQuery.value.trim().toLocaleLowerCase()
+  if (query) return allPickerTasks.value.filter(task => `${task.title || ''} ${task.listName || ''}`.toLocaleLowerCase().includes(query)).slice(0, 30)
+  const recentIds = new Set(recentTasks.value.map(task => task.id))
+  return allPickerTasks.value.filter(task => !recentIds.has(task.id)).slice(0, 30)
+})
+const currentTaskSearchResults = computed(() => {
+  const query = currentTaskSearchQuery.value.trim().toLocaleLowerCase()
+  if (!query) return openTasks.value.slice(0, 80)
+  return openTasks.value.filter(task => `${task.title || ''} ${listNameOf(task.listId)}`.toLocaleLowerCase().includes(query))
+})
 const currentList = computed(() => store.currentList)
 const recentLists = computed(() => {
   const seen = new Set()
@@ -686,7 +587,17 @@ const currentPlanMode = computed(() => {
 function setGardenGoal(event) { store.updateFocusGardenSettings({ dailyGoalMinutes: Number(event.target.value) }) }
 function start() { store.startFocus(selectedProfile.value?.id, selectedTaskId.value, selectedProfileId.value === 'free-focus' ? selectedDurationSeconds.value : undefined) }
 function finish(result) { store.finishFocus(result, finishNote.value); finishNote.value = '' }
-function changeCurrentTask(event) { store.updateFocusTask(event.target.value || null) }
+function toggleCurrentTaskPicker() {
+  currentTaskPickerOpen.value = !currentTaskPickerOpen.value
+  if (currentTaskPickerOpen.value) {
+    currentTaskSearchQuery.value = ''
+    nextTick(() => currentTaskSearchInput.value?.focus())
+  }
+}
+function setCurrentTask(taskId) {
+  store.updateFocusTask(taskId)
+  currentTaskPickerOpen.value = false
+}
 function requestEndFocus() { endConfirmOpen.value = true }
 function confirmEndFocus() {
   endConfirmOpen.value = false
@@ -745,6 +656,14 @@ function closeFreeDurationEditor(event) {
   if (event.target?.closest?.('.clock-free-time__editor')) return
   freeDurationEditing.value = false
 }
+function closeCurrentTaskPicker(event) {
+  if (!currentTaskPickerOpen.value || currentTaskPicker.value?.contains(event.target)) return
+  currentTaskPickerOpen.value = false
+}
+function closeTaskPickerOnOutside(event) {
+  if (!taskPickerOpen.value || taskPicker.value?.contains(event.target)) return
+  taskPickerOpen.value = false
+}
 function toggleTaskPicker() {
   taskPickerOpen.value = !taskPickerOpen.value
   if (taskPickerOpen.value) {
@@ -787,6 +706,7 @@ function toggleListGroup(key) {
 function groupTaskCount(group) { return group.lists.reduce((count, list) => count + list.taskCount, 0) }
 function chooseTask(taskId) {
   selectedTaskId.value = taskId
+  taskPickerOpen.value = false
 }
 function applyFocusTaskDraft() {
   const taskId = store.consumeFocusTaskDraft()
@@ -819,21 +739,20 @@ function syncVisualClock() {
   visualClockNow.value = Date.now()
   visualClockFrame = window.requestAnimationFrame(syncVisualClock)
 }
-watch(taskPickerOpen, (open) => {
-  if (typeof document === 'undefined') return
-  document.body.style.overflow = open ? 'hidden' : ''
-})
 onMounted(() => {
   window.addEventListener('pointerdown', closeFreeDurationEditor)
+  window.addEventListener('pointerdown', closeCurrentTaskPicker)
+  window.addEventListener('pointerdown', closeTaskPickerOnOutside)
   window.addEventListener('resize', positionFreeDurationEditor)
   window.addEventListener('resize', positionGardenPreview)
   visualClockFrame = window.requestAnimationFrame(syncVisualClock)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('pointerdown', closeFreeDurationEditor)
+  window.removeEventListener('pointerdown', closeCurrentTaskPicker)
+  window.removeEventListener('pointerdown', closeTaskPickerOnOutside)
   window.removeEventListener('resize', positionFreeDurationEditor)
   window.removeEventListener('resize', positionGardenPreview)
   if (visualClockFrame) window.cancelAnimationFrame(visualClockFrame)
-  if (typeof document !== 'undefined') document.body.style.overflow = ''
 })
 </script>
