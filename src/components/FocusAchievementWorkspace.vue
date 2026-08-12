@@ -56,7 +56,7 @@
         </section>
 
         <div class="overview-doors">
-          <button type="button" class="overview-door card-surface" @click="activeTab = 'species'"><span><BookOpen :size="18" /></span><div><small>花种图鉴</small><strong>{{ nextSpecies ? `下一种：${nextSpecies.name}` : '所有花种已解锁' }}</strong><em>{{ nextSpecies ? `还差 ${Math.max(0, nextSpecies.unlockMinutes - store.focusGardenTotals.totalMinutes)} 分钟` : '回看培养和盛放记录' }}</em></div><ChevronRight :size="17" /></button>
+          <button type="button" class="overview-door card-surface" @click="activeTab = 'species'"><span><BookOpen :size="18" /></span><div><small>花种图鉴</small><strong>{{ nextSpecies ? `下一种：${nextSpecies.name}` : '第一册图鉴已完成' }}</strong><em>{{ nextSpecies ? `还差 ${Math.max(0, nextSpecies.unlockMinutes - store.focusGardenTotals.totalMinutes)} 分钟` : `已深入培养 ${deepCompanionCount} / ${store.focusGardenSpecies.length} 种` }}</em></div><ChevronRight :size="17" /></button>
           <button type="button" class="overview-door card-surface" @click="activeTab = 'badges'"><span><Trophy :size="18" /></span><div><small>成长徽章</small><strong>{{ nextAchievement ? `下一枚：${nextAchievement.name}` : '全部徽章已获得' }}</strong><em>{{ nextAchievement ? `还差 ${achievementRemaining(nextAchievement)}` : '查看你的成长档案' }}</em></div><ChevronRight :size="17" /></button>
         </div>
       </section>
@@ -332,6 +332,11 @@
           <div><span>下一种花</span><strong>{{ nextSpecies.name }}</strong><small>解锁门槛 {{ nextSpecies.unlockMinutes }} 分钟 · 还差 {{ speciesUnlockRemaining(nextSpecies) }} 分钟</small><i><b :style="{ width: `${nextSpeciesProgress}%` }" /></i></div>
           <ChevronRight :size="18" />
         </button>
+        <section v-else class="species-complete card-surface" aria-label="第一册花种图鉴已完成">
+          <span class="species-complete__seal"><Check :size="22" /></span>
+          <div><span>第一册 · 十二花境</span><strong>图鉴已完整收藏</strong><small>{{ collectionCompletedAt ? `${formatCollectionDate(collectionCompletedAt)} 完成 · ` : '' }}接下来，选择喜欢的花继续培养陪伴等级。</small></div>
+          <div class="species-complete__depth"><small>深入培养</small><strong>{{ deepCompanionCount }} / {{ store.focusGardenSpecies.length }}</strong><i><b :style="{ width: `${companionCollectionProgress}%` }" /></i></div>
+        </section>
         <section
           class="species-playground card-surface"
           :class="[`species-playground--${selectedSpecies.id}`, { 'is-night': selectedSpecies.night }]"
@@ -381,30 +386,58 @@
             <button type="button" class="species-playground__hint" @click.stop="triggerPlantReaction"><Sparkles :size="13" />轻点花朵看看</button>
           </div>
           <aside class="species-playground__info">
-            <span class="species-playground__collection"><Flower2 :size="14" />{{ selectedCollection.name }}</span>
-            <h2>{{ selectedSpecies.name }}</h2>
-            <p>{{ selectedSpecies.description }}</p>
-            <dl>
-              <div><dt>累计培养</dt><dd>{{ selectedSpecies.growthMinutes }} 分钟</dd></div>
-              <div><dt>完整盛放</dt><dd>{{ selectedSpecies.bloomCount }} 次</dd></div>
-            </dl>
-            <div class="species-detail__unlock" :class="{ 'is-locked': !selectedSpecies.unlocked }">
-              <span><Check v-if="selectedSpecies.unlocked" :size="16" /><LockKeyhole v-else :size="16" /></span>
-              <div><small>解锁门槛</small><strong>累计 {{ selectedSpecies.unlockMinutes }} 分钟</strong><em v-if="!selectedSpecies.unlocked">还差 {{ speciesUnlockRemaining(selectedSpecies) }} 分钟</em></div>
+            <header class="species-playground__identity">
+              <span class="species-playground__collection"><Flower2 :size="14" />{{ selectedCollection.name }}</span>
+              <h2>{{ selectedSpecies.name }}</h2>
+              <p><span>花语</span><strong>{{ selectedSpeciesProfile.flowerLanguage }}</strong></p>
+            </header>
+            <div class="species-playground__meaning">
+              <span>花园寄语</span>
+              <blockquote>{{ selectedSpeciesProfile.gardenMessage }}</blockquote>
             </div>
-            <button v-if="selectedSpecies.unlocked" class="species-playground__choose" type="button" :disabled="isCurrentSpecies(selectedSpecies.id)" @click="chooseSpecies(selectedSpecies.id)">
-              <Sprout :size="15" />{{ speciesButtonLabel(selectedSpecies.id) }}
-            </button>
-            <button v-if="selectedSpecies.growthMinutes > 0" class="species-playground__footprint" type="button" @click="openSpeciesFootprint(selectedSpecies.id)">
-              <CalendarDays :size="14" />查看最近种植
-            </button>
-            <div v-else class="achievement-progress"><i :style="{ width: `${speciesUnlockProgress(selectedSpecies)}%` }"></i></div>
+            <p class="species-playground__description"><span>花朵档案</span>{{ selectedSpecies.description }}</p>
+            <section class="species-playground__progress" aria-label="培养进度">
+              <dl>
+                <div><dt>累计培养</dt><dd>{{ selectedSpecies.growthMinutes }} <small>分钟</small></dd></div>
+                <div><dt>完整盛放</dt><dd>{{ selectedSpecies.bloomCount }} <small>次</small></dd></div>
+              </dl>
+              <div v-if="selectedSpecies.companion" class="species-companion">
+                <header>
+                  <div><span>陪伴等级</span><strong>{{ selectedSpecies.companion.name }}</strong></div>
+                  <b>{{ selectedSpecies.companion.progress }}%</b>
+                </header>
+                <p>{{ selectedSpecies.companion.description }}</p>
+                <div class="species-companion__next">
+                  <span v-if="selectedSpecies.companion.next">迈向「{{ selectedSpecies.companion.next.name }}」</span>
+                  <span v-else>陪伴纪念</span>
+                  <strong v-if="selectedSpecies.companion.next">还需 {{ companionRequirement(selectedSpecies) }}</strong>
+                  <strong v-else>已达最高等级</strong>
+                </div>
+                <i><b :style="{ width: `${selectedSpecies.companion.progress}%` }" /></i>
+              </div>
+              <div class="species-detail__unlock" :class="{ 'is-locked': !selectedSpecies.unlocked }">
+                <span><Check v-if="selectedSpecies.unlocked" :size="14" /><LockKeyhole v-else :size="14" /></span>
+                <div><small>解锁门槛</small><strong>累计 {{ selectedSpecies.unlockMinutes }} 分钟</strong><em v-if="!selectedSpecies.unlocked">还差 {{ speciesUnlockRemaining(selectedSpecies) }} 分钟</em></div>
+              </div>
+              <div
+                v-if="selectedSpecies.unlocked || selectedSpecies.growthMinutes > 0"
+                class="species-playground__actions"
+              >
+                <button v-if="selectedSpecies.unlocked" class="species-playground__choose" type="button" :disabled="isCurrentSpecies(selectedSpecies.id)" @click="chooseSpecies(selectedSpecies.id)">
+                  <Sprout :size="14" />{{ speciesButtonLabel(selectedSpecies.id) }}
+                </button>
+                <button v-if="selectedSpecies.growthMinutes > 0" class="species-playground__footprint" type="button" @click="openSpeciesFootprint(selectedSpecies.id)">
+                  <CalendarDays :size="14" />查看足迹
+                </button>
+              </div>
+              <div v-if="!selectedSpecies.growthMinutes" class="achievement-progress"><i :style="{ width: `${speciesUnlockProgress(selectedSpecies)}%` }"></i></div>
+            </section>
           </aside>
         </section>
 
         <section class="species-replay card-surface">
           <header class="achievement-section-heading">
-            <div><span>成长回放</span><h2>{{ selectedStage.name }}</h2><p>{{ stageDescriptions[selectedStage.id] }}</p></div>
+            <div><span>成长回放 · 以今日目标 {{ store.focusGardenToday.goalMinutes }} 分钟计算</span><h2>{{ selectedStage.name }} <small>累计 {{ selectedStageMilestone.minutes }} 分钟</small></h2><p>{{ stageDescriptions[selectedStage.id] }}</p></div>
             <div class="species-replay__actions">
               <button type="button" @click="toggleGrowthReplay">
                 <Pause v-if="replayPlaying" :size="13" />
@@ -414,7 +447,7 @@
               <small>{{ selectedStageNumber + 1 }} / {{ gardenStages.length }}</small>
             </div>
           </header>
-          <label class="species-replay__range">
+          <label class="species-replay__range" :style="{ '--replay-progress': `${replayProgress}%` }">
             <span class="sr-only">查看 {{ selectedSpecies.name }} 的成长阶段</span>
             <input
               v-model.number="selectedStageIndex"
@@ -422,7 +455,7 @@
               min="0"
               :max="gardenStages.length - 1"
               step="0.01"
-              :aria-valuetext="selectedStage.name"
+              :aria-valuetext="`${selectedStage.name}，累计 ${selectedStageMilestone.minutes} 分钟`"
               @pointerdown="beginReplayScrub"
               @pointerup="endReplayScrub"
               @pointercancel="endReplayScrub"
@@ -432,7 +465,7 @@
           <div class="species-replay__steps" role="tablist" aria-label="成长阶段">
             <button v-for="(stage, index) in gardenStages" :key="stage.id" type="button" role="tab" :aria-selected="selectedStageNumber === index" :class="{ active: selectedStageNumber === index, reached: selectedStageIndex >= index }" @click="selectReplayStage(index)">
               <i><Sprout v-if="index < 3" :size="13" /><Flower2 v-else :size="13" /></i>
-              <span>{{ stage.name }}</span>
+              <span><b>{{ stage.name }}</b><small>累计 {{ stageMilestones[index].minutes }} 分钟</small></span>
             </button>
           </div>
         </section>
@@ -451,7 +484,7 @@
               :class="{ selected: selectedSpeciesId === species.id, locked: !species.unlocked }"
               :style="{ '--plant-level': index % 2, '--plant-accent': species.accent, '--plant-scene': species.scene }"
               :aria-pressed="selectedSpeciesId === species.id"
-              :aria-label="species.unlocked ? `${species.name}，已解锁，门槛 ${species.unlockMinutes} 分钟` : `${species.name}，解锁门槛 ${species.unlockMinutes} 分钟，还差 ${speciesUnlockRemaining(species)} 分钟`"
+              :aria-label="speciesCardLabel(species)"
               :while-hover="{ y: -4 }"
               :while-press="{ scale: .97 }"
               @click="selectSpecies(species.id)"
@@ -465,7 +498,7 @@
               <span class="species-collection__status" :class="{ 'is-locked': !species.unlocked }">
                 <Check v-if="species.unlocked" :size="12" />
                 <LockKeyhole v-else :size="12" />
-                <template v-if="species.unlocked">门槛 {{ species.unlockMinutes }} 分钟</template>
+                <template v-if="species.unlocked">{{ species.companion.name }} · {{ species.companion.progress }}%</template>
                 <template v-else><span>门槛 {{ species.unlockMinutes }} 分钟</span><b>还差 {{ speciesUnlockRemaining(species) }} 分钟</b></template>
               </span>
             </Motion.button>
@@ -480,14 +513,13 @@
             <div>
               <p class="badges-overview__eyebrow">专注成长路径</p>
               <h2>{{ unlockedAchievements.length }} / {{ store.focusGardenAchievements.length }} 已获得</h2>
-              <span class="badges-overview__score">{{ achievementPoints }} / {{ maxAchievementPoints }} 成就点 · {{ achievementCompletion }}% 完成度</span>
-              <p>每一枚徽章都对应花田里真实发生过的一次成长。</p>
+              <span class="badges-overview__score">{{ achievementCompletion }}% 完成 · 每枚徽章都来自真实专注记录</span>
             </div>
           </div>
           <div class="badges-overview__stats" aria-label="花田成长统计">
             <div><small>累计专注</small><strong>{{ durationHuman(store.focusGardenTotals.totalMinutes) }}</strong></div>
+            <div><small>当前连续</small><strong>{{ currentFocusGardenStreak }} 天</strong></div>
             <div><small>完整盛放</small><strong>{{ store.focusGardenTotals.bloomCount }} 朵</strong></div>
-            <div><small>已培养花种</small><strong>{{ store.focusGardenTotals.speciesCount }} 种</strong></div>
           </div>
           <div class="badges-overview__today">
             <FocusSpeciesPreview :species-id="store.focusGardenToday.speciesId" alt="" />
@@ -500,92 +532,116 @@
           </div>
         </header>
 
-        <section v-if="featuredAchievement" class="badges-featured card-surface" :class="{ unlocked: featuredAchievement.unlockedAt }">
-          <div class="badges-featured__identity">
-            <span class="badges-featured__seal"><component :is="achievementBadgeIcon(featuredAchievement)" :size="30" /><small v-if="badgeTier(featuredAchievement)">{{ badgeTier(featuredAchievement) }}</small></span>
+        <section v-if="focusAchievement" class="badge-focus card-surface" :class="{ complete: focusAchievement.unlockedAt }">
+          <div class="badge-focus__identity">
+            <span class="badge-focus__icon"><component :is="achievementBadgeIcon(focusAchievement)" :size="30" /></span>
             <div>
-              <span class="badges-featured__eyebrow">{{ featuredAchievement.unlockedAt ? '最近获得' : '正在形成' }} · {{ featuredAchievementReward.label }}</span>
-              <h2>{{ featuredAchievement.name }}</h2>
-              <p>{{ featuredAchievement.description }}</p>
+              <p>{{ trackedAchievement ? '正在追踪' : (focusAchievement.unlockedAt ? '最近获得' : '建议下一枚') }}</p>
+              <h2>{{ focusAchievement.name }}</h2>
+              <span>{{ focusAchievement.description }}</span>
             </div>
           </div>
-          <div class="badges-featured__progress">
-            <div><small>{{ featuredAchievement.unlockedAt ? `获得于 ${formatShortDate(featuredAchievement.unlockedAt)}` : '当前完成度' }}</small><strong>{{ featuredAchievement.progress }} / {{ featuredAchievement.target }}</strong></div>
-            <i><b :style="{ width: `${featuredAchievementProgress}%` }"></b></i>
-            <span>{{ featuredAchievementReward.hint }}</span>
+          <div class="badge-focus__progress">
+            <div><span>{{ focusAchievement.unlockedAt ? `获得于 ${formatShortDate(focusAchievement.unlockedAt)}` : `还差 ${achievementRemaining(focusAchievement)}` }}</span><strong>{{ achievementPercent(focusAchievement) }}%</strong></div>
+            <i role="progressbar" :aria-label="`${focusAchievement.name}完成度`" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="achievementPercent(focusAchievement)"><b :style="{ width: `${achievementPercent(focusAchievement)}%` }"></b></i>
+          </div>
+          <div class="badge-focus__actions">
+            <button v-if="!focusAchievement.unlockedAt" type="button" class="badge-focus__primary" @click="performAchievementAction(focusAchievement)">{{ achievementActionLabel(focusAchievement) }}<ArrowRight :size="15" /></button>
+            <button type="button" @click="openAchievementDetail(focusAchievement, $event.currentTarget)">查看规则</button>
           </div>
         </section>
-
-        <section class="badges-growth-panorama">
-          <article class="badges-level card-surface">
-            <header>
-              <div><span>花田等级</span><h2>{{ currentGrowthRank.name }}</h2><p>{{ currentGrowthRank.description }}</p></div>
-              <strong>Lv. {{ currentGrowthRankIndex + 1 }}</strong>
-            </header>
-            <div class="badges-level__progress"><i><b :style="{ width: `${growthRankProgress}%` }"></b></i><span>{{ durationHuman(store.focusGardenTotals.totalMinutes) }} · {{ nextGrowthRank ? `距离${nextGrowthRank.name}还差 ${nextGrowthRank.threshold - store.focusGardenTotals.totalMinutes} 分钟` : '已达到花田最高等级' }}</span></div>
-            <div class="badges-level__steps" aria-label="花田成长等级">
-              <span v-for="(rank, index) in growthRanks" :key="rank.id" :class="{ active: index <= currentGrowthRankIndex, current: index === currentGrowthRankIndex }"><i></i><small>{{ rank.shortName }}</small></span>
-            </div>
-          </article>
-
-          <article class="badges-momentum card-surface">
-            <header><span>花田节奏</span><Flame :size="18" /></header>
-            <div class="badges-momentum__grid">
-              <div><CalendarDays :size="15" /><small>有记录的日子</small><strong>{{ store.focusGardenTotals.activeDays }} 天</strong></div>
-              <div><Flame :size="15" /><small>最长连续</small><strong>{{ store.focusGardenTotals.longestStreak }} 天</strong></div>
-              <div><TimerReset :size="15" /><small>最长单次</small><strong>{{ durationHuman(store.focusGardenTotals.longestSessionMinutes) }}</strong></div>
-              <div><Leaf :size="15" /><small>当前花种</small><strong>{{ todaySpeciesName }}</strong></div>
-            </div>
-          </article>
+        <section v-else class="badge-focus badge-focus--complete card-surface">
+          <Flower2 :size="24" />
+          <div><p>成长路径已完成</p><h2>继续留下属于你的专注记录</h2></div>
         </section>
 
-        <section class="badges-category-index" role="tablist" aria-label="按成长维度浏览徽章">
-          <button v-for="group in achievementGroups" :key="`index-${group.id}`" type="button" role="tab" :aria-selected="activeBadgeGroupId === group.id" class="badges-category-index__item" :class="[`badges-category-index__item--${group.id}`, { active: activeBadgeGroupId === group.id }]" @click="selectedBadgeGroupId = group.id">
-            <div><span>{{ group.label }}</span><strong>{{ group.items.filter(item => item.unlockedAt).length }} / {{ group.items.length }}</strong></div>
-            <small>{{ group.reward.label }}</small>
-            <i><b :style="{ width: `${Math.round(group.items.filter(item => item.unlockedAt).length / group.items.length * 100)}%` }"></b></i>
-          </button>
-        </section>
-
-        <section v-if="nextAchievement" class="badges-next card-surface">
-          <div class="badges-next__label"><span>下一步</span><small>还差 {{ achievementRemaining(nextAchievement) }}</small></div>
-          <div class="badges-next__copy"><h2>{{ nextAchievement.name }}</h2><p>{{ nextAchievement.description }}</p></div>
-          <div class="badges-next__progress">
-            <strong>{{ nextAchievement.progress }} / {{ nextAchievement.target }}</strong>
-            <i><b :style="{ width: `${nextAchievementProgress}%` }"></b></i>
-          </div>
-        </section>
-        <section v-else class="badges-next badges-next--complete card-surface">
-          <div class="badges-next__label"><span>花田已盛放</span><small>全部徽章已获得</small></div>
-          <div class="badges-next__copy"><h2>继续培养下一种花</h2><p>你的专注已经留下完整的成长记录，新的花种还在图鉴里等你发现。</p></div>
-          <Flower2 :size="22" />
-        </section>
-
-        <section v-for="group in visibleBadgeGroups" :key="group.id" class="badges-group" :class="`badges-group--${group.id}`">
-          <header>
-            <div><span>{{ group.label }}</span><h2>{{ group.description }}</h2><small class="badges-group__reward">{{ group.reward.label }} · {{ group.reward.hint }}</small></div>
-            <div class="badges-group__controls">
-              <div role="group" aria-label="徽章显示范围">
-                <button v-for="option in badgeStatusOptions" :key="option.id" type="button" :class="{ active: badgeStatusFilter === option.id }" @click="badgeStatusFilter = option.id">{{ option.label }}</button>
-              </div>
-              <small><strong>{{ group.items.filter(item => item.unlockedAt).length }}</strong> / {{ group.items.length }} · {{ Math.round(group.items.filter(item => item.unlockedAt).length / group.items.length * 100) }}%</small>
-            </div>
+        <section class="badge-library" aria-labelledby="badge-library-title">
+          <header class="badge-library__header">
+            <div><p>徽章收藏</p><h2 id="badge-library-title">浏览全部成长记录</h2></div>
+            <span>显示 {{ visibleAchievements.length }} 枚，共 {{ store.focusGardenAchievements.length }} 枚</span>
           </header>
-          <div class="badges-grid">
-            <article v-for="item in group.visibleItems" :key="item.id" class="badge-card card-surface" :class="[{ unlocked: item.unlockedAt }, `badge-card--${group.id}`]">
-              <span class="badge-card__icon"><component :is="achievementBadgeIcon(item)" :size="25" /><small v-if="badgeTier(item)">{{ badgeTier(item) }}</small></span>
-              <div><span class="badge-card__reward">{{ group.reward.label }}</span><h3>{{ item.name }}</h3><p>{{ item.description }}</p></div>
-              <span v-if="item.unlockedAt" class="badge-card__date"><Check :size="13" />{{ formatShortDate(item.unlockedAt) }}</span>
-              <div v-else class="badge-card__progress"><span>{{ item.progress }} / {{ item.target }}</span><i><b :style="{ width: `${Math.min(100, Math.round(item.progress / item.target * 100))}%` }"></b></i></div>
-            </article>
-            <div v-if="!group.visibleItems.length" class="badges-group__empty"><Check v-if="badgeStatusFilter === 'in-progress'" :size="18" /><Trophy v-else :size="18" /><p>{{ badgeStatusFilter === 'in-progress' ? '这一类徽章已经全部获得。' : '这一类还没有获得的徽章。' }}</p></div>
+          <div class="badge-library__filters">
+            <div class="badge-category-tabs" role="tablist" aria-label="按成长维度筛选" @keydown="handleBadgeCategoryKeydown">
+              <button v-for="option in badgeCategoryOptions" :key="option.id" type="button" role="tab" data-badge-category :tabindex="selectedBadgeGroupId === option.id ? 0 : -1" :aria-selected="selectedBadgeGroupId === option.id" :class="{ active: selectedBadgeGroupId === option.id }" @click="selectedBadgeGroupId = option.id">{{ option.label }} <small>{{ option.count }}</small></button>
+            </div>
+            <div class="badge-status-filter" role="group" aria-label="按获得状态筛选">
+              <button v-for="option in badgeStatusOptions" :key="option.id" type="button" :aria-pressed="badgeStatusFilter === option.id" :class="{ active: badgeStatusFilter === option.id }" @click="badgeStatusFilter = option.id">{{ option.label }}</button>
+            </div>
           </div>
+          <div v-if="visibleAchievements.length" class="badges-grid">
+            <button v-for="item in visibleAchievements" :key="item.id" type="button" class="badge-card card-surface" :class="[{ unlocked: item.unlockedAt, tracked: trackedAchievement?.id === item.id }, `badge-card--${item.kind}`]" @click="openAchievementDetail(item, $event.currentTarget)">
+              <div class="badge-card__identity">
+                <span class="badge-card__icon"><component :is="achievementBadgeIcon(item)" :size="25" /><small v-if="badgeTier(item)">{{ badgeTier(item) }}</small></span>
+                <div class="badge-card__copy"><span class="badge-card__reward">{{ achievementReward(item).label }}<small v-if="badgeTier(item)">第 {{ badgeTier(item) }} 阶</small></span><h3>{{ item.name }}</h3><p>{{ item.description }}</p></div>
+              </div>
+              <span v-if="trackedAchievement?.id === item.id" class="badge-card__tracked"><Pin :size="12" />追踪中</span>
+              <div class="badge-card__footer">
+                <span v-if="item.unlockedAt" class="badge-card__date"><Check :size="14" /><span><small>已获得</small><strong>{{ formatShortDate(item.unlockedAt) }}</strong></span></span>
+                <div v-else class="badge-card__progress">
+                  <div><span>当前 {{ item.progress }} / {{ item.target }}</span><strong>{{ achievementPercent(item) }}%</strong></div>
+                  <i role="progressbar" :aria-label="`${item.name}完成度`" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="achievementPercent(item)"><b :style="{ width: `${achievementPercent(item)}%` }"></b></i>
+                  <small>还差 {{ achievementRemaining(item) }}</small>
+                </div>
+                <span class="badge-card__open" aria-hidden="true"><ArrowRight :size="15" /></span>
+              </div>
+            </button>
+          </div>
+          <div v-else class="badge-library__empty"><Trophy :size="20" /><p>当前筛选下没有徽章，换个分类或状态看看。</p></div>
         </section>
 
         <details v-if="legacyRewards.length" class="legacy-rewards card-surface">
           <summary><span><Archive :size="17" />历史收获</span><small>旧版专注记录，只读保留</small></summary>
           <div><span v-for="reward in legacyRewards" :key="reward.id"><FocusRewardBadge :reward="reward.id" size="md" />{{ reward.name }} × {{ reward.count }}</span></div>
         </details>
+
+        <Teleport to=".app">
+          <div v-if="selectedAchievement" class="badge-detail-backdrop" @click.self="closeAchievementDetail">
+            <section class="badge-detail" role="dialog" aria-modal="true" aria-labelledby="badge-detail-title" @keydown="handleBadgeDetailKeydown">
+              <button ref="badgeDetailCloseButton" type="button" class="badge-detail__close" aria-label="关闭徽章详情" @click="closeAchievementDetail"><X :size="18" /></button>
+              <header class="badge-detail__header">
+                <span class="badge-detail__icon"><component :is="achievementBadgeIcon(selectedAchievement)" :size="34" /></span>
+                <div>
+                  <p class="badge-detail__eyebrow">{{ achievementReward(selectedAchievement).label }}</p>
+                  <h2 id="badge-detail-title">{{ selectedAchievement.name }}</h2>
+                  <p>{{ selectedAchievement.description }}</p>
+                </div>
+              </header>
+              <div class="badge-detail__rule">
+                <span>完成条件</span>
+                <strong>{{ achievementRuleText(selectedAchievement) }}</strong>
+                <i role="progressbar" :aria-label="`${selectedAchievement.name}完成度`" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="achievementPercent(selectedAchievement)"><b :style="{ width: `${achievementPercent(selectedAchievement)}%` }"></b></i>
+                <small v-if="selectedAchievement.unlockedAt">已于 {{ formatShortDate(selectedAchievement.unlockedAt) }} 获得</small>
+                <small v-else>当前 {{ selectedAchievement.progress }} / {{ selectedAchievement.target }}，还差 {{ achievementRemaining(selectedAchievement) }}</small>
+              </div>
+              <div class="badge-detail__insights">
+                <article>
+                  <span><BookOpen :size="14" />统计口径</span>
+                  <p>{{ achievementScopeText(selectedAchievement) }}</p>
+                </article>
+                <article>
+                  <span><CalendarDays :size="14" />最近进展</span>
+                  <strong>{{ achievementRecentProgress(selectedAchievement).value }}</strong>
+                  <p>{{ achievementRecentProgress(selectedAchievement).detail }}</p>
+                </article>
+              </div>
+              <div v-if="achievementSeriesNeighbors(selectedAchievement).length" class="badge-detail__series">
+                <span>同系列徽章</span>
+                <div>
+                  <button v-for="item in achievementSeriesNeighbors(selectedAchievement)" :key="item.id" type="button" @click="selectedAchievement = item">
+                    <component :is="achievementBadgeIcon(item)" :size="16" />
+                    <span><small>{{ item.unlockedAt ? '已获得' : `${achievementPercent(item)}%` }}</small><strong>{{ item.name }}</strong></span>
+                    <ArrowRight :size="14" />
+                  </button>
+                </div>
+              </div>
+              <p class="badge-detail__hint">{{ achievementActionHint(selectedAchievement) }}</p>
+              <div class="badge-detail__actions">
+                <button v-if="!selectedAchievement.unlockedAt" type="button" class="primary" @click="performAchievementAction(selectedAchievement)">{{ achievementActionLabel(selectedAchievement) }}</button>
+                <button v-if="!selectedAchievement.unlockedAt" type="button" :aria-pressed="trackedAchievement?.id === selectedAchievement.id" @click="toggleTrackedAchievement(selectedAchievement)"><Pin :size="14" />{{ trackedAchievement?.id === selectedAchievement.id ? '取消追踪' : '设为追踪目标' }}</button>
+              </div>
+            </section>
+          </div>
+        </Teleport>
       </section>
     </div>
   </main>
@@ -594,12 +650,16 @@
 <script setup>
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, ref } from 'vue'
 import { motion as Motion } from 'motion-v'
-import { Archive, ArrowRight, BookOpen, CalendarDays, Check, ChevronLeft, ChevronRight, ChevronUp, Flame, Flower2, Leaf, LockKeyhole, Pause, Play, Sparkles, Sprout, Timer, TimerReset, Trees, Trophy, X } from 'lucide-vue-next'
+import { Archive, ArrowRight, BookOpen, CalendarDays, Check, ChevronLeft, ChevronRight, ChevronUp, Flame, Flower2, Leaf, LockKeyhole, Pause, Pin, Play, Sparkles, Sprout, Timer, TimerReset, Trees, Trophy, X } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import {
   FOCUS_GARDEN_COLLECTIONS,
   FOCUS_GARDEN_ACHIEVEMENT_REWARDS,
+  FOCUS_GARDEN_RANKS,
+  FOCUS_GARDEN_SPECIES,
   FOCUS_GARDEN_STAGES,
+  focusGardenCollectionCompletionDate,
+  focusGardenStageMilestones,
   gardenStageFor,
   localGardenDateKey,
   monthGardenCells
@@ -641,8 +701,10 @@ const store = useTaskStore()
 const activeTab = ref('overview')
 const selectedYear = ref(new Date().getFullYear())
 const selectedMonth = ref(new Date().getMonth())
-const selectedBadgeGroupId = ref(null)
-const badgeStatusFilter = ref('in-progress')
+const selectedBadgeGroupId = ref('all')
+const badgeStatusFilter = ref('all')
+const selectedAchievement = ref(null)
+const badgeDetailCloseButton = ref(null)
 const selectedSpeciesId = ref(store.focusGarden.selectedSpeciesId)
 const selectedStageIndex = ref(5)
 const reactionBurst = ref(0)
@@ -657,6 +719,7 @@ const monthGardenExpanded = ref(false)
 const monthGridWidth = ref(0)
 let monthGridObserver = null
 let replayAnimationFrame = 0
+let badgeDetailTrigger = null
 const todayKey = localGardenDateKey()
 const gardenStages = FOCUS_GARDEN_STAGES
 const stageDescriptions = {
@@ -795,14 +858,36 @@ const monthLeadingBlanks = computed(() => {
 })
 const unlockedAchievements = computed(() => store.focusGardenAchievements.filter(item => item.unlockedAt))
 const recentAchievements = computed(() => [...unlockedAchievements.value].sort((a, b) => new Date(b.unlockedAt) - new Date(a.unlockedAt)).slice(0, 3))
-const achievementPoints = computed(() => unlockedAchievements.value.reduce((sum, item) => sum + (FOCUS_GARDEN_ACHIEVEMENT_REWARDS[item.kind]?.points || 1), 0))
-const maxAchievementPoints = computed(() => store.focusGardenAchievements.reduce((sum, item) => sum + (FOCUS_GARDEN_ACHIEVEMENT_REWARDS[item.kind]?.points || 1), 0))
 const achievementCompletion = computed(() => store.focusGardenAchievements.length ? Math.round(unlockedAchievements.value.length / store.focusGardenAchievements.length * 100) : 0)
+const currentFocusGardenStreak = computed(() => {
+  const activeDates = new Set(store.focusGarden.days.filter(item => item.growthMinutes > 0).map(item => item.date))
+  const cursor = new Date()
+  if (!activeDates.has(localGardenDateKey(cursor))) cursor.setDate(cursor.getDate() - 1)
+  let streak = 0
+  while (activeDates.has(localGardenDateKey(cursor))) {
+    streak += 1
+    cursor.setDate(cursor.getDate() - 1)
+  }
+  return streak
+})
 const nextSpecies = computed(() => store.focusGardenSpecies.filter(item => !item.unlocked).sort((a, b) => a.unlockMinutes - b.unlockMinutes)[0] || null)
 const nextSpeciesProgress = computed(() => nextSpecies.value ? Math.min(100, Math.round(store.focusGardenTotals.totalMinutes / nextSpecies.value.unlockMinutes * 100)) : 100)
+const collectionCompletedAt = computed(() => nextSpecies.value ? null : focusGardenCollectionCompletionDate(store.focusGarden))
+const deepCompanionCount = computed(() => store.focusGardenSpecies.filter(item => item.companion && ['companion', 'familiar', 'symbiosis'].includes(item.companion.id)).length)
+const companionCollectionProgress = computed(() => Math.round(deepCompanionCount.value / Math.max(1, store.focusGardenSpecies.length) * 100))
+const nextCompanionSpecies = computed(() => [...store.focusGardenSpecies]
+  .filter(item => item.unlocked && item.companion?.next)
+  .sort((a, b) => {
+    const usedDifference = Number(b.growthMinutes > 0) - Number(a.growthMinutes > 0)
+    return usedDifference || b.companion.progress - a.companion.progress || b.growthMinutes - a.growthMinutes
+  })[0] || null)
 const selectedSpecies = computed(() => store.focusGardenSpecies.find(item => item.id === selectedSpeciesId.value) || store.focusGardenSpecies[0])
+const selectedSpeciesProfile = computed(() => FOCUS_GARDEN_SPECIES.find(item => item.id === selectedSpecies.value?.id) || selectedSpecies.value)
 const selectedStageNumber = computed(() => Math.max(0, Math.min(gardenStages.length - 1, Math.round(selectedStageIndex.value))))
 const selectedStage = computed(() => gardenStages[selectedStageNumber.value] || gardenStages[0])
+const stageMilestones = computed(() => focusGardenStageMilestones(store.focusGardenToday.goalMinutes))
+const selectedStageMilestone = computed(() => stageMilestones.value[selectedStageNumber.value] || stageMilestones.value[0])
+const replayProgress = computed(() => selectedStageIndex.value / Math.max(1, gardenStages.length - 1) * 100)
 const selectedCollection = computed(() => FOCUS_GARDEN_COLLECTIONS.find(item => item.id === selectedSpecies.value.collectionId) || FOCUS_GARDEN_COLLECTIONS[0])
 const speciesStageBackdrops = {
   camellia: camelliaStageBackdrop,
@@ -845,14 +930,7 @@ const recentGardenDays = computed(() => {
     return { date: dateKey, day: date.getDate(), weekday: weekdays[date.getDay()], entry: entries.get(dateKey) || null }
   })
 })
-const growthRanks = [
-  { id: 'seed', name: '播种者', shortName: '播种', threshold: 0, description: '第一分钟落进土壤，花田从今天开始。' },
-  { id: 'sprout', name: '破土者', shortName: '破土', threshold: 60, description: '稳定的投入让第一株花真正破土。' },
-  { id: 'leaves', name: '舒叶者', shortName: '舒叶', threshold: 180, description: '专注逐渐形成自己的节奏，叶片开始舒展。' },
-  { id: 'bud', name: '守护者', shortName: '花苞', threshold: 600, description: '持续照料每一次投入，花苞正在聚拢。' },
-  { id: 'opening', name: '初绽者', shortName: '初绽', threshold: 1800, description: '积累已经被看见，花田进入初绽阶段。' },
-  { id: 'bloom', name: '盛放园丁', shortName: '盛放', threshold: 5400, description: '长久专注成为一座可以回望的完整花田。' }
-]
+const growthRanks = FOCUS_GARDEN_RANKS
 const currentGrowthRankIndex = computed(() => {
   const total = store.focusGardenTotals.totalMinutes
   return Math.max(0, growthRanks.reduce((index, rank, currentIndex) => total >= rank.threshold ? currentIndex : index, 0))
@@ -873,9 +951,9 @@ const achievementGroups = computed(() => [
   { id: 'variety', label: '多样', description: '培养不同花种留下的色彩', icon: Leaf }
 ].map(group => ({ ...group, reward: FOCUS_GARDEN_ACHIEVEMENT_REWARDS[group.id], items: store.focusGardenAchievements.filter(item => item.kind === group.id) })).filter(group => group.items.length))
 const badgeStatusOptions = [
-  { id: 'in-progress', label: '正在形成' },
+  { id: 'all', label: '全部' },
   { id: 'unlocked', label: '已获得' },
-  { id: 'all', label: '全部' }
+  { id: 'near', label: '接近完成' }
 ]
 const nextAchievement = computed(() => [...store.focusGardenAchievements]
   .filter(item => !item.unlockedAt)
@@ -884,15 +962,29 @@ const nextAchievement = computed(() => [...store.focusGardenAchievements]
     const remainingB = b.target ? Math.max(0, b.target - b.progress) / b.target : 1
     return remainingA - remainingB
   })[0] || null)
-const activeBadgeGroupId = computed(() => selectedBadgeGroupId.value || nextAchievement.value?.kind || achievementGroups.value[0]?.id || '')
-const visibleBadgeGroups = computed(() => achievementGroups.value
-  .filter(group => group.id === activeBadgeGroupId.value)
-  .map(group => ({
-    ...group,
-    visibleItems: group.items.filter(item => (
-      badgeStatusFilter.value === 'all' || (badgeStatusFilter.value === 'unlocked' ? item.unlockedAt : !item.unlockedAt)
-    ))
-  })))
+const badgeCategoryOptions = computed(() => [
+  { id: 'all', label: '全部', count: store.focusGardenAchievements.length },
+  ...achievementGroups.value.map(group => ({ id: group.id, label: group.label, count: group.items.length }))
+])
+const trackedAchievement = computed(() => store.focusGardenAchievements.find(item => (
+  item.id === store.focusGarden.trackedAchievementId && !item.unlockedAt
+)) || null)
+const focusAchievement = computed(() => trackedAchievement.value || nextAchievement.value || recentAchievements.value[0] || null)
+const visibleAchievements = computed(() => {
+  const filtered = store.focusGardenAchievements.filter(item => {
+    if (selectedBadgeGroupId.value !== 'all' && item.kind !== selectedBadgeGroupId.value) return false
+    if (badgeStatusFilter.value === 'unlocked') return Boolean(item.unlockedAt)
+    if (badgeStatusFilter.value === 'near') return !item.unlockedAt && achievementPercent(item) >= 40
+    return true
+  })
+  return [...filtered].sort((a, b) => {
+    if (trackedAchievement.value?.id === a.id) return -1
+    if (trackedAchievement.value?.id === b.id) return 1
+    if (Boolean(a.unlockedAt) !== Boolean(b.unlockedAt)) return a.unlockedAt ? -1 : 1
+    if (a.unlockedAt && b.unlockedAt) return new Date(b.unlockedAt) - new Date(a.unlockedAt)
+    return achievementPercent(b) - achievementPercent(a)
+  })
+})
 const nextAchievementProgress = computed(() => nextAchievement.value
   ? Math.min(100, Math.round(nextAchievement.value.progress / Math.max(1, nextAchievement.value.target) * 100))
   : 100)
@@ -901,6 +993,11 @@ const primaryGoal = computed(() => {
   if (nextSpecies.value) candidates.push({
     type: 'species', icon: Leaf, progress: nextSpeciesProgress.value, title: `解锁 ${nextSpecies.value.name}`,
     description: `再专注 ${Math.max(0, nextSpecies.value.unlockMinutes - store.focusGardenTotals.totalMinutes)} 分钟，让花圃多一种颜色。`, actionLabel: '查看图鉴'
+  })
+  if (!nextSpecies.value && nextCompanionSpecies.value) candidates.push({
+    type: 'companion', icon: Flower2, progress: nextCompanionSpecies.value.companion.progress,
+    title: `${nextCompanionSpecies.value.name} · ${nextCompanionSpecies.value.companion.next.name}`,
+    description: `继续培养这株花，还需${companionRequirement(nextCompanionSpecies.value)}。`, actionLabel: '继续培养'
   })
   if (nextAchievement.value) candidates.push({
     type: 'badges', icon: Trophy, progress: nextAchievementProgress.value, title: `获得「${nextAchievement.value.name}」`,
@@ -912,13 +1009,6 @@ const primaryGoal = computed(() => {
   })
   return candidates.sort((a, b) => b.progress - a.progress)[0] || null
 })
-const featuredAchievement = computed(() => recentAchievements.value[0] || nextAchievement.value || store.focusGardenAchievements[0] || null)
-const featuredAchievementProgress = computed(() => featuredAchievement.value
-  ? Math.min(100, Math.round(featuredAchievement.value.progress / Math.max(1, featuredAchievement.value.target) * 100))
-  : 0)
-const featuredAchievementReward = computed(() => featuredAchievement.value
-  ? FOCUS_GARDEN_ACHIEVEMENT_REWARDS[featuredAchievement.value.kind]
-  : { label: '成长徽记', hint: '每一次投入都会留下印记' })
 const legacyRewards = computed(() => {
   const names = { blueberry: '蓝莓', strawberry: '草莓', tomato: '番茄', watermelon: '西瓜', pumpkin: '南瓜' }
   return Object.entries(names).map(([id, name]) => ({
@@ -930,6 +1020,23 @@ const legacyRewards = computed(() => {
 
 function stageName(id) { return FOCUS_GARDEN_STAGES.find(item => item.id === id)?.name || '种子' }
 function daySpeciesName(id) { return store.focusGardenSpecies.find(item => item.id === id)?.name || '小雏菊' }
+function formatCollectionDate(value) {
+  const [year, month, day] = String(value).split('-')
+  return `${year} 年 ${Number(month)} 月 ${Number(day)} 日`
+}
+function companionRequirement(species) {
+  const requirements = []
+  if (species?.companion?.remainingMinutes) requirements.push(`${species.companion.remainingMinutes} 分钟`)
+  if (species?.companion?.remainingBlooms) requirements.push(`盛放 ${species.companion.remainingBlooms} 次`)
+  return requirements.join('、') || '完成当前条件'
+}
+function speciesCardLabel(species) {
+  if (!species.unlocked) return `${species.name}，解锁门槛 ${species.unlockMinutes} 分钟，还差 ${speciesUnlockRemaining(species)} 分钟`
+  const next = species.companion?.next
+  return next
+    ? `${species.name}，已解锁，陪伴等级${species.companion.name}，当前进度${species.companion.progress}%，下一阶${next.name}，还需${companionRequirement(species)}`
+    : `${species.name}，已解锁，陪伴等级${species.companion?.name || '初识'}，已达到最高陪伴等级`
+}
 function durationHuman(minutes) {
   const value = Math.max(0, Math.round(Number(minutes) || 0))
   if (value < 60) return `${value} 分钟`
@@ -939,6 +1046,137 @@ function durationHuman(minutes) {
 function achievementRemaining(item) {
   const labels = { totalMinutes: '分钟', bloomCount: '朵花', speciesCount: '种花', longestSessionMinutes: '分钟', activeDays: '天', goalDays: '天', collectionCount: '座花圃', longestStreak: '天' }
   return `${Math.max(0, item.target - item.progress)} ${labels[item.metric] || '点进度'}`
+}
+function achievementPercent(item) {
+  return Math.min(100, Math.max(0, Math.round((Number(item?.progress) || 0) / Math.max(1, Number(item?.target) || 1) * 100)))
+}
+function achievementReward(item) {
+  return FOCUS_GARDEN_ACHIEVEMENT_REWARDS[item?.kind] || { label: '成长徽记', hint: '每一次投入都会留下印记' }
+}
+function achievementRuleText(item) {
+  const labels = {
+    totalMinutes: `累计完成 ${durationHuman(item.target)} 专注`,
+    bloomCount: `让花朵完整盛放 ${item.target} 次`,
+    speciesCount: `培养过 ${item.target} 种不同花种`,
+    longestSessionMinutes: `在同一轮中累计完成 ${item.target} 分钟有效专注`,
+    activeDays: `在 ${item.target} 个不同日期留下专注记录`,
+    goalDays: `有 ${item.target} 天达到当天专注目标`,
+    collectionCount: `完成 ${item.target} 个花种系列`,
+    longestStreak: `连续 ${item.target} 天留下专注记录`
+  }
+  return labels[item.metric] || item.description
+}
+function achievementActionLabel(item) {
+  return ['speciesCount', 'collectionCount'].includes(item.metric) ? '查看花种图鉴' : '开始一轮专注'
+}
+function achievementActionHint(item) {
+  if (item.unlockedAt) return '这枚徽章已经收入你的成长档案。'
+  if (item.metric === 'longestSessionMinutes') return '长时间投入请按身体状态安排暂停和休息；徽章只记录有效专注时长。'
+  if (item.metric === 'goalDays' && store.focusGardenToday.growthMinutes > 0) return `今天已完成 ${store.focusGardenToday.growthMinutes} 分钟，目标为 ${store.focusGardenToday.goalMinutes} 分钟。`
+  return achievementReward(item).hint
+}
+function achievementScopeText(item) {
+  const scopes = {
+    totalMinutes: '只累计已完成专注中的有效分钟，不包含休息、暂停和提前结束的时间。',
+    bloomCount: '当天有效专注达到当天目标时记为一次盛放；同一天只记录一株今日花。',
+    speciesCount: '花种在任意一天产生有效专注后即算培养过，重复培养不会增加种类数。',
+    longestSessionMinutes: '取单轮已完成专注的有效分钟；暂停和休息不计时，请按身体状态合理休息。',
+    activeDays: '自然日内产生至少 1 分钟有效专注，即记为一个成长日。',
+    goalDays: '当天累计有效专注达到该日保存的目标分钟数，即记为一个达标日。',
+    collectionCount: '同一花圃系列中的花种产生有效专注后，该系列才计入已培养花圃。',
+    longestStreak: '按自然日连续计算；没有成长记录的日期会中断连续天数，但不会撤销已获得徽章。'
+  }
+  return scopes[item.metric] || '根据花田中保存的有效专注记录自动计算。'
+}
+function achievementRecentProgress(item) {
+  const start = new Date()
+  start.setHours(0, 0, 0, 0)
+  start.setDate(start.getDate() - 6)
+  const startKey = localGardenDateKey(start)
+  const recentDays = store.focusGarden.days.filter(day => day.date >= startKey && day.growthMinutes > 0)
+  const recentFocusRecords = store.focusHistory.filter(record => (
+    record.phase === 'focus' && record.result === 'completed' && localGardenDateKey(record.finishedAt) >= startKey
+  ))
+  const lastDay = [...store.focusGarden.days].filter(day => day.growthMinutes > 0).sort((a, b) => b.date.localeCompare(a.date))[0]
+  const lastText = lastDay ? `最近一次推进：${formatShortDate(`${lastDay.date}T12:00:00`)}` : '还没有有效专注记录'
+  const values = {
+    totalMinutes: recentDays.reduce((sum, day) => sum + day.growthMinutes, 0),
+    bloomCount: recentDays.filter(day => gardenStageFor(day.growthMinutes, day.goalMinutes).id === 'bloom').length,
+    speciesCount: new Set(recentDays.map(day => day.speciesId)).size,
+    longestSessionMinutes: Math.max(0, ...recentFocusRecords.map(record => Math.floor((Number(record.elapsedSeconds) || 0) / 60))),
+    activeDays: recentDays.length,
+    goalDays: recentDays.filter(day => day.growthMinutes >= day.goalMinutes).length,
+    collectionCount: new Set(recentDays.map(day => FOCUS_GARDEN_SPECIES.find(species => species.id === day.speciesId)?.collectionId).filter(Boolean)).size,
+    longestStreak: currentFocusGardenStreak.value
+  }
+  const labels = {
+    totalMinutes: `${durationHuman(values.totalMinutes)}投入`,
+    bloomCount: `${values.bloomCount} 朵盛放`,
+    speciesCount: `${values.speciesCount} 种花`,
+    longestSessionMinutes: `最长 ${durationHuman(values.longestSessionMinutes)}`,
+    activeDays: `${values.activeDays} 个成长日`,
+    goalDays: `${values.goalDays} 个达标日`,
+    collectionCount: `${values.collectionCount} 座花圃`,
+    longestStreak: `当前连续 ${values.longestStreak} 天`
+  }
+  return { value: `近 7 天 · ${labels[item.metric] || '持续成长'}`, detail: lastText }
+}
+function achievementSeriesNeighbors(item) {
+  const series = store.focusGardenAchievements.filter(candidate => candidate.kind === item.kind)
+  const index = series.findIndex(candidate => candidate.id === item.id)
+  return [series[index - 1], series[index + 1]].filter(Boolean)
+}
+function performAchievementAction(item) {
+  closeAchievementDetail(false)
+  if (['speciesCount', 'collectionCount'].includes(item.metric)) activeTab.value = 'species'
+  else store.setClockView('focus')
+}
+function toggleTrackedAchievement(item) {
+  store.trackFocusGardenAchievement(item.id)
+  closeAchievementDetail()
+}
+function openAchievementDetail(item, trigger) {
+  selectedAchievement.value = item
+  badgeDetailTrigger = trigger instanceof HTMLElement ? trigger : null
+  nextTick(() => badgeDetailCloseButton.value?.focus())
+}
+function closeAchievementDetail(restoreFocus = true) {
+  selectedAchievement.value = null
+  const trigger = badgeDetailTrigger
+  badgeDetailTrigger = null
+  if (restoreFocus) nextTick(() => trigger?.focus())
+}
+function handleBadgeDetailKeydown(event) {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    closeAchievementDetail()
+    return
+  }
+  if (event.key !== 'Tab') return
+  const dialog = event.currentTarget
+  const focusable = [...dialog.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+  if (!focusable.length) return
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault()
+    first.focus()
+  }
+}
+function handleBadgeCategoryKeydown(event) {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+  const tabs = [...event.currentTarget.querySelectorAll('[data-badge-category]')]
+  const currentIndex = tabs.indexOf(document.activeElement)
+  let nextIndex = currentIndex
+  if (event.key === 'Home') nextIndex = 0
+  else if (event.key === 'End') nextIndex = tabs.length - 1
+  else nextIndex = (currentIndex + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length
+  event.preventDefault()
+  tabs[nextIndex]?.click()
+  tabs[nextIndex]?.focus()
 }
 function achievementBadgeIcon(item) {
   return achievementBadgeIcons[item.id] || Trophy
@@ -1000,6 +1238,11 @@ function collapseMonthGarden() {
   monthGardenExpanded.value = false
 }
 function openPrimaryGoal() {
+  if (primaryGoal.value?.type === 'companion' && nextCompanionSpecies.value) {
+    selectedSpeciesId.value = nextCompanionSpecies.value.id
+    activeTab.value = 'species'
+    return
+  }
   if (!primaryGoal.value) return
   activeTab.value = primaryGoal.value.type === 'badges' ? 'badges' : primaryGoal.value.type === 'species' ? 'species' : 'field'
 }
@@ -1135,8 +1378,10 @@ onBeforeUnmount(() => {
 .achievement-workspace {
   width: 100%;
   min-height: 0;
+  box-sizing: border-box;
   padding: 24px;
   overflow: auto;
+  container-type: inline-size;
   background: radial-gradient(circle at 14% 0, var(--accent-soft), transparent 26%), var(--main-bg);
   scrollbar-width: thin;
   scrollbar-color: var(--text-muted-26-fallback) transparent;
@@ -1494,6 +1739,7 @@ onBeforeUnmount(() => {
 .achievement-trail .achievement-recent__list article > span { width: 27px; height: 27px; }.achievement-trail .achievement-recent__list article > span svg { width: 16px; height: 16px; }.achievement-trail .achievement-recent__list strong { font-size: 10px; }.achievement-trail .achievement-recent__list small,.achievement-trail .achievement-recent__list time { font-size: 8px; }
 .achievement-species { display: grid; gap: 16px; }
 .species-next { display: grid; grid-template-columns: 60px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px 14px; border-color: color-mix(in srgb, var(--accent) 23%, var(--divider-soft)); background: color-mix(in srgb, var(--accent-soft) 24%, var(--surface)); text-align: left; cursor: pointer; }.species-next :deep(.focus-species-preview) { width: 58px; height: 58px; object-fit: contain; }.species-next > div { display: grid; gap: 3px; min-width: 0; }.species-next span { color: var(--accent-strong); font-size: 10px; font-weight: 800; letter-spacing: .06em; }.species-next strong { color: var(--text); font-size: 14px; }.species-next small { overflow: hidden; color: var(--text-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }.species-next i { display: block; width: min(360px, 100%); height: 5px; margin-top: 3px; overflow: hidden; border-radius: 99px; background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }.species-next i b { display: block; height: 100%; border-radius: inherit; background: var(--accent); }.species-next > svg { color: var(--text-muted); }.species-next:hover { border-color: color-mix(in srgb, var(--accent) 40%, var(--divider-soft)); }
+.species-complete { display: grid; grid-template-columns: 46px minmax(0, 1fr) minmax(150px, .32fr); align-items: center; gap: 14px; padding: 13px 16px; border-color: color-mix(in srgb, #9eae72 34%, var(--divider-soft)); background: linear-gradient(110deg, color-mix(in srgb, #f7f3d9 52%, var(--surface)), var(--surface)); }.species-complete__seal { display: grid; width: 44px; height: 44px; place-items: center; border: 1px solid color-mix(in srgb, #9eae72 38%, var(--divider-soft)); border-radius: 50%; background: color-mix(in srgb, #f0d96b 22%, var(--surface)); color: #78884f; box-shadow: inset 0 0 0 5px rgba(255,255,255,.48); }.species-complete > div { display: grid; min-width: 0; gap: 3px; }.species-complete > div > span,.species-complete__depth small { color: var(--accent-strong); font-size: 9px; font-weight: 800; letter-spacing: .05em; }.species-complete > div > strong { color: var(--text); font-size: 15px; }.species-complete > div > small { overflow: hidden; color: var(--text-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }.species-complete__depth { justify-items: stretch; padding-left: 14px; border-left: 1px solid var(--divider-soft); }.species-complete__depth strong { font-size: 13px !important; text-align: right; }.species-complete__depth i,.species-companion > i { display: block; height: 5px; overflow: hidden; border-radius: 99px; background: var(--surface-muted); }.species-complete__depth i b,.species-companion > i b { display: block; height: 100%; border-radius: inherit; background: color-mix(in srgb, #9eae72 82%, var(--accent)); }
 .species-playground {
   display: grid;
   grid-template-columns: minmax(0, 1.45fr) minmax(260px, .72fr);
@@ -1549,15 +1795,16 @@ onBeforeUnmount(() => {
 .species-playground__hint { position: absolute; z-index: 4; right: 18px; bottom: 16px; display: inline-flex; align-items: center; gap: 5px; padding: 7px 10px; border: 1px solid rgba(255,255,255,.72); border-radius: 999px; background: rgba(255,255,255,.72); color: var(--accent-strong); font-size: 10px; cursor: pointer; backdrop-filter: blur(6px); }
 .species-playground__particle { --angle: calc(var(--particle-index) * 45deg); position: absolute; z-index: 3; bottom: 144px; left: 50%; width: 7px; height: 7px; border-radius: 70% 30% 70% 30%; background: var(--species-accent); opacity: 0; animation: species-particle .85s ease-out both; }
 @keyframes species-particle { 20% { opacity: .8; } to { opacity: 0; transform: rotate(var(--angle)) translateY(-90px) scale(.3); } }
-.species-playground__info { display: grid; align-content: center; gap: 12px; padding: 28px; background: color-mix(in srgb, var(--surface) 92%, var(--species-scene)); }
-.species-playground__collection { display: inline-flex; align-items: center; gap: 6px; width: fit-content; padding: 6px 9px; border-radius: 999px; background: color-mix(in srgb, var(--species-scene) 65%, var(--surface)); color: var(--accent-strong); font-size: 10px; font-weight: 750; }
-.species-playground__info h2 { margin: 0; color: var(--text); font-size: 28px; letter-spacing: -.04em; }.species-playground__info > p { min-height: 42px; margin: -5px 0 0; color: var(--text-muted); font-size: 12px; line-height: 1.65; }
-.species-playground__info dl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 2px 0; }.species-playground__info dl div { display: grid; gap: 4px; padding: 10px; border: 1px solid color-mix(in srgb, var(--species-accent) 13%, var(--divider-soft)); border-radius: 12px; background: rgba(255,255,255,.68); }.species-playground__info dt { color: var(--text-muted); font-size: 9px; }.species-playground__info dd { margin: 0; color: var(--text); font-size: 12px; font-weight: 750; }
+.species-playground__info { display: grid; align-content: start; grid-template-rows: auto auto minmax(42px, auto) auto auto auto auto; gap: 13px; padding: 26px 28px; background: color-mix(in srgb, var(--surface) 92%, var(--species-scene)); }
+.species-playground__identity { display: grid; justify-items: start; gap: 7px; }.species-playground__collection { display: inline-flex; align-items: center; gap: 6px; width: fit-content; padding: 5px 8px; border-radius: 999px; background: color-mix(in srgb, var(--species-scene) 65%, var(--surface)); color: var(--accent-strong); font-size: 10px; font-weight: 750; }.species-playground__identity h2 { margin: 0; color: var(--text); font-size: 31px; line-height: 1.1; letter-spacing: -.045em; }.species-playground__identity > p { display: flex; align-items: baseline; gap: 8px; margin: 0; }.species-playground__identity > p span,.species-playground__meaning > span,.species-playground__description > span { flex: none; color: var(--text-muted); font-size: 10px; font-weight: 750; letter-spacing: .08em; }.species-playground__identity > p strong { color: color-mix(in srgb, var(--species-accent) 76%, var(--text)); font-size: 15px; font-weight: 800; line-height: 1.4; }
+.species-playground__meaning { display: grid; gap: 5px; min-width: 0; padding: 11px 13px 12px; border-radius: 12px; background: linear-gradient(90deg, color-mix(in srgb, var(--species-scene) 58%, var(--surface)), rgba(255,255,255,.54)); }.species-playground__meaning > span { color: var(--accent-strong); }.species-playground__meaning blockquote { position: relative; margin: 0; padding-left: 11px; color: color-mix(in srgb, var(--text-muted) 88%, var(--text)); font-size: 13px; line-height: 1.65; }.species-playground__meaning blockquote::before { position: absolute; top: 4px; bottom: 4px; left: 0; width: 2px; border-radius: 999px; background: color-mix(in srgb, var(--species-accent) 64%, transparent); content: ''; }.species-playground__description { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 8px; min-height: 42px; margin: 0; padding-top: 11px; border-top: 1px solid color-mix(in srgb, var(--species-accent) 14%, var(--divider-soft)); color: var(--text-muted); font-size: 12px; line-height: 1.65; }.species-playground__description > span { padding-top: 2px; }
+.species-playground__progress { display: grid; gap: 10px; padding-top: 1px; }.species-playground__progress dl { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin: 0; border: 1px solid color-mix(in srgb, var(--species-accent) 16%, var(--divider-soft)); border-radius: 12px; background: rgba(255,255,255,.6); overflow: hidden; }.species-playground__progress dl div { display: grid; gap: 4px; min-height: 48px; padding: 10px 12px; }.species-playground__progress dl div + div { border-left: 1px solid color-mix(in srgb, var(--species-accent) 13%, var(--divider-soft)); }.species-playground__progress dt { color: var(--text-muted); font-size: 10px; }.species-playground__progress dd { margin: 0; color: var(--text); font-size: 17px; font-weight: 800; letter-spacing: -.02em; }.species-playground__progress dd small { color: var(--text-muted); font-size: 10px; font-weight: 650; letter-spacing: 0; }
 .species-detail__status { display: inline-flex; align-items: center; gap: 5px; width: fit-content; padding: 6px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-strong); font-size: 10px; font-weight: 700; }.species-detail__status.is-locked { background: var(--surface-muted); color: var(--text-muted); }
-.species-detail__unlock { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 8px; align-items: center; padding: 9px 10px; border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--divider-soft)); border-radius: 12px; background: color-mix(in srgb, var(--accent-soft) 35%, var(--surface)); }.species-detail__unlock > span { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 10px; background: var(--surface); color: var(--accent-strong); }.species-detail__unlock > div { display: grid; gap: 1px; }.species-detail__unlock small { color: var(--text-muted); font-size: 9px; }.species-detail__unlock strong { color: var(--text); font-size: 12px; }.species-detail__unlock em { color: var(--accent-strong); font-size: 10px; font-style: normal; font-weight: 750; }.species-detail__unlock.is-locked { border-style: dashed; background: var(--surface-muted); }.species-detail__unlock.is-locked > span { color: var(--text-muted); }
-.species-playground__choose { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 39px; border-radius: 11px; background: linear-gradient(135deg, var(--accent), var(--accent-strong)); color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 18px color-mix(in srgb, var(--accent) 25%, transparent); }.species-playground__choose:disabled { background: var(--surface-muted); color: var(--text-muted); box-shadow: none; cursor: default; }.species-playground__footprint { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 35px; border: 1px solid color-mix(in srgb, var(--species-accent) 28%, var(--divider-soft)); border-radius: 10px; color: var(--species-accent); font-size: 11px; font-weight: 700; cursor: pointer; }.species-playground__footprint:hover { background: color-mix(in srgb, var(--species-accent) 10%, var(--surface)); }
-.species-replay { padding: 18px 20px 20px; }.species-replay__actions { display: flex; align-items: center; gap: 12px; }.species-replay__actions button { display: inline-flex; align-items: center; gap: 5px; padding: 6px 9px; border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--divider-soft)); border-radius: 999px; background: var(--accent-soft); color: var(--accent-strong); font-size: 10px; font-weight: 700; cursor: pointer; }.species-replay__actions small { color: var(--accent-strong); font-size: 11px; font-weight: 750; }.species-replay__range { display: block; margin: 17px 13px 4px; }.species-replay__range input { width: 100%; accent-color: var(--accent); cursor: grab; }.species-replay__range input:active { cursor: grabbing; }
-.species-replay__steps { position: relative; display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }.species-replay__steps::before { position: absolute; top: 15px; right: 7%; left: 7%; height: 2px; background: var(--divider-soft); content: ''; }.species-replay__steps button { position: relative; z-index: 1; display: grid; justify-items: center; gap: 5px; padding: 3px; color: var(--text-muted); font-size: 10px; cursor: pointer; }.species-replay__steps button i { display: grid; width: 30px; height: 30px; place-items: center; border: 2px solid var(--surface); border-radius: 50%; background: var(--surface-muted); box-shadow: 0 0 0 1px var(--divider-soft); }.species-replay__steps button.reached i { background: var(--accent-soft); color: var(--accent-strong); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent); }.species-replay__steps button.active { color: var(--accent-strong); font-weight: 750; }.species-replay__steps button.active i { color: #fff; background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); transform: scale(1.06); }
+.species-companion { display: grid; gap: 8px; padding: 12px; border-radius: 13px; background: linear-gradient(120deg, color-mix(in srgb, #f5f2d8 54%, var(--surface)), color-mix(in srgb, var(--species-scene) 34%, var(--surface))); }.species-companion > header { display: flex; align-items: start; justify-content: space-between; gap: 10px; }.species-companion > header > div { display: grid; gap: 2px; }.species-companion > header span,.species-companion__next span { color: var(--text-muted); font-size: 10px; font-weight: 650; letter-spacing: .04em; }.species-companion > header strong { color: #657440; font-size: 16px; font-weight: 800; letter-spacing: -.02em; }.species-companion > header > b { min-width: 34px; padding: 4px 6px; border-radius: 999px; background: rgba(255,255,255,.58); color: #78884f; font-size: 10px; font-weight: 800; text-align: center; }.species-companion p { margin: -1px 0 0; color: var(--text-muted); font-size: 11px; line-height: 1.5; }.species-companion__next { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding-top: 2px; }.species-companion__next strong { color: #657440; font-size: 10px; font-weight: 750; text-align: right; }.species-companion i { height: 5px; overflow: hidden; border-radius: 99px; background: rgba(120,136,79,.14); }.species-companion i b { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #aebb77, #78884f); }
+.species-detail__unlock { display: flex; align-items: center; gap: 7px; min-height: 22px; color: var(--text-muted); }.species-detail__unlock > span { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 50%; background: var(--accent-soft); color: var(--accent-strong); }.species-detail__unlock > div { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 6px; }.species-detail__unlock small,.species-detail__unlock em { color: var(--text-muted); font-size: 10px; font-style: normal; }.species-detail__unlock strong { color: var(--text-muted); font-size: 10px; font-weight: 650; }.species-detail__unlock em { color: var(--accent-strong); font-weight: 700; }.species-detail__unlock.is-locked > span { background: var(--surface-muted); color: var(--text-muted); }
+.species-playground__actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }.species-playground__actions > :only-child { grid-column: 1 / -1; }.species-playground__choose { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; padding: 0 12px; border-radius: 10px; background: linear-gradient(135deg, var(--accent), var(--accent-strong)); color: #fff; font-size: 11px; font-weight: 750; cursor: pointer; box-shadow: 0 6px 14px color-mix(in srgb, var(--accent) 19%, transparent); }.species-playground__choose:disabled { background: var(--surface-muted); color: var(--text-muted); box-shadow: none; cursor: default; }.species-playground__footprint { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 36px; padding: 0 11px; border: 1px solid color-mix(in srgb, var(--species-accent) 25%, var(--divider-soft)); border-radius: 10px; color: var(--species-accent); font-size: 10px; font-weight: 750; cursor: pointer; }.species-playground__footprint:hover { background: color-mix(in srgb, var(--species-accent) 10%, var(--surface)); }
+.species-replay { --replay-step-gap: 8px; --replay-stage-center-inset: calc(8.333333% - 3.333333px); --replay-thumb-size: 16px; --replay-range-inset: calc(var(--replay-stage-center-inset) - 8px); padding: 20px 24px 22px; }.species-replay .achievement-section-heading h2 { display: flex; align-items: baseline; gap: 9px; }.species-replay .achievement-section-heading h2 small { color: var(--accent-strong); font-size: 12px; font-weight: 700; }.species-replay__actions { display: flex; align-items: center; gap: 12px; }.species-replay__actions button { display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 6px 10px; border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--divider-soft)); border-radius: 999px; background: var(--accent-soft); color: var(--accent-strong); font-size: 11px; font-weight: 700; cursor: pointer; }.species-replay__actions small { color: var(--accent-strong); font-size: 12px; font-weight: 750; }.species-replay__range { position: relative; display: block; height: 18px; margin: 18px 0 8px; }.species-replay__range::before { position: absolute; top: 6px; right: var(--replay-stage-center-inset); left: var(--replay-stage-center-inset); height: 6px; border-radius: 999px; background: linear-gradient(to right, var(--accent) 0 var(--replay-progress), var(--divider-soft) var(--replay-progress) 100%); content: ''; }.species-replay__range input { position: relative; display: block; width: calc(100% - var(--replay-range-inset) - var(--replay-range-inset)); height: 18px; margin: 0 var(--replay-range-inset); appearance: none; -webkit-appearance: none; background: transparent; cursor: grab; }.species-replay__range input::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; background: transparent; }.species-replay__range input::-webkit-slider-thumb { box-sizing: border-box; width: var(--replay-thumb-size); height: var(--replay-thumb-size); margin-top: -5px; border: 3px solid var(--surface); border-radius: 50%; appearance: none; -webkit-appearance: none; background: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent); }.species-replay__range input:active { cursor: grabbing; }.species-replay__range input:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 999px; }
+.species-replay__steps { position: relative; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--replay-step-gap); }.species-replay__steps::before { position: absolute; top: 17px; right: var(--replay-stage-center-inset); left: var(--replay-stage-center-inset); height: 2px; background: var(--divider-soft); content: ''; }.species-replay__steps button { position: relative; z-index: 1; display: grid; grid-template-rows: 34px minmax(39px, auto); justify-items: center; align-items: start; gap: 6px; min-width: 0; min-height: 79px; padding: 0 2px; color: var(--text-muted); cursor: pointer; }.species-replay__steps button i { display: grid; width: 34px; height: 34px; place-items: center; border: 2px solid var(--surface); border-radius: 50%; background: var(--surface-muted); box-shadow: 0 0 0 1px var(--divider-soft); }.species-replay__steps button span { display: grid; justify-items: center; gap: 2px; min-width: 0; }.species-replay__steps button span b { color: currentColor; font-size: 12px; font-weight: 700; line-height: 1.35; }.species-replay__steps button span small { display: block; max-width: 100%; overflow: hidden; color: var(--text-muted); font-size: 10px; font-weight: 550; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }.species-replay__steps button.reached i { background: var(--accent-soft); color: var(--accent-strong); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent); }.species-replay__steps button.active { color: var(--accent-strong); font-weight: 750; }.species-replay__steps button.active span small { color: var(--accent-strong); }.species-replay__steps button.active i { color: #fff; background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); transform: scale(1.06); }
 .species-collection { padding: 18px 18px 14px; overflow: hidden; background: linear-gradient(180deg, var(--surface), color-mix(in srgb, var(--collection-scene) 54%, var(--surface))); }.species-collection > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }.species-collection > header span { color: var(--accent-strong); font-size: 11px; font-weight: 800; letter-spacing: .06em; }.species-collection > header h2 { margin: 4px 0 0; color: var(--text-muted); font-size: 11px; font-weight: 500; }.species-collection > header small { padding: 5px 8px; border-radius: 999px; background: rgba(255,255,255,.7); color: var(--text-muted); font-size: 9px; }
 .species-collection__garden { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 12px; padding: 13px 12px 8px; border-radius: 17px; background: linear-gradient(180deg, rgba(255,255,255,.48), color-mix(in srgb, var(--collection-scene) 78%, #cadfc8)); }
 .species-collection__garden > button { position: relative; display: grid; grid-template-rows: 116px auto auto auto; justify-items: center; align-items: end; min-width: 0; min-height: 191px; padding: 5px 8px 11px; border: 1px solid transparent; border-radius: 15px; color: var(--text); cursor: pointer; transform: translateY(calc(var(--plant-level) * 7px)); }.species-collection__garden > button:hover,.species-collection__garden > button:focus-visible { border-color: color-mix(in srgb, var(--plant-accent) 35%, transparent); background: color-mix(in srgb, var(--plant-scene) 48%, rgba(255,255,255,.62)); outline: none; }.species-collection__garden > button.selected { border-color: var(--plant-accent); background: color-mix(in srgb, var(--plant-scene) 56%, rgba(255,255,255,.82)); box-shadow: 0 8px 22px color-mix(in srgb, var(--plant-accent) 17%, transparent); }.species-collection__garden > button.locked { color: var(--text-muted); }
@@ -1575,12 +1822,17 @@ onBeforeUnmount(() => {
 .badges-category-index { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }.badges-category-index__item { --category-accent: var(--accent); display: grid; gap: 6px; padding: 10px 11px; border: 1px solid var(--divider-soft); border-radius: 12px; background: var(--surface); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: transform .16s ease, border-color .16s ease, background-color .16s ease; }.badges-category-index__item:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--category-accent) 35%, var(--divider-soft)); }.badges-category-index__item.active { border-color: color-mix(in srgb, var(--category-accent) 52%, var(--divider-soft)); background: color-mix(in srgb, var(--category-accent) 8%, var(--surface)); box-shadow: 0 7px 16px color-mix(in srgb, var(--category-accent) 12%, transparent); }.badges-category-index__item--start { --category-accent: #bd9841; }.badges-category-index__item--streak { --category-accent: #6f9d75; }.badges-category-index__item--accumulate { --category-accent: #c47f45; }.badges-category-index__item--deep { --category-accent: #7081b6; }.badges-category-index__item--variety { --category-accent: #a477ae; }.badges-category-index__item > div { display: flex; align-items: center; justify-content: space-between; gap: 5px; }.badges-category-index__item span { color: var(--category-accent); font-size: 10px; font-weight: 800; }.badges-category-index__item strong { color: var(--text); font-size: 10px; }.badges-category-index__item small { overflow: hidden; color: var(--text-muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }.badges-category-index__item > i { height: 4px; overflow: hidden; border-radius: 99px; background: var(--surface-muted); }.badges-category-index__item > i b { display: block; height: 100%; border-radius: inherit; background: var(--category-accent); }
 .badges-featured { --featured-accent: #bd9841; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(220px, .75fr); align-items: center; gap: 22px; padding: 18px 22px; border-color: color-mix(in srgb, var(--featured-accent) 24%, var(--divider-soft)); background: radial-gradient(circle at 14% 50%, color-mix(in srgb, var(--featured-accent) 13%, transparent), transparent 32%), color-mix(in srgb, var(--featured-accent) 3%, var(--surface)); }.badges-featured.unlocked { --featured-accent: #8c9f61; }.badges-featured__identity { display: flex; align-items: center; gap: 14px; min-width: 0; }.badges-featured__seal { position: relative; display: grid; flex: 0 0 auto; width: 72px; height: 72px; place-items: center; border: 1px solid color-mix(in srgb, var(--featured-accent) 34%, var(--divider-soft)); border-radius: 22px; background: color-mix(in srgb, var(--featured-accent) 13%, var(--surface)); color: var(--featured-accent); box-shadow: inset 0 0 0 7px color-mix(in srgb, var(--featured-accent) 6%, transparent), 0 8px 18px color-mix(in srgb, var(--featured-accent) 13%, transparent); }.badges-featured__seal::before,.badges-featured__seal::after { position: absolute; width: 9px; height: 9px; border: 1px solid color-mix(in srgb, var(--featured-accent) 38%, transparent); border-radius: 50%; content: ''; }.badges-featured__seal::before { top: 9px; right: 12px; }.badges-featured__seal::after { bottom: 10px; left: 12px; }.badges-featured__seal small { position: absolute; right: -6px; bottom: -5px; display: grid; width: 20px; height: 20px; place-items: center; border: 2px solid var(--surface); border-radius: 50%; background: var(--featured-accent); color: #fff; font-size: 8px; font-weight: 800; }.badges-featured__identity > div { min-width: 0; }.badges-featured__eyebrow { display: block; overflow: hidden; color: var(--featured-accent); font-size: 10px; font-weight: 800; letter-spacing: .04em; text-overflow: ellipsis; white-space: nowrap; }.badges-featured h2 { margin: 4px 0 3px; color: var(--text); font-size: 19px; letter-spacing: -.03em; }.badges-featured p { margin: 0; color: var(--text-muted); font-size: 11px; line-height: 1.5; }.badges-featured__progress { display: grid; gap: 7px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--featured-accent) 20%, var(--divider-soft)); border-radius: 13px; background: color-mix(in srgb, var(--featured-accent) 5%, var(--surface)); }.badges-featured__progress > div { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }.badges-featured__progress small { color: var(--text-muted); font-size: 9px; }.badges-featured__progress strong { color: var(--text); font-size: 12px; }.badges-featured__progress > i { height: 6px; overflow: hidden; border-radius: 99px; background: var(--surface-muted); }.badges-featured__progress > i b { display: block; height: 100%; border-radius: inherit; background: var(--featured-accent); }.badges-featured__progress > span { color: var(--text-muted); font-size: 9px; }
 .badge-card::before { position: absolute; top: -1px; right: 16px; left: 16px; height: 3px; border-radius: 0 0 99px 99px; background: var(--badge-accent); opacity: .12; content: ''; }.badge-card.unlocked::before { opacity: .72; }.badge-card.unlocked:hover { transform: translateY(-3px); box-shadow: 0 12px 25px color-mix(in srgb, var(--badge-accent) 12%, transparent); }
+.badge-focus { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, .55fr) auto; align-items: center; gap: 20px; padding: 18px 20px; border-color: color-mix(in srgb, var(--accent) 24%, var(--divider-soft)); background: linear-gradient(105deg, color-mix(in srgb, var(--accent-soft) 62%, var(--surface)), var(--surface) 66%); }.badge-focus.complete { border-color: color-mix(in srgb, #9daf70 34%, var(--divider-soft)); }.badge-focus__identity { display: flex; align-items: center; gap: 13px; min-width: 0; }.badge-focus__icon { display: grid; flex: 0 0 auto; width: 58px; height: 58px; place-items: center; border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--divider-soft)); border-radius: 18px; background: var(--surface); color: var(--accent-strong); box-shadow: 0 7px 18px color-mix(in srgb, var(--accent) 12%, transparent); }.badge-focus__identity p,.badge-library__header p { margin: 0; color: var(--accent-strong); font-size: 10px; font-weight: 800; letter-spacing: .04em; }.badge-focus__identity h2 { margin: 3px 0; color: var(--text); font-size: 18px; }.badge-focus__identity span { display: block; color: var(--text-muted); font-size: 10px; line-height: 1.5; }.badge-focus__progress { display: grid; gap: 7px; }.badge-focus__progress > div { display: flex; justify-content: space-between; gap: 9px; color: var(--text-muted); font-size: 10px; }.badge-focus__progress strong { color: var(--accent-strong); }.badge-focus__progress > i,.badge-detail__rule > i { display: block; height: 7px; overflow: hidden; border-radius: 99px; background: var(--surface-muted); }.badge-focus__progress b,.badge-detail__rule b { display: block; height: 100%; border-radius: inherit; background: var(--accent); }.badge-focus__actions { display: flex; gap: 7px; }.badge-focus__actions button,.badge-detail__actions button { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; gap: 5px; padding: 0 11px; border: 1px solid var(--divider-soft); border-radius: 9px; background: var(--surface); color: var(--text); font: inherit; font-size: 10px; font-weight: 700; cursor: pointer; white-space: nowrap; }.badge-focus__actions .badge-focus__primary,.badge-detail__actions .primary { border-color: var(--accent); background: var(--accent); color: #fff; }.badge-focus--complete { grid-template-columns: auto 1fr; }.badge-focus--complete > svg { color: var(--accent-strong); }.badge-focus--complete p { margin: 0; color: var(--accent-strong); font-size: 10px; }.badge-focus--complete h2 { margin: 3px 0 0; color: var(--text); font-size: 16px; }
+.badge-library { display: grid; gap: 12px; }.badge-library__header { display: flex; align-items: end; justify-content: space-between; gap: 12px; }.badge-library__header h2 { margin: 2px 0 0; color: var(--text); font-size: 16px; }.badge-library__header > span { color: var(--text-muted); font-size: 10px; }.badge-library__filters { display: flex; align-items: center; justify-content: space-between; gap: 12px; }.badge-category-tabs,.badge-status-filter { display: flex; align-items: center; gap: 4px; }.badge-category-tabs { overflow-x: auto; padding: 3px; border: 1px solid var(--divider-soft); border-radius: 11px; background: var(--surface); scrollbar-width: none; }.badge-category-tabs::-webkit-scrollbar { display: none; }.badge-category-tabs button,.badge-status-filter button { min-height: 32px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--text-muted); font: inherit; font-size: 10px; cursor: pointer; white-space: nowrap; }.badge-category-tabs button small { margin-left: 3px; color: inherit; opacity: .72; }.badge-category-tabs button.active,.badge-status-filter button.active { background: var(--accent-soft); color: var(--accent-strong); font-weight: 750; }.badge-status-filter { flex: 0 0 auto; padding: 3px; border-radius: 10px; background: var(--surface-muted); }.badge-card { width: 100%; color: inherit; font: inherit; text-align: left; cursor: pointer; }.badge-card:focus-visible,.badge-category-tabs button:focus-visible,.badge-status-filter button:focus-visible,.badge-focus button:focus-visible,.badge-detail button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }.badge-card.tracked { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent); }.badge-card__copy { min-width: 0; }.badge-card__tracked { position: absolute; top: 9px; right: 10px; display: inline-flex; align-items: center; gap: 3px; padding: 3px 6px; border-radius: 99px; background: var(--accent-soft); color: var(--accent-strong); font-size: 8px; font-weight: 750; }.badge-library__empty { display: grid; min-height: 150px; place-content: center; justify-items: center; gap: 8px; border: 1px dashed var(--divider-soft); border-radius: 14px; color: var(--accent-strong); }.badge-library__empty p { margin: 0; color: var(--text-muted); font-size: 11px; }
+.badge-detail-backdrop { position: fixed; z-index: 1200; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(17, 31, 28, .32); backdrop-filter: blur(3px); }.badge-detail { position: relative; display: grid; width: min(520px, calc(100vw - 32px)); max-height: min(760px, calc(100vh - 40px)); gap: 14px; overflow-y: auto; box-sizing: border-box; padding: 28px; border: 1px solid var(--divider-soft, #e2e8e6); border-radius: 20px; background: var(--surface, #fff); box-shadow: 0 24px 70px rgba(20, 46, 40, .22); }.badge-detail__close { position: absolute; top: 15px; right: 15px; display: grid; width: 40px; height: 40px; place-items: center; border: 0; border-radius: 11px; background: var(--surface-muted, #f8faf9); color: var(--text-muted, #687674); cursor: pointer; }.badge-detail__header { display: grid; grid-template-columns: 68px minmax(0, 1fr); align-items: center; gap: 16px; padding-right: 42px; }.badge-detail__header > div { display: grid; min-width: 0; gap: 5px; }.badge-detail__icon { display: grid; width: 68px; height: 68px; place-items: center; border-radius: 20px; background: var(--accent-soft, #e5f5f2); color: var(--accent-strong, #1f6f68); }.badge-detail__eyebrow { margin: 0 !important; color: var(--accent-strong, #1f6f68) !important; font-size: 12px !important; font-weight: 800; }.badge-detail h2 { margin: 0; color: var(--text, #17211f); font-size: 26px; line-height: 1.25; }.badge-detail__header p:last-child { margin: 0; color: var(--text-muted, #53635f); font-size: 14px; line-height: 1.5; }.badge-detail__rule { display: grid; gap: 9px; margin-top: 2px; padding: 16px; border: 1px solid var(--divider-soft, #e2e8e6); border-radius: 14px; background: var(--surface-muted, #f8faf9); }.badge-detail__rule > span { color: var(--accent-strong, #1f6f68); font-size: 12px; font-weight: 800; }.badge-detail__rule strong { color: var(--text, #17211f); font-size: 15px; line-height: 1.45; }.badge-detail__rule small { color: var(--text-muted, #53635f); font-size: 12px; }.badge-detail__insights { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }.badge-detail__insights article { display: grid; align-content: start; gap: 6px; padding: 13px 14px; border: 1px solid var(--divider-soft, #e2e8e6); border-radius: 13px; }.badge-detail__insights span,.badge-detail__series > span { display: inline-flex; align-items: center; gap: 5px; color: var(--accent-strong, #1f6f68); font-size: 12px; font-weight: 800; }.badge-detail__insights strong { color: var(--text, #17211f); font-size: 13px; }.badge-detail__insights p { margin: 0; color: var(--text-muted, #53635f); font-size: 12px; line-height: 1.55; }.badge-detail__series { display: grid; gap: 8px; }.badge-detail__series > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }.badge-detail__series button { display: grid; grid-template-columns: 28px minmax(0, 1fr) 14px; align-items: center; gap: 7px; min-height: 54px; padding: 8px 10px; border: 1px solid var(--divider-soft, #e2e8e6); border-radius: 11px; background: var(--surface, #fff); color: var(--accent-strong, #1f6f68); font: inherit; text-align: left; cursor: pointer; }.badge-detail__series button > span { display: grid; min-width: 0; gap: 2px; }.badge-detail__series button small { color: var(--text-muted, #53635f); font-size: 10px; }.badge-detail__series button strong { overflow: hidden; color: var(--text, #17211f); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }.badge-detail__series button > svg:last-child { color: var(--text-muted, #53635f); }.badge-detail__hint { padding: 11px 13px; border-left: 3px solid var(--accent, #2f8f86); background: var(--accent-soft, #e5f5f2); }.badge-detail__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 1px; }.badge-detail__actions button { min-height: 38px; padding-inline: 14px; font-size: 12px; }
+.badge-card { grid-template-columns: 1fr; min-height: 164px; gap: 13px; padding: 16px; overflow: hidden; opacity: .78; }.badge-card__identity { display: grid; grid-template-columns: 52px minmax(0, 1fr); align-items: start; gap: 12px; }.badge-card__icon { width: 50px; height: 50px; border-radius: 16px; }.badge-card__copy { display: grid; gap: 3px; padding-top: 1px; }.badge-card__reward { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 10px; }.badge-card__reward small { padding-left: 6px; border-left: 1px solid color-mix(in srgb, var(--badge-accent) 25%, var(--divider-soft)); color: var(--text-muted); font-size: 9px; font-weight: 600; }.badge-card h3 { margin: 0; font-size: 15px; line-height: 1.35; }.badge-card p { display: -webkit-box; margin-top: 1px; overflow: hidden; color: color-mix(in srgb, var(--text-muted) 92%, var(--text)); font-size: 11px; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }.badge-card__footer { display: grid; grid-template-columns: minmax(0, 1fr) 30px; align-items: end; gap: 10px; margin-top: auto; padding-top: 11px; border-top: 1px solid color-mix(in srgb, var(--badge-accent) 13%, var(--divider-soft)); }.badge-card__date { grid-column: auto; align-items: center; gap: 7px; color: var(--badge-accent); font-size: 11px; }.badge-card__date > span { display: flex; align-items: baseline; gap: 6px; }.badge-card__date small { color: var(--text-muted); font-size: 10px; font-weight: 600; }.badge-card__date strong { color: var(--text); font-size: 11px; }.badge-card__progress { grid-column: auto; gap: 5px; }.badge-card__progress > div { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }.badge-card__progress > div span,.badge-card__progress > small { color: var(--text-muted); font-size: 9px; }.badge-card__progress > div strong { color: var(--badge-accent); font-size: 11px; }.badge-card__progress > small { text-align: left; }.badge-card__open { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 9px; background: color-mix(in srgb, var(--badge-accent) 8%, var(--surface)); color: var(--badge-accent); transition: background-color .18s ease, transform .18s ease; }.badge-card:hover .badge-card__open { background: color-mix(in srgb, var(--badge-accent) 16%, var(--surface)); transform: translateX(2px); }.badge-card.unlocked { opacity: 1; }.badge-card.unlocked::after { position: absolute; top: 12px; right: 12px; width: 7px; height: 7px; border: 2px solid var(--surface); border-radius: 50%; background: var(--badge-accent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--badge-accent) 25%, transparent); content: ''; }.badge-card.tracked::after { display: none; }.badge-card__tracked { top: 10px; right: 10px; padding: 4px 7px; font-size: 9px; }.badge-card::before { right: 0; left: 0; height: 4px; border-radius: 0; }
 @media (prefers-reduced-motion: reduce) { .species-playground__particle { animation: none; }.species-replay__steps button.active i { transform: none; } }
-@media (max-width: 980px) { .achievement-field { grid-template-columns: 1fr; }.achievement-side { grid-template-rows: none; height: auto; }.achievement-year__landscape { grid-template-columns: repeat(4, 1fr); }.badges-grid { grid-template-columns: repeat(2, 1fr); }.achievement-summary,.achievement-trail { display: grid; }.species-playground { grid-template-columns: 1fr; }.species-playground__info { grid-template-columns: 1fr 1fr; align-items: center; }.species-playground__info > p,.species-playground__info h2,.species-playground__collection { grid-column: 1 / -1; } }
+@media (max-width: 980px) { .achievement-field { grid-template-columns: 1fr; }.achievement-side { grid-template-rows: none; height: auto; }.achievement-year__landscape { grid-template-columns: repeat(4, 1fr); }.badges-grid { grid-template-columns: repeat(2, 1fr); }.achievement-summary,.achievement-trail { display: grid; }.species-playground { grid-template-columns: 1fr; }.species-playground__info { grid-template-columns: 1fr 1fr; align-items: center; }.species-playground__identity,.species-playground__meaning,.species-playground__description,.species-playground__progress { grid-column: 1 / -1; } }
 /* 应用侧栏展开时右栏会先收窄；缩小进度环，让年度寄语仍以自然短句阅读。 */
 @media (max-width: 1280px) and (min-width: 981px) { .achievement-summary { padding: 15px; }.achievement-summary__overview { grid-template-columns: 86px minmax(0, 1fr); gap: 9px; }.achievement-summary__ring svg { width: 86px; height: 86px; }.achievement-summary__ring > div small,.achievement-summary__ring > div em { font-size: 7px; }.achievement-summary__ring > div strong { font-size: 11px; }.achievement-summary__headline { gap: 3px; }.achievement-summary__headline small { font-size: 8px; }.achievement-summary__headline strong { font-size: 12px; line-height: 1.35; }.achievement-summary__headline p { font-size: 8.5px; line-height: 1.55; }.achievement-summary dl { gap: 6px; margin-top: 12px; }.achievement-summary dl div { grid-template-columns: 21px minmax(0, 1fr); min-height: 52px; padding: 7px; }.achievement-summary__icon { width: 21px; height: 21px; border-radius: 7px; }.achievement-summary__icon svg { width: 12px; height: 12px; }.achievement-summary dt { font-size: 8px; }.achievement-summary dd { font-size: 10px; } }
 @media (max-width: 620px) { .achievement-workspace { padding: 14px; }.achievement-header { align-items: flex-start; }.achievement-header__today { display: none; }.achievement-year__landscape { grid-template-columns: repeat(3, 1fr); }.badges-grid { grid-template-columns: 1fr; }.achievement-month__grid button,.achievement-month__blank { min-height: 56px; }.achievement-tabs { top: -14px; }.achievement-tabs button { font-size: 11px; }.badges-overview { align-items: flex-start; flex-direction: column; }.species-playground__scene { min-height: 300px; }.species-playground__plant { width: 204px; }.species-playground__plant.is-artwork { width: 204px; margin-bottom: 28px; }.species-playground__info { display: grid; grid-template-columns: 1fr; padding: 20px; }.species-playground__info > * { grid-column: auto; }.species-replay__steps span { font-size: 9px; }.species-collection__garden { grid-template-columns: repeat(2, 1fr); }.species-collection__garden > button { min-height: 156px; } }
 @media (max-width: 760px) { .overview-hero { grid-template-columns: minmax(0, 1fr) 118px; padding: 16px; }.overview-hero__plant .focus-plant { width: 104px; }.overview-goal { grid-template-columns: 40px minmax(0, 1fr) auto; }.overview-goal__progress { display: none; }.overview-week__days { gap: 4px; }.overview-week__days button { min-height: 92px; padding-inline: 0; }.overview-week__days .terrarium { transform: scale(.67); }.overview-week__days button > span { left: 5px; }.overview-week__days button > strong { right: 5px; }.achievement-month-entry { align-items: flex-start; flex-direction: column; gap: 10px; }.species-next { grid-template-columns: 50px minmax(0, 1fr) auto; }.species-next :deep(.focus-species-preview) { width: 48px; height: 48px; } }
+@media (max-width: 760px) { .species-complete { grid-template-columns: 42px minmax(0, 1fr); }.species-complete__depth { grid-column: 1 / -1; grid-template-columns: 1fr auto; align-items: center; padding: 9px 0 0; border-top: 1px solid var(--divider-soft); border-left: 0; }.species-complete__depth i { grid-column: 1 / -1; } }
 @media (max-width: 520px) { .achievement-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }.overview-hero { grid-template-columns: 1fr; }.overview-hero__plant { display: none; }.overview-hero__facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }.overview-hero__facts div { min-width: 0; padding: 8px; }.overview-hero__facts strong { font-size: 11px; }.overview-goal { grid-template-columns: 38px minmax(0, 1fr); }.overview-goal button { grid-column: 1 / -1; }.overview-doors { grid-template-columns: 1fr; }.overview-week { padding: 14px 9px; }.overview-week__days { gap: 1px; }.overview-week__days button { min-height: 76px; border-color: transparent; background: transparent; }.overview-week__days .terrarium { transform: scale(.53); }.overview-week__days button > strong { font-size: 10px; } }
 @media (max-width: 980px) { .badges-overview { grid-template-columns: 1fr 1fr; }.badges-overview__today { grid-column: 1 / -1; }.badges-next { grid-template-columns: auto minmax(0, 1fr); }.badges-next__progress { grid-column: 1 / -1; } }
 @media (max-width: 620px) { .badges-overview { display: grid; gap: 14px; }.badges-overview__stats { width: 100%; }.badges-overview__today { width: 100%; box-sizing: border-box; }.badges-next,.badges-next--complete { grid-template-columns: 1fr auto; gap: 11px; }.badges-next__copy { grid-column: 1 / -1; grid-row: 2; }.badges-next__progress { grid-column: 1 / -1; grid-row: 3; }.badges-next--complete .badges-next__copy { grid-column: 1 / -1; }.badges-next--complete > svg { grid-column: 2; grid-row: 1; } }
@@ -1611,5 +1863,46 @@ onBeforeUnmount(() => {
 .field-hero__plant > div {
   outline: none;
   &:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+}
+@media (max-width: 980px) {
+  .badge-focus { grid-template-columns: minmax(0, 1fr) minmax(190px, .6fr); }
+  .badge-focus__actions { grid-column: 1 / -1; }
+  .badge-library__filters { align-items: stretch; flex-direction: column; }
+  .badge-category-tabs { width: 100%; box-sizing: border-box; }
+  .badge-status-filter { width: fit-content; }
+}
+@media (max-width: 620px) {
+  .badge-focus { grid-template-columns: 1fr; gap: 14px; padding: 16px; }
+  .badge-focus__actions { grid-column: auto; flex-wrap: wrap; }
+  .badge-library__header { align-items: flex-start; flex-direction: column; }
+  .badge-status-filter { width: 100%; box-sizing: border-box; }
+  .badge-status-filter button { flex: 1; }
+  .badge-detail-backdrop { align-items: end; padding: 0; }
+  .badge-detail { width: 100%; max-height: 90vh; overflow-y: auto; border-radius: 20px 20px 0 0; }
+  .badge-detail__header { grid-template-columns: 56px minmax(0, 1fr); gap: 12px; padding-right: 36px; }
+  .badge-detail__icon { width: 56px; height: 56px; border-radius: 17px; }
+  .badge-detail h2 { font-size: 22px; }
+  .badge-detail__insights,.badge-detail__series > div { grid-template-columns: 1fr; }
+}
+@container (max-width: 700px) {
+  .achievement-header { align-items: flex-start; }
+  .achievement-header__today { min-width: 170px; }
+  .achievement-tabs button { gap: 4px; font-size: 11px; }
+  .badges-overview { grid-template-columns: 1fr; gap: 14px; }
+  .badges-overview__stats { width: 100%; }
+  .badges-overview__today { width: 100%; box-sizing: border-box; }
+  .badge-focus { grid-template-columns: 1fr; gap: 14px; }
+  .badge-focus__actions { grid-column: auto; flex-wrap: wrap; }
+  .badge-library__filters { align-items: stretch; flex-direction: column; }
+  .badge-category-tabs { width: 100%; box-sizing: border-box; }
+  .badge-status-filter { width: 100%; box-sizing: border-box; }
+  .badge-status-filter button { flex: 1; }
+  .badges-grid { grid-template-columns: 1fr; }
+}
+@container (max-width: 430px) {
+  .achievement-header__today { display: none; }
+  .achievement-header h1 { font-size: 23px; }
+  .achievement-tabs button { padding-inline: 3px; }
+  .badges-overview__stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 </style>

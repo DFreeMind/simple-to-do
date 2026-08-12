@@ -4,13 +4,19 @@ import {
   FOCUS_GARDEN_ACHIEVEMENTS,
   FOCUS_GARDEN_COLLECTIONS,
   FOCUS_GARDEN_ACHIEVEMENT_REWARDS,
+  FOCUS_GARDEN_RANKS,
   FOCUS_GARDEN_SPECIES,
+  FOCUS_SPECIES_COMPANION_LEVELS,
   createDefaultFocusGarden,
+  focusGardenCollectionCompletionDate,
+  focusGardenStageMilestones,
   gardenStageFor,
   focusGardenTotals,
+  focusSpeciesCompanionLevel,
   normalizeFocusGarden,
   recordFocusGardenGrowth,
   unlockedFocusGardenSpecies,
+  updateTrackedFocusGardenAchievement,
   updateFocusGardenPreference
 } from '../src/utils/focusGarden.mjs'
 
@@ -24,6 +30,13 @@ test('成长徽章覆盖多种维度并提供分类奖励', () => {
 test('花种目录包含 12 种且解锁门槛形成递增阶梯', () => {
   assert.equal(FOCUS_GARDEN_SPECIES.length, 12)
   assert.equal(new Set(FOCUS_GARDEN_SPECIES.map(item => item.id)).size, 12)
+  assert.ok(FOCUS_GARDEN_SPECIES.every(item => typeof item.flowerLanguage === 'string' && item.flowerLanguage.length >= 4))
+  assert.ok(FOCUS_GARDEN_SPECIES.every(item => typeof item.gardenMessage === 'string' && item.gardenMessage.length >= 8))
+  assert.deepEqual(Object.fromEntries(FOCUS_GARDEN_SPECIES.map(item => [item.id, item.flowerLanguage])), {
+    daisy: '天真、和平与希望', tulip: '爱的表白、荣誉与永恒', cosmos: '纯真、自由与永远快乐', sunflower: '信念、光辉与忠诚',
+    poppy: '生离死别与悲歌', lavender: '等待爱情', iris: '好消息、希望与勇气', hydrangea: '感谢、希望与团聚',
+    lily: '顺利、心想事成与祝福', camellia: '理想的爱与谦让', peony: '富贵、圆满与吉祥', moonflower: '梦想常在'
+  })
   const collectionIds = new Set(FOCUS_GARDEN_COLLECTIONS.map(item => item.id))
   assert.ok(FOCUS_GARDEN_SPECIES.every(item => collectionIds.has(item.collectionId)))
   assert.deepEqual(
@@ -37,6 +50,36 @@ test('花种目录包含 12 种且解锁门槛形成递增阶梯', () => {
   assert.equal(FOCUS_GARDEN_SPECIES[1].unlockMinutes > FOCUS_GARDEN_SPECIES[0].unlockMinutes, true)
 })
 
+test('花田长期等级覆盖第一册完成与多年成长', () => {
+  assert.deepEqual(FOCUS_GARDEN_RANKS.map(item => item.threshold), [0, 60, 180, 600, 1800, 5400, 9000, 15000, 24000, 36000])
+  assert.equal(FOCUS_GARDEN_RANKS.find(item => item.threshold === 15000)?.name, '花境守望者')
+})
+
+test('单花陪伴等级同时要求培养分钟与盛放次数', () => {
+  assert.deepEqual(FOCUS_SPECIES_COMPANION_LEVELS.map(item => item.name), ['初识', '初绽', '相伴', '熟稔', '共生'])
+  assert.equal(focusSpeciesCompanionLevel(300, 4).name, '初绽')
+  const companion = focusSpeciesCompanionLevel(300, 5)
+  assert.equal(companion.name, '相伴')
+  assert.equal(companion.next.name, '熟稔')
+  assert.equal(companion.remainingMinutes, 600)
+  assert.equal(companion.remainingBlooms, 7)
+  assert.equal(focusSpeciesCompanionLevel(1800, 30).name, '共生')
+  assert.equal(focusSpeciesCompanionLevel(1800, 30, false), null)
+})
+
+test('第一册完成日期由累计分钟首次跨过最终门槛的花田日派生', () => {
+  const garden = {
+    ...createDefaultFocusGarden(new Date('2026-01-01T08:00:00+08:00')),
+    days: [
+      { date: '2026-01-01', speciesId: 'daisy', goalMinutes: 50, growthMinutes: 8000 },
+      { date: '2026-01-02', speciesId: 'tulip', goalMinutes: 50, growthMinutes: 6999 },
+      { date: '2026-01-03', speciesId: 'cosmos', goalMinutes: 50, growthMinutes: 1 }
+    ]
+  }
+  assert.equal(focusGardenCollectionCompletionDate(garden), '2026-01-03')
+  assert.equal(focusGardenCollectionCompletionDate({ ...garden, days: garden.days.slice(0, 2) }), null)
+})
+
 test('生长阶段按每日目标比例推进', () => {
   assert.equal(gardenStageFor(0, 50).id, 'seed')
   assert.equal(gardenStageFor(1, 50).id, 'sprout')
@@ -44,6 +87,12 @@ test('生长阶段按每日目标比例推进', () => {
   assert.equal(gardenStageFor(25, 50).id, 'bud')
   assert.equal(gardenStageFor(40, 50).id, 'opening')
   assert.equal(gardenStageFor(50, 50).id, 'bloom')
+})
+
+test('阶段门槛会随今日目标换算为可预期的专注分钟', () => {
+  assert.deepEqual(focusGardenStageMilestones(50).map(item => item.minutes), [0, 1, 10, 25, 40, 50])
+  assert.deepEqual(focusGardenStageMilestones(25).map(item => item.minutes), [0, 1, 5, 13, 20, 25])
+  assert.deepEqual(focusGardenStageMilestones(90).map(item => item.minutes), [0, 1, 18, 45, 72, 90])
 })
 
 test('旧花园继续按旧门槛保持已解锁状态', () => {
@@ -185,4 +234,24 @@ test('已有花田记录会补齐达到门槛的新成就', () => {
   assert.ok(ids.has('focus-600'))
   assert.ok(ids.has('active-days-3'))
   assert.ok(ids.has('goal-days-3'))
+})
+
+test('成长徽章只允许追踪一个未获得目标并兼容旧数据', () => {
+  const now = new Date('2026-07-10T10:00:00+08:00')
+  const garden = createDefaultFocusGarden(now)
+  const first = updateTrackedFocusGardenAchievement(garden, 'focus-600')
+  assert.equal(first.trackedAchievementId, 'focus-600')
+  const replaced = updateTrackedFocusGardenAchievement(first, 'species-3')
+  assert.equal(replaced.trackedAchievementId, 'species-3')
+  assert.equal(updateTrackedFocusGardenAchievement(replaced, 'unknown').trackedAchievementId, null)
+  assert.equal(normalizeFocusGarden({ ...garden, trackedAchievementId: 'focus-600' }, now).trackedAchievementId, 'focus-600')
+})
+
+test('追踪中的徽章获得后自动取消追踪', () => {
+  const now = new Date('2026-07-10T10:00:00+08:00')
+  const garden = updateTrackedFocusGardenAchievement(createDefaultFocusGarden(now), 'deep-90')
+  const result = recordFocusGardenGrowth(garden, { elapsedSeconds: 90 * 60, finishedAt: now.toISOString() }, now)
+  assert.ok(result.unlockedAchievementIds.includes('deep-90'))
+  assert.equal(result.garden.trackedAchievementId, null)
+  assert.equal(updateTrackedFocusGardenAchievement(result.garden, 'deep-90').trackedAchievementId, null)
 })
