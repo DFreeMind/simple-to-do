@@ -58,7 +58,9 @@ async function capture(name) {
   const client = await page.context().newCDPSession(page)
   const result = await client.send('Page.captureScreenshot', {
     format: 'webp',
-    quality: 60,
+    // 使用中等质量 WebP：手册正文中会按容器缩放显示，50 在 1280×800
+    // 截图上仍能清晰辨认控件与文字，同时避免把应用安装包显著撑大。
+    quality: 50,
     captureBeyondViewport: false
   })
   const buffer = Buffer.from(result.data, 'base64')
@@ -152,15 +154,14 @@ if (await workListButton.count()) {
       await firstEmoji.click({ force: true })
       await waitForUi(400)
     }
+    // emoji-picker-element 关闭动画结束前仍会拦截后续色板点击。
+    await page.keyboard.press('Escape')
+    await waitForUi(400)
   } else {
     await capture('group-management')
   }
-  // 点选一个预设强调色（第一个非"自动配色"的色块），让色板出现在截图里。
-  const colorSwatch = page.locator('.group-dialog__color-grid button:not(.is-active), .group-dialog button[aria-label*="颜色"]').first()
-  if (await colorSwatch.count()) {
-    await colorSwatch.click()
-    await waitForUi(300)
-  }
+  // 截图已经完整展示图标与色板选择，不再点击色块，避免 emoji 组件的关闭动画
+  // 在部分 Chromium 版本中拦截指针事件，造成整个截图流程中断。
   await page.keyboard.press('Escape')
   await waitForUi()
   const dialogClose = page.locator('button.group-dialog__close').first()
@@ -257,10 +258,23 @@ if (await detailPanel.count()) {
     await page.keyboard.press('Escape')
     await waitForUi(400)
   }
+}
 
+// Escape 在部分运行时会同时关闭日期浮层与详情面板；重新选中示例任务，
+// 保证富文本截图始终来自稳定、可见的详情上下文。
+let editorDetail = page.locator('.task-detail').first()
+if (!await editorDetail.count()) {
+  const reportTask = page.getByText('完成季度报告初稿', { exact: true }).first()
+  if (await reportTask.count()) {
+    await reportTask.click()
+    await waitForUi(600)
+  }
+  editorDetail = page.locator('.task-detail').first()
+}
+if (await editorDetail.count()) {
   // 富文本编辑器：把"更多块"按钮滚到 .task-detail 视口中部，让向下展开的菜单能完整显示。
   // 弹层在 .task-detail 内部 absolute 定位，受 overflow:auto 裁切；先留出约 320px 视口空间。
-  await detailPanel.evaluate((element) => {
+  await editorDetail.evaluate((element) => {
     const wrap = element.querySelector('.rich-editor__more-wrap')
     if (wrap) wrap.scrollIntoView({ block: 'center' })
     else element.scrollTop = element.scrollHeight
@@ -291,6 +305,13 @@ await clickText('重要')
 await capture('important-view')
 await clickText('收集箱')
 await capture('inbox-view')
+
+// 完成记录与垃圾桶是数据恢复工作流的关键入口，分别展示真实的筛选状态和可恢复项目。
+await clickText('完成记录')
+await capture('completed-view')
+await clickText('垃圾桶')
+await capture('trash-view')
+await clickText('收集箱')
 
 // 附件大图预览：收集箱里的 test-3 任务（demo 自带两张图）
 {
@@ -369,8 +390,10 @@ if (await profileButton.count()) {
   await capture('space-management')
   await clickText('备份与恢复')
   await capture('profile-security')
-  const profileClose = page.locator('button.profile-panel__close, button[aria-label="关闭个人空间"]').first()
+  const profileClose = page.locator('button.profile-panel__close').first()
   if (await profileClose.count()) await profileClose.click()
+  else await page.keyboard.press('Escape')
+  await waitForUi()
 }
 
 // Switch to the clock module and capture each of the four clock tabs.
