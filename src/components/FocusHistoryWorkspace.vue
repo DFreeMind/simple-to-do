@@ -2969,10 +2969,11 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .review-workspace {
+  --review-workspace-padding: clamp(18px, 2.6vw, 34px);
   align-content: start;
   justify-items: stretch;
   overflow: auto;
-  padding: clamp(18px, 2.6vw, 34px);
+  padding: var(--review-workspace-padding);
   background:
     radial-gradient(circle at 84% 2%, color-mix(in srgb, var(--accent-soft) 82%, transparent), transparent 30%),
     radial-gradient(circle at 2% 24%, color-mix(in srgb, #dbeaf4 54%, transparent), transparent 24%),
@@ -2994,7 +2995,7 @@ onBeforeUnmount(() => {
   background-clip: padding-box;
 }
 .review-shell { width: min(100%, 1120px); margin: 0 auto; }
-.review-controls { display: flex; align-items: center; min-height: 48px; margin-bottom: 14px; padding: 4px 6px; border: 1px solid var(--divider-soft); border-radius: 14px; background: color-mix(in srgb, var(--surface) 88%, transparent); box-shadow: 0 6px 16px var(--text-4-fallback); }
+.review-controls { position: sticky; top: calc(var(--review-workspace-padding) * -1); z-index: 10; display: flex; align-items: center; min-height: 48px; margin-bottom: 14px; padding: 4px 6px; border: 1px solid var(--divider-soft); border-radius: 14px; background: var(--surface); box-shadow: 0 8px 18px var(--text-4-fallback); }
 .review-tabs { display: flex; flex: 0 0 auto; gap: 5px; padding: 0; }
 .review-tabs button { display: inline-flex; min-height: 42px; align-items: center; gap: 7px; padding: 0 13px; border-radius: 10px; color: var(--text-muted); font-size: 12px; font-weight: 680; }
 .review-tabs button:hover { color: var(--text); background: var(--surface-muted); }
