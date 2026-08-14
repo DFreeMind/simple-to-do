@@ -2112,6 +2112,7 @@ export const useTaskStore = defineStore('task', () => {
     const status = rawSession.status === 'paused' ? 'paused' : 'running'
     const startedAt = status === 'running' && isValidIsoDate(rawSession.startedAt) ? rawSession.startedAt : null
     const taskId = tasks.value.some(task => !task.deleted && task.id === rawSession.taskId) ? rawSession.taskId : null
+    const nextTaskId = tasks.value.some(task => !task.deleted && task.id === rawSession.nextTaskId) ? rawSession.nextTaskId : null
     const phase = ['focus', 'short-break', 'long-break'].includes(rawSession.phase) ? rawSession.phase : 'focus'
     const profile = profiles.find(item => item.id === profileId)
     const durationSeconds = rawSession.durationSeconds === null || rawSession.durationSeconds === undefined
@@ -2121,6 +2122,7 @@ export const useTaskStore = defineStore('task', () => {
       id: String(rawSession.id || genId()),
       profileId,
       taskId,
+      nextTaskId,
       status: startedAt ? status : 'paused',
       createdAt: isValidIsoDate(rawSession.createdAt) ? rawSession.createdAt : nowIso(),
       startedAt,
@@ -2139,6 +2141,7 @@ export const useTaskStore = defineStore('task', () => {
     return {
       phase,
       profileId,
+      taskId: tasks.value.some(task => !task.deleted && task.id === rawBreak.taskId) ? rawBreak.taskId : null,
       durationSeconds: normalizeDuration(rawBreak.durationSeconds, phase === 'long-break' ? focusSettings.longBreakSeconds : focusSettings.shortBreakSeconds),
       createdAt: isValidIsoDate(rawBreak.createdAt) ? rawBreak.createdAt : nowIso()
     }
@@ -2427,6 +2430,7 @@ export const useTaskStore = defineStore('task', () => {
       id: genId(),
       profileId: pending.profileId,
       taskId: null,
+      nextTaskId: pending.taskId,
       status: 'running',
       createdAt: startedAt,
       startedAt,
@@ -2443,8 +2447,10 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   function skipPendingBreak() {
-    if (!clock.value.pendingBreak) return false
+    const pending = clock.value.pendingBreak
+    if (!pending) return false
     clock.value.pendingBreak = null
+    focusTaskDraftId.value = activeTasks.value.some(task => task.id === pending.taskId) ? pending.taskId : null
     showNotice('已跳过本次休息', 'info')
     return true
   }
@@ -2503,6 +2509,7 @@ export const useTaskStore = defineStore('task', () => {
       clock.value.pendingBreak = {
         phase: isLongBreak ? 'long-break' : 'short-break',
         profileId: session.profileId,
+        taskId: session.taskId,
         durationSeconds: isLongBreak ? clock.value.focusSettings.longBreakSeconds : clock.value.focusSettings.shortBreakSeconds,
         createdAt: nowIso()
       }
@@ -2510,6 +2517,9 @@ export const useTaskStore = defineStore('task', () => {
     }
     focusClockNow.value = Date.now()
     syncFocusTimer()
+    if (session.phase !== 'focus') {
+      focusTaskDraftId.value = activeTasks.value.some(task => task.id === session.nextTaskId) ? session.nextTaskId : null
+    }
     if (session.phase === 'focus' && result === 'completed') {
       // native 端 dueAt 触发时已根据主窗口焦点区分 'in-app' / 'background'
       // 'background' 时 native 已发出系统通知和 reminder window，前端不再显示 celebration 避免双弹

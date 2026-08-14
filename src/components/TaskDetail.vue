@@ -253,7 +253,10 @@
         <template v-if="hasLinkedFocus">
           <div class="section-heading">
             <h2><Timer :size="15" />专注投入</h2>
-            <button type="button" class="focus-link__history" @click="openFocusHistory">查看全部 {{ linkedFocusRecords.length }} 段</button>
+            <div class="focus-link__actions">
+              <button type="button" class="focus-link__continue" @click="prepareFocusForTask"><Play :size="13" fill="currentColor" />开始专注</button>
+              <button type="button" class="focus-link__history" @click="openFocusHistory">查看全部 {{ linkedFocusRecords.length }} 段</button>
+            </div>
           </div>
           <div class="focus-link-panel">
             <span class="focus-link-panel__icon"><Timer :size="16" /></span>
@@ -261,8 +264,11 @@
             <small>{{ linkedFocusRecords.length }} 段已完成专注 · 最近 {{ formatFocusDate(linkedFocusRecords[0].finishedAt) }}</small>
           </div>
           <div class="focus-link-records">
-            <div v-for="record in linkedFocusRecords" :key="record.id"><span>{{ formatFocusDate(record.finishedAt) }}</span><strong>{{ formatFocusDuration(record.elapsedSeconds) }}</strong></div>
+            <div v-for="record in visibleLinkedFocusRecords" :key="record.id"><span>{{ formatFocusDate(record.finishedAt) }}</span><strong>{{ formatFocusDuration(record.elapsedSeconds) }}</strong></div>
           </div>
+          <button v-if="hasCollapsedFocusRecords" type="button" class="focus-link__records-toggle" :aria-expanded="focusRecordsExpanded" @click="focusRecordsExpanded = !focusRecordsExpanded">
+            <ChevronDown :size="14" :class="{ 'is-expanded': focusRecordsExpanded }" />{{ focusRecordsExpanded ? '收起记录' : `展开其余 ${linkedFocusRecords.length - visibleLinkedFocusRecords.length} 段` }}
+          </button>
         </template>
         <div v-else class="focus-link-start">
           <span><Timer :size="16" /></span>
@@ -349,6 +355,7 @@ const detailEmptyMessage = computed(() => {
 })
 const newSubtask = ref('')
 const editorContent = ref('')
+const focusRecordsExpanded = ref(false)
 const richTextEditor = ref(null)
 const titleInput = ref(null)
 const confirmDialog = reactive({
@@ -434,6 +441,8 @@ const linkedFocusRecords = computed(() => {
 })
 const linkedFocusSeconds = computed(() => linkedFocusRecords.value.reduce((total, item) => total + Math.max(0, Number(item.elapsedSeconds) || 0), 0))
 const hasLinkedFocus = computed(() => linkedFocusSeconds.value > 0)
+const visibleLinkedFocusRecords = computed(() => focusRecordsExpanded.value ? linkedFocusRecords.value : linkedFocusRecords.value.slice(0, 3))
+const hasCollapsedFocusRecords = computed(() => linkedFocusRecords.value.length > 3)
 const subtaskProgressPercent = computed(() => {
   const total = task.value?.subtasks.length || 0
   if (!total) return 0
@@ -563,6 +572,7 @@ function formatSubtaskTitle(subtask, isCompleted) {
 
 watch(task, (nextTask) => {
   editorContent.value = nextTask?.descriptionHtml || ''
+  focusRecordsExpanded.value = false
   openSelect.value = ''
   openDatePicker.value = ''
   tagInput.value = ''

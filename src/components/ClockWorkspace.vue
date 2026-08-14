@@ -123,7 +123,7 @@
           </div>
           <div v-else-if="pendingBreak" class="clock-stage__actions">
             <button class="clock-button clock-button--primary" type="button" @click="store.startPendingBreak"><Coffee :size="18" />开始{{ pendingBreak.phase === 'long-break' ? '长休息' : '短休息' }}</button>
-            <button class="clock-button clock-button--quiet" type="button" title="跳过本次休息，回到专注类型选择" @click="store.skipPendingBreak">跳过休息，选择下一轮</button>
+            <button class="clock-button clock-button--quiet" type="button" title="跳过本次休息，继续当前任务的下一轮专注" @click="skipPendingBreak">跳过休息，继续当前任务</button>
           </div>
         <button v-else class="clock-button clock-button--primary clock-button--start" type="button" @click="start"><Play :size="20" fill="currentColor" />开始专注</button>
       </section>
@@ -218,8 +218,9 @@
                           <span><strong>暂不关联任务</strong></span>
                           <Check v-if="!activeSession.taskId" :size="16" />
                         </button>
+                        <p v-if="!currentTaskSearchQuery.trim() && currentTaskRecentTasks.length" class="clock-current-task-picker__label">最近使用</p>
                         <button
-                          v-for="task in currentTaskSearchResults"
+                          v-for="task in currentTaskRecentTasks"
                           :key="task.id"
                           type="button"
                           class="clock-current-task-picker__option"
@@ -232,7 +233,22 @@
                           <span><strong>{{ task.title }}</strong><small>{{ listNameOf(task.listId) }}</small></span>
                           <Check v-if="activeSession.taskId === task.id" :size="16" />
                         </button>
-                        <p v-if="!currentTaskSearchResults.length" class="clock-current-task-picker__empty">没有匹配的待处理任务</p>
+                        <p v-if="!currentTaskSearchQuery.trim()" class="clock-current-task-picker__label">全部任务</p>
+                        <button
+                          v-for="task in currentTaskPickerTasks"
+                          :key="task.id"
+                          type="button"
+                          class="clock-current-task-picker__option"
+                          :class="{ active: activeSession.taskId === task.id }"
+                          role="option"
+                          :aria-selected="activeSession.taskId === task.id"
+                          @click="setCurrentTask(task.id)"
+                        >
+                          <span class="clock-current-task-picker__option-icon"><i :style="{ background: listColorOf(task.listId) }" /></span>
+                          <span><strong>{{ task.title }}</strong><small>{{ listNameOf(task.listId) }}</small></span>
+                          <Check v-if="activeSession.taskId === task.id" :size="16" />
+                        </button>
+                        <p v-if="!currentTaskPickerTasks.length && !(currentTaskRecentTasks.length && !currentTaskSearchQuery.trim())" class="clock-current-task-picker__empty">没有匹配的待处理任务</p>
                       </div>
                     </div>
                   </div>
@@ -402,6 +418,12 @@ const recentTasks = computed(() => {
     if (result.length >= 6) break
   }
   return result
+})
+const currentTaskRecentTasks = computed(() => recentTasks.value.filter(task => task.id !== activeSession.value?.taskId))
+const currentTaskPickerTasks = computed(() => {
+  if (currentTaskSearchQuery.value.trim()) return currentTaskSearchResults.value
+  const recentIds = new Set(currentTaskRecentTasks.value.map(task => task.id))
+  return currentTaskSearchResults.value.filter(task => !recentIds.has(task.id))
 })
 const dueSoonTasks = computed(() => openTasks.value
   .filter(task => task.dueDate && startOfDayLocal(new Date(task.dueDate)) <= startOfDayLocal(new Date()))
@@ -578,7 +600,11 @@ const currentPomodoroRound = computed(() => Math.min(focusSettings.value.focuses
 const nextBreakLabel = computed(() => currentPomodoroRound.value >= focusSettings.value.focusesBeforeLongBreak
   ? `长休息 ${durationText(focusSettings.value.longBreakSeconds)}`
   : `短休息 ${durationText(focusSettings.value.shortBreakSeconds)}`)
-const nextFocusTaskTitle = computed(() => selectedTask.value?.title || currentTask.value?.title || '不关联任务')
+const pendingFocusTask = computed(() => {
+  const taskId = pendingBreak.value?.taskId || (activeSession.value?.phase !== 'focus' ? activeSession.value?.nextTaskId : null)
+  return openTasks.value.find(task => task.id === taskId) || null
+})
+const nextFocusTaskTitle = computed(() => pendingFocusTask.value?.title || selectedTask.value?.title || currentTask.value?.title || '不关联任务')
 const currentPlanMode = computed(() => {
   if (activeSession.value) return `${currentProfile.value?.name || '专注中'} · ${durationText(activeSession.value.durationSeconds)}`
   if (pendingBreak.value) return `${pendingBreak.value.phase === 'long-break' ? '长休息' : '短休息'} · ${durationText(pendingBreak.value.durationSeconds)}`
@@ -587,6 +613,11 @@ const currentPlanMode = computed(() => {
 function setGardenGoal(event) { store.updateFocusGardenSettings({ dailyGoalMinutes: Number(event.target.value) }) }
 function start() { store.startFocus(selectedProfile.value?.id, selectedTaskId.value, selectedProfileId.value === 'free-focus' ? selectedDurationSeconds.value : undefined) }
 function finish(result) { store.finishFocus(result, finishNote.value); finishNote.value = '' }
+function skipPendingBreak() {
+  const taskId = pendingBreak.value?.taskId
+  if (!store.skipPendingBreak()) return
+  selectedTaskId.value = openTasks.value.some(task => task.id === taskId) ? taskId : null
+}
 function toggleCurrentTaskPicker() {
   currentTaskPickerOpen.value = !currentTaskPickerOpen.value
   if (currentTaskPickerOpen.value) {
@@ -730,6 +761,9 @@ watch(taskSearchQuery, () => { keyboardIndex.value = 0 })
 watch(sidebarId, () => { keyboardIndex.value = 0 })
 watch(() => store.focusTaskDraftId, (taskId) => {
   if (taskId) applyFocusTaskDraft()
+}, { immediate: true })
+watch(() => pendingBreak.value?.taskId, (taskId) => {
+  if (taskId && openTasks.value.some(task => task.id === taskId)) selectedTaskId.value = taskId
 }, { immediate: true })
 function formatClock(seconds) { const value = Math.max(0, Math.floor(seconds || 0)); return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}` }
 function formatTime(date) { return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}` }
