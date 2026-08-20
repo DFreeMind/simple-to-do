@@ -4,8 +4,10 @@
     :class="{
       'is-ready': ready,
       'is-scrubbing': scrubbing,
-      'is-static': motion === 'static'
+      'is-static': motion === 'static',
+      'is-thumbnail': presentation === 'thumbnail'
     }"
+    :style="thumbnailStyle"
     aria-hidden="true"
   >
     <img
@@ -42,6 +44,11 @@ const props = defineProps({
     default: 'interactive',
     validator: value => ['static', 'idle', 'interactive'].includes(value)
   },
+  presentation: {
+    type: String,
+    default: 'default',
+    validator: value => ['default', 'thumbnail'].includes(value)
+  },
   reaction: { type: Number, default: 0 }
 })
 
@@ -72,6 +79,22 @@ const normalizedProgress = computed(() => {
 })
 
 const activeArtwork = computed(() => artwork.value[Math.round(normalizedProgress.value)] || artwork.value[0])
+
+// 大部分花卉阶段图使用 512 × 640 的透明画布，植物基线在画布底部；
+// 小雏菊是 512 × 512。缩略图若直接等比缩放，会将可见主体压到框的下方。
+// 偏移只用于缩略图构图，预览大图与其他展示场景保持素材原始构图。
+const thumbnailContentOffset = computed(() => {
+  if (props.presentation !== 'thumbnail' || props.speciesId === 'daisy') return '0%'
+  return {
+    seed: '-15%',
+    sprout: '-13%',
+    leaves: '-8%',
+    bud: '-7%',
+    opening: '-6%',
+    bloom: '-4%'
+  }[props.stage] || '0%'
+})
+const thumbnailStyle = computed(() => ({ '--focus-artwork-thumbnail-offset': thumbnailContentOffset.value }))
 
 function handleLoad() {
   if (ready.value) return
@@ -128,7 +151,11 @@ watch(() => activeArtwork.value.source, () => {
   opacity: 1;
   transition: opacity 220ms ease-out;
   user-select: none;
-  will-change: opacity;
+  will-change: opacity, transform;
+}
+
+.focus-stage-artwork.is-thumbnail .focus-stage-artwork__layer {
+  transform: translateY(var(--focus-artwork-thumbnail-offset, 0%));
 }
 
 .focus-stage-artwork.is-scrubbing .focus-stage-artwork__layer,

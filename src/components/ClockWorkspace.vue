@@ -85,7 +85,7 @@
               @focusin="showGardenPreview"
               @focusout="hideGardenPreview"
             >
-              <FocusStageArtwork :species-id="gardenToday.speciesId" :stage="gardenToday.stage" motion="static" />
+              <FocusStageArtwork :species-id="gardenToday.speciesId" :stage="gardenToday.stage" motion="static" presentation="thumbnail" />
             </div>
             <div class="clock-stage__garden-copy">
               <div class="clock-stage__garden-heading">
