@@ -758,6 +758,14 @@
                       立即重新启动
                     </button>
                   </template>
+                  <template v-else-if="updateState === 'error' && updaterState.update">
+                    <button class="small-btn update-card__action" type="button" :disabled="updateActionDisabled" @click="downloadManualUpdate">
+                      下载到下载文件夹
+                    </button>
+                    <button class="text-btn" type="button" :disabled="updateActionDisabled" @click="openReleasePage">
+                      打开下载页
+                    </button>
+                  </template>
                   <button
                     v-else-if="!['installing', 'restarting'].includes(updateState)"
                     class="small-btn update-card__action"
@@ -792,7 +800,7 @@
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
 import { Bell, Check, CheckSquare, Compass, Download, ExternalLink, Folder, Globe, Info, PanelTop, Palette, Pin, SlidersHorizontal, Tag, Timer, Trash2, Volume2, Waves, X } from 'lucide-vue-next'
-import { checkForUpdates as checkForUpdatesService, installUpdate as installUpdateService, restartUpdateApplication, skipCurrentUpdate, updaterState, updateNotes as resolveUpdateNotes } from '@/services/updater'
+import { checkForUpdates as checkForUpdatesService, downloadManualUpdate as downloadManualUpdateService, installUpdate as installUpdateService, restartUpdateApplication, skipCurrentUpdate, updaterState, updateNotes as resolveUpdateNotes } from '@/services/updater'
 import { currentReleaseHighlights, releaseHistory } from '@/data/releases'
 import { useTaskStore } from '@/stores/task'
 import { openReleasePage as openReleasePageInBrowser, openSystemNotificationSettings } from '@/services/platform'
@@ -1057,6 +1065,18 @@ function skipUpdateVersion() {
 
 async function installUpdate() {
   await installUpdateService()
+}
+
+async function downloadManualUpdate() {
+  await downloadManualUpdateService()
+}
+
+async function openReleasePage() {
+  try {
+    await openReleasePageInBrowser()
+  } catch (error) {
+    updaterState.error = error?.message || '无法打开下载页，请稍后重试。'
+  }
 }
 
 async function restartUpdate() {

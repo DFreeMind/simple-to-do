@@ -66,7 +66,7 @@
                   <span class="clock-end-confirm__icon"><Pause :size="20" /></span>
                   <p>提前结束</p>
                   <h2 id="clock-end-confirm-title">要结束这一轮专注吗？</h2>
-                  <span>本轮会记录为未完成，不会计入今日花成长。</span>
+                  <span>本轮会记录为未完成；已投入的整分钟仍会计入今日花成长。</span>
                   <div class="clock-end-confirm__actions"><button type="button" @click="endConfirmOpen = false">继续专注</button><button type="button" @click="confirmEndFocus">确认结束</button></div>
                 </section>
               </div>
@@ -584,14 +584,25 @@ const sessionTimeRange = computed(() => {
   return `${start} — 预计 ${formatTime(end)} 结束`
 })
 const stageLabel = computed(() => activeSession.value ? (activeSession.value.status === 'paused' ? '已暂停' : activeSession.value.phase === 'focus' ? '正在专注' : '正在休息') : pendingBreak.value ? '下一步' : '准备开始')
-const stageDetail = computed(() => activeSession.value ? (activeSession.value.phase === 'focus' ? currentTaskTitle.value : '暂时离开屏幕，回来再继续。') : pendingBreak.value ? '刚完成一段专注，给自己一点恢复时间。' : selectedProfileId.value === 'free-focus' && selectedDurationSeconds.value ? `自由设定 ${durationText(selectedDurationSeconds.value)}，点击时间可修改。` : selectedProfile.value?.description || '')
+const pausedDuration = computed(() => {
+  const session = activeSession.value
+  const lastEvent = session?.timeline?.[session.timeline.length - 1]
+  if (session?.status !== 'paused' || lastEvent?.type !== 'paused') return 0
+  const pausedAt = new Date(lastEvent.at).getTime()
+  return Number.isFinite(pausedAt) ? Math.max(0, Math.floor((visualClockNow.value - pausedAt) / 1000)) : 0
+})
+const stageDetail = computed(() => activeSession.value
+  ? (activeSession.value.status === 'paused'
+      ? `已暂停 ${formatDuration(pausedDuration.value)} · 继续后从当前进度接着计时`
+      : activeSession.value.phase === 'focus' ? currentTaskTitle.value : '暂时离开屏幕，回来再继续。')
+  : pendingBreak.value ? '刚完成一段专注，给自己一点恢复时间。' : selectedProfileId.value === 'free-focus' && selectedDurationSeconds.value ? `自由设定 ${durationText(selectedDurationSeconds.value)}，点击时间可修改。` : selectedProfile.value?.description || '')
 const headline = computed(() => activeSession.value ? (activeSession.value.phase === 'focus' ? '保持在这件事上' : '让大脑真正休息') : pendingBreak.value ? '先恢复，再继续' : '从一件小事开始')
 const todayHistory = computed(() => store.focusHistory.filter(item => new Date(item.finishedAt).toDateString() === new Date().toDateString()))
 const todaySeconds = computed(() => todayHistory.value.filter(item => item.phase === 'focus').reduce((total, item) => total + item.elapsedSeconds, 0))
 const todayCompletedCount = computed(() => todayHistory.value.filter(item => item.phase === 'focus' && item.result === 'completed').length)
 const todayInterruptedCount = computed(() => todayHistory.value.filter(item => item.phase === 'focus' && item.result !== 'completed').length)
 const todayEffectiveSeconds = computed(() => todayHistory.value
-  .filter(item => item.phase === 'focus' && item.result === 'completed')
+  .filter(item => item.phase === 'focus' && ['completed', 'abandoned'].includes(item.result))
   .reduce((total, item) => total + item.elapsedSeconds, 0) + (activeSession.value?.phase === 'focus' ? store.focusElapsedSeconds : 0))
 const goalRemainingMinutes = computed(() => Math.max(0, gardenToday.value.goalMinutes - gardenToday.value.growthMinutes))
 const focusSettings = computed(() => store.clock.focusSettings)
@@ -766,6 +777,7 @@ watch(() => pendingBreak.value?.taskId, (taskId) => {
   if (taskId && openTasks.value.some(task => task.id === taskId)) selectedTaskId.value = taskId
 }, { immediate: true })
 function formatClock(seconds) { const value = Math.max(0, Math.floor(seconds || 0)); return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}` }
+function formatDuration(seconds) { const value = Math.max(0, Math.floor(seconds || 0)); const hours = Math.floor(value / 3600); const minutes = Math.floor((value % 3600) / 60); const rest = value % 60; return hours > 0 ? `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(rest).padStart(2, '0')}` : `${String(minutes).padStart(2, '0')}:${String(rest).padStart(2, '0')}` }
 function formatTime(date) { return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}` }
 function durationText(seconds) { if (seconds === null || seconds === undefined) return '自由计时'; const minutes = Math.round(seconds / 60); return minutes >= 60 ? `${Math.floor(minutes / 60)} 小时` : `${minutes} 分钟` }
 function closeTaskPicker() { taskPickerOpen.value = false }

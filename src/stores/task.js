@@ -1927,7 +1927,7 @@ export const useTaskStore = defineStore('task', () => {
     const history = Array.isArray(rawClock?.history)
       ? rawClock.history.map(item => normalizeFocusHistory(item, profiles)).filter(Boolean).slice(0, MAX_FOCUS_HISTORY)
       : []
-    const garden = normalizeFocusGarden(rawClock?.garden)
+    const garden = reconcileFocusGardenWithHistory(normalizeFocusGarden(rawClock?.garden), history)
     return {
       profiles,
       focusSettings,
@@ -2170,6 +2170,32 @@ export const useTaskStore = defineStore('task', () => {
     }
   }
 
+  // 旧版本可能把长时间未结束的会话写入花圃日汇总；历史记录已在规范化时限制为单轮最多 8 小时，
+  // 因此仅在花圃值大于同日有效历史汇总时回填，避免覆盖没有历史记录的旧花圃数据。
+  function reconcileFocusGardenWithHistory(garden, history) {
+    const minutesByDate = new Map()
+    history.forEach(item => {
+      if (item.phase !== 'focus' || !['completed', 'abandoned'].includes(item.result)) return
+      const minutes = Math.max(0, Math.floor((Number(item.elapsedSeconds) || 0) / 60))
+      if (!minutes) return
+      const date = localGardenDateKey(item.finishedAt)
+      minutesByDate.set(date, (minutesByDate.get(date) || 0) + minutes)
+    })
+    let changed = false
+    const days = garden.days.map(day => {
+      const historyMinutes = minutesByDate.get(day.date)
+      const savedMinutes = Math.max(0, Number(day.growthMinutes) || 0)
+      if (!Number.isFinite(historyMinutes) || historyMinutes >= savedMinutes) return day
+      changed = true
+      return {
+        ...day,
+        growthMinutes: historyMinutes,
+        stage: gardenStageFor(historyMinutes, day.goalMinutes).id
+      }
+    })
+    return changed ? { ...garden, days } : garden
+  }
+
   function normalizeFocusTimeline(rawTimeline) {
     if (!Array.isArray(rawTimeline)) return []
     return rawTimeline
@@ -2204,10 +2230,10 @@ export const useTaskStore = defineStore('task', () => {
 
   function getFocusElapsedSeconds(session, now = Date.now()) {
     if (!session) return 0
-    const base = Math.max(0, Number(session.elapsedSeconds) || 0)
+    const base = Math.min(8 * 60 * 60, Math.max(0, Number(session.elapsedSeconds) || 0))
     if (session.status !== 'running' || !session.startedAt) return base
     const live = Math.floor((now - new Date(session.startedAt).getTime()) / 1000)
-    return base + Math.max(0, live)
+    return Math.min(8 * 60 * 60, base + Math.max(0, live))
   }
 
   function getFocusSessionDuration(session) {
@@ -2224,9 +2250,14 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   function currentPauseSeconds(session, endedAt = Date.now()) {
+    const pausedAt = currentPauseStartedAt(session)
+    if (!pausedAt) return 0
+    return Math.max(0, Math.round((endedAt - new Date(pausedAt).getTime()) / 1000))
+  }
+
+  function currentPauseStartedAt(session) {
     const lastEvent = Array.isArray(session?.timeline) ? session.timeline[session.timeline.length - 1] : null
-    if (lastEvent?.type !== 'paused' || !isValidIsoDate(lastEvent.at)) return 0
-    return Math.max(0, Math.round((endedAt - new Date(lastEvent.at).getTime()) / 1000))
+    return lastEvent?.type === 'paused' && isValidIsoDate(lastEvent.at) ? lastEvent.at : null
   }
 
   function syncFocusTimer() {
@@ -2269,6 +2300,7 @@ export const useTaskStore = defineStore('task', () => {
       durationSeconds: duration === null ? null : Math.max(0, Math.round(duration)),
       remainingSeconds: duration === null ? null : Math.max(0, Math.round(duration - elapsedSeconds)),
       elapsedSeconds: Math.max(0, Math.round(elapsedSeconds)),
+      pausedAt: session.status === 'paused' ? currentPauseStartedAt(session) : null,
       syncedAt: Date.now(),
       alwaysOnTop: settings.value.focusControllerAlwaysOnTop !== false,
       style: settings.value.focusControllerStyle
@@ -2490,7 +2522,9 @@ export const useTaskStore = defineStore('task', () => {
     })
     clock.value.history = clock.value.history.slice(0, MAX_FOCUS_HISTORY)
     let gardenGrowth = null
-    if (session.phase === 'focus' && normalizedResult === 'completed') {
+    // 手动提前结束并不等于这段投入无效：保留“未完成”结果，同时把已投入的整分钟计入花圃。
+    // 系统中断仍不计入，避免把未正常收尾的会话误记为成长。
+    if (session.phase === 'focus' && ['completed', 'abandoned'].includes(normalizedResult)) {
       const recorded = recordFocusGardenGrowth(clock.value.garden, { elapsedSeconds, finishedAt })
       clock.value.garden = recorded.garden
       gardenGrowth = {
@@ -2690,7 +2724,7 @@ export const useTaskStore = defineStore('task', () => {
     const growthMinutes = clock.value.history
       .filter(item => (
         item.phase === 'focus' &&
-        item.result === 'completed' &&
+        ['completed', 'abandoned'].includes(item.result) &&
         localGardenDateKey(item.finishedAt) === today &&
         new Date(item.finishedAt).getTime() >= startedAt
       ))

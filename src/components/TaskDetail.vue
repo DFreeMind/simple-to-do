@@ -261,10 +261,10 @@
           <div class="focus-link-panel">
             <span class="focus-link-panel__icon"><Timer :size="16" /></span>
             <strong>{{ formatFocusDuration(linkedFocusSeconds) }}</strong>
-            <small>{{ linkedFocusRecords.length }} 段已完成专注 · 最近 {{ formatFocusDate(linkedFocusRecords[0].finishedAt) }}</small>
+            <small>{{ linkedFocusSummary }} · 最近 {{ formatFocusDate(linkedFocusRecords[0].finishedAt) }}</small>
           </div>
           <div class="focus-link-records">
-            <div v-for="record in visibleLinkedFocusRecords" :key="record.id"><span>{{ formatFocusDate(record.finishedAt) }}</span><strong>{{ formatFocusDuration(record.elapsedSeconds) }}</strong></div>
+            <div v-for="record in visibleLinkedFocusRecords" :key="record.id"><span>{{ formatFocusDate(record.finishedAt) }}</span><strong>{{ formatFocusDuration(record.elapsedSeconds) }}</strong><small :class="`is-${record.result}`">{{ focusResultLabel(record.result) }}</small></div>
           </div>
           <button v-if="hasCollapsedFocusRecords" type="button" class="focus-link__records-toggle" :aria-expanded="focusRecordsExpanded" @click="focusRecordsExpanded = !focusRecordsExpanded">
             <ChevronDown :size="14" :class="{ 'is-expanded': focusRecordsExpanded }" />{{ focusRecordsExpanded ? '收起记录' : `展开其余 ${linkedFocusRecords.length - visibleLinkedFocusRecords.length} 段` }}
@@ -436,11 +436,16 @@ const completedSubtasks = computed(() => task.value?.subtasks.filter(item => ite
 const linkedFocusRecords = computed(() => {
   if (!task.value?.id) return []
   return store.focusHistory
-    .filter(item => item.taskId === task.value.id && item.phase === 'focus' && item.result === 'completed')
+    .filter(item => item.taskId === task.value.id && item.phase === 'focus' && ['completed', 'abandoned'].includes(item.result))
     .sort((a, b) => new Date(b.finishedAt).getTime() - new Date(a.finishedAt).getTime())
 })
 const linkedFocusSeconds = computed(() => linkedFocusRecords.value.reduce((total, item) => total + Math.max(0, Number(item.elapsedSeconds) || 0), 0))
 const hasLinkedFocus = computed(() => linkedFocusSeconds.value > 0)
+const linkedFocusSummary = computed(() => {
+  const completed = linkedFocusRecords.value.filter(item => item.result === 'completed').length
+  const abandoned = linkedFocusRecords.value.filter(item => item.result === 'abandoned').length
+  return abandoned ? `${completed} 段完成 · ${abandoned} 段提前结束` : `${completed} 段完成`
+})
 const visibleLinkedFocusRecords = computed(() => focusRecordsExpanded.value ? linkedFocusRecords.value : linkedFocusRecords.value.slice(0, 3))
 const hasCollapsedFocusRecords = computed(() => linkedFocusRecords.value.length > 3)
 const subtaskProgressPercent = computed(() => {
@@ -513,6 +518,7 @@ function formatFocusDuration(seconds) {
   const minutes = totalMinutes % 60
   return minutes ? `${hours} 小时 ${minutes} 分钟` : `${hours} 小时`
 }
+function focusResultLabel(result) { return result === 'completed' ? '完成' : '提前结束' }
 
 function formatFocusDate(value) {
   const date = new Date(value)

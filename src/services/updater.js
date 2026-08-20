@@ -118,6 +118,21 @@ export async function installUpdate() {
   }
 }
 
+/** 自动安装失败时，下载完整安装包到系统“下载”文件夹，并定位该文件。 */
+export async function downloadManualUpdate() {
+  const downloadUrl = updaterState.update?.downloadUrl
+  if (!downloadUrl) return false
+  try {
+    const path = await invoke('download_manual_update', { downloadUrl })
+    updaterState.error = `完整安装包已下载到：${path}`
+    return true
+  } catch (error) {
+    updaterState.error = '下载安装包失败，请改为打开下载页后手动下载。'
+    console.warn('[updater] 下载手动安装包失败:', error)
+    return false
+  }
+}
+
 /** 请求应用重启；若 macOS 未如期退出，则恢复为可操作的 installed 状态。 */
 export async function restartUpdateApplication() {
   if (!isTauri()) return false

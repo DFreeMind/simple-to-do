@@ -260,6 +260,7 @@ struct FocusControllerPayload {
     duration_seconds: Option<u64>,
     remaining_seconds: Option<u64>,
     elapsed_seconds: u64,
+    paused_at: Option<String>,
     synced_at: i64,
     always_on_top: bool,
     style: String,
@@ -575,6 +576,65 @@ async fn install_pending_update(app: tauri::AppHandle) -> Result<bool, String> {
     // 安装成功必须先返回前端，不能在同一个 IPC command 中调用 app.restart()。
     // restart() 不返回；macOS 若退出请求未推进，前端会永远停在“正在安装”。
     Ok(true)
+}
+
+/// 自动更新无法替换应用时，将同一版本的完整安装包保存到系统“下载”目录，供用户手动安装。
+#[tauri::command]
+async fn download_manual_update(app: tauri::AppHandle, download_url: String) -> Result<String, String> {
+    let updater_url = url::Url::parse(&download_url)
+        .map_err(|error| format!("更新包地址无效: {error}"))?;
+    let host = updater_url.host_str().unwrap_or_default();
+    if updater_url.scheme() != "https" || !matches!(host, "simpletodo.duqimeng.cn" | "github.com") {
+        return Err("更新包地址不受信任".to_string());
+    }
+    let updater_name = updater_url
+        .path_segments()
+        .and_then(|mut segments| segments.next_back())
+        .unwrap_or_default()
+        .to_string();
+    let installer_name = if cfg!(target_os = "macos") {
+        updater_name
+            .strip_suffix(".app.tar.gz")
+            .map(|name| format!("{name}.dmg"))
+    } else {
+        Some(updater_name.clone())
+    }
+    .filter(|name| {
+        name.starts_with("simple-to-do_")
+            && (name.ends_with(".dmg") || name.ends_with(".exe"))
+            && !name.contains('/')
+            && !name.contains('\\')
+    })
+    .ok_or_else(|| "无法确定可手动安装的更新包".to_string())?;
+    let mut installer_url = updater_url;
+    let installer_directory = installer_url.path().trim_end_matches(&updater_name).to_string();
+    installer_url.set_path(&format!("{installer_directory}{installer_name}"));
+    let response = reqwest::get(installer_url.as_str())
+        .await
+        .map_err(|error| format!("下载安装包失败: {error}"))?
+        .error_for_status()
+        .map_err(|error| format!("下载安装包失败: {error}"))?;
+    let bytes = response.bytes().await.map_err(|error| format!("读取安装包失败: {error}"))?;
+    let download_dir = app
+        .path()
+        .download_dir()
+        .map_err(|error| format!("无法获取下载目录: {error}"))?;
+    fs::create_dir_all(&download_dir).map_err(|error| format!("创建下载目录失败: {error}"))?;
+    let destination = download_dir.join(&installer_name);
+    fs::write(&destination, bytes).map_err(|error| format!("保存安装包失败: {error}"))?;
+
+    #[cfg(target_os = "macos")]
+    Command::new("open")
+        .args(["-R", destination.to_string_lossy().as_ref()])
+        .spawn()
+        .map_err(|error| format!("打开下载位置失败: {error}"))?;
+    #[cfg(target_os = "windows")]
+    Command::new("explorer.exe")
+        .arg(format!("/select,{}", destination.display()))
+        .spawn()
+        .map_err(|error| format!("打开下载位置失败: {error}"))?;
+
+    Ok(destination.to_string_lossy().to_string())
 }
 
 /// 在安装 command 已经向前端确认成功后请求重启。
@@ -5301,6 +5361,7 @@ fn main() {
             get_system_idle_seconds,
             check_for_update,
             install_pending_update,
+            download_manual_update,
             restart_application
         ])
         .build(tauri::generate_context!())

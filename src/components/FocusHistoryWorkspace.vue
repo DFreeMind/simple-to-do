@@ -74,7 +74,7 @@
           </section>
           <div class="review-metrics">
             <article class="review-metric review-metric--primary">
-              <span class="review-metric__label" :title="`已记录的专注阶段（不含休息；中断或放弃的实际投入也会保留）`"><Timer :size="13" />专注投入</span>
+              <span class="review-metric__label" :title="`已记录的专注阶段（不含休息；中断或提前结束的实际投入也会保留）`"><Timer :size="13" />专注投入</span>
               <strong :aria-label="`${selectedRangeLabel}累计专注投入 ${formatDuration(totalFocusSeconds)}`">{{ formatDuration(totalFocusSeconds) }}</strong>
               <small>{{ completedFocusEntries.length }} 段自然完成 · {{ focusActiveDays }} 天有投入</small>
               <span v-if="previousRangeStart && focusSecondsDelta" :class="['review-metric__delta', focusSecondsDelta > 0 ? 'is-up' : 'is-down']" :title="`与上一周期对比（${previousRangeStart.days} 天）`">
@@ -859,7 +859,7 @@ const detailRef = ref(null)
 const FOCUS_RESULT_OPTIONS = [
   { value: 'all', label: '全部结果' },
   { value: 'completed', label: '已完成' },
-  { value: 'unfinished', label: '中断或放弃' }
+  { value: 'unfinished', label: '中断或提前结束' }
 ]
 const FOCUS_PHASE_OPTIONS = [
   { value: 'all', label: '专注与休息' },
@@ -1251,7 +1251,7 @@ function summarizeTrendTooltip(day) {
   const outcomeText = [
     outcomes.completed ? `完成 ${outcomes.completed} 段` : '',
     outcomes.interrupted ? `中断 ${outcomes.interrupted} 段` : '',
-    outcomes.abandoned ? `放弃 ${outcomes.abandoned} 段` : ''
+    outcomes.abandoned ? `提前结束 ${outcomes.abandoned} 段` : ''
   ].filter(Boolean).join(' · ') || '暂无结果信息'
   const unlinkedCount = day.records.length - linkedCount
   const taskText = primaryTask
@@ -2557,7 +2557,7 @@ function durationMetricParts(seconds) {
     : [{ value: hours, unit: '小时' }]
 }
 function phaseLabel(phase) { return phase === 'long-break' ? '长休息' : phase === 'short-break' ? '短休息' : '未关联任务的专注' }
-function resultLabel(result) { return result === 'completed' ? '已完成' : result === 'abandoned' ? '已放弃' : '被中断' }
+function resultLabel(result) { return result === 'completed' ? '已完成' : result === 'abandoned' ? '提前结束' : '被中断' }
 function rhythmActionLabel(action) { return ({ completed: '已完成', snoozed: '已延后', 'skipped-today': '今天跳过', dismissed: '稍后处理', 'natural-break': '自然离席' }[action] || '已处理') }
 function triggerTypeLabel(type) { return ({ interval: '间隔提醒', 'fixed-time': '固定时刻', 'active-duration': '连续活跃' }[type] || '节律提醒') }
 function rhythmTimeline(item) {

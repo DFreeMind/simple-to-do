@@ -4,7 +4,7 @@
     <div class="focus-island__copy">
       <span v-if="expanded" class="focus-island__status">{{ statusLabel }}</span>
       <h1 id="focus-controller-title">{{ formattedTime }}</h1>
-      <p>{{ controller.taskTitle || fallbackText }}<template v-if="expanded && expectedEnd"> · {{ expectedEnd }}</template></p>
+      <p>{{ controller.status === 'paused' ? `暂停 ${formattedPausedTime}` : controller.taskTitle || fallbackText }}<template v-if="expanded && expectedEnd"> · {{ expectedEnd }}</template></p>
     </div>
     <div v-if="expanded" class="focus-island__tools" @pointerdown.stop>
       <FocusControllerStyleMenu :model-value="controller.style" @select="$emit('select-style', $event)" />
@@ -27,7 +27,7 @@
 import { computed } from 'vue'
 import { Check, ChevronDown, ChevronUp, Minus, Pause, Pin, PinOff, Play, Plus, X } from 'lucide-vue-next'
 import FocusControllerStyleMenu from './FocusControllerStyleMenu.vue'
-const props=defineProps({controller:{type:Object,required:true},formattedTime:{type:String,required:true},canAdjust:Boolean,busy:Boolean,progressRatio:{type:Number,default:0},expanded:Boolean,liveSeconds:{type:Number,default:0}})
+const props=defineProps({controller:{type:Object,required:true},formattedTime:{type:String,required:true},canAdjust:Boolean,busy:Boolean,progressRatio:{type:Number,default:0},expanded:Boolean,liveSeconds:{type:Number,default:0},pausedSeconds:{type:Number,default:0}})
 defineEmits(['action','toggle-top','close','select-style','drag','toggle-expanded'])
 const progressPercent=computed(()=>Math.round(Math.max(0,Math.min(1,props.progressRatio))*100))
 const progressText=computed(()=>props.controller.durationSeconds===null?'∞':`${progressPercent.value}%`)
@@ -35,6 +35,8 @@ const ringStyle=computed(()=>({background:`conic-gradient(${props.controller.sta
 const statusLabel=computed(()=>props.controller.status==='paused'?'已暂停':props.controller.phase==='focus'?'正在专注':'正在休息')
 const fallbackText=computed(()=>props.controller.phase==='focus'?'保持在当前这件事上':'暂时离开屏幕，恢复一下')
 const expectedEnd=computed(()=>{if(props.controller.remainingSeconds===null||props.controller.status==='paused')return'';const date=new Date(Date.now()+props.liveSeconds*1000);return`预计 ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')} 结束`})
+const formattedPausedTime=computed(()=>formatDuration(props.pausedSeconds))
+function formatDuration(seconds){const value=Math.max(0,Math.floor(seconds||0));const hours=Math.floor(value/3600);const minutes=Math.floor((value%3600)/60);const rest=value%60;return hours>0?`${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}:${String(rest).padStart(2,'0')}`:`${String(minutes).padStart(2,'0')}:${String(rest).padStart(2,'0')}`}
 </script>
 
 <style scoped>

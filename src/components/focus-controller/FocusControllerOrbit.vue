@@ -44,7 +44,7 @@ import { computed } from 'vue'
 import { CircleCheck, Minus, Pause, Pin, PinOff, Play, Plus, X } from 'lucide-vue-next'
 import FocusControllerStyleMenu from './FocusControllerStyleMenu.vue'
 
-const props = defineProps({ controller: { type: Object, required: true }, formattedTime: { type: String, required: true }, canAdjust: Boolean, busy: Boolean, progressRatio: { type: Number, default: 0 } })
+const props = defineProps({ controller: { type: Object, required: true }, formattedTime: { type: String, required: true }, canAdjust: Boolean, busy: Boolean, progressRatio: { type: Number, default: 0 }, pausedSeconds: { type: Number, default: 0 } })
 defineEmits(['action', 'toggle-top', 'close', 'select-style', 'drag'])
 
 const progressPercent = computed(() => Math.max(0, Math.min(100, props.progressRatio * 100)))
@@ -55,7 +55,8 @@ const markerPoint = computed(() => {
 })
 const statusLabel = computed(() => props.controller.status === 'paused' ? '已暂停' : props.controller.phase === 'focus' ? '正在专注' : '正在休息')
 const fallbackText = computed(() => props.controller.phase === 'focus' ? '保持在当前这件事上' : '暂时离开屏幕，恢复一下')
-const remainingLabel = computed(() => isCountdown.value ? `剩余 ${Math.round(progressPercent.value)}%` : '自由计时')
+const remainingLabel = computed(() => props.controller.status === 'paused' ? `暂停 ${formatDuration(props.pausedSeconds)}` : isCountdown.value ? `剩余 ${Math.round(progressPercent.value)}%` : '自由计时')
+function formatDuration(seconds) { const value = Math.max(0, Math.floor(seconds || 0)); const hours = Math.floor(value / 3600); const minutes = Math.floor((value % 3600) / 60); const rest = value % 60; return hours > 0 ? `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(rest).padStart(2, '0')}` : `${String(minutes).padStart(2, '0')}:${String(rest).padStart(2, '0')}` }
 </script>
 
 <style scoped>

@@ -6,6 +6,7 @@
       :controller="controller"
       :formatted-time="formattedTime"
       :live-seconds="liveSeconds"
+      :paused-seconds="pausedSeconds"
       :can-adjust="canAdjust"
       :busy="busy"
       :progress-ratio="progressRatio"
@@ -44,6 +45,11 @@ const liveSeconds = computed(() => {
   const elapsedSinceSync = controller.value.status === 'running' ? Math.max(0, Math.floor((now.value - Number(controller.value.syncedAt || now.value)) / 1000)) : 0
   if (controller.value.remainingSeconds === null) return Math.max(0, Number(controller.value.elapsedSeconds || 0) + elapsedSinceSync)
   return Math.max(0, Number(controller.value.remainingSeconds || 0) - elapsedSinceSync)
+})
+const pausedSeconds = computed(() => {
+  if (controller.value?.status !== 'paused' || !controller.value.pausedAt) return 0
+  const pausedAt = new Date(controller.value.pausedAt).getTime()
+  return Number.isFinite(pausedAt) ? Math.max(0, Math.floor((now.value - pausedAt) / 1000)) : 0
 })
 const formattedTime = computed(() => {
   const seconds = Math.floor(liveSeconds.value)
