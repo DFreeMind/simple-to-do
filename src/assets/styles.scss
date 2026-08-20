@@ -1724,6 +1724,7 @@ body.is-resizing {
   margin: 0;
   justify-self: center;
   align-self: center;
+  transform: translateX(-2px);
 }
 .clock-stage__garden-art .focus-stage-artwork__layer { object-position: center; }
 .clock-stage__garden-art .focus-stage-artwork__light { opacity: .36; }
