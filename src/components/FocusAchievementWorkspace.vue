@@ -231,6 +231,12 @@
               <strong>{{ selectedMonthSummary.days }} 天</strong>
             </span>
             <span class="achievement-month__stat-divider" aria-hidden="true" />
+            <span class="achievement-month__stat" :title="`本月 ${selectedMonthSummary.goalDays} 个成长日完成了当天目标`">
+              <Target :size="14" class="achievement-month__stat-icon" />
+              <small>目标达成</small>
+              <strong>{{ selectedMonthSummary.goalDays }} / {{ selectedMonthSummary.days }} 天</strong>
+            </span>
+            <span class="achievement-month__stat-divider" aria-hidden="true" />
             <span class="achievement-month__stat">
               <Timer :size="14" class="achievement-month__stat-icon" />
               <small>投入时间</small>
@@ -256,11 +262,15 @@
               v-for="cell in monthCells"
               :key="cell.date"
               type="button"
-              :class="{ grown: cell.entry, future: cell.date > todayKey, active: cell.date === todayKey }"
+              :class="{ grown: cell.entry, future: cell.date > todayKey, active: cell.date === todayKey, weekend: isWeekend(cell.date), reached: cell.entry && isGrowthGoalReached(cell.entry, cellEffectiveFocusMinutes(cell)) }"
               :aria-label="dayCellLabel(cell)"
               @click="openDayDetail(cell)"
             >
-              <span class="achievement-month__day">{{ cell.day }}</span>
+              <span class="achievement-month__day" :class="{ 'is-today': cell.date === todayKey }"><b>{{ cell.day }}</b><small v-if="cell.date === todayKey">今日</small></span>
+              <span v-if="cellEffectiveFocusMinutes(cell) > 0" class="achievement-month__cell-summary" :title="`${durationHuman(cellEffectiveFocusMinutes(cell))}有效专注${isGrowthGoalReached(cell.entry, cellEffectiveFocusMinutes(cell)) ? '，已达成当天目标' : ''}`" aria-hidden="true">
+                <Timer :size="10" />{{ durationCompact(cellEffectiveFocusMinutes(cell)) }}
+                <Check v-if="isGrowthGoalReached(cell.entry, cellEffectiveFocusMinutes(cell))" class="achievement-month__cell-goal" :size="11" />
+              </span>
               <FocusTerrarium
                 class="achievement-month__terrarium"
                 :style="{ transform: `scale(${monthTerrariumScale})` }"
@@ -295,22 +305,24 @@
                   <small>{{ daySpeciesName(selectedDayCell.entry.speciesId) }} · {{ stageName(selectedDayCell.entry.stage) }}</small>
                   <strong>{{ selectedDayProgress >= 100 ? '当天目标已完成' : '这株花正在生长' }}</strong>
                   <p>{{ stageDescriptions[selectedDayCell.entry.stage] || '这一天的专注，已经在花田里留下了可回望的成长。' }}</p>
-                  <div class="achievement-day-dialog__focus-total"><Timer :size="16" /><b>{{ durationHuman(selectedDayCell.entry.growthMinutes) }}</b><span>有效专注</span></div>
-                  <i class="achievement-day-dialog__progress" aria-label="当天目标完成进度"><b :style="{ width: `${selectedDayProgress}%` }" /></i>
+                  <div class="achievement-day-dialog__summary" aria-label="当天专注统计">
+                    <div><span>有效专注</span><b>{{ durationHuman(selectedDayDisplayMinutes) }}</b></div>
+                    <div><span>完成轮次</span><b>{{ selectedDayCompletedFocusCount }} 段</b></div>
+                    <div><span>提前结束</span><b>{{ selectedDayAbandonedFocusCount }} 段</b></div>
+                  </div>
+                  <div class="achievement-day-dialog__goal-progress" :aria-label="`当天目标：已完成 ${selectedDayDisplayMinutes} 分钟，共 ${selectedDayCell.entry.goalMinutes} 分钟`">
+                    <span>已完成 {{ selectedDayDisplayMinutes }} / {{ selectedDayCell.entry.goalMinutes }} 分钟</span>
+                    <i><b :style="{ width: `${selectedDayProgress}%` }" /></i>
+                  </div>
                 </div>
               </div>
-              <dl class="achievement-day-dialog__stats">
-                <div><dt>当天目标</dt><dd>{{ selectedDayCell.entry.goalMinutes }} 分钟</dd><small>为这株花设定</small></div>
-                <div><dt>完成进度</dt><dd>{{ selectedDayProgress }}%</dd><small>{{ selectedDayProgress >= 100 ? '目标已达成' : '持续投入中' }}</small></div>
-                <div><dt>完成专注</dt><dd>{{ selectedDayFocusCount }} 段</dd><small>已保存的专注记录</small></div>
-              </dl>
               <section class="achievement-day-dialog__tasks">
-                <header><span>当天专注</span><small>{{ selectedDayFocusCount ? `${selectedDayFocusCount} 段 · ${durationHuman(selectedDayCell.entry.growthMinutes)}` : '历史记录不可用' }}</small></header>
+                <header><span>当天专注</span><small>{{ selectedDayFocusSummary }}</small></header>
                 <ul v-if="selectedDayFocusSessions.length" class="achievement-day-dialog__timeline">
                   <li v-for="session in selectedDayFocusSessions" :key="session.id">
                     <time><strong>{{ session.startedTime }}</strong><span>至 {{ session.finishedTime }}</span></time>
                     <i><Timer :size="15" /></i>
-                    <div><strong>{{ session.taskTitle || '未关联任务' }}</strong><small>{{ session.profileName || '已完成专注' }}</small></div>
+                    <div><strong>{{ session.taskTitle || '未关联任务' }}</strong><small><span>{{ session.profileName || '专注记录' }}</span><em :class="`is-${session.result}`">{{ focusResultLabel(session.result) }}</em></small></div>
                     <b>{{ durationHuman(session.minutes) }}</b>
                   </li>
                 </ul>
@@ -396,7 +408,6 @@
               <span><Leaf :size="16" />花园寄语</span>
               <blockquote>{{ selectedSpeciesProfile.gardenMessage }}</blockquote>
             </div>
-            <p class="species-playground__description"><span><Archive :size="15" />花朵档案</span>{{ selectedSpecies.description }}</p>
             <section class="species-playground__progress" aria-label="培养进度">
               <div v-if="selectedSpecies.companion" class="species-companion">
                 <header>
@@ -531,9 +542,9 @@
           </div>
         </header>
 
-        <section v-if="focusAchievement" class="badge-focus card-surface" :class="{ complete: focusAchievement.unlockedAt }">
+        <section v-if="focusAchievement" class="badge-focus card-surface" :class="{ complete: focusAchievement.unlockedAt }" :style="achievementBadgeStyle(focusAchievement)">
           <div class="badge-focus__identity">
-            <span class="badge-focus__icon"><component :is="achievementBadgeIcon(focusAchievement)" :size="30" /></span>
+            <span class="badge-focus__icon"><AchievementBadgeEmblem :achievement-id="focusAchievement.id" :icon="achievementBadgeIcon(focusAchievement)" :icon-size="30" /></span>
             <div>
               <p>{{ trackedAchievement ? '正在追踪' : (focusAchievement.unlockedAt ? '最近获得' : '建议下一枚') }}</p>
               <h2>{{ focusAchievement.name }}</h2>
@@ -568,9 +579,9 @@
             </div>
           </div>
           <div v-if="visibleAchievements.length" class="badges-grid">
-            <button v-for="item in visibleAchievements" :key="item.id" type="button" class="badge-card card-surface" :class="[{ unlocked: item.unlockedAt, tracked: trackedAchievement?.id === item.id }, `badge-card--${item.kind}`]" @click="openAchievementDetail(item, $event.currentTarget)">
+            <button v-for="item in visibleAchievements" :key="item.id" type="button" class="badge-card card-surface" :class="[{ unlocked: item.unlockedAt, tracked: trackedAchievement?.id === item.id }, `badge-card--${item.kind}`]" :style="achievementBadgeStyle(item)" @click="openAchievementDetail(item, $event.currentTarget)">
               <div class="badge-card__identity">
-                <span class="badge-card__icon"><component :is="achievementBadgeIcon(item)" :size="25" /><small v-if="badgeTier(item)">{{ badgeTier(item) }}</small></span>
+                <span class="badge-card__icon"><AchievementBadgeEmblem :achievement-id="item.id" :icon="achievementBadgeIcon(item)" :icon-size="25" /><span class="badge-card__state" :class="{ 'is-earned': item.unlockedAt }" aria-hidden="true"><Check v-if="item.unlockedAt" :size="11" /><LockKeyhole v-else :size="10" /></span></span>
                 <div class="badge-card__copy"><span class="badge-card__reward">{{ achievementReward(item).label }}<small v-if="badgeTier(item)">第 {{ badgeTier(item) }} 阶</small></span><h3>{{ item.name }}</h3><p>{{ item.description }}</p></div>
               </div>
               <span v-if="trackedAchievement?.id === item.id" class="badge-card__tracked"><Pin :size="12" />追踪中</span>
@@ -595,10 +606,10 @@
 
         <Teleport to=".app">
           <div v-if="selectedAchievement" class="badge-detail-backdrop" @click.self="closeAchievementDetail">
-            <section class="badge-detail" role="dialog" aria-modal="true" aria-labelledby="badge-detail-title" @keydown="handleBadgeDetailKeydown">
+            <section class="badge-detail" role="dialog" aria-modal="true" aria-labelledby="badge-detail-title" :style="achievementBadgeStyle(selectedAchievement)" @keydown="handleBadgeDetailKeydown">
               <button ref="badgeDetailCloseButton" type="button" class="badge-detail__close" aria-label="关闭徽章详情" @click="closeAchievementDetail"><X :size="18" /></button>
               <header class="badge-detail__header">
-                <span class="badge-detail__icon"><component :is="achievementBadgeIcon(selectedAchievement)" :size="34" /></span>
+                <span class="badge-detail__icon"><AchievementBadgeEmblem :achievement-id="selectedAchievement.id" :icon="achievementBadgeIcon(selectedAchievement)" :icon-size="34" /></span>
                 <div>
                   <p class="badge-detail__eyebrow">{{ achievementReward(selectedAchievement).label }}</p>
                   <h2 id="badge-detail-title">{{ selectedAchievement.name }}</h2>
@@ -649,7 +660,7 @@
 <script setup>
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, ref } from 'vue'
 import { motion as Motion } from 'motion-v'
-import { Archive, ArrowRight, BookOpen, CalendarDays, Check, ChevronLeft, ChevronRight, ChevronUp, Flame, Flower2, Leaf, LockKeyhole, Pause, Pin, Play, Sparkles, Sprout, Timer, TimerReset, Trees, Trophy, X } from 'lucide-vue-next'
+import { Archive, ArrowRight, BadgeCheck, BookOpen, BookOpenCheck, CalendarCheck, CalendarDays, CalendarHeart, Check, ChevronLeft, ChevronRight, ChevronUp, Flame, Flower, Flower2, Leaf, LockKeyhole, MoonStar, Palette, PanelsTopLeft, Pause, Pin, Play, Sparkles, Sprout, Sun, SunMoon, Target, Timer, TimerReset, TreePine, Trees, Trophy, X } from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task'
 import {
   FOCUS_GARDEN_COLLECTIONS,
@@ -668,6 +679,7 @@ import FocusPlant from './FocusPlant.vue'
 import FocusRewardBadge from './FocusRewardBadge.vue'
 import FocusSpeciesPreview from './FocusSpeciesPreview.vue'
 import FocusTerrarium from './FocusTerrarium.vue'
+import AchievementBadgeEmblem from './AchievementBadgeEmblem.vue'
 
 // 阶段 id → 温室尺寸档位
 // empty: 无罩（基础花田位）；small: 幼苗温室；medium: 成长温室；large: 盛放温室
@@ -683,18 +695,19 @@ const TERRARIUM_SIZE_BY_STAGE = {
 function terrariumSizeFor(stageId) {
   return TERRARIUM_SIZE_BY_STAGE[stageId] || 'small'
 }
-import camelliaStageBackdrop from '@/assets/focus-garden/stage-backgrounds/camellia.png'
-import cosmosStageBackdrop from '@/assets/focus-garden/stage-backgrounds/cosmos.png'
-import daisyStageBackdrop from '@/assets/focus-garden/stage-backgrounds/daisy.png'
-import hydrangeaStageBackdrop from '@/assets/focus-garden/stage-backgrounds/hydrangea.png'
-import irisStageBackdrop from '@/assets/focus-garden/stage-backgrounds/iris.png'
-import lavenderStageBackdrop from '@/assets/focus-garden/stage-backgrounds/lavender.png'
-import lilyStageBackdrop from '@/assets/focus-garden/stage-backgrounds/lily.png'
-import moonflowerStageBackdrop from '@/assets/focus-garden/stage-backgrounds/moonflower.png'
-import peonyStageBackdrop from '@/assets/focus-garden/stage-backgrounds/peony.png'
-import poppyStageBackdrop from '@/assets/focus-garden/stage-backgrounds/poppy.png'
-import sunflowerStageBackdrop from '@/assets/focus-garden/stage-backgrounds/sunflower.png'
-import tulipStageBackdrop from '@/assets/focus-garden/stage-backgrounds/tulip.png'
+import botanicalConservatoryBackdrop from '@/assets/focus-garden/stage-backgrounds/botanical-conservatory.png'
+import camelliaStageBackdrop from '@/assets/focus-garden/stage-backgrounds/camellia-v2.webp'
+import cosmosStageBackdrop from '@/assets/focus-garden/stage-backgrounds/cosmos-v2.webp'
+import daisyStageBackdrop from '@/assets/focus-garden/stage-backgrounds/daisy-v2.webp'
+import hydrangeaStageBackdrop from '@/assets/focus-garden/stage-backgrounds/hydrangea-v2.webp'
+import irisStageBackdrop from '@/assets/focus-garden/stage-backgrounds/iris-v2.webp'
+import lavenderStageBackdrop from '@/assets/focus-garden/stage-backgrounds/lavender-v2.webp'
+import lilyStageBackdrop from '@/assets/focus-garden/stage-backgrounds/lily-v2.webp'
+import moonflowerStageBackdrop from '@/assets/focus-garden/stage-backgrounds/moonflower-v2.webp'
+import peonyStageBackdrop from '@/assets/focus-garden/stage-backgrounds/peony-v2.webp'
+import poppyStageBackdrop from '@/assets/focus-garden/stage-backgrounds/poppy-v2.webp'
+import sunflowerStageBackdrop from '@/assets/focus-garden/stage-backgrounds/sunflower-v2.webp'
+import tulipStageBackdrop from '@/assets/focus-garden/stage-backgrounds/tulip-v2.webp'
 
 const FocusStageArtwork = defineAsyncComponent(() => import('./FocusStageArtwork.vue'))
 const panelBotanicalModules = import.meta.glob(
@@ -736,26 +749,33 @@ const stageDescriptions = {
 }
 const achievementBadgeIcons = {
   'first-growth': Sprout,
-  'first-bloom': Flower2,
-  'active-days-3': CalendarDays,
-  'goal-days-3': Check,
-  'focus-600': Trophy,
-  'focus-1800': Sparkles,
-  'focus-3600': Trophy,
+  'first-bloom': Flower,
+  'active-days-3': CalendarHeart,
+  'goal-days-3': Target,
+  'focus-600': Sun,
+  'focus-1800': Trees,
+  'focus-3600': TreePine,
   'bloom-10': Flower2,
-  'bloom-25': Flower2,
+  'bloom-25': Flower,
   'deep-90': TimerReset,
-  'deep-120': TimerReset,
-  'deep-180': Sparkles,
-  'species-3': Leaf,
-  'species-6': BookOpen,
-  'species-9': Sparkles,
-  'species-12': Trophy,
-  'collections-3': Flower2,
-  'streak-3': CalendarDays,
-  'streak-7': Flame,
-  'streak-14': Sparkles,
+  'deep-120': MoonStar,
+  'deep-180': SunMoon,
+  'species-3': Palette,
+  'species-6': BookOpenCheck,
+  'species-9': Palette,
+  'species-12': BadgeCheck,
+  'collections-3': PanelsTopLeft,
+  'streak-3': CalendarCheck,
+  'streak-7': CalendarHeart,
+  'streak-14': Flame,
   'active-days-30': CalendarDays
+}
+const achievementBadgeAccents = {
+  'first-growth': '#78a95f', 'first-bloom': '#d68991', 'active-days-3': '#7d9f75', 'goal-days-3': '#c0924c',
+  'focus-600': '#d59a45', 'focus-1800': '#a37845', 'focus-3600': '#5e9871', 'bloom-10': '#cf7685', 'bloom-25': '#b9607c',
+  'deep-90': '#718bc3', 'deep-120': '#6877b4', 'deep-180': '#8266ac',
+  'species-3': '#a16fa4', 'species-6': '#8b70ae', 'species-9': '#7869b0', 'species-12': '#a77756', 'collections-3': '#7c8fa8',
+  'streak-3': '#79a47b', 'streak-7': '#bd7b58', 'streak-14': '#b45d68', 'active-days-30': '#638f7b'
 }
 const achievementBadgeTiers = {
   'first-growth': 'I',
@@ -818,9 +838,20 @@ const yearSummary = computed(() => {
   }
 })
 const monthCells = computed(() => monthGardenCells(selectedYear.value, selectedMonth.value, store.focusGarden.days))
+const effectiveFocusMinutesByDate = computed(() => {
+  const totals = new Map()
+  store.focusHistory.forEach(record => {
+    if (record.phase !== 'focus' || !['completed', 'abandoned'].includes(record.result)) return
+    const minutes = Math.max(0, Math.floor((Number(record.elapsedSeconds) || 0) / 60))
+    if (!minutes) return
+    const date = localGardenDateKey(record.finishedAt)
+    totals.set(date, (totals.get(date) || 0) + minutes)
+  })
+  return totals
+})
 const monthTerrariumScale = computed(() => {
   if (!monthGridWidth.value) return .86
-  const cellWidth = (monthGridWidth.value - 36) / 7
+  const cellWidth = (monthGridWidth.value - 60) / 7
   return Math.min(1, Math.max(.48, (cellWidth - 10) / 100))
 })
 const isCurrentMonth = computed(() => selectedYear.value === new Date().getFullYear() && selectedMonth.value === new Date().getMonth())
@@ -828,30 +859,50 @@ const selectedMonthSummary = computed(() => {
   const entries = monthCells.value.map(cell => cell.entry).filter(Boolean)
   return {
     days: entries.filter(entry => entry.growthMinutes > 0).length,
+    goalDays: entries.filter(entry => entry.growthMinutes > 0 && entry.growthMinutes >= Math.max(1, Number(entry.goalMinutes) || 1)).length,
     minutes: entries.reduce((sum, entry) => sum + Math.max(0, Number(entry.growthMinutes) || 0), 0),
     blooms: entries.filter(entry => gardenStageFor(entry.growthMinutes, entry.goalMinutes).id === 'bloom').length,
     species: new Set(entries.filter(entry => entry.growthMinutes > 0).map(entry => entry.speciesId)).size
   }
 })
-const selectedDayProgress = computed(() => {
-  const entry = selectedDayCell.value?.entry
-  if (!entry) return 0
-  return Math.min(100, Math.round((Number(entry.growthMinutes) || 0) / Math.max(1, Number(entry.goalMinutes) || 1) * 100))
-})
 const selectedDayFocusRecords = computed(() => {
   const date = selectedDayCell.value?.date
   if (!date) return []
   return store.focusHistory.filter(item => (
-    item.phase === 'focus' && item.result === 'completed' && localGardenDateKey(item.finishedAt) === date
+    item.phase === 'focus' && localGardenDateKey(item.finishedAt) === date
   ))
 })
 const selectedDayFocusCount = computed(() => selectedDayFocusRecords.value.length)
+const selectedDayEffectiveFocusRecords = computed(() => selectedDayFocusRecords.value.filter(item => ['completed', 'abandoned'].includes(item.result)))
+const selectedDayCompletedFocusCount = computed(() => selectedDayFocusRecords.value.filter(item => item.result === 'completed').length)
+const selectedDayAbandonedFocusCount = computed(() => selectedDayFocusRecords.value.filter(item => item.result === 'abandoned').length)
+const selectedDayInterruptedFocusCount = computed(() => selectedDayFocusRecords.value.filter(item => item.result === 'interrupted').length)
+const selectedDayFocusSummary = computed(() => {
+  if (!selectedDayFocusCount.value) return '历史记录不可用'
+  const parts = [`共 ${selectedDayFocusCount.value} 段记录`, `完成 ${selectedDayCompletedFocusCount.value} 段`]
+  if (selectedDayAbandonedFocusCount.value) parts.push(`提前结束 ${selectedDayAbandonedFocusCount.value} 段`)
+  if (selectedDayInterruptedFocusCount.value) parts.push(`中断 ${selectedDayInterruptedFocusCount.value} 段`)
+  return parts.join(' · ')
+})
+// 历史记录仍在时，以其累计时长作为详情页唯一口径；旧版花圃日数据可能与历史记录不同步。
+const selectedDayDisplayMinutes = computed(() => {
+  if (selectedDayEffectiveFocusRecords.value.length) {
+    return selectedDayEffectiveFocusRecords.value.reduce((sum, item) => sum + Math.max(0, Math.floor((Number(item.elapsedSeconds) || 0) / 60)), 0)
+  }
+  return Math.max(0, Number(selectedDayCell.value?.entry?.growthMinutes) || 0)
+})
+const selectedDayProgress = computed(() => {
+  const entry = selectedDayCell.value?.entry
+  if (!entry) return 0
+  return Math.min(100, Math.round(selectedDayDisplayMinutes.value / Math.max(1, Number(entry.goalMinutes) || 1) * 100))
+})
 const selectedDayFocusSessions = computed(() => [...selectedDayFocusRecords.value]
   .sort((a, b) => new Date(a.startedAt || a.finishedAt).getTime() - new Date(b.startedAt || b.finishedAt).getTime())
   .map(item => ({
     id: item.id,
     taskTitle: String(item.taskTitle || '').trim(),
     profileName: String(item.profileName || '').trim(),
+    result: item.result,
     minutes: Math.max(0, Math.floor((Number(item.elapsedSeconds) || 0) / 60)),
     startedTime: formatDayTime(item.startedAt || item.finishedAt),
     finishedTime: formatDayTime(item.finishedAt)
@@ -900,6 +951,7 @@ const stageMilestones = computed(() => focusGardenStageMilestones(store.focusGar
 const selectedStageMilestone = computed(() => stageMilestones.value[selectedStageNumber.value] || stageMilestones.value[0])
 const replayProgress = computed(() => selectedStageIndex.value / Math.max(1, gardenStages.length - 1) * 100)
 const selectedCollection = computed(() => FOCUS_GARDEN_COLLECTIONS.find(item => item.id === selectedSpecies.value.collectionId) || FOCUS_GARDEN_COLLECTIONS[0])
+// 每种花均使用专属的低对比水彩环境；通用植物园背景仅在未来新增花种尚未配图时兜底。
 const speciesStageBackdrops = {
   camellia: camelliaStageBackdrop,
   cosmos: cosmosStageBackdrop,
@@ -914,7 +966,7 @@ const speciesStageBackdrops = {
   sunflower: sunflowerStageBackdrop,
   tulip: tulipStageBackdrop
 }
-const selectedSpeciesBackdrop = computed(() => speciesStageBackdrops[selectedSpecies.value.id] || '')
+const selectedSpeciesBackdrop = computed(() => speciesStageBackdrops[selectedSpecies.value.id] || botanicalConservatoryBackdrop)
 const usesArtworkStage = computed(() => !artworkStageFailed.value)
 const speciesCollections = computed(() => FOCUS_GARDEN_COLLECTIONS.map(collection => {
   const species = store.focusGardenSpecies.filter(item => item.collectionId === collection.id)
@@ -1060,6 +1112,27 @@ function durationHuman(minutes) {
   const hours = Math.floor(value / 60)
   return `${hours} 小时${value % 60 ? ` ${value % 60} 分钟` : ''}`
 }
+function durationCompact(minutes) {
+  const value = Math.max(0, Math.round(Number(minutes) || 0))
+  if (value < 60) return `${value}分`
+  const hours = Math.floor(value / 60)
+  const rest = value % 60
+  return rest ? `${hours}时${rest}分` : `${hours}时`
+}
+function cellEffectiveFocusMinutes(cell) {
+  if (!cell?.entry) return 0
+  return effectiveFocusMinutesByDate.value.get(cell.date) ?? Math.max(0, Number(cell.entry.growthMinutes) || 0)
+}
+function isGrowthGoalReached(entry, growthMinutes = entry?.growthMinutes) {
+  return Number(growthMinutes) > 0 && Number(growthMinutes) >= Math.max(1, Number(entry?.goalMinutes) || 1)
+}
+function isWeekend(dateKey) {
+  const weekday = new Date(`${dateKey}T12:00:00`).getDay()
+  return weekday === 0 || weekday === 6
+}
+function focusResultLabel(result) {
+  return result === 'completed' ? '完成' : result === 'abandoned' ? '提前结束' : '中断'
+}
 function achievementRemaining(item) {
   const labels = { totalMinutes: '分钟', bloomCount: '朵花', speciesCount: '种花', longestSessionMinutes: '分钟', activeDays: '天', goalDays: '天', collectionCount: '座花圃', longestStreak: '天' }
   return `${Math.max(0, item.target - item.progress)} ${labels[item.metric] || '点进度'}`
@@ -1094,10 +1167,10 @@ function achievementActionHint(item) {
 }
 function achievementScopeText(item) {
   const scopes = {
-    totalMinutes: '只累计已完成专注中的有效分钟，不包含休息、暂停和提前结束的时间。',
+    totalMinutes: '累计已完成或提前结束的专注中的有效分钟；休息、暂停和系统中断不计入。',
     bloomCount: '当天有效专注达到当天目标时记为一次盛放；同一天只记录一株今日花。',
     speciesCount: '花种在任意一天产生有效专注后即算培养过，重复培养不会增加种类数。',
-    longestSessionMinutes: '取单轮已完成专注的有效分钟；暂停和休息不计时，请按身体状态合理休息。',
+    longestSessionMinutes: '取单轮已完成或提前结束专注的有效分钟；暂停和休息不计时，请按身体状态合理休息。',
     activeDays: '自然日内产生至少 1 分钟有效专注，即记为一个成长日。',
     goalDays: '当天累计有效专注达到该日保存的目标分钟数，即记为一个达标日。',
     collectionCount: '同一花圃系列中的花种产生有效专注后，该系列才计入已培养花圃。',
@@ -1112,7 +1185,7 @@ function achievementRecentProgress(item) {
   const startKey = localGardenDateKey(start)
   const recentDays = store.focusGarden.days.filter(day => day.date >= startKey && day.growthMinutes > 0)
   const recentFocusRecords = store.focusHistory.filter(record => (
-    record.phase === 'focus' && record.result === 'completed' && localGardenDateKey(record.finishedAt) >= startKey
+    record.phase === 'focus' && ['completed', 'abandoned'].includes(record.result) && localGardenDateKey(record.finishedAt) >= startKey
   ))
   const lastDay = [...store.focusGarden.days].filter(day => day.growthMinutes > 0).sort((a, b) => b.date.localeCompare(a.date))[0]
   const lastText = lastDay ? `最近一次推进：${formatShortDate(`${lastDay.date}T12:00:00`)}` : '还没有有效专注记录'
@@ -1197,6 +1270,9 @@ function handleBadgeCategoryKeydown(event) {
 }
 function achievementBadgeIcon(item) {
   return achievementBadgeIcons[item.id] || Trophy
+}
+function achievementBadgeStyle(item) {
+  return { '--badge-accent': achievementBadgeAccents[item?.id] || 'var(--accent)' }
 }
 function badgeTier(item) {
   return achievementBadgeTiers[item.id] || ''
@@ -1654,7 +1730,7 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis; white-space: nowrap;
 }
 .achievement-month__stat-divider { width: 1px; height: 12px; background: color-mix(in srgb, var(--divider-soft) 80%, transparent); flex: none; }
-.achievement-month__weekdays,.achievement-month__grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.achievement-month__weekdays,.achievement-month__grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; }
 .achievement-month__weekdays { margin: 14px 0 6px; }
 .achievement-month__weekdays span { color: var(--text-muted); font-size: 10px; text-align: center; font-weight: 600; }
 /* 月格子：每个 cell 都是温室。日期数字在左上角，温室底对齐到 cell 底部。
@@ -1684,8 +1760,11 @@ onBeforeUnmount(() => {
 .achievement-month__grid button *:focus-visible { outline: none; }
 .achievement-month__grid button:hover { transform: translateY(-1px); }
 .achievement-month__grid button.future { opacity: .5; }
-.achievement-month__day { position: absolute; top: 5px; left: 8px; font-size: 10px; color: var(--text-muted); font-weight: 600; }
-.achievement-month__terrarium { display: block; flex: 0 0 auto; transform-origin: center bottom; }
+.achievement-month__grid button::before { position: absolute; z-index: 0; top: 0; right: 0; left: 0; height: 31px; border-bottom: 1px solid color-mix(in srgb, var(--divider-soft) 86%, transparent); border-radius: 11px 11px 0 0; background: color-mix(in srgb, var(--surface-muted) 54%, var(--surface)); content: ''; pointer-events: none; }.achievement-month__grid button.weekend::before { background: color-mix(in srgb, #fff1dd 52%, var(--surface)); }.achievement-month__grid button.grown::before { background: color-mix(in srgb, #e4f0da 74%, var(--surface)); }.achievement-month__grid button.active::before { background: color-mix(in srgb, #c4e0b5 75%, var(--surface)); }
+.achievement-month__grid button.weekend { background: color-mix(in srgb, #fff8ed 42%, var(--surface)); }.achievement-month__grid button.grown { border-color: color-mix(in srgb, #7cae70 30%, var(--divider-soft)); background: radial-gradient(circle at 12% 8%, rgba(214, 234, 202, .52), transparent 37%), var(--surface); box-shadow: inset 0 3px 0 color-mix(in srgb, #6f9a5a 58%, transparent); }.achievement-month__grid button.grown.weekend { background: radial-gradient(circle at 12% 8%, rgba(214, 234, 202, .48), transparent 37%), color-mix(in srgb, #fff8ed 32%, var(--surface)); }.achievement-month__grid button.reached { border-color: color-mix(in srgb, #6f9a5a 45%, var(--divider-soft)); }
+.achievement-month__day { position: absolute; z-index: 2; top: 6px; left: 7px; display: inline-flex; align-items: center; gap: 3px; min-height: 18px; padding: 0 5px; border-radius: 7px; background: color-mix(in srgb, var(--surface-muted) 74%, var(--surface)); color: var(--text-muted); font-size: 10px; font-weight: 700; line-height: 1; }.achievement-month__day b { font: inherit; }.achievement-month__day small { color: #4f7842; font-size: 8px; font-weight: 800; }.achievement-month__grid button.grown .achievement-month__day { background: color-mix(in srgb, #e7f1dc 78%, var(--surface)); color: #4f7842; }.achievement-month__grid button.weekend .achievement-month__day { background: color-mix(in srgb, #fff2df 76%, var(--surface)); color: #8d7250; }.achievement-month__grid button.active .achievement-month__day { background: #5d914f; color: #fff; }.achievement-month__grid button.active .achievement-month__day small { color: #eff9e9; }
+.achievement-month__cell-summary { position: absolute; z-index: 2; top: 5px; right: 7px; display: inline-flex; align-items: center; gap: 3px; min-height: 20px; padding: 1px 6px; border: 1px solid color-mix(in srgb, #6f9a5a 44%, var(--divider-soft)); border-radius: 99px; background: color-mix(in srgb, #edf7e6 82%, var(--surface)); box-shadow: 0 2px 5px rgba(64, 107, 55, .1); color: #4f7842; font-size: 9px; font-weight: 800; line-height: 1; }.achievement-month__cell-summary svg { color: #5c904d; }.achievement-month__cell-summary .achievement-month__cell-goal { color: #34723d; }
+.achievement-month__terrarium { position: relative; z-index: 1; display: block; flex: 0 0 auto; transform-origin: center bottom; }
 .achievement-month__blank { min-height: 156px; }
 .achievement-month-entry { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 18px; border-style: dashed; background: color-mix(in srgb, #eff5e4 30%, var(--surface)); }.achievement-month-entry > div { min-width: 0; }.achievement-month-entry span { color: var(--accent-strong); font-size: 10px; font-weight: 800; letter-spacing: .08em; }.achievement-month-entry h2 { margin: 4px 0 3px; color: var(--text); font-size: 17px; }.achievement-month-entry p { margin: 0; color: var(--text-muted); font-size: 11px; line-height: 1.5; }.achievement-month-entry button { flex: 0 0 auto; }
 /* 当日高亮：底色变浅绿，边框变绿，罩子也会变绿（在 terrarium--highlight 里） */
@@ -1693,7 +1772,7 @@ onBeforeUnmount(() => {
   background: color-mix(in srgb, #c5dda6 35%, var(--surface));
   box-shadow: 0 0 0 2px color-mix(in srgb, #6f9a5a 65%, transparent), 0 6px 14px rgba(36, 85, 73, .1);
 }
-.achievement-month__grid button.active .achievement-month__day { color: #4f7842; font-weight: 700; }
+.achievement-month__grid button.active .achievement-month__day { font-weight: 700; }
 .achievement-day-dialog { position: fixed; z-index: 40; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(25, 39, 32, .34); backdrop-filter: blur(5px); }
 .achievement-day-dialog__panel { width: min(440px, 100%); max-height: min(650px, calc(100vh - 48px)); overflow: auto; padding: 19px; border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--divider-soft)); border-radius: 18px; background: var(--surface); box-shadow: 0 24px 70px rgba(20, 42, 33, .25); }
 .achievement-day-dialog__panel > header,.achievement-day-dialog__tasks > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
@@ -1709,15 +1788,14 @@ onBeforeUnmount(() => {
 .achievement-day-dialog__empty { display: grid; justify-items: center; gap: 10px; padding: 38px 24px 20px; color: var(--accent-strong); text-align: center; }.achievement-day-dialog__empty p { max-width: 260px; margin: 0; color: var(--text-muted); font-size: 12px; line-height: 1.65; }
 /* 当日详情以“投入结果 → 目标完成度 → 专注记录”的顺序呈现，避免小字号挤在一起。 */
 .achievement-day-dialog { background: rgba(25, 39, 32, .38); backdrop-filter: blur(7px); }
-.achievement-day-dialog__panel { width: min(640px, 100%); max-height: calc(100vh - 32px); padding: 24px; border-radius: 22px; box-shadow: 0 28px 80px rgba(20, 42, 33, .27); }
+.achievement-day-dialog__panel { display: flex; width: min(640px, 100%); height: min(720px, calc(100vh - 32px)); max-height: calc(100vh - 32px); flex-direction: column; overflow: hidden; padding: 24px; border-radius: 22px; box-shadow: 0 28px 80px rgba(20, 42, 33, .27); }
 .achievement-day-dialog__panel > header,.achievement-day-dialog__tasks > header { gap: 14px; }.achievement-day-dialog__panel > header > div > span,.achievement-day-dialog__tasks > header > span { font-size: 13px; }.achievement-day-dialog__panel h2 { margin-top: 5px; font-size: 27px; line-height: 1.15; }.achievement-day-dialog__panel > header > button { width: 40px; height: 40px; border-radius: 12px; }
-.achievement-day-dialog__hero { grid-template-columns: 156px 1fr; gap: 18px; min-height: 156px; margin-top: 19px; padding: 11px 18px 11px 7px; border-color: color-mix(in srgb, #9bbf85 28%, var(--divider-soft)); border-radius: 17px; background: linear-gradient(118deg, color-mix(in srgb, #eff5e4 74%, var(--surface)), color-mix(in srgb, #f8faef 46%, var(--surface))); }.achievement-day-dialog__hero :deep(.focus-plant) { width: 154px; height: 136px; }.achievement-day-dialog__hero > div { gap: 5px; }.achievement-day-dialog__hero small { font-size: 12px; font-weight: 800; }.achievement-day-dialog__hero strong { font-size: 20px; letter-spacing: -.025em; }.achievement-day-dialog__hero p { font-size: 13px; line-height: 1.55; }
-.achievement-day-dialog__focus-total { display: flex; align-items: baseline; gap: 6px; margin-top: 3px; color: var(--accent-strong); }.achievement-day-dialog__focus-total b { color: var(--text); font-size: 16px; }.achievement-day-dialog__focus-total span { color: var(--text-muted); font-size: 11px; }.achievement-day-dialog__progress { display: block; height: 6px; overflow: hidden; margin-top: 3px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }.achievement-day-dialog__progress b { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), #87aa70); }
-.achievement-day-dialog__stats { gap: 10px; margin: 15px 0 17px; }.achievement-day-dialog__stats div { align-content: center; min-height: 70px; padding: 11px 12px; border-radius: 13px; }.achievement-day-dialog__stats dt,.achievement-day-dialog__stats small { font-size: 11px; }.achievement-day-dialog__stats dd { font-size: 17px; font-weight: 800; }
-.achievement-day-dialog__tasks { padding-top: 16px; }.achievement-day-dialog__tasks > header > span { font-size: 14px; }.achievement-day-dialog__tasks > header small { font-size: 11px; }.achievement-day-dialog__tasks ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }.achievement-day-dialog__tasks li { display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: center; gap: 9px; min-height: 52px; padding: 10px 12px; border-radius: 11px; }.achievement-day-dialog__tasks li > span { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 9px; background: var(--accent-soft); color: var(--accent-strong); }.achievement-day-dialog__tasks li div { display: grid; min-width: 0; gap: 2px; }.achievement-day-dialog__tasks li strong { overflow: hidden; color: var(--text); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }.achievement-day-dialog__tasks li small,.achievement-day-dialog__tasks > p { margin: 0; color: var(--text-muted); font-size: 11px; }.achievement-day-dialog__tasks li > b { grid-column: 2; color: var(--text); font-size: 12px; white-space: nowrap; }.achievement-day-dialog__tasks > p { margin-top: 12px; padding: 12px; border-radius: 11px; background: var(--surface-muted); line-height: 1.65; }.achievement-day-dialog__tasks-more { color: var(--accent-strong) !important; }.achievement-day-dialog__empty { gap: 11px; padding: 42px 24px 22px; }.achievement-day-dialog__empty p { max-width: 290px; font-size: 13px; }
-/* 当日专注按真实时间轴完整呈现；内容过长时可继续滚动，但不显示干扰性的滚动条。 */
-.achievement-day-dialog__panel { overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; }.achievement-day-dialog__panel::-webkit-scrollbar { display: none; }
-.achievement-day-dialog__tasks ul.achievement-day-dialog__timeline { grid-template-columns: 1fr; gap: 7px; }.achievement-day-dialog__timeline li { grid-template-columns: 84px 28px minmax(0, 1fr) auto; min-height: 46px; gap: 8px; padding: 9px 11px; }.achievement-day-dialog__timeline time { display: grid; align-content: center; gap: 1px; color: var(--text-muted); font-style: normal; }.achievement-day-dialog__timeline time strong { color: var(--text); font-size: 12px; }.achievement-day-dialog__timeline time span { font-size: 10px; }.achievement-day-dialog__timeline li > i { display: grid; width: 26px; height: 26px; place-items: center; border-radius: 50%; background: var(--accent-soft); color: var(--accent-strong); }.achievement-day-dialog__timeline li > b { grid-column: auto; font-size: 13px; }.achievement-day-dialog__timeline li div { gap: 1px; }.achievement-day-dialog__timeline li small { font-size: 10px; }
+.achievement-day-dialog__hero { grid-template-columns: 156px 1fr; flex: 0 0 auto; gap: 18px; min-height: 156px; margin-top: 19px; padding: 11px 18px 11px 7px; border-color: color-mix(in srgb, #9bbf85 28%, var(--divider-soft)); border-radius: 17px; background: linear-gradient(118deg, color-mix(in srgb, #eff5e4 74%, var(--surface)), color-mix(in srgb, #f8faef 46%, var(--surface))); }.achievement-day-dialog__hero :deep(.focus-plant) { width: 154px; height: 136px; }.achievement-day-dialog__hero > div { gap: 5px; }.achievement-day-dialog__hero small { font-size: 12px; font-weight: 800; }.achievement-day-dialog__hero strong { font-size: 20px; letter-spacing: -.025em; }.achievement-day-dialog__hero p { font-size: 13px; line-height: 1.55; }
+.achievement-day-dialog__summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin-top: 3px; }.achievement-day-dialog__summary div { display: grid; gap: 2px; min-width: 0; }.achievement-day-dialog__summary span { color: var(--text-muted); font-size: 10px; }.achievement-day-dialog__summary b { overflow: hidden; color: var(--text); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }.achievement-day-dialog__goal-progress { display: grid; gap: 4px; margin-top: 2px; }.achievement-day-dialog__goal-progress span { color: var(--text-muted); font-size: 10px; }.achievement-day-dialog__goal-progress i { display: block; height: 6px; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }.achievement-day-dialog__goal-progress i b { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), #87aa70); }
+.achievement-day-dialog__tasks { display: flex; min-height: 0; flex: 1 1 auto; flex-direction: column; padding-top: 16px; }.achievement-day-dialog__tasks > header { flex: 0 0 auto; }.achievement-day-dialog__tasks > header > span { font-size: 14px; }.achievement-day-dialog__tasks > header small { font-size: 11px; }.achievement-day-dialog__tasks ul { display: grid; min-height: 0; flex: 1 1 auto; align-content: start; grid-auto-rows: max-content; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 12px 0 0; padding-right: 3px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--text-muted-26-fallback) transparent; }.achievement-day-dialog__tasks li { display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: center; gap: 9px; min-height: 52px; padding: 10px 12px; border-radius: 11px; }.achievement-day-dialog__tasks li > span { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 9px; background: var(--accent-soft); color: var(--accent-strong); }.achievement-day-dialog__tasks li div { display: grid; min-width: 0; gap: 2px; }.achievement-day-dialog__tasks li strong { overflow: hidden; color: var(--text); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }.achievement-day-dialog__tasks li small,.achievement-day-dialog__tasks > p { margin: 0; color: var(--text-muted); font-size: 11px; }.achievement-day-dialog__timeline li small { display: flex; align-items: center; gap: 5px; }.achievement-day-dialog__timeline li small em { display: inline-flex; align-items: center; min-height: 18px; padding: 0 6px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-strong); font-size: 9px; font-style: normal; font-weight: 750; white-space: nowrap; }.achievement-day-dialog__timeline li small em.is-abandoned { background: color-mix(in srgb, #e7a453 18%, var(--surface)); color: #a86518; }.achievement-day-dialog__timeline li small em.is-interrupted { background: var(--surface-muted); color: var(--text-muted); }.achievement-day-dialog__tasks li > b { grid-column: 2; color: var(--text); font-size: 12px; white-space: nowrap; }.achievement-day-dialog__tasks > p { margin-top: 12px; padding: 12px; border-radius: 11px; background: var(--surface-muted); line-height: 1.65; }.achievement-day-dialog__tasks-more { color: var(--accent-strong) !important; }.achievement-day-dialog__empty { gap: 11px; padding: 42px 24px 22px; }.achievement-day-dialog__empty p { max-width: 290px; font-size: 13px; }
+/* 当日专注按真实时间轴完整呈现；记录过长时只滚动记录区域，顶部信息保持可见。 */
+.achievement-day-dialog__panel { scrollbar-width: none; -ms-overflow-style: none; }.achievement-day-dialog__panel::-webkit-scrollbar { display: none; }
+.achievement-day-dialog__tasks ul.achievement-day-dialog__timeline { grid-template-columns: 1fr; gap: 8px; }.achievement-day-dialog__timeline li { grid-template-columns: 86px 32px minmax(0, 1fr) auto; min-height: 58px; gap: 11px; padding: 10px 14px; border: 1px solid transparent; background: color-mix(in srgb, var(--surface-muted) 78%, var(--surface)); }.achievement-day-dialog__timeline time { display: grid; align-content: center; gap: 2px; color: var(--text-muted); font-style: normal; font-variant-numeric: tabular-nums; }.achievement-day-dialog__timeline time strong { color: #40534d; font-size: 13px; font-weight: 750; line-height: 1.2; }.achievement-day-dialog__timeline time span { color: var(--text-muted); font-size: 10px; line-height: 1.25; }.achievement-day-dialog__timeline li > i { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 50%; background: var(--accent-soft); color: var(--accent-strong); }.achievement-day-dialog__timeline li div { align-content: center; gap: 4px; }.achievement-day-dialog__timeline li strong { color: #29473e; font-size: 14px; font-weight: 720; line-height: 1.25; }.achievement-day-dialog__timeline li small { display: flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: 11px; line-height: 1.2; }.achievement-day-dialog__timeline li small > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.achievement-day-dialog__timeline li small em { min-height: 19px; padding: 0 7px; font-size: 10px; }.achievement-day-dialog__timeline li > b { grid-column: auto; padding-left: 8px; color: #356458; font-size: 13px; font-weight: 750; font-variant-numeric: tabular-nums; }.achievement-day-dialog__timeline li:hover { border-color: color-mix(in srgb, var(--accent) 14%, var(--divider-soft)); background: var(--surface-muted); }
 /* 近期足迹：原 下一个解锁 紧凑化为顶部一行，下面是徽章列表 */
 .achievement-trail { padding: 18px; }
 .achievement-trail__next { display: grid; grid-template-columns: 22px 56px 1fr; align-items: center; gap: 12px; margin-top: 12px; padding: 10px 12px; border: 1px dashed color-mix(in srgb, #b9c89e 65%, transparent); border-radius: 12px; background: color-mix(in srgb, #eff5e4 35%, var(--surface)); }
@@ -1759,8 +1837,9 @@ onBeforeUnmount(() => {
 .species-complete { display: grid; grid-template-columns: 46px minmax(0, 1fr) minmax(150px, .32fr); align-items: center; gap: 14px; padding: 13px 16px; border-color: color-mix(in srgb, #9eae72 34%, var(--divider-soft)); background: linear-gradient(110deg, color-mix(in srgb, #f7f3d9 52%, var(--surface)), var(--surface)); }.species-complete__seal { display: grid; width: 44px; height: 44px; place-items: center; border: 1px solid color-mix(in srgb, #9eae72 38%, var(--divider-soft)); border-radius: 50%; background: color-mix(in srgb, #f0d96b 22%, var(--surface)); color: #78884f; box-shadow: inset 0 0 0 5px rgba(255,255,255,.48); }.species-complete > div { display: grid; min-width: 0; gap: 3px; }.species-complete > div > span,.species-complete__depth small { color: var(--accent-strong); font-size: 9px; font-weight: 800; letter-spacing: .05em; }.species-complete > div > strong { color: var(--text); font-size: 15px; }.species-complete > div > small { overflow: hidden; color: var(--text-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }.species-complete__depth { justify-items: stretch; padding-left: 14px; border-left: 1px solid var(--divider-soft); }.species-complete__depth strong { font-size: 13px !important; text-align: right; }.species-complete__depth i,.species-companion > i { display: block; height: 5px; overflow: hidden; border-radius: 99px; background: var(--surface-muted); }.species-complete__depth i b,.species-companion > i b { display: block; height: 100%; border-radius: inherit; background: color-mix(in srgb, #9eae72 82%, var(--accent)); }
 .species-playground {
   display: grid;
-  grid-template-columns: minmax(0, 1.14fr) minmax(420px, .86fr);
-  height: 610px;
+  grid-template-columns: minmax(380px, .98fr) minmax(440px, 1.02fr);
+  min-height: clamp(540px, 34vw, 650px);
+  height: auto;
   overflow: hidden;
   border-color: color-mix(in srgb, var(--species-accent) 24%, var(--divider-soft));
 }
@@ -1770,13 +1849,14 @@ onBeforeUnmount(() => {
   min-height: 0;
   place-items: end center;
   overflow: hidden;
+  container-type: inline-size;
   background:
     radial-gradient(circle at 72% 17%, color-mix(in srgb, var(--species-sun) 52%, transparent), transparent 22%),
     linear-gradient(180deg, color-mix(in srgb, var(--species-scene) 76%, #fff), var(--species-horizon));
   cursor: pointer;
 }
-.species-playground__backdrop { position: absolute; z-index: 0; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center bottom; filter: saturate(.78) contrast(.92) brightness(1.03); opacity: .82; pointer-events: none; }
-.species-playground__focus-wash { position: absolute; z-index: 1; inset: 0; pointer-events: none; background: radial-gradient(ellipse 42% 54% at 50% 54%, rgba(255,255,255,.5) 0 20%, rgba(255,255,255,.14) 58%, transparent 100%); }
+.species-playground__backdrop { position: absolute; z-index: 0; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center bottom; filter: saturate(.82) contrast(.94) brightness(1.02); opacity: .96; pointer-events: none; }
+.species-playground__focus-wash { position: absolute; z-index: 1; inset: 0; pointer-events: none; background: radial-gradient(ellipse 44% 58% at 50% 62%, rgba(255,255,255,.13) 0 20%, transparent 68%), linear-gradient(160deg, color-mix(in srgb, var(--species-scene) 18%, transparent), transparent 48%, color-mix(in srgb, var(--species-accent) 13%, transparent)); mix-blend-mode: multiply; }
 .species-playground__scene.has-artwork-backdrop { background: var(--species-horizon); }
 .species-playground__scene.has-artwork-backdrop::before,.species-playground__scene.has-artwork-backdrop::after,.species-playground__scene.has-artwork-backdrop .species-playground__sun,.species-playground__scene.has-artwork-backdrop .species-playground__clouds,.species-playground__scene.has-artwork-backdrop .species-playground__hills,.species-playground__scene.has-artwork-backdrop .species-playground__foreground { display: none; }
 .species-playground__scene::before,.species-playground__scene::after { position: absolute; inset: 0; pointer-events: none; content: ''; }
@@ -1807,16 +1887,16 @@ onBeforeUnmount(() => {
 .species-playground--lily .species-playground__sun { top: 57px; right: 10%; transform: scale(.8); }.species-playground--camellia .species-playground__scene::after { background: radial-gradient(ellipse at 13% 83%, rgba(65,104,78,.25) 0 22px, transparent 23px) 0 0 / 70px 36px; }
 .species-playground--peony .species-playground__hills i:first-child { bottom: -90px; height: 210px; }.species-playground--moonflower .species-playground__scene::after { background: radial-gradient(circle at 78% 76%, rgba(177,187,255,.18), transparent 26%); }
 .species-playground--sunflower .species-playground__foreground i::before,.species-playground--sunflower .species-playground__foreground i::after { background: #f5cc5a; }.species-playground--lavender .species-playground__foreground i::before,.species-playground--lavender .species-playground__foreground i::after { background: #a89adc; }.species-playground--moonflower .species-playground__foreground { opacity: .42; }.species-playground--moonflower .species-playground__foreground i::before,.species-playground--moonflower .species-playground__foreground i::after { background: #c4c8ff; }
-.species-playground__plant { position: relative; z-index: 3; width: 286px; margin-bottom: -18px; }
-.species-playground__plant.is-artwork { width: 286px; margin-bottom: 26px; }
+.species-playground__plant { position: relative; z-index: 3; width: clamp(250px, 52cqi, 470px); margin-bottom: -18px; }
+.species-playground__plant.is-artwork { width: clamp(330px, 70cqi, 600px); margin-bottom: clamp(14px, 3cqi, 34px); }
 .species-playground__hint { position: absolute; z-index: 4; right: 18px; bottom: 16px; display: inline-flex; align-items: center; gap: 5px; padding: 7px 10px; border: 1px solid rgba(255,255,255,.72); border-radius: 999px; background: rgba(255,255,255,.72); color: var(--accent-strong); font-size: 10px; cursor: pointer; backdrop-filter: blur(6px); }
 .species-playground__particle { --angle: calc(var(--particle-index) * 45deg); position: absolute; z-index: 3; bottom: 144px; left: 50%; width: 7px; height: 7px; border-radius: 70% 30% 70% 30%; background: var(--species-accent); opacity: 0; animation: species-particle .85s ease-out both; }
 @keyframes species-particle { 20% { opacity: .8; } to { opacity: 0; transform: rotate(var(--angle)) translateY(-90px) scale(.3); } }
-.species-playground__info { display: grid; min-height: 0; grid-template-rows: auto auto auto minmax(0, 1fr) auto; gap: 11px; padding: 24px 30px 22px; overflow: hidden; background: linear-gradient(150deg, color-mix(in srgb, var(--surface) 96%, #fff6ec), color-mix(in srgb, var(--surface) 90%, var(--species-scene))); }
+.species-playground__info { display: grid; grid-template-rows: auto auto auto auto; align-content: start; gap: 12px; padding: 24px 30px 22px; overflow: visible; background: linear-gradient(150deg, color-mix(in srgb, var(--surface) 96%, #fff6ec), color-mix(in srgb, var(--surface) 90%, var(--species-scene))); }
 .species-playground__identity { position: relative; display: grid; min-height: 112px; justify-items: start; gap: 7px; padding-right: 148px; }.species-playground__collection { display: inline-flex; align-items: center; gap: 6px; width: fit-content; padding: 6px 10px; border-radius: 999px; background: color-mix(in srgb, var(--species-scene) 42%, var(--surface)); color: #68794d; font-size: 10px; font-weight: 800; }.species-playground__identity h2 { margin: 0; color: var(--text); font-size: 34px; line-height: 1.08; letter-spacing: -.055em; }.species-playground__identity > p { display: flex; align-items: baseline; gap: 10px; margin: 0; }.species-playground__identity > p span,.species-playground__meaning > span,.species-playground__description > span { flex: none; color: #6e7f59; font-size: 10px; font-weight: 800; letter-spacing: .08em; }.species-playground__identity > p strong { color: color-mix(in srgb, var(--species-accent) 80%, var(--text)); font-size: 16px; font-weight: 800; line-height: 1.4; }.species-playground__botanical { position: absolute; top: -13px; right: -4px; width: 210px; height: 154px; object-fit: cover; object-position: right center; opacity: .82; pointer-events: none; filter: saturate(.88) contrast(.94); mix-blend-mode: multiply; transform-origin: top right; }.species-playground__botanical.is-cosmos { top: -19px; right: -10px; width: 214px; transform: rotate(-3deg); }.species-playground__botanical.is-poppy { top: -17px; right: -11px; width: 216px; opacity: .8; }.species-playground__botanical.is-sunflower { top: -9px; right: -6px; width: 206px; transform: rotate(2deg); }.species-playground__botanical.is-lavender { top: -22px; right: -9px; width: 214px; }.species-playground__botanical.is-iris { top: -16px; right: -9px; width: 210px; transform: rotate(-2deg); }.species-playground__botanical.is-hydrangea { top: -15px; right: -3px; width: 208px; }.species-playground__botanical.is-lily { top: -18px; right: -7px; width: 212px; }.species-playground__botanical.is-camellia,.species-playground__botanical.is-peony { top: -15px; right: -9px; width: 214px; }.species-playground__botanical.is-moonflower { top: -18px; right: -9px; width: 216px; }.species-playground__collection svg,.species-playground__meaning > span svg,.species-playground__description > span svg,.species-companion > header span svg,.species-companion__stats dt svg { stroke-width: 1.7; }.species-playground__meaning > span svg,.species-playground__description > span svg { padding: 3px; border-radius: 8px; background: color-mix(in srgb, var(--species-scene) 46%, #fff); box-sizing: content-box; }
 .species-playground__meaning { display: grid; gap: 9px; min-width: 0; padding: 15px 17px 16px; border: 1px solid color-mix(in srgb, var(--species-accent) 24%, var(--divider-soft)); border-radius: 20px; background: rgba(255,255,255,.54); box-shadow: 0 10px 20px color-mix(in srgb, var(--species-accent) 9%, transparent); }.species-playground__meaning > span { display: inline-flex; align-items: center; gap: 7px; color: #5f7644; font-size: 12px; }.species-playground__meaning blockquote { position: relative; margin: 0; padding-left: 14px; color: color-mix(in srgb, var(--text-muted) 88%, var(--text)); font-size: 14px; line-height: 1.65; }.species-playground__meaning blockquote::before { position: absolute; top: 4px; bottom: 4px; left: 0; width: 3px; border-radius: 999px; background: color-mix(in srgb, var(--species-accent) 66%, #ff9a87); content: ''; }.species-playground__description { display: grid; grid-template-columns: minmax(92px, auto) minmax(0, 1fr); gap: 10px; min-height: 0; margin: 0; padding: 3px 4px 15px; border-bottom: 1px dashed color-mix(in srgb, var(--species-accent) 22%, var(--divider-soft)); color: var(--text-muted); font-size: 12px; line-height: 1.65; }.species-playground__description > span { display: inline-flex; align-items: center; gap: 6px; color: #5f7644; }
 .species-playground__botanical { translate: 0 12px; }.species-playground__meaning { position: relative; z-index: 2; background: color-mix(in srgb, var(--surface) 88%, var(--species-scene)); }
-.species-playground__progress { display: grid; min-height: 0; align-content: start; gap: 10px; padding-top: 1px; }.species-playground__progress > .species-detail__unlock,.species-playground__progress > .achievement-progress { grid-column: 1 / -1; }
+.species-playground__progress { display: grid; align-content: start; gap: 10px; padding-top: 1px; overflow: visible; }.species-playground__progress > .species-detail__unlock,.species-playground__progress > .achievement-progress { grid-column: 1 / -1; }
 .species-detail__status { display: inline-flex; align-items: center; gap: 5px; width: fit-content; padding: 6px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-strong); font-size: 10px; font-weight: 700; }.species-detail__status.is-locked { background: var(--surface-muted); color: var(--text-muted); }
 .species-companion { display: grid; gap: 8px; padding: 14px; border: 1px solid color-mix(in srgb, var(--species-accent) 18%, var(--divider-soft)); border-radius: 22px; background: linear-gradient(145deg, rgba(255,255,255,.82), color-mix(in srgb, var(--species-scene) 24%, #fffaf4)); box-shadow: 0 8px 18px rgba(90, 92, 60, .06); }.species-companion > header { display: flex; align-items: start; justify-content: space-between; gap: 12px; }.species-companion > header > div { display: grid; gap: 2px; }.species-companion > header span { color: #617848; font-size: 12px; font-weight: 800; letter-spacing: .04em; }.species-companion > header span { display: inline-flex; align-items: center; gap: 6px; }.species-companion > header strong { color: #506738; font-size: 23px; font-weight: 800; letter-spacing: -.04em; }.species-companion__ring { display: grid; width: 54px; height: 54px; place-items: center; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.9) 58%, transparent 60%), conic-gradient(#81945c var(--companion-progress), color-mix(in srgb, #81945c 16%, var(--divider-soft)) 0); color: #536b3b; font-size: 12px; font-weight: 850; }.species-companion p { margin: 0; color: var(--text-muted); font-size: 11px; line-height: 1.5; }.species-companion__stages { position: relative; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: start; gap: 2px; padding-top: 7px; }.species-companion__stages::before { position: absolute; top: 16px; right: 8%; left: 8%; height: 4px; border-radius: 999px; background: color-mix(in srgb, var(--species-accent) 13%, var(--divider-soft)); content: ''; }.species-companion__stages > span { position: relative; z-index: 1; display: grid; justify-items: center; gap: 5px; color: var(--text-muted); font-size: 9px; }.species-companion__stages > span i { display: grid; width: 19px; height: 19px; place-items: center; border: 3px solid rgba(255,255,255,.96); border-radius: 50%; background: var(--divider-soft); box-shadow: 0 0 0 1px color-mix(in srgb, var(--species-accent) 13%, var(--divider-soft)); }.species-companion__stages > span b { font-weight: 700; white-space: nowrap; }.species-companion__stages > span.reached { color: #677c49; }.species-companion__stages > span.reached i { background: color-mix(in srgb, var(--species-accent) 56%, #91a56a); }.species-companion__stages > span.active i { color: #fff; background: #718849; box-shadow: 0 0 0 3px color-mix(in srgb, var(--species-accent) 16%, #fff); }.species-companion__stages > strong { grid-column: 1 / -1; margin-top: 2px; color: #5f7644; font-size: 10px; font-weight: 800; text-align: right; }.species-companion__stats { display: grid; grid-template-columns: 1fr 1fr; margin: 2px 0 0; overflow: hidden; border: 1px solid color-mix(in srgb, var(--species-accent) 16%, var(--divider-soft)); border-radius: 15px; background: rgba(255,255,255,.62); }.species-companion__stats div { display: grid; gap: 3px; padding: 10px 12px; }.species-companion__stats div + div { border-left: 1px solid color-mix(in srgb, var(--species-accent) 14%, var(--divider-soft)); }.species-companion__stats dt { display: inline-flex; align-items: center; gap: 5px; color: var(--text-muted); font-size: 10px; }.species-companion__stats dt svg { color: #81945c; }.species-companion__stats dd { margin: 0; color: #506738; font-size: 20px; font-weight: 850; letter-spacing: -.04em; }.species-companion__stats dd small { color: var(--text-muted); font-size: 10px; font-weight: 650; letter-spacing: 0; }
 .species-companion { gap: 6px; padding: 12px 14px 11px; border-radius: 19px; }.species-companion > header { align-items: center; }.species-companion > header > div { gap: 0; }.species-companion > header strong { font-size: 20px; line-height: 1.2; }.species-companion__ring { width: 46px; height: 46px; font-size: 11px; }.species-companion__description { overflow: hidden; margin: 0; font-size: 10px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }.species-companion__stages { gap: 0; padding: 5px 2px 0; }.species-companion__stages::before { top: 14px; right: 9%; left: 9%; height: 3px; }.species-companion__stages > button { position: relative; z-index: 1; display: grid; justify-items: center; gap: 3px; min-width: 0; padding: 0; border: 0; background: transparent; color: var(--text-muted); font: inherit; font-size: 9px; cursor: help; }.species-companion__stages > button i { display: grid; width: 17px; height: 17px; place-items: center; border: 3px solid rgba(255,255,255,.96); border-radius: 50%; background: var(--divider-soft); box-shadow: 0 0 0 1px color-mix(in srgb, var(--species-accent) 13%, var(--divider-soft)); }.species-companion__stages > button b { font-weight: 700; line-height: 1.2; white-space: nowrap; }.species-companion__stages > button.reached { color: #677c49; }.species-companion__stages > button.reached i { background: color-mix(in srgb, var(--species-accent) 56%, #91a56a); }.species-companion__stages > button.active i { color: #fff; background: #718849; box-shadow: 0 0 0 3px color-mix(in srgb, var(--species-accent) 16%, #fff); }.species-companion__stages > button:focus-visible { outline: 2px solid var(--species-accent); outline-offset: 3px; border-radius: 8px; }.species-companion__stage-tooltip { position: absolute; z-index: 5; bottom: calc(100% + 8px); left: 50%; width: max-content; max-width: 150px; padding: 6px 8px; border: 1px solid color-mix(in srgb, var(--species-accent) 22%, var(--divider-soft)); border-radius: 8px; background: rgba(255,255,255,.96); box-shadow: 0 5px 14px rgba(65,77,55,.12); color: #526542; font-size: 9px; line-height: 1.35; opacity: 0; pointer-events: none; transform: translate(-50%, 3px); transition: opacity .15s ease, transform .15s ease; }.species-companion__stages > button:hover .species-companion__stage-tooltip,.species-companion__stages > button:focus-visible .species-companion__stage-tooltip { opacity: 1; transform: translate(-50%, 0); }.species-companion__summary { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; margin-top: 2px; padding-top: 7px; border-top: 1px solid color-mix(in srgb, var(--species-accent) 13%, var(--divider-soft)); color: var(--text-muted); font-size: 9px; }.species-companion__summary strong { margin-right: auto; color: #5f7644; font-size: 10px; font-weight: 800; }.species-companion__summary span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }.species-companion__summary svg { color: #81945c; }.species-detail__unlock { display: flex; align-items: center; gap: 7px; min-height: 22px; color: var(--text-muted); }.species-detail__unlock > span { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 50%; background: var(--accent-soft); color: var(--accent-strong); }.species-detail__unlock > div { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 6px; }.species-detail__unlock small,.species-detail__unlock em { color: var(--text-muted); font-size: 10px; font-style: normal; }.species-detail__unlock strong { color: var(--text-muted); font-size: 10px; font-weight: 650; }.species-detail__unlock em { color: var(--accent-strong); font-weight: 700; }.species-detail__unlock.is-locked > span { background: var(--surface-muted); color: var(--text-muted); }
@@ -1857,8 +1937,8 @@ onBeforeUnmount(() => {
 @media (max-width: 760px) { .badges-growth-panorama { grid-template-columns: 1fr; } }
 @media (max-width: 420px) { .badges-level,.badges-momentum { padding: 14px; }.badges-level__steps small { font-size: 8px; }.badges-momentum__grid div { padding: 8px 7px; } }
 @media (max-width: 980px) { .field-hero { grid-template-columns: minmax(0, 1.2fr) minmax(180px, .8fr); }.field-hero__progress { grid-column: 1 / -1; } .badges-category-index { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 620px) { .field-hero { grid-template-columns: 1fr; gap: 13px; padding: 18px; }.field-hero__copy h2 { font-size: 21px; }.field-hero__plant { order: -1; }.field-hero__facts { margin-top: 12px; }.field-hero__progress { grid-column: auto; }.achievement-month__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }.badges-category-index { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 620px) { .achievement-day-dialog { padding: 14px; }.achievement-day-dialog__panel { max-height: calc(100vh - 28px); padding: 16px; }.achievement-day-dialog__hero { grid-template-columns: 106px 1fr; }.achievement-day-dialog__hero :deep(.focus-plant) { width: 106px; }.achievement-day-dialog__stats { grid-template-columns: 1fr; }.achievement-day-dialog__stats div { grid-template-columns: 1fr auto; align-items: center; }.achievement-day-dialog__tasks li { align-items: flex-start; flex-direction: column; gap: 3px; } }
+@media (max-width: 620px) { .field-hero { grid-template-columns: 1fr; gap: 13px; padding: 18px; }.field-hero__copy h2 { font-size: 21px; }.field-hero__plant { order: -1; }.field-hero__facts { margin-top: 12px; }.field-hero__progress { grid-column: auto; }.achievement-month__stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; }.achievement-month__stat-divider { display: none; }.badges-category-index { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .achievement-day-dialog { padding: 14px; }.achievement-day-dialog__panel { max-height: calc(100vh - 28px); padding: 16px; }.achievement-day-dialog__hero { grid-template-columns: 106px 1fr; }.achievement-day-dialog__hero :deep(.focus-plant) { width: 106px; }.achievement-day-dialog__stats { grid-template-columns: 1fr; }.achievement-day-dialog__stats div { grid-template-columns: 1fr auto; align-items: center; }.achievement-day-dialog__tasks li { align-items: flex-start; flex-direction: column; gap: 3px; }.achievement-day-dialog__timeline li { align-items: center; flex-direction: initial; gap: 8px; padding: 9px 10px; } }
 @media (max-width: 760px) { .badges-featured { grid-template-columns: 1fr; gap: 14px; padding: 16px; }.badges-featured__progress { width: auto; } }
 
 /* 修复：WebView2 上鼠标点完花朵后系统会强制显示深色 outline（Chromium 桌面版默认
@@ -1923,4 +2003,6 @@ onBeforeUnmount(() => {
   .achievement-tabs button { padding-inline: 3px; }
   .badges-overview__stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+.badge-focus { border-color: color-mix(in srgb, var(--badge-accent, var(--accent)) 24%, var(--divider-soft)); background: linear-gradient(105deg, color-mix(in srgb, var(--badge-accent, var(--accent)) 13%, var(--surface)), var(--surface) 66%); }.badge-focus__icon { border-color: color-mix(in srgb, var(--badge-accent, var(--accent)) 28%, var(--divider-soft)); color: var(--badge-accent, var(--accent-strong)); }.badge-detail__icon { background: color-mix(in srgb, var(--badge-accent, var(--accent)) 15%, var(--surface)); color: var(--badge-accent, var(--accent-strong)); }.badge-detail__eyebrow { color: var(--badge-accent, var(--accent-strong)) !important; }
+.badge-card:not(.unlocked) { border-style: dashed; background: color-mix(in srgb, var(--surface-muted) 52%, var(--surface)); opacity: .58; }.badge-card:not(.unlocked) .badge-card__icon { background: color-mix(in srgb, var(--surface-muted) 82%, var(--surface)); color: color-mix(in srgb, var(--badge-accent) 42%, var(--text-muted)); filter: saturate(.42); }.badge-card:not(.unlocked) .badge-card__reward { color: var(--text-muted); }.badge-card.unlocked { border-color: color-mix(in srgb, var(--badge-accent) 48%, var(--divider-soft)); background: radial-gradient(circle at 12% 8%, color-mix(in srgb, var(--badge-accent) 13%, transparent), transparent 34%), color-mix(in srgb, var(--badge-accent) 7%, var(--surface)); box-shadow: 0 8px 20px color-mix(in srgb, var(--badge-accent) 11%, transparent); }.badge-card.unlocked .badge-card__icon { border-color: color-mix(in srgb, var(--badge-accent) 42%, var(--divider-soft)); background: radial-gradient(circle at 32% 20%, rgba(255,255,255,.92), transparent 42%), color-mix(in srgb, var(--badge-accent) 23%, var(--surface)); }.badge-card__state { position: absolute; z-index: 4; right: -5px; bottom: -5px; display: grid; width: 18px; height: 18px; place-items: center; border: 2px solid var(--surface); border-radius: 50%; background: var(--surface-muted); color: var(--text-muted); box-shadow: 0 2px 5px rgba(29, 45, 41, .15); }.badge-card__state.is-earned { background: var(--badge-accent); color: #fff; }.badge-card.unlocked::after { display: none; }
 </style>

@@ -46,7 +46,7 @@ const LEGACY_FOCUS_GARDEN_UNLOCK_MINUTES = {
 }
 
 export const FOCUS_GARDEN_STAGES = [
-  { id: 'seed', name: '种子', threshold: 0 },
+  { id: 'seed', name: '新芽', threshold: 0 },
   { id: 'sprout', name: '破土', threshold: 0.01 },
   { id: 'leaves', name: '舒叶', threshold: 0.2 },
   { id: 'bud', name: '花苞', threshold: 0.5 },

@@ -55,11 +55,20 @@ const ready = ref(false)
 const failed = ref(false)
 
 function sourceForStage(speciesId, stageId) {
+  const legacyStageId = stageId === 'seed' ? 'sprout' : stageId
   return stageModules[
-    `/src/assets/focus-garden/species-stages/${speciesId}-v2/${stageId}.png`
+    `/src/assets/focus-garden/species-stages/${speciesId}/${legacyStageId}.webp`
   ] || stageModules[
-    `/src/assets/focus-garden/species-stages/${speciesId}/${stageId}.webp`
-  ] || stageModules[`/src/assets/focus-garden/species-stages/daisy/${stageId}.webp`]
+    `/src/assets/focus-garden/species-stages/${speciesId}-v6/${stageId}.png`
+  ] || stageModules[
+    `/src/assets/focus-garden/species-stages/${speciesId}-v5/${stageId}.png`
+  ] || stageModules[
+    `/src/assets/focus-garden/species-stages/${speciesId}-v3/${legacyStageId}.webp`
+  ] || stageModules[
+    `/src/assets/focus-garden/species-stages/${speciesId}-v2/${legacyStageId}.png`
+  ] || stageModules[
+    `/src/assets/focus-garden/species-stages/${speciesId}-v4/${legacyStageId}.png`
+  ] || stageModules[`/src/assets/focus-garden/species-stages/daisy/${legacyStageId}.webp`]
 }
 
 const artwork = computed(() => stageIds.map(id => ({ id, source: sourceForStage(props.speciesId, id) })))
@@ -96,21 +105,36 @@ watch(() => activeArtwork.value.source, () => {
 .focus-stage-artwork {
   position: relative;
   width: 100%;
-  aspect-ratio: 4 / 5;
+  aspect-ratio: 1;
   overflow: visible;
   background: transparent;
   isolation: isolate;
 }
 
-.focus-stage-artwork__layer {
+.focus-stage-artwork::before {
   position: absolute;
   z-index: 0;
+  right: 12%;
+  bottom: 5.2%;
+  left: 12%;
+  height: 9%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(50, 66, 47, .22), rgba(50, 66, 47, .06) 52%, transparent 74%);
+  content: '';
+  filter: blur(3px);
+  pointer-events: none;
+}
+
+.focus-stage-artwork__layer {
+  position: absolute;
+  z-index: 1;
   right: 0;
   bottom: 0;
   left: 0;
   width: 100%;
-  height: auto;
+  height: 100%;
   object-fit: contain;
+  object-position: center bottom;
   opacity: 1;
   transition: opacity 220ms ease-out;
   user-select: none;

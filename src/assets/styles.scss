@@ -7232,6 +7232,8 @@ body.is-resizing {
 
 .focus-link-records > div + div { border-top: 1px solid var(--divider-soft); }
 .focus-link-records strong { color: var(--accent-strong); font-size: 11px; }
+.focus-link-records small { flex: 0 0 auto; padding: 2px 6px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-strong); font-size: 9px; font-weight: 700; }
+.focus-link-records small.is-abandoned { background: color-mix(in srgb, #e7a453 18%, var(--surface)); color: #a86518; }
 
 .focus-link__records-toggle {
   display: inline-flex;
