@@ -1724,7 +1724,9 @@ body.is-resizing {
   margin: 0;
   justify-self: center;
   align-self: center;
-  transform: translateX(-2px);
+  // 花卉素材的透明画布顶部留白较多；仅在紧凑缩略图中上移可见主体，
+  // 让花盆落在卡片视觉中心，同时不影响悬停预览的大图构图。
+  transform: translateY(-10px);
 }
 .clock-stage__garden-art .focus-stage-artwork__layer { object-position: center; }
 .clock-stage__garden-art .focus-stage-artwork__light { opacity: .36; }
