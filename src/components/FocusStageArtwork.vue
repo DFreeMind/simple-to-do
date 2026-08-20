@@ -48,7 +48,7 @@ const props = defineProps({
 const emit = defineEmits(['ready', 'error'])
 const stageIds = ['seed', 'sprout', 'leaves', 'bud', 'opening', 'bloom']
 const stageModules = import.meta.glob(
-  '/src/assets/focus-garden/species-stages/**/*.{webp,png}',
+  '/src/assets/focus-garden/species-stages/*/*.webp',
   { eager: true, query: '?url', import: 'default' }
 )
 const ready = ref(false)
@@ -58,16 +58,6 @@ function sourceForStage(speciesId, stageId) {
   const legacyStageId = stageId === 'seed' ? 'sprout' : stageId
   return stageModules[
     `/src/assets/focus-garden/species-stages/${speciesId}/${legacyStageId}.webp`
-  ] || stageModules[
-    `/src/assets/focus-garden/species-stages/${speciesId}-v6/${stageId}.png`
-  ] || stageModules[
-    `/src/assets/focus-garden/species-stages/${speciesId}-v5/${stageId}.png`
-  ] || stageModules[
-    `/src/assets/focus-garden/species-stages/${speciesId}-v3/${legacyStageId}.webp`
-  ] || stageModules[
-    `/src/assets/focus-garden/species-stages/${speciesId}-v2/${legacyStageId}.png`
-  ] || stageModules[
-    `/src/assets/focus-garden/species-stages/${speciesId}-v4/${legacyStageId}.png`
   ] || stageModules[`/src/assets/focus-garden/species-stages/daisy/${legacyStageId}.webp`]
 }
 
