@@ -6033,24 +6033,24 @@ body.is-resizing {
   z-index: 12;
   display: grid;
   gap: 0;
-  padding: 12px 16px 10px;
+  padding: 8px 16px 7px;
   border-bottom: 1px solid var(--divider-soft);
   background: linear-gradient(180deg, var(--surface), var(--surface));
-  box-shadow: 0 8px 20px var(--text-4-fallback);
+  box-shadow: 0 5px 14px var(--text-4-fallback);
   overflow: visible;
 }
 
 .detail-hero__card {
   position: relative;
   display: grid;
-  gap: 8px;
+  gap: 5px;
   min-width: 0;
-  padding: 12px 15px 13px;
+  padding: 9px 12px 10px;
   overflow: visible;
   border: 1px solid var(--accent-24-fallback);
-  border-radius: 16px;
-  background: linear-gradient(135deg, var(--accent-soft), var(--surface) 72%);
-  box-shadow: 0 8px 18px var(--accent-8-fallback), inset 3px 0 0 var(--accent);
+  border-radius: 13px;
+  background: linear-gradient(135deg, var(--accent-soft), var(--surface) 64%);
+  box-shadow: 0 4px 12px var(--accent-8-fallback), inset 3px 0 0 var(--accent);
 
   &::after {
     display: none;
@@ -6129,7 +6129,7 @@ body.is-resizing {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 34px;
+  min-height: 30px;
   gap: 10px;
 }
 
@@ -6141,15 +6141,15 @@ body.is-resizing {
   gap: 1px;
   padding: 2px;
   border: 1px solid var(--accent-16-surface-muted-fallback);
-  border-radius: 10px;
+  border-radius: 9px;
   background: var(--surface-92-fallback);
   box-shadow: 0 2px 7px var(--text-6-fallback);
 }
 
 .detail-icon-action {
   display: inline-grid;
-  width: 29px;
-  height: 29px;
+  width: 27px;
+  height: 27px;
   place-items: center;
   padding: 0;
   border: 1px solid transparent;
@@ -6187,7 +6187,7 @@ body.is-resizing {
   display: block;
   width: 100%;
   min-width: 0;
-  min-height: 32px;
+  min-height: 29px;
   max-height: 64px;
   padding: 1px 0 0;
   resize: none;
@@ -6195,7 +6195,7 @@ body.is-resizing {
   outline: 0;
   background: transparent;
   color: var(--text);
-  font-size: 21px;
+  font-size: 20px;
   font-weight: 700;
   line-height: 1.3;
   overflow-y: hidden;
@@ -6418,7 +6418,7 @@ body.is-resizing {
 }
 
 .detail-section--tags {
-  margin-top: 8px;
+  margin-top: 6px;
 }
 
 .detail-tags-row {
@@ -6439,14 +6439,14 @@ body.is-resizing {
   flex: 0 0 auto;
   align-items: center;
   gap: 5px;
-  min-height: 30px;
+  min-height: 28px;
   color: var(--text-muted);
   font-size: 12px;
   font-weight: 700;
 }
 
 .detail-section {
-  margin: 12px 18px 0;
+  margin: 10px 18px 0;
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -6800,7 +6800,7 @@ body.is-resizing {
 .subtask-panel {
   background: var(--surface-92-fallback);
   border-radius: 14px;
-  padding: 6px;
+  padding: 5px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -7029,7 +7029,7 @@ body.is-resizing {
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   column-gap: 12px;
-  min-height: 36px;
+  min-height: 34px;
   padding: 6px 10px;
   margin-top: 2px;
   border-radius: 8px;
@@ -7297,7 +7297,7 @@ body.is-resizing {
 }
 
 .detail-section--editor {
-  padding-bottom: 8px;
+  padding-bottom: 4px;
 }
 
 .rich-editor {
@@ -7411,6 +7411,41 @@ body.is-resizing {
   background: var(--surface-muted-68-surface-fallback);
   border-radius: var(--radius-md) var(--radius-md) 0 0;
 
+}
+
+.rich-editor__edit-bar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-height: 34px;
+  padding: 0 11px;
+  border: 0;
+  border-bottom: 1px solid var(--border-86-transparent-fallback);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: var(--surface-muted-68-surface-fallback);
+  color: var(--accent-strong);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+
+  small {
+    margin-left: auto;
+    color: var(--text-subtle);
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  &:hover {
+    background: var(--accent-9-fallback);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
 }
 
 .rich-editor__toolbar-divider {
@@ -7653,7 +7688,7 @@ body.is-resizing {
 }
 
 .editor-content {
-  max-height: 320px;
+  max-height: 280px;
   overflow-y: auto;
   @extend %app-scroll-thin;
 }
@@ -7758,6 +7793,78 @@ body.is-resizing {
   flex-wrap: wrap;
   gap: 8px;
   padding: 14px 18px 22px;
+}
+
+.detail-footer__more {
+  position: relative;
+}
+
+.detail-footer__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+
+  &:hover,
+  &[aria-expanded='true'] {
+    border-color: var(--accent-24-fallback);
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+}
+
+.detail-footer__menu {
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 0;
+  z-index: 30;
+  display: grid;
+  min-width: 146px;
+  gap: 2px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: var(--shadow-popover);
+
+  button {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 31px;
+    padding: 4px 7px;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover { background: var(--accent-soft); color: var(--accent-strong); }
+    &.danger:hover { background: var(--danger-10-fallback); color: var(--danger); }
+  }
+}
+
+.detail-footer__menu-divider {
+  height: 1px;
+  margin: 3px 2px;
+  background: var(--divider-soft);
 }
 
 .hidden-file-input {
@@ -10819,7 +10926,8 @@ body.is-resizing {
 
   img {
     max-width: 100%;
-    max-height: 100%;
+    max-height: 280px;
+    object-fit: contain;
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-popover);
   }
