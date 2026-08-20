@@ -1709,7 +1709,7 @@ body.is-resizing {
   display: grid;
   width: 52px;
   height: 65px;
-  place-items: end center;
+  place-items: center;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--accent) 13%, transparent);
   border-radius: 14px;
@@ -1722,7 +1722,10 @@ body.is-resizing {
   width: 52px;
   height: 65px;
   margin: 0;
+  justify-self: center;
+  align-self: center;
 }
+.clock-stage__garden-art .focus-stage-artwork__layer { object-position: center; }
 .clock-stage__garden-art .focus-stage-artwork__light { opacity: .36; }
 .clock-garden-preview { position: fixed; z-index: var(--z-popover); top: var(--garden-preview-top); left: var(--garden-preview-left); display: grid; justify-items: center; gap: 7px; width: min(240px, calc(100vw - 32px)); padding: 11px; border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--divider-soft)); border-radius: 18px; background-color: #fff; background-image: linear-gradient(145deg, #fff 0%, #f7fcfa 100%); box-shadow: 0 20px 48px rgba(31, 55, 88, .22), inset 0 1px 0 rgba(255, 255, 255, .9); pointer-events: none; -webkit-transform: translateZ(0); transform: translateZ(0); }
 .clock-garden-preview > span { color: var(--accent-strong); font-size: 11px; font-weight: 750; }
