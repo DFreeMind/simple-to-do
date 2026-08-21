@@ -124,6 +124,15 @@ watch(() => activeArtwork.value.source, () => {
   isolation: isolate;
 }
 
+/* 缩略图由外层卡片提供非正方形尺寸。若保留默认的 1:1 比例，CSS Grid 会按
+ * 65px 高度反推为 65px 宽，并从 52px 容器左侧开始裁剪，造成主体视觉上偏右。 */
+.focus-stage-artwork.is-thumbnail {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  aspect-ratio: auto;
+}
+
 .focus-stage-artwork::before {
   position: absolute;
   z-index: 0;
