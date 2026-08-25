@@ -661,26 +661,30 @@
 
           <section v-else class="settings-section about-section">
             <header class="about-hero">
-              <img :src="appIcon" alt="" />
-              <div class="about-card__identity">
-                <p class="eyebrow">本地优先 · 桌面任务管理</p>
-                <h3>易简清单</h3>
-                <p>记录、安排并完成每一个下一步。</p>
-                <div class="about-hero__meta"><span>v{{ version }}</span><span>Tauri 桌面应用</span></div>
+              <div class="about-hero__brand">
+                <img :src="appIcon" alt="" />
+                <div class="about-card__identity">
+                  <p class="eyebrow">本地优先 · 桌面任务管理</p>
+                  <h3>易简清单</h3>
+                  <p>记录、安排并完成每一个下一步。</p>
+                </div>
               </div>
-              <button class="about-hero__guide" type="button" @click="store.openHelpCenter">
-                <Compass :size="17" />
-                <span>使用指南</span>
-              </button>
+              <div class="about-hero__actions">
+                <div class="about-hero__meta"><span>v{{ version }}</span><span>Tauri 桌面应用</span></div>
+                <button class="about-hero__guide" type="button" @click="store.openHelpCenter">
+                  <Compass :size="17" />
+                  <span>使用指南</span>
+                </button>
+              </div>
             </header>
 
             <section class="release-notes" aria-labelledby="release-notes-title">
               <div class="release-notes__head">
                 <div>
-                  <p class="eyebrow">本次更新</p>
+                  <p class="eyebrow">版本亮点</p>
                   <h4 id="release-notes-title">v{{ version }} 带来了什么</h4>
                 </div>
-                <span>当前稳定版</span>
+                <span class="release-notes__status"><Check :size="14" aria-hidden="true" />当前稳定版</span>
               </div>
               <ul class="release-notes__list">
                 <li v-for="item in currentReleaseHighlights" :key="item">

@@ -13,6 +13,17 @@ const stageRoot = fileURLToPath(
 const previewRoot = fileURLToPath(
   new URL('../src/assets/focus-garden/species-previews/', import.meta.url)
 )
+const artworkComponentPath = fileURLToPath(
+  new URL('../src/components/FocusStageArtwork.vue', import.meta.url)
+)
+
+test('非正方形缩略图不会继承默认的一比一画布', () => {
+  const source = readFileSync(artworkComponentPath, 'utf8')
+  const thumbnailRule = source.match(/\.focus-stage-artwork\.is-thumbnail\s*\{([^}]*)\}/)?.[1] || ''
+  assert.match(thumbnailRule, /aspect-ratio:\s*auto/, '缩略图应取消默认的一比一宽高比')
+  assert.match(thumbnailRule, /min-width:\s*0/, '缩略图应允许收缩到外层卡片宽度')
+  assert.match(thumbnailRule, /height:\s*100%/, '缩略图应沿用外层卡片高度')
+})
 
 test('12 种花均提供六张完整阶段原画', () => {
   const paths = []

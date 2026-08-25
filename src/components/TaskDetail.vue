@@ -246,7 +246,7 @@
         <div class="section-heading">
           <h2>备注</h2>
         </div>
-        <RichTextEditor ref="richTextEditor" v-model="editorContent" placeholder="写下背景、链接、待办块或粘贴图片..." />
+        <RichTextEditor ref="richTextEditor" v-model="editorContent" compact placeholder="写下背景、链接、待办块或粘贴图片..." />
       </section>
 
       <section class="detail-section detail-section--focus-link">
@@ -278,18 +278,27 @@
       </section>
 
       <footer class="detail-footer">
-        <button class="pill-btn" type="button" @click="copyTask">
-          <Copy :size="16" />
-          创建副本
-        </button>
-        <button class="pill-btn" type="button" @click="copyLink">
-          <LinkIcon :size="16" />
-          复制链接
-        </button>
-        <button class="pill-btn danger" type="button" @click="deleteTask">
-          <Trash2 :size="16" />
-          删除
-        </button>
+        <div class="detail-footer__more" @click.stop>
+          <button class="detail-footer__trigger" type="button" :aria-expanded="moreActionsOpen" @click="moreActionsOpen = !moreActionsOpen">
+            <MoreHorizontal :size="17" />
+            更多操作
+          </button>
+          <div v-if="moreActionsOpen" class="detail-footer__menu" role="menu">
+            <button type="button" role="menuitem" @click="copyTask">
+              <Copy :size="16" />
+              创建副本
+            </button>
+            <button type="button" role="menuitem" @click="copyLink">
+              <LinkIcon :size="16" />
+              复制链接
+            </button>
+            <span class="detail-footer__menu-divider"></span>
+            <button class="danger" type="button" role="menuitem" @click="deleteTask">
+              <Trash2 :size="16" />
+              删除任务
+            </button>
+          </div>
+        </div>
       </footer>
 
       <ConfirmDialog
@@ -319,6 +328,7 @@ import {
   Flag,
   Link as LinkIcon,
   ListChecks,
+  MoreHorizontal,
   PanelRightOpen,
   Pin,
   Play,
@@ -369,6 +379,7 @@ const confirmDialog = reactive({
 
 const openSelect = ref('')
 const openDatePicker = ref('')
+const moreActionsOpen = ref(false)
 const tagInput = ref('')
 const listTrigger = ref(null)
 const dateTrigger = ref(null)
@@ -581,6 +592,7 @@ watch(task, (nextTask) => {
   focusRecordsExpanded.value = false
   openSelect.value = ''
   openDatePicker.value = ''
+  moreActionsOpen.value = false
   tagInput.value = ''
   nextTick(() => {
     if (titleInput.value) autoResize(titleInput.value)
@@ -621,6 +633,7 @@ function choosePriority(priority) {
 function closeSelect() {
   openSelect.value = ''
   openDatePicker.value = ''
+  moreActionsOpen.value = false
 }
 
 function toggleDatePicker(field) {
@@ -694,6 +707,7 @@ function addSubtask() {
 
 
 function copyTask() {
+  moreActionsOpen.value = false
   const copied = store.copyTask(task.value.id)
   if (copied) {
     store.selectTask(copied.id)
@@ -702,6 +716,7 @@ function copyTask() {
 }
 
 async function copyLink() {
+  moreActionsOpen.value = false
   try {
     await navigator.clipboard?.writeText(`todo://${task.value.id}`)
     store.showNotice('任务链接已复制', 'success')
@@ -711,6 +726,7 @@ async function copyLink() {
 }
 
 function deleteTask() {
+  moreActionsOpen.value = false
   confirmDialog.title = '删除任务'
   confirmDialog.message = '删除此任务？任务会先进入垃圾桶。'
   confirmDialog.confirmText = '删除'

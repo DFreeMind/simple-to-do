@@ -9,7 +9,12 @@
     </button>
 
     <template v-else>
-      <div class="rich-editor__toolbar" role="toolbar" aria-label="备注格式工具">
+      <button v-if="compact && toolbarCollapsed" class="rich-editor__edit-bar" type="button" @click="openEditorControls">
+        <PenLine :size="15" />
+        <span>编辑备注</span>
+        <small>点击内容也可开始编辑</small>
+      </button>
+      <div v-if="!compact || !toolbarCollapsed" class="rich-editor__toolbar" role="toolbar" aria-label="备注格式工具">
         <div class="rich-editor__block-wrap">
           <button ref="blockTriggerRef" class="rich-editor__tool rich-editor__block-trigger" :class="{ active: blockMenuOpen }" type="button" :title="`文本类型：${currentBlockLabel()}`" :aria-label="`文本类型：${currentBlockLabel()}`" :aria-expanded="blockMenuOpen" @mousedown.prevent @click="blockMenuOpen = !blockMenuOpen"><Type :size="16" /><ChevronDown :size="12" /></button>
         </div>
@@ -34,7 +39,7 @@
           <button ref="moreTriggerRef" class="rich-editor__tool" :class="{ active: moreMenuOpen }" type="button" title="更多块" aria-label="更多块" @mousedown.prevent @click="moreMenuOpen = !moreMenuOpen"><MoreHorizontal :size="16" /></button>
         </div>
       </div>
-      <editor-content :editor="editor" class="editor-content" @click="onEditorContentClick" />
+      <editor-content :editor="editor" class="editor-content" @click="onEditorContentClick" @focusin="toolbarCollapsed = false" />
       <footer class="rich-editor__status"><span>{{ editorStats.characters }} 字 · {{ editorStats.words }} 词</span><span>{{ editorStats.readingMinutes }} 分钟阅读</span></footer>
     </template>
     <input ref="fileInput" type="file" accept="image/*" multiple class="hidden-file-input" @change="onFileSelected" />
@@ -114,11 +119,13 @@ const AttachmentImage = Image.extend({
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
-  placeholder: { type: String, default: '添加备注…' }
+  placeholder: { type: String, default: '添加备注…' },
+  compact: { type: Boolean, default: false }
 })
 const emit = defineEmits(['update:modelValue'])
 const isExpanded = ref(false)
 const isFocusMode = ref(false)
+const toolbarCollapsed = ref(false)
 const moreMenuOpen = ref(false)
 const blockMenuOpen = ref(false)
 const linkPopoverOpen = ref(false)
@@ -225,6 +232,11 @@ function hasEditorContent() {
 
 function focusEditor() {
   isExpanded.value = true
+  nextTick(() => editor.value?.commands.focus('end'))
+}
+
+function openEditorControls() {
+  toolbarCollapsed.value = false
   nextTick(() => editor.value?.commands.focus('end'))
 }
 
@@ -609,6 +621,7 @@ const editor = useEditor({
   },
   onCreate: ({ editor: targetEditor }) => {
     isExpanded.value = !targetEditor.isEmpty
+    toolbarCollapsed.value = props.compact && !targetEditor.isEmpty
     touchEditor()
   },
   onUpdate: ({ editor: targetEditor }) => {
@@ -616,10 +629,14 @@ const editor = useEditor({
     emit('update:modelValue', serializeEditorHtml(targetEditor.getHTML()))
   },
   onSelectionUpdate: touchEditor,
-  onFocus: () => { isExpanded.value = true },
+  onFocus: () => {
+    isExpanded.value = true
+    toolbarCollapsed.value = false
+  },
   onBlur: () => {
     window.setTimeout(() => {
       if (!linkPopoverOpen.value && !hasEditorContent()) isExpanded.value = false
+      if (!linkPopoverOpen.value && props.compact && hasEditorContent()) toolbarCollapsed.value = true
     }, 120)
   },
 })
@@ -638,6 +655,7 @@ watch(() => props.modelValue, async (value) => {
     const resolved = await resolveEditorHtml(value)
     editor.value.commands.setContent(resolved, false)
     isExpanded.value = !editor.value.isEmpty
+    toolbarCollapsed.value = props.compact && !editor.value.isEmpty
   }
 })
 
