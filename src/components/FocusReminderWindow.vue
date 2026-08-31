@@ -35,6 +35,11 @@
         <p id="focus-reminder-description" class="focus-reminder-description">{{ description }}</p>
       </div>
 
+      <div v-if="reminder.phase !== 'focus'" class="focus-reminder-pet" aria-hidden="true">
+        <span class="focus-reminder-pet__glow"></span>
+        <img :src="restPet.src" alt="" />
+      </div>
+
       <div v-if="reminder.taskTitle" class="focus-reminder-task">
         <span><ListChecks :size="16" />本轮推进</span>
         <strong>{{ reminder.taskTitle }}</strong>
@@ -74,10 +79,25 @@ import {
   markFocusReminderReady
 } from '@/services/platform'
 import { playSoundPreview } from '@/utils/sound'
+import restOtterIllustration from '@/assets/illustrations/rest-otter.png'
+import restBunnyIllustration from '@/assets/illustrations/rest-bunny.png'
+import restRedPandaIllustration from '@/assets/illustrations/rest-red-panda.png'
+import restCatIllustration from '@/assets/illustrations/rest-cat.png'
+import restHedgehogIllustration from '@/assets/illustrations/rest-hedgehog.png'
+import restDuckIllustration from '@/assets/illustrations/rest-duck.png'
 
 const reminder = ref(null)
 const primaryAction = ref(null)
 const busy = ref(false)
+const restPets = [
+  { src: restOtterIllustration },
+  { src: restBunnyIllustration },
+  { src: restRedPandaIllustration },
+  { src: restCatIllustration },
+  { src: restHedgehogIllustration },
+  { src: restDuckIllustration }
+]
+const restPet = ref(restPets[0])
 let unlistenRefresh
 let unlistenPresented
 let presentedRevision = 0
@@ -109,6 +129,9 @@ const primaryLabel = computed(() => {
 async function loadReminder() {
   const payload = await getFocusReminderPayload()
   if (!payload) return
+  if (payload.revision !== reminder.value?.revision) {
+    restPet.value = restPets[Math.floor(Math.random() * restPets.length)]
+  }
   reminder.value = payload
   await nextTick()
   const disposition = await markFocusReminderReady(payload.revision)
@@ -369,6 +392,35 @@ onBeforeUnmount(() => {
 .focus-reminder-metric span { color: #57706a; font-size: 13px; font-weight: 650; }
 .focus-reminder-description { max-width: 338px; margin: 10px auto 0; color: #63736f; font-size: 13px; line-height: 1.65; }
 
+.focus-reminder-pet {
+  position: relative;
+  display: grid;
+  width: 184px;
+  height: 184px;
+  margin: auto auto 0;
+  place-items: center;
+}
+.focus-reminder-pet__glow {
+  position: absolute;
+  bottom: 5px;
+  width: 92px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(92, 181, 162, .16);
+  filter: blur(4px);
+  animation: pet-shadow 4.6s ease-in-out infinite;
+}
+.focus-reminder-pet img {
+  position: relative;
+  z-index: 1;
+  width: 180px;
+  height: 180px;
+  object-fit: contain;
+  filter: drop-shadow(0 7px 9px rgba(37, 120, 105, .08));
+  transform-origin: 50% 82%;
+  animation: pet-breathe 4.6s ease-in-out infinite;
+}
+
 .focus-reminder-task,
 .focus-reminder-insight {
   margin-right: 28px;
@@ -427,9 +479,21 @@ onBeforeUnmount(() => {
   to { opacity: 1; transform: rotate(18deg) scale(1); }
 }
 
+@keyframes pet-breathe {
+  0%, 100% { transform: translateY(1px) scale(1); }
+  50% { transform: translateY(-2px) scale(1.012); }
+}
+
+@keyframes pet-shadow {
+  0%, 100% { transform: scaleX(1); opacity: .42; }
+  50% { transform: scaleX(.9); opacity: .3; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .focus-reminder-halo,
-  .focus-reminder-orbit { animation: none; }
+  .focus-reminder-orbit,
+  .focus-reminder-pet__glow,
+  .focus-reminder-pet img { animation: none; }
   .focus-reminder-actions button,
   .focus-reminder-titlebar button { transition: none; }
 }
