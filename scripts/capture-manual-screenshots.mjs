@@ -202,58 +202,52 @@ await waitForUi()
 await capture('task-detail')
 
 // 任务详情顶部属性行：日期/提醒/重复/优先级/清单
-// 滚到详情顶部，并把日期浮层展开，让"顶部属性行"截图能展示日期/提醒/重复按钮与摘要。
+// 滚到详情顶部，不展开任何浮层，让"顶部属性行"截图展示日期、优先级、清单等可操作的元数据按钮。
 {
   const detailTop = page.locator('.task-detail').first()
   if (await detailTop.count()) {
     await detailTop.evaluate((element) => { element.scrollTop = 0 })
     await waitForUi(400)
   }
-  const dateMetaButton = page.locator('.task-detail .detail-meta-action').first()
-  if (await dateMetaButton.count()) {
-    await dateMetaButton.click()
-    await waitForUi(500)
-  }
   await capture('task-detail-meta')
-  await page.keyboard.press('Escape')
-  await waitForUi(400)
 }
 
-// 任务详情子任务区域：滚到子任务进度 + 列表
+// 任务详情子任务区域：选择有子任务的任务，滚到子任务区域顶部，确保子任务列表完整可见。
 {
+  // 确保选中"完成季度报告初稿"（有4个子任务）
+  const reportTask = page.getByText('完成季度报告初稿', { exact: true }).first()
+  if (await reportTask.count()) {
+    await reportTask.click()
+    await waitForUi(600)
+  }
   const detailMid = page.locator('.task-detail').first()
   if (await detailMid.count()) {
     await detailMid.evaluate((element) => {
       const subtasks = element.querySelector('.detail-section--subtasks')
-      if (subtasks) subtasks.scrollIntoView({ block: 'start' })
-      else element.scrollTop = element.scrollHeight / 2
+      if (subtasks) {
+        // 把子任务区域滚到详情面板顶部，确保子任务列表完整可见
+        const elementRect = element.getBoundingClientRect()
+        const subtaskRect = subtasks.getBoundingClientRect()
+        element.scrollTop += (subtaskRect.top - elementRect.top) - 16
+      } else {
+        element.scrollTop = element.scrollHeight / 3
+      }
     })
-    await waitForUi(400)
+    await waitForUi(500)
   }
   await capture('subtask-panel')
 }
 
 const detailPanel = page.locator('.task-detail').first()
 if (await detailPanel.count()) {
-  // 关闭 task-detail-meta 留下的浮层（如有），再展开 date 浮层。
-  await page.keyboard.press('Escape')
+  // 先滚到详情顶部，再展开日期浮层，确保浮层完整显示不被截断。
+  await detailPanel.evaluate((element) => { element.scrollTop = 0 })
   await waitForUi(400)
   const dateTrigger = page.locator('.detail-meta-action').first()
   if (await dateTrigger.count()) {
     await dateTrigger.click()
-    await waitForUi(500)
-    // 只展开"提醒"组：DatePicker 同时只能展开一个 extra，最后保留提醒的丰富选项，
-    // 让截图和 task-detail-meta 区分开（后者是默认折叠的浮层全貌）。
-    for (const label of ['提醒']) {
-      const row = page.locator(`button.dp-extra-row:has-text("${label}")`).first()
-      if (await row.count()) {
-        const expanded = await row.getAttribute('aria-expanded').catch(() => null)
-        if (expanded !== 'true') {
-          await row.click()
-          await waitForUi(400)
-        }
-      }
-    }
+    await waitForUi(600)
+    // 不展开任何额外分组，展示日期浮层的默认完整状态（日历 + 时间/提醒/重复折叠摘要）。
     await capture('date-reminder')
     await page.keyboard.press('Escape')
     await waitForUi(400)
@@ -272,22 +266,19 @@ if (!await editorDetail.count()) {
   editorDetail = page.locator('.task-detail').first()
 }
 if (await editorDetail.count()) {
-  // 富文本编辑器：把"更多块"按钮滚到 .task-detail 视口中部，让向下展开的菜单能完整显示。
-  // 弹层在 .task-detail 内部 absolute 定位，受 overflow:auto 裁切；先留出约 320px 视口空间。
+  // 富文本编辑器：滚到编辑器区域，确保工具栏和编辑内容都完整可见，不弹出更多块菜单。
   await editorDetail.evaluate((element) => {
-    const wrap = element.querySelector('.rich-editor__more-wrap')
-    if (wrap) wrap.scrollIntoView({ block: 'center' })
-    else element.scrollTop = element.scrollHeight
+    const editor = element.querySelector('.rich-editor, .detail-section--description')
+    if (editor) {
+      const elementRect = element.getBoundingClientRect()
+      const editorRect = editor.getBoundingClientRect()
+      element.scrollTop += (editorRect.top - elementRect.top) - 16
+    } else {
+      element.scrollTop = element.scrollHeight / 2
+    }
   })
   await waitForUi(500)
-  const moreMenu = page.locator('button[aria-label="更多块"]').first()
-  if (await moreMenu.count()) {
-    await moreMenu.click()
-    await waitForUi(600)
-  }
   await capture('rich-editor')
-  await page.keyboard.press('Escape')
-  await waitForUi(400)
 }
 
 await closeDetail()

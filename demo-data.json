@@ -1257,7 +1257,7 @@
       "id": "test-3",
       "title": "带附件的任务：确认图片预览区域",
       "description": "",
-      "descriptionHtml": "<p>这是任务里插入的附件图片，点击可在大图模式预览：</p>\n<img src=\"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgNTAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiM3YmUwYzQiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiM1YThjZTAiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIgZmlsbD0idXJsKCNnKSIvPjx0ZXh0IHg9IjQwMCIgeT0iMjcwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXNpemU9IjY0IiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9InN5c3RlbS11aSI+6ZmE5Lu256S65L6LIDE8L3RleHQ+PC9zdmc+\" alt=\"附件示例 1\" data-attachment-src=\"attachments/demo/preview-1.png\" style=\"max-width: 100%; border-radius: 12px;\" />\n<p>多张图片可左右切换查看：</p>\n<img src=\"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgNTAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiM3YzZlZTYiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiMzYWE2YjkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIgZmlsbD0idXJsKCNnKSIvPjx0ZXh0IHg9IjQwMCIgeT0iMjcwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXNpemU9IjY0IiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9InN5c3RlbS11aSI+6ZmE5Lu256S65L6LIDI8L3RleHQ+PC9zdmc+\" alt=\"附件示例 2\" data-attachment-src=\"attachments/demo/preview-2.png\" style=\"max-width: 100%; border-radius: 12px;\" />\n<p>图片附件保存在应用数据目录，扫描后可在\"个人空间 → 存储与清理\"中查看引用情况。</p>",
+      "descriptionHtml": "<p>这是一个带附件的任务，用于测试图片预览区域。</p><p>附件包含两张设计稿图片：</p><ul><li>界面设计稿.png</li><li>流程图.png</li></ul>",
       "completed": false,
       "completedAt": null,
       "deleted": false,
@@ -1276,18 +1276,34 @@
       "subtasks": [],
       "attachments": [
         {
-          "id": "preview-1",
-          "name": "附件示例 1.png",
-          "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgNTAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiM3YmUwYzQiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiM1YThjZTAiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIgZmlsbD0idXJsKCNnKSIvPjx0ZXh0IHg9IjQwMCIgeT0iMjcwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXNpemU9IjY0IiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9InN5c3RlbS11aSI+6ZmE5Lu256S65L6LIDE8L3RleHQ+PC9zdmc+",
-          "sizeBytes": 184052,
-          "kind": "image"
+          "id": "att-1",
+          "kind": "image",
+          "mime": "image/png",
+          "originalName": "界面设计稿.png",
+          "path": "",
+          "relativePath": "",
+          "sha256": "",
+          "sizeBytes": 24500,
+          "width": 800,
+          "height": 600,
+          "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+          "createdAt": "2026-08-10T02:00:00.000Z",
+          "lastReferencedAt": "2026-08-10T02:00:00.000Z"
         },
         {
-          "id": "preview-2",
-          "name": "附件示例 2.png",
-          "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgNTAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiM3YzZlZTYiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiMzYWE2YjkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIgZmlsbD0idXJsKCNnKSIvPjx0ZXh0IHg9IjQwMCIgeT0iMjcwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXNpemU9IjY0IiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9InN5c3RlbS11aSI+6ZmE5Lu256S65L6LIDI8L3RleHQ+PC9zdmc+",
-          "sizeBytes": 196012,
-          "kind": "image"
+          "id": "att-2",
+          "kind": "image",
+          "mime": "image/png",
+          "originalName": "流程图.png",
+          "path": "",
+          "relativePath": "",
+          "sha256": "",
+          "sizeBytes": 18200,
+          "width": 600,
+          "height": 400,
+          "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+          "createdAt": "2026-08-10T02:05:00.000Z",
+          "lastReferencedAt": "2026-08-10T02:05:00.000Z"
         }
       ],
       "comments": [],
@@ -1321,6 +1337,902 @@
       "editorMode": "detail",
       "createdAt": "2026-08-10T23:00:00.000Z",
       "updatedAt": "2026-08-10T23:00:00.000Z"
+    },
+    {
+      "id": "done-1001",
+      "title": "整理上周会议纪要",
+      "description": "",
+      "descriptionHtml": "<p>用时约 1小时。</p>",
+      "completed": true,
+      "completedAt": "2026-08-11T08:30:00.000Z",
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "meetings",
+      "dueDate": "2026-08-11T10:00:00.000Z",
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 1,
+      "tags": [
+        "会议",
+        "整理"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-08-10T01:00:00.000Z",
+      "updatedAt": "2026-08-11T08:30:00.000Z"
+    },
+    {
+      "id": "done-1002",
+      "title": "提交季度预算申请",
+      "description": "",
+      "descriptionHtml": "<p>用时约 2小时。</p>",
+      "completed": true,
+      "completedAt": "2026-08-10T08:30:00.000Z",
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "work-tasks",
+      "dueDate": "2026-08-10T10:00:00.000Z",
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 1,
+      "tags": [
+        "财务",
+        "重要"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-08-09T01:00:00.000Z",
+      "updatedAt": "2026-08-10T08:30:00.000Z"
+    },
+    {
+      "id": "done-1003",
+      "title": "修复登录页样式问题",
+      "description": "",
+      "descriptionHtml": "<p>用时约 45分钟。</p>",
+      "completed": true,
+      "completedAt": "2026-08-09T08:30:00.000Z",
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "work-tasks",
+      "dueDate": "2026-08-09T10:00:00.000Z",
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 1,
+      "tags": [
+        "开发",
+        "Bug"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-08-08T01:00:00.000Z",
+      "updatedAt": "2026-08-09T08:30:00.000Z"
+    },
+    {
+      "id": "done-1004",
+      "title": "与设计师对齐首页改版",
+      "description": "",
+      "descriptionHtml": "<p>用时约 1.5小时。</p>",
+      "completed": true,
+      "completedAt": "2026-08-08T08:30:00.000Z",
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "meetings",
+      "dueDate": "2026-08-08T10:00:00.000Z",
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 1,
+      "tags": [
+        "会议",
+        "设计"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-08-07T01:00:00.000Z",
+      "updatedAt": "2026-08-08T08:30:00.000Z"
+    },
+    {
+      "id": "done-1005",
+      "title": "更新 API 接口文档",
+      "description": "",
+      "descriptionHtml": "<p>用时约 2小时。</p>",
+      "completed": true,
+      "completedAt": "2026-08-07T08:30:00.000Z",
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "work-tasks",
+      "dueDate": "2026-08-07T10:00:00.000Z",
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 1,
+      "tags": [
+        "文档",
+        "开发"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-08-06T01:00:00.000Z",
+      "updatedAt": "2026-08-07T08:30:00.000Z"
+    },
+    {
+      "id": "done-1006",
+      "title": "完成用户调研报告",
+      "description": "",
+      "descriptionHtml": "<p>用时约 3小时。</p>",
+      "completed": true,
+      "completedAt": "2026-08-06T08:30:00.000Z",
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "work-tasks",
+      "dueDate": "2026-08-06T10:00:00.000Z",
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 1,
+      "tags": [
+        "调研",
+        "产品"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-08-05T01:00:00.000Z",
+      "updatedAt": "2026-08-06T08:30:00.000Z"
+    },
+    {
+      "id": "done-1007",
+      "title": "缴纳本月水电费",
+      "description": "",
+      "descriptionHtml": "<p>用时约 15分钟。</p>",
+      "completed": true,
+      "completedAt": "2026-08-05T08:30:00.000Z",
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "personal",
+      "dueDate": "2026-08-05T10:00:00.000Z",
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 1,
+      "tags": [
+        "生活",
+        "缴费"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-08-04T01:00:00.000Z",
+      "updatedAt": "2026-08-05T08:30:00.000Z"
+    },
+    {
+      "id": "done-1008",
+      "title": "预约牙医检查",
+      "description": "",
+      "descriptionHtml": "<p>用时约 10分钟。</p>",
+      "completed": true,
+      "completedAt": "2026-08-04T08:30:00.000Z",
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "health",
+      "dueDate": "2026-08-04T10:00:00.000Z",
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 1,
+      "tags": [
+        "健康",
+        "预约"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-08-03T01:00:00.000Z",
+      "updatedAt": "2026-08-04T08:30:00.000Z"
+    },
+    {
+      "id": "done-1009",
+      "title": "读完《深度工作》第三章",
+      "description": "",
+      "descriptionHtml": "<p>用时约 40分钟。</p>",
+      "completed": true,
+      "completedAt": "2026-08-02T08:30:00.000Z",
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "reading",
+      "dueDate": "2026-08-02T10:00:00.000Z",
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 1,
+      "tags": [
+        "阅读",
+        "学习"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-08-01T01:00:00.000Z",
+      "updatedAt": "2026-08-02T08:30:00.000Z"
+    },
+    {
+      "id": "done-1010",
+      "title": "整理电脑桌面文件",
+      "description": "",
+      "descriptionHtml": "<p>用时约 30分钟。</p>",
+      "completed": true,
+      "completedAt": "2026-07-31T08:30:00.000Z",
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "personal",
+      "dueDate": "2026-07-31T10:00:00.000Z",
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 1,
+      "tags": [
+        "整理",
+        "效率"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-07-30T01:00:00.000Z",
+      "updatedAt": "2026-07-31T08:30:00.000Z"
+    },
+    {
+      "id": "done-1011",
+      "title": "完成 Python 课程第 4 单元",
+      "description": "",
+      "descriptionHtml": "<p>用时约 1小时。</p>",
+      "completed": true,
+      "completedAt": "2026-07-29T08:30:00.000Z",
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "courses",
+      "dueDate": "2026-07-29T10:00:00.000Z",
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 1,
+      "tags": [
+        "学习",
+        "编程"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-07-28T01:00:00.000Z",
+      "updatedAt": "2026-07-29T08:30:00.000Z"
+    },
+    {
+      "id": "done-1012",
+      "title": "家庭大扫除",
+      "description": "",
+      "descriptionHtml": "<p>用时约 2小时。</p>",
+      "completed": true,
+      "completedAt": "2026-07-27T08:30:00.000Z",
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "home",
+      "dueDate": "2026-07-27T10:00:00.000Z",
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 1,
+      "tags": [
+        "家务",
+        "周末"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-07-26T01:00:00.000Z",
+      "updatedAt": "2026-07-27T08:30:00.000Z"
+    },
+    {
+      "id": "done-1013",
+      "title": "项目 Alpha 周会同步",
+      "description": "",
+      "descriptionHtml": "<p>用时约 1小时。</p>",
+      "completed": true,
+      "completedAt": "2026-07-25T08:30:00.000Z",
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "meetings",
+      "dueDate": "2026-07-25T10:00:00.000Z",
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 1,
+      "tags": [
+        "会议",
+        "项目"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-07-24T01:00:00.000Z",
+      "updatedAt": "2026-07-25T08:30:00.000Z"
+    },
+    {
+      "id": "done-1014",
+      "title": "备份重要文件到移动硬盘",
+      "description": "",
+      "descriptionHtml": "<p>用时约 30分钟。</p>",
+      "completed": true,
+      "completedAt": "2026-07-23T08:30:00.000Z",
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "personal",
+      "dueDate": "2026-07-23T10:00:00.000Z",
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 1,
+      "tags": [
+        "备份",
+        "安全"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-07-22T01:00:00.000Z",
+      "updatedAt": "2026-07-23T08:30:00.000Z"
+    },
+    {
+      "id": "done-1015",
+      "title": "跑步 5 公里",
+      "description": "",
+      "descriptionHtml": "<p>用时约 35分钟。</p>",
+      "completed": true,
+      "completedAt": "2026-07-21T08:30:00.000Z",
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "health",
+      "dueDate": "2026-07-21T10:00:00.000Z",
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 1,
+      "tags": [
+        "运动",
+        "健康"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-07-20T01:00:00.000Z",
+      "updatedAt": "2026-07-21T08:30:00.000Z"
+    },
+    {
+      "id": "done-1016",
+      "title": "整理读书笔记",
+      "description": "",
+      "descriptionHtml": "<p>用时约 1小时。</p>",
+      "completed": true,
+      "completedAt": "2026-07-18T08:30:00.000Z",
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "reading",
+      "dueDate": "2026-07-18T10:00:00.000Z",
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 1,
+      "tags": [
+        "阅读",
+        "整理"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-07-17T01:00:00.000Z",
+      "updatedAt": "2026-07-18T08:30:00.000Z"
+    },
+    {
+      "id": "task-1051",
+      "title": "整理客户反馈清单",
+      "description": "",
+      "descriptionHtml": "",
+      "completed": false,
+      "completedAt": null,
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "work-tasks",
+      "dueDate": "2026-08-14T02:00:00.000Z",
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 2,
+      "tags": [
+        "客户",
+        "整理"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-08-09T01:00:00.000Z",
+      "updatedAt": "2026-08-11T02:00:00.000Z"
+    },
+    {
+      "id": "task-1052",
+      "title": "更新产品路线图",
+      "description": "",
+      "descriptionHtml": "",
+      "completed": false,
+      "completedAt": null,
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "work-tasks",
+      "dueDate": "2026-08-17T02:00:00.000Z",
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 2,
+      "tags": [
+        "产品",
+        "规划"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-08-09T01:00:00.000Z",
+      "updatedAt": "2026-08-11T02:00:00.000Z"
+    },
+    {
+      "id": "task-1053",
+      "title": "与运维确认部署流程",
+      "description": "",
+      "descriptionHtml": "",
+      "completed": false,
+      "completedAt": null,
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "meetings",
+      "dueDate": "2026-08-13T02:00:00.000Z",
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 1,
+      "tags": [
+        "会议",
+        "运维"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-08-09T01:00:00.000Z",
+      "updatedAt": "2026-08-11T02:00:00.000Z"
+    },
+    {
+      "id": "task-1054",
+      "title": "写一篇技术博客",
+      "description": "",
+      "descriptionHtml": "",
+      "completed": false,
+      "completedAt": null,
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "someday",
+      "dueDate": null,
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 0,
+      "tags": [
+        "写作",
+        "技术"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-08-09T01:00:00.000Z",
+      "updatedAt": "2026-08-11T02:00:00.000Z"
+    },
+    {
+      "id": "task-1055",
+      "title": "研究新框架可行性",
+      "description": "",
+      "descriptionHtml": "",
+      "completed": false,
+      "completedAt": null,
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "someday",
+      "dueDate": null,
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 0,
+      "tags": [
+        "调研",
+        "技术"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-08-09T01:00:00.000Z",
+      "updatedAt": "2026-08-11T02:00:00.000Z"
+    },
+    {
+      "id": "task-1056",
+      "title": "买生日礼物",
+      "description": "",
+      "descriptionHtml": "",
+      "completed": false,
+      "completedAt": null,
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "personal",
+      "dueDate": "2026-08-19T02:00:00.000Z",
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 2,
+      "tags": [
+        "购物",
+        "家庭"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-08-09T01:00:00.000Z",
+      "updatedAt": "2026-08-11T02:00:00.000Z"
+    },
+    {
+      "id": "task-1057",
+      "title": "整理手机相册",
+      "description": "",
+      "descriptionHtml": "",
+      "completed": false,
+      "completedAt": null,
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "personal",
+      "dueDate": null,
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 0,
+      "tags": [
+        "整理",
+        "照片"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-08-09T01:00:00.000Z",
+      "updatedAt": "2026-08-11T02:00:00.000Z"
+    },
+    {
+      "id": "task-1058",
+      "title": "学做一道新菜",
+      "description": "",
+      "descriptionHtml": "",
+      "completed": false,
+      "completedAt": null,
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "home",
+      "dueDate": null,
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 0,
+      "tags": [
+        "烹饪",
+        "生活"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-08-09T01:00:00.000Z",
+      "updatedAt": "2026-08-11T02:00:00.000Z"
+    },
+    {
+      "id": "task-1059",
+      "title": "更换净水器滤芯",
+      "description": "",
+      "descriptionHtml": "",
+      "completed": false,
+      "completedAt": null,
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "home",
+      "dueDate": "2026-08-15T02:00:00.000Z",
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 1,
+      "tags": [
+        "家务",
+        "维护"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-08-09T01:00:00.000Z",
+      "updatedAt": "2026-08-11T02:00:00.000Z"
+    },
+    {
+      "id": "task-1060",
+      "title": "体检报告解读",
+      "description": "",
+      "descriptionHtml": "",
+      "completed": false,
+      "completedAt": null,
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "health",
+      "dueDate": "2026-08-16T02:00:00.000Z",
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 2,
+      "tags": [
+        "健康",
+        "体检"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-08-09T01:00:00.000Z",
+      "updatedAt": "2026-08-11T02:00:00.000Z"
+    },
+    {
+      "id": "task-1061",
+      "title": "买运动鞋",
+      "description": "",
+      "descriptionHtml": "",
+      "completed": false,
+      "completedAt": null,
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "health",
+      "dueDate": "2026-08-18T02:00:00.000Z",
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 1,
+      "tags": [
+        "购物",
+        "运动"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-08-09T01:00:00.000Z",
+      "updatedAt": "2026-08-11T02:00:00.000Z"
+    },
+    {
+      "id": "task-1062",
+      "title": "读完《设计心理学》",
+      "description": "",
+      "descriptionHtml": "",
+      "completed": false,
+      "completedAt": null,
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "reading",
+      "dueDate": "2026-08-22T02:00:00.000Z",
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 1,
+      "tags": [
+        "阅读",
+        "设计"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-08-09T01:00:00.000Z",
+      "updatedAt": "2026-08-11T02:00:00.000Z"
+    },
+    {
+      "id": "task-1063",
+      "title": "整理英语生词本",
+      "description": "",
+      "descriptionHtml": "",
+      "completed": false,
+      "completedAt": null,
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "reading",
+      "dueDate": null,
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 0,
+      "tags": [
+        "英语",
+        "整理"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-08-09T01:00:00.000Z",
+      "updatedAt": "2026-08-11T02:00:00.000Z"
+    },
+    {
+      "id": "task-1064",
+      "title": "完成 React 进阶课程",
+      "description": "",
+      "descriptionHtml": "",
+      "completed": false,
+      "completedAt": null,
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "courses",
+      "dueDate": "2026-08-26T02:00:00.000Z",
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 2,
+      "tags": [
+        "学习",
+        "前端"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-08-09T01:00:00.000Z",
+      "updatedAt": "2026-08-11T02:00:00.000Z"
+    },
+    {
+      "id": "task-1065",
+      "title": "准备旅行攻略",
+      "description": "",
+      "descriptionHtml": "",
+      "completed": false,
+      "completedAt": null,
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "travel",
+      "dueDate": "2026-09-01T02:00:00.000Z",
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 1,
+      "tags": [
+        "旅行",
+        "规划"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-08-09T01:00:00.000Z",
+      "updatedAt": "2026-08-11T02:00:00.000Z"
+    },
+    {
+      "id": "task-1066",
+      "title": "检查护照有效期",
+      "description": "",
+      "descriptionHtml": "",
+      "completed": false,
+      "completedAt": null,
+      "deleted": false,
+      "deletedAt": null,
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "travel",
+      "dueDate": "2026-08-27T02:00:00.000Z",
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 2,
+      "tags": [
+        "证件",
+        "旅行"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-08-09T01:00:00.000Z",
+      "updatedAt": "2026-08-11T02:00:00.000Z"
     }
   ],
   "trash": [
@@ -1378,9 +2290,146 @@
       "editorMode": "detail",
       "createdAt": "2026-07-28T02:00:00.000Z",
       "updatedAt": "2026-08-10T07:00:00.000Z"
+    },
+    {
+      "id": "trash-1017",
+      "title": "过期的活动策划方案",
+      "description": "",
+      "descriptionHtml": "",
+      "completed": false,
+      "completedAt": null,
+      "deleted": true,
+      "deletedAt": "2026-08-09T06:00:00.000Z",
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "work-tasks",
+      "dueDate": null,
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 0,
+      "tags": [
+        "垃圾桶",
+        "文档"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-08-07T02:00:00.000Z",
+      "updatedAt": "2026-08-09T06:00:00.000Z"
+    },
+    {
+      "id": "trash-1018",
+      "title": "重复的购物清单",
+      "description": "",
+      "descriptionHtml": "",
+      "completed": false,
+      "completedAt": null,
+      "deleted": true,
+      "deletedAt": "2026-08-07T06:00:00.000Z",
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "home",
+      "dueDate": null,
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 0,
+      "tags": [
+        "垃圾桶",
+        "重复"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-08-05T02:00:00.000Z",
+      "updatedAt": "2026-08-07T06:00:00.000Z"
+    },
+    {
+      "id": "trash-1019",
+      "title": "已取消的预约",
+      "description": "",
+      "descriptionHtml": "",
+      "completed": false,
+      "completedAt": null,
+      "deleted": true,
+      "deletedAt": "2026-08-04T06:00:00.000Z",
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "health",
+      "dueDate": null,
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 0,
+      "tags": [
+        "垃圾桶",
+        "取消"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-08-02T02:00:00.000Z",
+      "updatedAt": "2026-08-04T06:00:00.000Z"
+    },
+    {
+      "id": "trash-1020",
+      "title": "测试用临时任务",
+      "description": "",
+      "descriptionHtml": "",
+      "completed": false,
+      "completedAt": null,
+      "deleted": true,
+      "deletedAt": "2026-07-31T06:00:00.000Z",
+      "pinned": false,
+      "important": false,
+      "myDayDate": null,
+      "listId": "inbox",
+      "dueDate": null,
+      "reminderAt": null,
+      "repeatRule": null,
+      "priority": 0,
+      "tags": [
+        "垃圾桶",
+        "测试"
+      ],
+      "subtasks": [],
+      "attachments": [],
+      "comments": [],
+      "editorMode": "detail",
+      "createdAt": "2026-07-29T02:00:00.000Z",
+      "updatedAt": "2026-07-31T06:00:00.000Z"
     }
   ],
-  "listTrash": [],
+  "listTrash": [
+    {
+      "id": "deleted-list-1",
+      "name": "临时项目",
+      "groupId": "projects",
+      "color": "#9ca3af",
+      "isSystem": false,
+      "sortOrder": 5000,
+      "viewMode": "list",
+      "deleted": true,
+      "deletedAt": "2026-08-07T02:00:00.000Z",
+      "taskCount": 3
+    },
+    {
+      "id": "deleted-list-2",
+      "name": "旧版需求池",
+      "groupId": null,
+      "color": "#6b7280",
+      "isSystem": false,
+      "sortOrder": 6000,
+      "viewMode": "list",
+      "deleted": true,
+      "deletedAt": "2026-07-28T01:00:00.000Z",
+      "taskCount": 8
+    }
+  ],
   "taskGroups": [
     {
       "id": "tg-alpha-review",
@@ -1434,15 +2483,776 @@
     "pendingBreak": null,
     "cycleFocusCount": 0,
     "rhythm": {
-      "reminders": [],
+      "reminders": [
+        {
+          "id": "rhythm-eye",
+          "title": "护眼远望",
+          "enabled": true,
+          "triggerType": "interval",
+          "intervalSeconds": 1200,
+          "weekdays": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "workStart": "09:00",
+          "workEnd": "18:00",
+          "quietStart": "12:00",
+          "quietEnd": "13:30",
+          "emoji": "👁️",
+          "color": "#4f8de8",
+          "messages": [
+            "看看远处，让眼睛休息一下",
+            "20 分钟到了，远望 20 秒",
+            "眼睛累了吗？看看窗外的绿色"
+          ],
+          "cycleStartedAt": "2026-08-12T01:00:00.000Z",
+          "nextDueAt": "2026-08-12T06:20:00.000Z",
+          "pendingSince": null,
+          "snoozedUntil": null,
+          "lastCompletedAt": "2026-08-12T06:00:00.000Z",
+          "lastNotifiedAt": "2026-08-12T06:00:00.000Z",
+          "lastResolvedAt": "2026-08-12T06:00:00.000Z",
+          "sortOrder": 1000,
+          "createdAt": "2026-08-02T01:00:00.000Z",
+          "updatedAt": "2026-08-12T06:00:00.000Z"
+        },
+        {
+          "id": "rhythm-water",
+          "title": "补水提醒",
+          "enabled": true,
+          "triggerType": "interval",
+          "intervalSeconds": 3600,
+          "weekdays": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            0
+          ],
+          "workStart": "08:00",
+          "workEnd": "22:00",
+          "quietStart": null,
+          "quietEnd": null,
+          "emoji": "💧",
+          "color": "#5fb8ad",
+          "messages": [
+            "该喝水啦，保持身体水分",
+            "一杯水，让大脑更清醒",
+            "别忘了补水哦"
+          ],
+          "cycleStartedAt": "2026-08-12T01:00:00.000Z",
+          "nextDueAt": "2026-08-12T07:00:00.000Z",
+          "pendingSince": null,
+          "snoozedUntil": null,
+          "lastCompletedAt": "2026-08-12T06:00:00.000Z",
+          "lastNotifiedAt": "2026-08-12T06:00:00.000Z",
+          "lastResolvedAt": "2026-08-12T06:00:00.000Z",
+          "sortOrder": 2000,
+          "createdAt": "2026-08-02T01:00:00.000Z",
+          "updatedAt": "2026-08-12T06:00:00.000Z"
+        },
+        {
+          "id": "rhythm-stretch",
+          "title": "起身活动",
+          "enabled": true,
+          "triggerType": "active-duration",
+          "intervalSeconds": 2700,
+          "weekdays": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "workStart": "09:00",
+          "workEnd": "18:00",
+          "quietStart": "12:00",
+          "quietEnd": "13:30",
+          "emoji": "🧘",
+          "color": "#e0a54f",
+          "messages": [
+            "坐久了，起来活动一下",
+            "伸个懒腰，放松肩颈",
+            "45 分钟到了，走动走动"
+          ],
+          "activitySeconds": 1800,
+          "lastActivitySampleAt": "2026-08-12T06:00:00.000Z",
+          "pendingSince": null,
+          "snoozedUntil": null,
+          "lastCompletedAt": "2026-08-12T03:30:00.000Z",
+          "lastNotifiedAt": "2026-08-12T03:30:00.000Z",
+          "lastResolvedAt": "2026-08-12T03:30:00.000Z",
+          "sortOrder": 3000,
+          "createdAt": "2026-08-04T01:00:00.000Z",
+          "updatedAt": "2026-08-12T06:00:00.000Z"
+        },
+        {
+          "id": "rhythm-shoulder",
+          "title": "肩颈舒展",
+          "enabled": false,
+          "triggerType": "active-duration",
+          "intervalSeconds": 5400,
+          "weekdays": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "workStart": "09:00",
+          "workEnd": "18:00",
+          "emoji": "💆",
+          "color": "#7c6ee6",
+          "messages": [
+            "肩颈僵硬了吗？做几组舒展",
+            "放松肩膀，转转脖子"
+          ],
+          "sortOrder": 4000,
+          "createdAt": "2026-08-07T01:00:00.000Z",
+          "updatedAt": "2026-08-07T01:00:00.000Z"
+        },
+        {
+          "id": "rhythm-breath",
+          "title": "呼吸放松",
+          "enabled": false,
+          "triggerType": "interval",
+          "intervalSeconds": 7200,
+          "weekdays": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "workStart": "09:00",
+          "workEnd": "18:00",
+          "emoji": "🌬️",
+          "color": "#cf6f87",
+          "messages": [
+            "深呼吸三次，让自己平静下来",
+            "花一分钟专注呼吸"
+          ],
+          "sortOrder": 5000,
+          "createdAt": "2026-08-07T01:00:00.000Z",
+          "updatedAt": "2026-08-07T01:00:00.000Z"
+        },
+        {
+          "id": "rhythm-wrapup",
+          "title": "今日收尾",
+          "enabled": false,
+          "triggerType": "fixed-time",
+          "fixedTime": "17:45",
+          "weekdays": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "emoji": "📋",
+          "color": "#5f9e72",
+          "messages": [
+            "快下班了，整理今天的任务",
+            "花 5 分钟回顾今天，规划明天"
+          ],
+          "sortOrder": 6000,
+          "createdAt": "2026-08-09T01:00:00.000Z",
+          "updatedAt": "2026-08-09T01:00:00.000Z"
+        }
+      ],
       "enabled": true,
       "pauseDuringFocus": true,
       "globalQuietHours": {
         "start": "22:00",
         "end": "08:00"
-      }
+      },
+      "history": [
+        {
+          "id": "rhythm-hist-1039",
+          "reminderId": "rhythm-eye",
+          "reminderTitle": "护眼远望",
+          "triggerType": "interval",
+          "triggerLabel": "间隔提醒",
+          "triggeredAt": "2026-08-12T06:00:00.000Z",
+          "resolvedAt": "2026-08-12T06:01:00.000Z",
+          "action": "completed",
+          "responseSeconds": 60,
+          "snoozeMinutes": null,
+          "timeline": [
+            {
+              "type": "triggered",
+              "at": "2026-08-12T06:00:00.000Z",
+              "snoozeMinutes": null,
+              "responseSeconds": 0
+            },
+            {
+              "type": "completed",
+              "at": "2026-08-12T06:01:00.000Z",
+              "snoozeMinutes": null,
+              "responseSeconds": 60
+            }
+          ]
+        },
+        {
+          "id": "rhythm-hist-1040",
+          "reminderId": "rhythm-water",
+          "reminderTitle": "补水提醒",
+          "triggerType": "interval",
+          "triggerLabel": "间隔提醒",
+          "triggeredAt": "2026-08-12T06:00:00.000Z",
+          "resolvedAt": "2026-08-12T06:05:00.000Z",
+          "action": "completed",
+          "responseSeconds": 300,
+          "snoozeMinutes": null,
+          "timeline": [
+            {
+              "type": "triggered",
+              "at": "2026-08-12T06:00:00.000Z",
+              "snoozeMinutes": null,
+              "responseSeconds": 0
+            },
+            {
+              "type": "completed",
+              "at": "2026-08-12T06:05:00.000Z",
+              "snoozeMinutes": null,
+              "responseSeconds": 300
+            }
+          ]
+        },
+        {
+          "id": "rhythm-hist-1041",
+          "reminderId": "rhythm-stretch",
+          "reminderTitle": "起身活动",
+          "triggerType": "active-duration",
+          "triggerLabel": "连续活跃",
+          "triggeredAt": "2026-08-12T03:30:00.000Z",
+          "resolvedAt": "2026-08-12T03:35:00.000Z",
+          "action": "snoozed",
+          "responseSeconds": 300,
+          "snoozeMinutes": 5,
+          "timeline": [
+            {
+              "type": "triggered",
+              "at": "2026-08-12T03:30:00.000Z",
+              "snoozeMinutes": null,
+              "responseSeconds": 0
+            },
+            {
+              "type": "snoozed",
+              "at": "2026-08-12T03:35:00.000Z",
+              "snoozeMinutes": 5,
+              "responseSeconds": 0
+            },
+            {
+              "type": "snoozed",
+              "at": "2026-08-12T03:35:00.000Z",
+              "snoozeMinutes": null,
+              "responseSeconds": 300
+            }
+          ]
+        },
+        {
+          "id": "rhythm-hist-1042",
+          "reminderId": "rhythm-eye",
+          "reminderTitle": "护眼远望",
+          "triggerType": "interval",
+          "triggerLabel": "间隔提醒",
+          "triggeredAt": "2026-08-11T08:00:00.000Z",
+          "resolvedAt": "2026-08-11T08:02:00.000Z",
+          "action": "completed",
+          "responseSeconds": 120,
+          "snoozeMinutes": null,
+          "timeline": [
+            {
+              "type": "triggered",
+              "at": "2026-08-11T08:00:00.000Z",
+              "snoozeMinutes": null,
+              "responseSeconds": 0
+            },
+            {
+              "type": "completed",
+              "at": "2026-08-11T08:02:00.000Z",
+              "snoozeMinutes": null,
+              "responseSeconds": 120
+            }
+          ]
+        },
+        {
+          "id": "rhythm-hist-1043",
+          "reminderId": "rhythm-water",
+          "reminderTitle": "补水提醒",
+          "triggerType": "interval",
+          "triggerLabel": "间隔提醒",
+          "triggeredAt": "2026-08-11T07:00:00.000Z",
+          "resolvedAt": "2026-08-11T07:01:00.000Z",
+          "action": "completed",
+          "responseSeconds": 60,
+          "snoozeMinutes": null,
+          "timeline": [
+            {
+              "type": "triggered",
+              "at": "2026-08-11T07:00:00.000Z",
+              "snoozeMinutes": null,
+              "responseSeconds": 0
+            },
+            {
+              "type": "completed",
+              "at": "2026-08-11T07:01:00.000Z",
+              "snoozeMinutes": null,
+              "responseSeconds": 60
+            }
+          ]
+        },
+        {
+          "id": "rhythm-hist-1044",
+          "reminderId": "rhythm-stretch",
+          "reminderTitle": "起身活动",
+          "triggerType": "active-duration",
+          "triggerLabel": "连续活跃",
+          "triggeredAt": "2026-08-11T02:30:00.000Z",
+          "resolvedAt": "2026-08-11T02:32:00.000Z",
+          "action": "completed",
+          "responseSeconds": 120,
+          "snoozeMinutes": null,
+          "timeline": [
+            {
+              "type": "triggered",
+              "at": "2026-08-11T02:30:00.000Z",
+              "snoozeMinutes": null,
+              "responseSeconds": 0
+            },
+            {
+              "type": "completed",
+              "at": "2026-08-11T02:32:00.000Z",
+              "snoozeMinutes": null,
+              "responseSeconds": 120
+            }
+          ]
+        },
+        {
+          "id": "rhythm-hist-1045",
+          "reminderId": "rhythm-eye",
+          "reminderTitle": "护眼远望",
+          "triggerType": "interval",
+          "triggerLabel": "间隔提醒",
+          "triggeredAt": "2026-08-10T07:00:00.000Z",
+          "resolvedAt": "2026-08-10T07:10:00.000Z",
+          "action": "dismissed",
+          "responseSeconds": 600,
+          "snoozeMinutes": null,
+          "timeline": [
+            {
+              "type": "triggered",
+              "at": "2026-08-10T07:00:00.000Z",
+              "snoozeMinutes": null,
+              "responseSeconds": 0
+            },
+            {
+              "type": "dismissed",
+              "at": "2026-08-10T07:10:00.000Z",
+              "snoozeMinutes": null,
+              "responseSeconds": 600
+            }
+          ]
+        },
+        {
+          "id": "rhythm-hist-1046",
+          "reminderId": "rhythm-water",
+          "reminderTitle": "补水提醒",
+          "triggerType": "interval",
+          "triggerLabel": "间隔提醒",
+          "triggeredAt": "2026-08-10T06:00:00.000Z",
+          "resolvedAt": "2026-08-10T06:02:00.000Z",
+          "action": "completed",
+          "responseSeconds": 120,
+          "snoozeMinutes": null,
+          "timeline": [
+            {
+              "type": "triggered",
+              "at": "2026-08-10T06:00:00.000Z",
+              "snoozeMinutes": null,
+              "responseSeconds": 0
+            },
+            {
+              "type": "completed",
+              "at": "2026-08-10T06:02:00.000Z",
+              "snoozeMinutes": null,
+              "responseSeconds": 120
+            }
+          ]
+        },
+        {
+          "id": "rhythm-hist-1047",
+          "reminderId": "rhythm-eye",
+          "reminderTitle": "护眼远望",
+          "triggerType": "interval",
+          "triggerLabel": "间隔提醒",
+          "triggeredAt": "2026-08-09T03:00:00.000Z",
+          "resolvedAt": "2026-08-09T03:01:00.000Z",
+          "action": "completed",
+          "responseSeconds": 60,
+          "snoozeMinutes": null,
+          "timeline": [
+            {
+              "type": "triggered",
+              "at": "2026-08-09T03:00:00.000Z",
+              "snoozeMinutes": null,
+              "responseSeconds": 0
+            },
+            {
+              "type": "completed",
+              "at": "2026-08-09T03:01:00.000Z",
+              "snoozeMinutes": null,
+              "responseSeconds": 60
+            }
+          ]
+        },
+        {
+          "id": "rhythm-hist-1048",
+          "reminderId": "rhythm-stretch",
+          "reminderTitle": "起身活动",
+          "triggerType": "active-duration",
+          "triggerLabel": "连续活跃",
+          "triggeredAt": "2026-08-09T06:00:00.000Z",
+          "resolvedAt": "2026-08-09T06:08:00.000Z",
+          "action": "skipped",
+          "responseSeconds": 480,
+          "snoozeMinutes": null,
+          "timeline": [
+            {
+              "type": "triggered",
+              "at": "2026-08-09T06:00:00.000Z",
+              "snoozeMinutes": null,
+              "responseSeconds": 0
+            },
+            {
+              "type": "skipped",
+              "at": "2026-08-09T06:08:00.000Z",
+              "snoozeMinutes": null,
+              "responseSeconds": 480
+            }
+          ]
+        },
+        {
+          "id": "rhythm-hist-1049",
+          "reminderId": "rhythm-water",
+          "reminderTitle": "补水提醒",
+          "triggerType": "interval",
+          "triggerLabel": "间隔提醒",
+          "triggeredAt": "2026-08-08T08:00:00.000Z",
+          "resolvedAt": "2026-08-08T08:03:00.000Z",
+          "action": "completed",
+          "responseSeconds": 180,
+          "snoozeMinutes": null,
+          "timeline": [
+            {
+              "type": "triggered",
+              "at": "2026-08-08T08:00:00.000Z",
+              "snoozeMinutes": null,
+              "responseSeconds": 0
+            },
+            {
+              "type": "completed",
+              "at": "2026-08-08T08:03:00.000Z",
+              "snoozeMinutes": null,
+              "responseSeconds": 180
+            }
+          ]
+        },
+        {
+          "id": "rhythm-hist-1050",
+          "reminderId": "rhythm-eye",
+          "reminderTitle": "护眼远望",
+          "triggerType": "interval",
+          "triggerLabel": "间隔提醒",
+          "triggeredAt": "2026-08-07T02:00:00.000Z",
+          "resolvedAt": "2026-08-07T02:02:00.000Z",
+          "action": "completed",
+          "responseSeconds": 120,
+          "snoozeMinutes": null,
+          "timeline": [
+            {
+              "type": "triggered",
+              "at": "2026-08-07T02:00:00.000Z",
+              "snoozeMinutes": null,
+              "responseSeconds": 0
+            },
+            {
+              "type": "completed",
+              "at": "2026-08-07T02:02:00.000Z",
+              "snoozeMinutes": null,
+              "responseSeconds": 120
+            }
+          ]
+        }
+      ]
     },
-    "garden": {},
+    "garden": {
+      "startedAt": "2026-07-29T00:00:00.000Z",
+      "unlockLadderVersion": 2,
+      "dailyGoalMinutes": 50,
+      "selectedSpeciesId": "daisy",
+      "nextSpeciesId": null,
+      "trackedAchievementId": null,
+      "longestSessionMinutes": 50,
+      "days": [
+        {
+          "date": "2026-07-30",
+          "speciesId": "daisy",
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "growthMinutes": 25,
+          "stage": "bud",
+          "finalizedAt": "2026-07-30T15:59:00.000Z"
+        },
+        {
+          "date": "2026-07-31",
+          "speciesId": "daisy",
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "growthMinutes": 50,
+          "stage": "bloom",
+          "finalizedAt": "2026-07-31T15:59:00.000Z"
+        },
+        {
+          "date": "2026-08-01",
+          "speciesId": "daisy",
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "growthMinutes": 75,
+          "stage": "bloom",
+          "finalizedAt": "2026-08-01T15:59:00.000Z"
+        },
+        {
+          "date": "2026-08-02",
+          "speciesId": "tulip",
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "growthMinutes": 30,
+          "stage": "bud",
+          "finalizedAt": "2026-08-02T15:59:00.000Z"
+        },
+        {
+          "date": "2026-08-03",
+          "speciesId": "tulip",
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "growthMinutes": 55,
+          "stage": "bloom",
+          "finalizedAt": "2026-08-03T15:59:00.000Z"
+        },
+        {
+          "date": "2026-08-04",
+          "speciesId": "tulip",
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "growthMinutes": 50,
+          "stage": "bloom",
+          "finalizedAt": "2026-08-04T15:59:00.000Z"
+        },
+        {
+          "date": "2026-08-05",
+          "speciesId": "cosmos",
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "growthMinutes": 25,
+          "stage": "bud",
+          "finalizedAt": "2026-08-05T15:59:00.000Z"
+        },
+        {
+          "date": "2026-08-06",
+          "speciesId": "cosmos",
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "growthMinutes": 70,
+          "stage": "bloom",
+          "finalizedAt": "2026-08-06T15:59:00.000Z"
+        },
+        {
+          "date": "2026-08-07",
+          "speciesId": "cosmos",
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "growthMinutes": 45,
+          "stage": "opening",
+          "finalizedAt": "2026-08-07T15:59:00.000Z"
+        },
+        {
+          "date": "2026-08-08",
+          "speciesId": "daisy",
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "growthMinutes": 50,
+          "stage": "bloom",
+          "finalizedAt": "2026-08-08T15:59:00.000Z"
+        },
+        {
+          "date": "2026-08-09",
+          "speciesId": "tulip",
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "growthMinutes": 55,
+          "stage": "bloom",
+          "finalizedAt": "2026-08-09T15:59:00.000Z"
+        },
+        {
+          "date": "2026-08-10",
+          "speciesId": "cosmos",
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "growthMinutes": 95,
+          "stage": "bloom",
+          "finalizedAt": "2026-08-10T15:59:00.000Z"
+        },
+        {
+          "date": "2026-08-11",
+          "speciesId": "daisy",
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "growthMinutes": 72,
+          "stage": "bloom",
+          "finalizedAt": "2026-08-11T15:59:00.000Z"
+        },
+        {
+          "date": "2026-08-12",
+          "speciesId": "daisy",
+          "goalMinutes": 50,
+          "goalAdjustments": 0,
+          "growthMinutes": 95,
+          "stage": "bloom",
+          "finalizedAt": null
+        }
+      ],
+      "sessionDays": [
+        {
+          "date": "2026-07-30",
+          "focusMinutes": 25,
+          "goalMinutes": 50
+        },
+        {
+          "date": "2026-07-31",
+          "focusMinutes": 50,
+          "goalMinutes": 50
+        },
+        {
+          "date": "2026-08-01",
+          "focusMinutes": 75,
+          "goalMinutes": 50
+        },
+        {
+          "date": "2026-08-02",
+          "focusMinutes": 30,
+          "goalMinutes": 50
+        },
+        {
+          "date": "2026-08-03",
+          "focusMinutes": 55,
+          "goalMinutes": 50
+        },
+        {
+          "date": "2026-08-04",
+          "focusMinutes": 50,
+          "goalMinutes": 50
+        },
+        {
+          "date": "2026-08-05",
+          "focusMinutes": 25,
+          "goalMinutes": 50
+        },
+        {
+          "date": "2026-08-06",
+          "focusMinutes": 70,
+          "goalMinutes": 50
+        },
+        {
+          "date": "2026-08-07",
+          "focusMinutes": 45,
+          "goalMinutes": 50
+        },
+        {
+          "date": "2026-08-08",
+          "focusMinutes": 50,
+          "goalMinutes": 50
+        },
+        {
+          "date": "2026-08-09",
+          "focusMinutes": 55,
+          "goalMinutes": 50
+        },
+        {
+          "date": "2026-08-10",
+          "focusMinutes": 95,
+          "goalMinutes": 50
+        },
+        {
+          "date": "2026-08-11",
+          "focusMinutes": 72,
+          "goalMinutes": 50
+        },
+        {
+          "date": "2026-08-12",
+          "focusMinutes": 95,
+          "goalMinutes": 50
+        }
+      ],
+      "achievements": [
+        {
+          "id": "first-growth",
+          "unlockedAt": "2026-07-30T01:00:00.000Z",
+          "progressValue": 957
+        },
+        {
+          "id": "first-bloom",
+          "unlockedAt": "2026-07-31T10:00:00.000Z",
+          "progressValue": 8
+        },
+        {
+          "id": "active-days-3",
+          "unlockedAt": "2026-08-01T12:00:00.000Z",
+          "progressValue": 12
+        },
+        {
+          "id": "goal-days-3",
+          "unlockedAt": "2026-08-02T12:00:00.000Z",
+          "progressValue": 8
+        },
+        {
+          "id": "focus-600",
+          "unlockedAt": "2026-08-07T12:00:00.000Z",
+          "progressValue": 957
+        },
+        {
+          "id": "bloom-10",
+          "unlockedAt": "2026-08-10T12:00:00.000Z",
+          "progressValue": 8
+        },
+        {
+          "id": "species-3",
+          "unlockedAt": "2026-08-05T12:00:00.000Z",
+          "progressValue": 3
+        },
+        {
+          "id": "streak-3",
+          "unlockedAt": "2026-08-01T12:00:00.000Z",
+          "progressValue": 5
+        },
+        {
+          "id": "streak-7",
+          "unlockedAt": "2026-08-05T12:00:00.000Z",
+          "progressValue": 7
+        },
+        {
+          "id": "deep-90",
+          "unlockedAt": "2026-08-10T08:00:00.000Z",
+          "progressValue": 95
+        }
+      ]
+    },
     "history": [
       {
         "id": "focus-demo-1",
@@ -1495,6 +3305,240 @@
         "phase": "focus",
         "result": "completed",
         "note": "完成精听和生词整理。"
+      },
+      {
+        "id": "focus-1021",
+        "profileId": "pomodoro",
+        "profileName": "番茄专注",
+        "taskId": "today-1",
+        "taskTitle": "10:30 团队站会同步阻塞事项",
+        "startedAt": "2026-08-12T01:00:00.000Z",
+        "finishedAt": "2026-08-12T01:25:00.000Z",
+        "elapsedSeconds": 1500,
+        "phase": "focus",
+        "result": "completed",
+        "note": "站会同步与阻塞梳理。"
+      },
+      {
+        "id": "focus-1022",
+        "profileId": "deep-work",
+        "profileName": "深度专注",
+        "taskId": "today-2",
+        "taskTitle": "完成季度报告初稿",
+        "startedAt": "2026-08-12T06:00:00.000Z",
+        "finishedAt": "2026-08-12T06:50:00.000Z",
+        "elapsedSeconds": 3000,
+        "phase": "focus",
+        "result": "completed",
+        "note": "报告数据整理与初稿撰写。"
+      },
+      {
+        "id": "focus-1023",
+        "profileId": "free-focus",
+        "profileName": "自由时长",
+        "taskId": "today-4",
+        "taskTitle": "每日 20 分钟英语听力",
+        "startedAt": "2026-08-12T12:00:00.000Z",
+        "finishedAt": "2026-08-12T12:20:00.000Z",
+        "elapsedSeconds": 1200,
+        "phase": "focus",
+        "result": "completed",
+        "note": "精听与生词整理。"
+      },
+      {
+        "id": "focus-1024",
+        "profileId": "deep-work",
+        "profileName": "深度专注",
+        "taskId": "tomorrow-2",
+        "taskTitle": "准备周五项目评审材料",
+        "startedAt": "2026-08-11T06:00:00.000Z",
+        "finishedAt": "2026-08-11T06:50:00.000Z",
+        "elapsedSeconds": 3000,
+        "phase": "focus",
+        "result": "completed",
+        "note": "评审材料梳理。"
+      },
+      {
+        "id": "focus-1025",
+        "profileId": "pomodoro",
+        "profileName": "番茄专注",
+        "taskId": "week-1",
+        "taskTitle": "本周复盘：整理 7 月目标进展",
+        "startedAt": "2026-08-11T02:00:00.000Z",
+        "finishedAt": "2026-08-11T02:22:00.000Z",
+        "elapsedSeconds": 1320,
+        "phase": "focus",
+        "result": "interrupted",
+        "note": "临时会议打断。"
+      },
+      {
+        "id": "focus-1026",
+        "profileId": "pomodoro",
+        "profileName": "番茄专注",
+        "taskId": "today-3",
+        "taskTitle": "下班后买咖啡豆和洗衣液",
+        "startedAt": "2026-08-10T01:00:00.000Z",
+        "finishedAt": "2026-08-10T01:25:00.000Z",
+        "elapsedSeconds": 1500,
+        "phase": "focus",
+        "result": "completed",
+        "note": "采购清单核对。"
+      },
+      {
+        "id": "focus-1027",
+        "profileId": "deep-work",
+        "profileName": "深度专注",
+        "taskId": "important-1",
+        "taskTitle": "确认备份策略",
+        "startedAt": "2026-08-10T07:00:00.000Z",
+        "finishedAt": "2026-08-10T07:45:00.000Z",
+        "elapsedSeconds": 2700,
+        "phase": "focus",
+        "result": "completed",
+        "note": "备份方案确认。"
+      },
+      {
+        "id": "focus-1028",
+        "profileId": "free-focus",
+        "profileName": "自由时长",
+        "taskId": "reading-1",
+        "taskTitle": "阅读《原子习惯》第 3 章",
+        "startedAt": "2026-08-09T13:00:00.000Z",
+        "finishedAt": "2026-08-09T13:30:00.000Z",
+        "elapsedSeconds": 1800,
+        "phase": "focus",
+        "result": "completed",
+        "note": "阅读与笔记。"
+      },
+      {
+        "id": "focus-1029",
+        "profileId": "pomodoro",
+        "profileName": "番茄专注",
+        "taskId": "project-1",
+        "taskTitle": "Alpha 项目需求评审",
+        "startedAt": "2026-08-09T02:00:00.000Z",
+        "finishedAt": "2026-08-09T02:25:00.000Z",
+        "elapsedSeconds": 1500,
+        "phase": "focus",
+        "result": "completed",
+        "note": "需求评审准备。"
+      },
+      {
+        "id": "focus-1030",
+        "profileId": "pomodoro",
+        "profileName": "番茄专注",
+        "taskId": "today-2",
+        "taskTitle": "完成季度报告初稿",
+        "startedAt": "2026-08-08T06:00:00.000Z",
+        "finishedAt": "2026-08-08T06:25:00.000Z",
+        "elapsedSeconds": 1500,
+        "phase": "focus",
+        "result": "completed",
+        "note": "报告大纲梳理。"
+      },
+      {
+        "id": "focus-1031",
+        "profileId": "free-focus",
+        "profileName": "自由时长",
+        "taskId": "health-1",
+        "taskTitle": "每天运动 30 分钟",
+        "startedAt": "2026-08-08T10:00:00.000Z",
+        "finishedAt": "2026-08-08T10:30:00.000Z",
+        "elapsedSeconds": 1800,
+        "phase": "focus",
+        "result": "completed",
+        "note": "慢跑与拉伸。"
+      },
+      {
+        "id": "focus-1032",
+        "profileId": "deep-work",
+        "profileName": "深度专注",
+        "taskId": "courses-1",
+        "taskTitle": "完成 Python 课程第 5 单元",
+        "startedAt": "2026-08-07T12:00:00.000Z",
+        "finishedAt": "2026-08-07T12:50:00.000Z",
+        "elapsedSeconds": 3000,
+        "phase": "focus",
+        "result": "completed",
+        "note": "课程学习与练习。"
+      },
+      {
+        "id": "focus-1033",
+        "profileId": "pomodoro",
+        "profileName": "番茄专注",
+        "taskId": "tomorrow-1",
+        "taskTitle": "09:00 发周报初稿",
+        "startedAt": "2026-08-07T08:00:00.000Z",
+        "finishedAt": "2026-08-07T08:25:00.000Z",
+        "elapsedSeconds": 1500,
+        "phase": "focus",
+        "result": "completed",
+        "note": "周报撰写。"
+      },
+      {
+        "id": "focus-1034",
+        "profileId": "pomodoro",
+        "profileName": "番茄专注",
+        "taskId": "today-1",
+        "taskTitle": "10:30 团队站会同步阻塞事项",
+        "startedAt": "2026-08-06T02:30:00.000Z",
+        "finishedAt": "2026-08-06T02:55:00.000Z",
+        "elapsedSeconds": 1500,
+        "phase": "focus",
+        "result": "completed",
+        "note": "站会记录整理。"
+      },
+      {
+        "id": "focus-1035",
+        "profileId": "deep-work",
+        "profileName": "深度专注",
+        "taskId": "project-2",
+        "taskTitle": "Beta 项目启动会议",
+        "startedAt": "2026-08-05T06:00:00.000Z",
+        "finishedAt": "2026-08-05T06:50:00.000Z",
+        "elapsedSeconds": 3000,
+        "phase": "focus",
+        "result": "completed",
+        "note": "启动会议准备。"
+      },
+      {
+        "id": "focus-1036",
+        "profileId": "pomodoro",
+        "profileName": "番茄专注",
+        "taskId": "reading-1",
+        "taskTitle": "阅读《原子习惯》第 3 章",
+        "startedAt": "2026-08-04T13:00:00.000Z",
+        "finishedAt": "2026-08-04T13:25:00.000Z",
+        "elapsedSeconds": 1500,
+        "phase": "focus",
+        "result": "completed",
+        "note": "阅读笔记。"
+      },
+      {
+        "id": "focus-1037",
+        "profileId": "pomodoro",
+        "profileName": "番茄专注",
+        "taskId": "important-1",
+        "taskTitle": "确认备份策略",
+        "startedAt": "2026-08-03T03:00:00.000Z",
+        "finishedAt": "2026-08-03T03:20:00.000Z",
+        "elapsedSeconds": 1200,
+        "phase": "focus",
+        "result": "interrupted",
+        "note": "被紧急消息打断。"
+      },
+      {
+        "id": "focus-1038",
+        "profileId": "free-focus",
+        "profileName": "自由时长",
+        "taskId": "today-4",
+        "taskTitle": "每日 20 分钟英语听力",
+        "startedAt": "2026-08-02T12:00:00.000Z",
+        "finishedAt": "2026-08-02T12:20:00.000Z",
+        "elapsedSeconds": 1200,
+        "phase": "focus",
+        "result": "completed",
+        "note": "听力练习。"
       }
     ]
   },
