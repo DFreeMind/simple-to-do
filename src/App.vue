@@ -187,6 +187,24 @@ let shellResizeObserver
 let taskDetailWindowExpansion = null
 let taskDetailWindowResizeVersion = 0
 let taskDetailWindowOpening = false
+let focusGardenDateTimer = null
+
+function scheduleFocusGardenDateRefresh() {
+  if (focusGardenDateTimer) window.clearTimeout(focusGardenDateTimer)
+  const now = new Date()
+  const nextDay = new Date(now)
+  nextDay.setHours(24, 0, 0, 120)
+  focusGardenDateTimer = window.setTimeout(() => {
+    store.refreshFocusGardenForDate()
+    scheduleFocusGardenDateRefresh()
+  }, Math.max(1_000, nextDay.getTime() - now.getTime()))
+}
+
+function refreshFocusGardenWhenVisible() {
+  if (document.visibilityState !== 'visible') return
+  store.refreshFocusGardenForDate()
+  scheduleFocusGardenDateRefresh()
+}
 
 function handleFocusElapsed(event) {
   const sessionId = event.payload?.sessionId
@@ -619,7 +637,11 @@ onMounted(async () => {
       .then(unlisten => { unlistenRhythmControllerAction = unlisten })
       .catch(error => console.warn('[App] 注册节律控制器操作失败:', error))
   }
-  store.loadData()
+  void store.loadData().then(() => {
+    store.refreshFocusGardenForDate()
+    scheduleFocusGardenDateRefresh()
+  })
+  document.addEventListener('visibilitychange', refreshFocusGardenWhenVisible)
   // 主窗口启动后静默检查更新：发现新版本在设置面板「关于与更新」显示角标，不打扰当前操作。
   if (!isDevelopment && window.__TAURI_INTERNALS__) {
     checkForUpdatesService({ skippedVersion: store.settings.skippedUpdateVersion, silent: true })
@@ -637,6 +659,8 @@ onBeforeUnmount(() => {
   unlistenRhythmElapsed?.()
   unlistenRhythmReminderOpen?.()
   unlistenRhythmReminderAction?.()
+  document.removeEventListener('visibilitychange', refreshFocusGardenWhenVisible)
+  if (focusGardenDateTimer) window.clearTimeout(focusGardenDateTimer)
   shellResizeObserver?.disconnect()
 })
 

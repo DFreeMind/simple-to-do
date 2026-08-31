@@ -9,6 +9,7 @@ import {
   FOCUS_SPECIES_COMPANION_LEVELS,
   createDefaultFocusGarden,
   focusGardenCollectionCompletionDate,
+  focusGardenAchievementTotals,
   focusGardenStageMilestones,
   gardenStageFor,
   focusGardenTotals,
@@ -114,6 +115,36 @@ test('完成专注累计今日花并解锁首个成长徽章', () => {
   assert.equal(second.garden.days[0].growthMinutes, 50)
   assert.equal(second.garden.days[0].stage, 'bloom')
   assert.deepEqual(new Set(second.garden.achievements.map(item => item.id)), new Set(['first-growth', 'first-bloom']))
+})
+
+test('跨日专注保留完整会话，但按自然日拆分花园成长与花种', () => {
+  const startedAt = new Date('2026-07-28T23:50:00+08:00')
+  const finishedAt = new Date('2026-07-29T00:20:00+08:00')
+  const garden = {
+    ...createDefaultFocusGarden(startedAt),
+    selectedSpeciesId: 'daisy',
+    nextSpeciesId: 'tulip'
+  }
+  const result = recordFocusGardenGrowth(garden, {
+    elapsedSeconds: 30 * 60,
+    startedAt: startedAt.toISOString(),
+    finishedAt: finishedAt.toISOString(),
+    gardenSpeciesId: 'daisy',
+    gardenGoalMinutes: 50,
+    timeline: [
+      { type: 'started', at: startedAt.toISOString() },
+      { type: 'finished', at: finishedAt.toISOString() }
+    ]
+  }, finishedAt)
+  assert.deepEqual(result.garden.days.map(day => [day.date, day.speciesId, day.growthMinutes]), [
+    ['2026-07-28', 'daisy', 10],
+    ['2026-07-29', 'tulip', 20]
+  ])
+  assert.deepEqual(result.garden.sessionDays, [{ date: '2026-07-28', focusMinutes: 30, goalMinutes: 50 }])
+  const achievementTotals = focusGardenAchievementTotals(result.garden)
+  assert.equal(achievementTotals.totalMinutes, 30)
+  assert.equal(achievementTotals.activeDays, 1)
+  assert.equal(achievementTotals.longestStreak, 1)
 })
 
 test('跨过累计门槛时只报告本轮新解锁花种', () => {

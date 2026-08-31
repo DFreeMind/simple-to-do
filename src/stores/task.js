@@ -61,11 +61,13 @@ import {
   FOCUS_GARDEN_ACHIEVEMENTS,
   FOCUS_GARDEN_SPECIES,
   createDefaultFocusGarden,
+  focusGardenAchievementTotals,
   focusGardenTotals as calculateFocusGardenTotals,
   focusSpeciesCompanionLevel,
   gardenStageFor,
   localGardenDateKey,
   normalizeFocusGarden,
+  prepareFocusGardenForDate,
   recordFocusGardenGrowth,
   updateTrackedFocusGardenAchievement,
   unlockedFocusGardenSpecies,
@@ -397,7 +399,7 @@ export const useTaskStore = defineStore('task', () => {
   })
   const focusGardenAchievements = computed(() => {
     const unlockedById = new Map(clock.value.garden.achievements.map(item => [item.id, item]))
-    const totals = focusGardenTotals.value
+    const totals = focusGardenAchievementTotals(clock.value.garden)
     return FOCUS_GARDEN_ACHIEVEMENTS.map(item => ({
       ...item,
       unlockedAt: unlockedById.get(item.id)?.unlockedAt || null,
@@ -853,6 +855,17 @@ export const useTaskStore = defineStore('task', () => {
       if (currentGoalMinutes !== previousGoalMinutes) showNotice(`今日目标已设为 ${currentGoalMinutes} 分钟`, 'success')
       else if (previousDay?.growthMinutes > 0 && previousDay.goalAdjustments >= 1) showNotice('今日目标已修正一次，明日可重新设置', 'info')
     }
+  }
+
+  // 应用常驻跨过午夜时，兑现“明日种植”并归档前一天；无需重新启动应用。
+  function refreshFocusGardenForDate(now = new Date()) {
+    const currentGarden = clock.value.garden
+    const preparedGarden = prepareFocusGardenForDate(currentGarden, now)
+    const changed = preparedGarden.selectedSpeciesId !== currentGarden.selectedSpeciesId
+      || preparedGarden.nextSpeciesId !== currentGarden.nextSpeciesId
+      || preparedGarden.days.some((day, index) => day !== currentGarden.days[index])
+    if (changed) clock.value.garden = preparedGarden
+    return changed
   }
 
   function trackFocusGardenAchievement(achievementId) {
@@ -2128,6 +2141,8 @@ export const useTaskStore = defineStore('task', () => {
       startedAt,
       elapsedSeconds: Math.max(0, Math.min(8 * 60 * 60, Math.round(Number(rawSession.elapsedSeconds) || 0))),
       phase,
+      gardenSpeciesId: FOCUS_GARDEN_SPECIES.some(species => species.id === rawSession.gardenSpeciesId) ? rawSession.gardenSpeciesId : null,
+      gardenGoalMinutes: phase === 'focus' ? Math.max(10, Math.min(240, Math.round(Number(rawSession.gardenGoalMinutes) || 50))) : null,
       durationSeconds,
       timeline: normalizeFocusTimeline(rawSession.timeline)
     }
@@ -2347,6 +2362,7 @@ export const useTaskStore = defineStore('task', () => {
 
   function startFocus(profileId = 'pomodoro', taskId = null, durationOverride = undefined) {
     if (clock.value.activeSession) return false
+    refreshFocusGardenForDate()
     const profile = focusProfiles.value.find(item => item.id === profileId) || focusProfiles.value[0]
     if (!profile) return false
     const validTaskId = activeTasks.value.some(task => task.id === taskId) ? taskId : null
@@ -2363,6 +2379,8 @@ export const useTaskStore = defineStore('task', () => {
       startedAt,
       elapsedSeconds: 0,
       phase: 'focus',
+      gardenSpeciesId: focusGardenToday.value.speciesId,
+      gardenGoalMinutes: focusGardenToday.value.goalMinutes,
       durationSeconds,
       timeline: [{ type: 'started', at: startedAt, durationSeconds, taskId: validTaskId, taskTitle: validTaskId ? activeTasks.value.find(task => task.id === validTaskId)?.title || '' : '' }]
     }
@@ -2525,7 +2543,14 @@ export const useTaskStore = defineStore('task', () => {
     // 手动提前结束并不等于这段投入无效：保留“未完成”结果，同时把已投入的整分钟计入花圃。
     // 系统中断仍不计入，避免把未正常收尾的会话误记为成长。
     if (session.phase === 'focus' && ['completed', 'abandoned'].includes(normalizedResult)) {
-      const recorded = recordFocusGardenGrowth(clock.value.garden, { elapsedSeconds, finishedAt })
+      const recorded = recordFocusGardenGrowth(clock.value.garden, {
+        elapsedSeconds,
+        startedAt: session.createdAt,
+        finishedAt,
+        timeline,
+        gardenSpeciesId: session.gardenSpeciesId,
+        gardenGoalMinutes: session.gardenGoalMinutes
+      })
       clock.value.garden = recorded.garden
       gardenGrowth = {
         day: clock.value.garden.days.find(day => day.date === localGardenDateKey(finishedAt)) || null,
@@ -3839,6 +3864,7 @@ export const useTaskStore = defineStore('task', () => {
     updateFocusSettings,
     updateFocusProfile,
     updateFocusGardenSettings,
+    refreshFocusGardenForDate,
     trackFocusGardenAchievement,
     startPendingBreak,
     skipPendingBreak,

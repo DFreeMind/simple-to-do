@@ -119,6 +119,7 @@ export function createDefaultFocusGarden(now = new Date()) {
     trackedAchievementId: null,
     longestSessionMinutes: 0,
     days: [],
+    sessionDays: [],
     achievements: []
   }
 }
@@ -133,6 +134,11 @@ export function normalizeFocusGarden(rawGarden, now = new Date()) {
   const uniqueDays = [...new Map(days.map(day => [day.date, day])).values()]
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(-3660)
+  const sessionDays = Array.isArray(raw.sessionDays)
+    ? [...new Map(raw.sessionDays.map(normalizeGardenSessionDay).filter(Boolean).map(day => [day.date, day])).values()]
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(-3660)
+    : null
   const achievementIds = new Set(FOCUS_GARDEN_ACHIEVEMENTS.map(item => item.id))
   const trackedAchievementId = achievementIds.has(raw.trackedAchievementId) ? raw.trackedAchievementId : null
   const achievements = Array.isArray(raw.achievements)
@@ -151,6 +157,7 @@ export function normalizeFocusGarden(rawGarden, now = new Date()) {
     trackedAchievementId,
     longestSessionMinutes: Math.max(0, Math.min(480, Math.round(Number(raw.longestSessionMinutes) || 0))),
     days: uniqueDays,
+    sessionDays,
     achievements
   }
   result.achievements = backfillFocusGardenAchievements(result, now)
@@ -159,7 +166,7 @@ export function normalizeFocusGarden(rawGarden, now = new Date()) {
 }
 
 function backfillFocusGardenAchievements(garden, now) {
-  const totals = focusGardenTotals(garden)
+  const totals = focusGardenAchievementTotals(garden)
   const existingIds = new Set(garden.achievements.map(item => item.id))
   const inferred = FOCUS_GARDEN_ACHIEVEMENTS
     .filter(item => !existingIds.has(item.id) && Number(totals[item.metric] || 0) >= item.target)
@@ -213,6 +220,15 @@ function normalizeGardenDay(rawDay) {
     growthMinutes,
     stage: gardenStageFor(growthMinutes, goalMinutes).id,
     finalizedAt: Number.isFinite(new Date(rawDay.finalizedAt).getTime()) ? rawDay.finalizedAt : null
+  }
+}
+
+function normalizeGardenSessionDay(rawDay) {
+  if (!rawDay || typeof rawDay !== 'object' || !/^\d{4}-\d{2}-\d{2}$/.test(rawDay.date || '')) return null
+  return {
+    date: rawDay.date,
+    focusMinutes: Math.max(0, Math.min(24 * 60, Math.round(Number(rawDay.focusMinutes) || 0))),
+    goalMinutes: Math.max(10, Math.min(240, Math.round(Number(rawDay.goalMinutes) || 50)))
   }
 }
 
@@ -275,6 +291,29 @@ export function focusGardenTotals(garden) {
   }
 }
 
+// 跨日会话只在花园中按自然日拆分；日数类成就仍按一整轮专注的开始日归属。
+export function focusGardenAchievementTotals(garden) {
+  const totals = focusGardenTotals(garden)
+  const sessionDays = Array.isArray(garden?.sessionDays) && (garden.sessionDays.length || !(garden?.days || []).length)
+    ? garden.sessionDays
+    : garden?.days
+  const activeDates = [...new Set((sessionDays || []).filter(day => Number(day.focusMinutes ?? day.growthMinutes) > 0).map(day => day.date))].sort()
+  const goalDays = (sessionDays || []).filter(day => Number(day.focusMinutes ?? day.growthMinutes) >= Math.max(1, Number(day.goalMinutes) || 50)).length
+  let longestStreak = 0
+  let streak = 0
+  activeDates.forEach((date, index) => {
+    const previous = activeDates[index - 1]
+    streak = previous && dateDifference(date, previous) === 1 ? streak + 1 : 1
+    longestStreak = Math.max(longestStreak, streak)
+  })
+  return {
+    ...totals,
+    activeDays: activeDates.length,
+    goalDays,
+    longestStreak
+  }
+}
+
 export function focusSpeciesCompanionLevel(growthMinutes = 0, bloomCount = 0, unlocked = true) {
   if (!unlocked) return null
   const minutes = Math.max(0, Number(growthMinutes) || 0)
@@ -332,38 +371,103 @@ export function unlockedFocusGardenSpecies(garden) {
   })
 }
 
+function splitFocusMinutesByDate(session, now) {
+  const totalMinutes = Math.max(0, Math.floor((Number(session?.elapsedSeconds) || 0) / 60))
+  const finishedAt = new Date(session?.finishedAt || now)
+  if (!totalMinutes || !Number.isFinite(finishedAt.getTime())) return []
+  const events = Array.isArray(session?.timeline) ? [...session.timeline] : []
+  const segments = []
+  let activeStartedAt = null
+  events
+    .filter(event => event && Number.isFinite(new Date(event.at).getTime()))
+    .sort((a, b) => new Date(a.at) - new Date(b.at))
+    .forEach(event => {
+      const at = new Date(event.at)
+      if (['started', 'resumed'].includes(event.type)) activeStartedAt = at
+      if (['paused', 'finished'].includes(event.type) && activeStartedAt && at > activeStartedAt) {
+        segments.push([activeStartedAt, at])
+        activeStartedAt = null
+      }
+    })
+  if (!segments.length) {
+    const startedAt = new Date(session?.startedAt || session?.finishedAt || now)
+    if (Number.isFinite(startedAt.getTime()) && finishedAt > startedAt) segments.push([startedAt, finishedAt])
+  }
+  const secondsByDate = new Map()
+  segments.forEach(([segmentStart, segmentEnd]) => {
+    let cursor = new Date(segmentStart)
+    while (cursor < segmentEnd) {
+      const nextDay = new Date(cursor)
+      nextDay.setHours(24, 0, 0, 0)
+      const boundary = nextDay < segmentEnd ? nextDay : segmentEnd
+      const date = localGardenDateKey(cursor)
+      secondsByDate.set(date, (secondsByDate.get(date) || 0) + Math.max(0, boundary - cursor) / 1000)
+      cursor = boundary
+    }
+  })
+  if (!secondsByDate.size) return [{ date: localGardenDateKey(finishedAt), minutes: totalMinutes }]
+  const parts = [...secondsByDate.entries()].map(([date, seconds]) => ({ date, seconds, minutes: Math.floor(seconds / 60) }))
+  let remainingMinutes = totalMinutes - parts.reduce((total, part) => total + part.minutes, 0)
+  parts.sort((a, b) => (b.seconds % 60) - (a.seconds % 60) || a.date.localeCompare(b.date))
+  for (let index = 0; remainingMinutes > 0; index = (index + 1) % parts.length, remainingMinutes -= 1) parts[index].minutes += 1
+  return parts.filter(part => part.minutes > 0).sort((a, b) => a.date.localeCompare(b.date))
+}
+
 export function recordFocusGardenGrowth(garden, session, now = new Date()) {
   const originalAchievementIds = new Set(Array.isArray(garden?.achievements) ? garden.achievements.map(item => item.id) : [])
   const prepared = prepareFocusGardenForDate(normalizeFocusGarden(garden, now), now)
   const elapsedMinutes = Math.max(0, Math.floor((Number(session?.elapsedSeconds) || 0) / 60))
   if (!elapsedMinutes) return { garden: prepared, unlockedAchievementIds: [], unlockedSpeciesIds: [] }
   const unlockedBefore = new Set(unlockedFocusGardenSpecies(prepared).map(item => item.id))
-  const date = localGardenDateKey(session?.finishedAt || now)
-  const existingIndex = prepared.days.findIndex(day => day.date === date)
-  const existing = existingIndex >= 0 ? prepared.days[existingIndex] : null
-  const speciesId = existing?.speciesId || prepared.selectedSpeciesId
-  const goalMinutes = existing?.goalMinutes || prepared.dailyGoalMinutes
-  const growthMinutes = (existing?.growthMinutes || 0) + elapsedMinutes
-  const day = {
-    date,
-    speciesId,
-    goalMinutes,
-    goalAdjustments: existing?.goalAdjustments || 0,
-    growthMinutes,
-    stage: gardenStageFor(growthMinutes, goalMinutes).id,
-    finalizedAt: date < localGardenDateKey(now) ? new Date(now).toISOString() : null
-  }
   const days = [...prepared.days]
-  if (existingIndex >= 0) days.splice(existingIndex, 1, day)
-  else days.push(day)
+  const startedDate = localGardenDateKey(session?.startedAt || session?.finishedAt || now)
+  splitFocusMinutesByDate(session, now).forEach(part => {
+    const existingIndex = days.findIndex(day => day.date === part.date)
+    const existing = existingIndex >= 0 ? days[existingIndex] : null
+    const speciesId = existing?.speciesId || (part.date === startedDate ? session?.gardenSpeciesId : prepared.selectedSpeciesId)
+    const goalMinutes = existing?.goalMinutes || (part.date === startedDate ? session?.gardenGoalMinutes : prepared.dailyGoalMinutes)
+    const safeGoalMinutes = Math.max(10, Math.min(240, Math.round(Number(goalMinutes) || prepared.dailyGoalMinutes)))
+    const growthMinutes = (existing?.growthMinutes || 0) + part.minutes
+    const day = {
+      date: part.date,
+      speciesId: FOCUS_GARDEN_SPECIES.some(species => species.id === speciesId) ? speciesId : prepared.selectedSpeciesId,
+      goalMinutes: safeGoalMinutes,
+      goalAdjustments: existing?.goalAdjustments || 0,
+      growthMinutes,
+      stage: gardenStageFor(growthMinutes, safeGoalMinutes).id,
+      finalizedAt: part.date < localGardenDateKey(now) ? new Date(now).toISOString() : null
+    }
+    if (existingIndex >= 0) days.splice(existingIndex, 1, day)
+    else days.push(day)
+  })
   days.sort((a, b) => a.date.localeCompare(b.date))
+
+  const sessionDays = Array.isArray(prepared.sessionDays) && (prepared.sessionDays.length || !prepared.days.length)
+    ? [...prepared.sessionDays]
+    : prepared.days.map(day => ({
+        date: day.date,
+        focusMinutes: day.growthMinutes,
+        goalMinutes: day.goalMinutes
+      }))
+  const sessionDayIndex = sessionDays.findIndex(day => day.date === startedDate)
+  const existingSessionDay = sessionDays[sessionDayIndex]
+  const sessionGoalMinutes = Math.max(10, Math.min(240, Math.round(Number(session?.gardenGoalMinutes) || existingSessionDay?.goalMinutes || prepared.dailyGoalMinutes)))
+  const sessionDay = {
+    date: startedDate,
+    focusMinutes: (existingSessionDay?.focusMinutes || 0) + elapsedMinutes,
+    goalMinutes: existingSessionDay?.goalMinutes || sessionGoalMinutes
+  }
+  if (sessionDayIndex >= 0) sessionDays.splice(sessionDayIndex, 1, sessionDay)
+  else sessionDays.push(sessionDay)
+  sessionDays.sort((a, b) => a.date.localeCompare(b.date))
 
   const updated = {
     ...prepared,
     longestSessionMinutes: Math.max(prepared.longestSessionMinutes || 0, elapsedMinutes),
-    days: days.slice(-3660)
+    days: days.slice(-3660),
+    sessionDays: sessionDays.slice(-3660)
   }
-  const totals = focusGardenTotals(updated)
+  const totals = focusGardenAchievementTotals(updated)
   const alreadyUnlocked = originalAchievementIds
   const newlyUnlocked = FOCUS_GARDEN_ACHIEVEMENTS.filter(item => (
     !alreadyUnlocked.has(item.id) && Number(totals[item.metric] || 0) >= item.target
